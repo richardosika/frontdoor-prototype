@@ -4,22 +4,59 @@ var $=function(s){return document.querySelector(s)};
 var aside=$('#aside'),scroll=$('#scroll'),tb=$('#tb'),ftslot=$('#ftslot'),overlay=$('#overlay'),phone=$('#phone');
 
 /* ---------- fictional data ---------- */
+/* ---------- member roles ---------- */
+var ROLEDEF=[
+ ["Developer","Capital","Raising capital or seeking partners","Entity / project reference","Hale Row Partners LLC · NJ entity no.","Entity good standing, deeds and permit history"],
+ ["Investor / Private Equity","Capital","Accredited individual, fund, or PE firm","Fund / entity name","Nguyen Capital LP","Accredited-investor attestation and entity records"],
+ ["Family Office","Capital","Private capital investing directly","Entity name","Kim Family Office LLC","Entity records, principal identity, accredited attestation"],
+ ["Lender / Debt Fund","Capital","Bridge, construction, and permanent debt","Lender license / NMLS ID","NJ lender license · NMLS ID 000000","State lender license and NMLS lookup"],
+ ["Mortgage Broker","Capital","Places loans for borrowers","NMLS ID","NMLS ID 000000","NMLS ID and state mortgage broker license lookup"],
+ ["General Contractor","Build and Design","Builds the project","State contractor license / registration","NJ-GC-000000","Contractor license, insurance, and bonding on file"],
+ ["Architect / Engineer","Build and Design","Design, entitlements, and engineering","State license number","NJ architect license no. 00000000","State licensing board lookup and active status"],
+ ["Real Estate Attorney","Legal","Closings, leases, and transactions","State bar admission","NJ Bar ID 000000000","Bar admission and good standing via state bar lookup"],
+ ["Securities Attorney","Legal","Offerings, fund formation, compliance","State bar admission","NY Bar reg. no. 0000000","Bar admission and standing; SEC / FINRA disciplinary check"],
+ ["Zoning / Land Use Attorney","Legal","Entitlements, variances, land use","State bar admission","NJ Bar ID 000000000","Bar admission and standing; land-use appearances reviewed"],
+ ["Insurance (builder's risk, title, surety / bonding)","Insurance","Builder's risk, title, surety / bonding","Producer / insurer license no.","NJ producer license no. 0000000","State insurance license lookup and surety carrier appointments"],
+ ["Broker","Services","Sales, leasing, and capital advisory","Real estate broker license","NJ broker license no. 0000000","State real estate license lookup"],
+ ["Appraiser","Services","Valuation and appraisal reports","State appraiser certification","NJ Certified General no. 00000","State appraiser board and ASC registry lookup"],
+ ["Property Manager","Services","Operations and asset management","Management license / entity no.","Entity no. · NJ broker license","Entity records, license where required, owner references"],
+ ["Accountant / Cost Seg","Services","Tax, audit, and cost segregation","CPA license / firm","NJ CPA license no. 00000","State CPA board license lookup"],
+ ["1031 Exchange Intermediary","Services","Qualified intermediary for exchanges","Entity no. · bond / E&O details","Entity no. · fidelity bond · E&O","Entity records, fidelity bond, and E&O coverage on file"]
+];
+var GROUPS=["Capital","Build and Design","Legal","Insurance","Services"];
+function rdef(r){return ROLEDEF.filter(function(d){return d[0]===r})[0]||ROLEDEF[0]}
+var ROLES=ROLEDEF.map(function(d){return d[0]});
+var ROLESHORT=function(r){return r.replace(/ \(.*\)$/,'')};
+
 var DEALS=[
  {id:'newark',type:'deal',role:'Developer',mkt:'NJ',size:'1-5',asset:'Multifamily',title:'18-unit multifamily, Newark NJ',who:'Marcus Hale',ini:'MH',org:'Hale Row Partners',pct:96,raise:'$2.5M',irr:'17.4%',min:'$100K',mult:'1.8x',blurb:'Value-add, 92% occupied. Closing in 45 days.',tier:'cf',time:'2h'},
  {id:'edison',type:'deal',role:'Developer',mkt:'NJ',size:'1-5',asset:'Storage',title:'Self-storage portfolio, Edison NJ',who:'Priya Anand',ini:'PA',org:'Anand Storage Co.',pct:91,raise:'$4.0M',irr:'15.1%',min:'$250K',mult:'1.6x',blurb:'Three stabilized facilities, one lease-up. 6-year hold.',tier:'cf',time:'1d'},
- {id:'hoboken',type:'seek',role:'GC',mkt:'NJ',size:'5+',asset:'Mixed-use',title:'Mixed-use, 40k sf — Hoboken NJ',who:'Elena Voss',ini:'EV',org:'Voss & Reed',pct:88,raise:'40k sf',irr:'Ground-up',min:'Bids Nov 15',mult:'',blurb:'Ground-up mixed-use, entitled. Union-friendly, bid by Nov 15.',tier:'v',time:'5h'},
+ {id:'hoboken',type:'seek',role:'General Contractor',need:'General Contractor',ns:'GC',mkt:'NJ',size:'5+',asset:'Mixed-use',title:'Mixed-use, 40k sf — Hoboken NJ',who:'Elena Voss',ini:'EV',org:'Voss & Reed',pct:88,raise:'40k sf',irr:'Ground-up',min:'Bids Nov 15',mult:'',blurb:'Ground-up mixed-use, entitled. Union-friendly, bid by Nov 15.',tier:'v',time:'5h'},
  {id:'brooklyn',type:'deal',role:'Developer',mkt:'NY',size:'5+',asset:'Multifamily',title:'64-unit adaptive reuse, Brooklyn NY',who:'Dana Whitfield',ini:'DW',org:'Whitfield Urban',pct:84,raise:'$9.5M',irr:'16.2%',min:'$500K',mult:'1.9x',blurb:'Former warehouse conversion with 421-a style incentives (fictional).',tier:'v',time:'3d'},
- {id:'jc',type:'deal',role:'Developer',mkt:'NJ',size:'1-5',asset:'Mixed-use',title:'Retail/office condo, Jersey City NJ',who:'Marcus Hale',ini:'MH',org:'Hale Row Partners',pct:79,raise:'$1.8M',irr:'13.8%',min:'$50K',mult:'1.5x',blurb:'Street-level retail with two floors of creative office.',tier:'cf',time:'4d'}
+ {id:'jc',type:'deal',role:'Developer',mkt:'NJ',size:'1-5',asset:'Mixed-use',title:'Retail/office condo, Jersey City NJ',who:'Marcus Hale',ini:'MH',org:'Hale Row Partners',pct:79,raise:'$1.8M',irr:'13.8%',min:'$50K',mult:'1.5x',blurb:'Street-level retail with two floors of creative office.',tier:'cf',time:'4d'},
+ {id:'brarch',type:'seek',role:'Developer',need:'Architect / Engineer',ns:'Architect',mkt:'NY',size:'5+',asset:'Multifamily',title:'Design team for 64-unit conversion, Brooklyn NY',who:'Dana Whitfield',ini:'DW',org:'Whitfield Urban',pct:82,raise:'64 units',irr:'Adaptive reuse',min:'RFP Dec 1',mult:'',blurb:'Seeking a NY-licensed architect and structural engineer for a warehouse conversion. State license required.',tier:'v',time:'6h',chips:['◎ Brooklyn NY','64 units','State license required']},
+ {id:'nzone',type:'seek',role:'Developer',need:'Zoning / Land Use Attorney',ns:'Land Use Atty',mkt:'NJ',size:'1-5',asset:'Mixed-use',title:'Variance counsel for Newark mixed-use site',who:'Marcus Hale',ini:'MH',org:'Hale Row Partners',pct:77,raise:'1 parcel',irr:'Variance',min:'Hearing Jan 14',mult:'',blurb:'Need NJ-admitted land use counsel for a use variance hearing. Bar standing verified before intro.',tier:'cf',time:'2d',chips:['◎ Newark NJ','Use variance','NJ bar required']},
+ {id:'edlend',type:'seek',role:'Developer',need:'Lender / Debt Fund',ns:'Lender',mkt:'NJ',size:'1-5',asset:'Storage',title:'Construction loan for storage expansion, Edison NJ',who:'Priya Anand',ini:'PA',org:'Anand Storage Co.',pct:74,raise:'$3.2M',irr:'Construction loan',min:'Term sheets Nov 30',mult:'',blurb:'Seeking a licensed lender for a 55% LTC construction facility on a fourth storage building.',tier:'cf',time:'3d',chips:['◎ Edison NJ','$3.2M','Licensed lenders']}
 ];
 var PEOPLE=[
- {id:'mh',ini:'MH',name:'Marcus Hale',role:'Developer',org:'Hale Row Partners',loc:'Newark, NJ',tier:'cf'},
- {id:'pa',ini:'PA',name:'Priya Anand',role:'Developer',org:'Edison NJ',loc:'Edison, NJ',tier:'cf'},
- {id:'rk',ini:'RK',name:'Rachel Kim',role:'Investor',org:'Kim Family Office',loc:'New York, NY',tier:'v'},
- {id:'ev',ini:'EV',name:'Elena Voss',role:'GC',org:'Voss & Reed',loc:'Hoboken, NJ',tier:'v'},
- {id:'ls',ini:'LS',name:'Leo Sandoval',role:'Lender',org:'Garden State Bridge',loc:'Princeton, NJ',tier:'inv'},
- {id:'tn',ini:'TN',name:'Tara Nguyen',role:'Investor',org:'Nguyen Capital',loc:'Jersey City, NJ',tier:'v'},
- {id:'dp',ini:'DP',name:'Daniel Park',role:'Broker',org:'Park Atlantic',loc:'Hackensack, NJ',tier:'v'},
- {id:'dw',ini:'DW',name:'Dana Whitfield',role:'Developer',org:'Whitfield Urban',loc:'Brooklyn, NY',tier:'v'}
+ {id:'mh',ini:'MH',name:'Marcus Hale',role:'Developer',org:'Hale Row Partners',loc:'Newark, NJ',tier:'cf',cred:"Hale Row Partners LLC · NJ entity in good standing · deeds and permits matched"},
+ {id:'pa',ini:'PA',name:'Priya Anand',role:'Developer',org:'Edison NJ',loc:'Edison, NJ',tier:'cf',cred:"Anand Storage Co. · NJ entity in good standing"},
+ {id:'rk',ini:'RK',name:'Rachel Kim',role:'Family Office',org:'Kim Family Office',loc:'New York, NY',tier:'v',cred:"Accredited-investor attestation · family office entity records on file"},
+ {id:'ev',ini:'EV',name:'Elena Voss',role:'General Contractor',org:'Voss & Reed',loc:'Hoboken, NJ',tier:'v',cred:"NJ GC registration active · insurance and bonding on file"},
+ {id:'ls',ini:'LS',name:'Leo Sandoval',role:'Lender / Debt Fund',org:'Garden State Bridge',loc:'Princeton, NJ',tier:'inv',cred:"NJ lender license (fictional) · NMLS lookup matched"},
+ {id:'tn',ini:'TN',name:'Tara Nguyen',role:'Investor / Private Equity',org:'Nguyen Capital',loc:'Jersey City, NJ',tier:'v',cred:"Accredited-investor attestation · fund entity records on file"},
+ {id:'dp',ini:'DP',name:'Daniel Park',role:'Broker',org:'Park Atlantic',loc:'Hackensack, NJ',tier:'v',cred:"NJ broker license active · lookup matched"},
+ {id:'dw',ini:'DW',name:'Dana Whitfield',role:'Developer',org:'Whitfield Urban',loc:'Brooklyn, NY',tier:'v',cred:"Whitfield Urban LLC · NY entity in good standing"},
+ {id:'hc',ini:'HC',name:"Hannah Cole",role:"Real Estate Attorney",org:"Cole Brandt LLP",loc:'Morristown, NJ',tier:'v',cred:"Admitted to NJ Bar (2012) and NY Bar (2013) · good standing confirmed via bar lookup"},
+ {id:'sr',ini:'SR',name:"Samir Rao",role:"Securities Attorney",org:"Rao Securities Law",loc:'New York, NY',tier:'cf',cred:"Admitted to NY Bar (2009) · good standing · SEC/FINRA disciplinary search clear"},
+ {id:'jw',ini:'JW',name:"Julian Weiss",role:"Zoning / Land Use Attorney",org:"Weiss Land Use PC",loc:'Newark, NJ',tier:'v',cred:"Admitted to NJ Bar (2010) · good standing · land-use board appearances reviewed"},
+ {id:'gl',ini:'GL',name:"Grace Liu",role:"Architect / Engineer",org:"Liu Studio Architects",loc:'Jersey City, NJ',tier:'cf',cred:"NJ Registered Architect · state board license active, no discipline on record"},
+ {id:'op',ini:'OP',name:"Owen Pratt",role:"Insurance (builder's risk, title, surety / bonding)",org:"Pratt Surety & Risk",loc:'Parsippany, NJ',tier:'v',cred:"NJ insurance producer license active · surety carrier appointments confirmed"},
+ {id:'mt',ini:'MT',name:"Mia Torres",role:"Mortgage Broker",org:"Torres Capital Advisors",loc:'Hoboken, NJ',tier:'v',cred:"NMLS ID active · NJ mortgage broker license matched"},
+ {id:'va',ini:'VA',name:"Victor Alvarez",role:"Appraiser",org:"Alvarez Valuation Group",loc:'Edison, NJ',tier:'v',cred:"NJ Certified General Appraiser · ASC registry lookup matched"},
+ {id:'ns',ini:'NS',name:"Nora Singh",role:"Property Manager",org:"Singh Property Partners",loc:'Newark, NJ',tier:'inv',cred:"Entity records checked · owner references pending"},
+ {id:'am',ini:'AM',name:"Alicia Moore",role:"Accountant / Cost Seg",org:"Moore & Lind CPAs",loc:'New York, NY',tier:'v',cred:"NJ and NY CPA licenses active · cost seg practice reviewed"},
+ {id:'bk',ini:'BK',name:"Ben Katz",role:"1031 Exchange Intermediary",org:"Katz Exchange Services",loc:'Princeton, NJ',tier:'v',cred:"Qualified intermediary entity checked · fidelity bond and E&O coverage on file"}
 ];
 var TIERNAME={cf:'Confirmed',v:'Verified',inv:'Invited'};
 var THREADS={
@@ -30,17 +67,17 @@ var THREADS={
  tn:[['l','Sounds good, let\'s talk Thursday.']]
 };
 var INBOX=[
- {p:'rk',pv:'Happy to review the deck. Can you send...',t:'2m',un:1,sub:'Investor · Verified'},
+ {p:'rk',pv:'Happy to review the deck. Can you send...',t:'2m',un:1,sub:'Investor / Private Equity · Verified'},
  {p:'pa',pv:'Request intro accepted — deal room opens after NDA',t:'1h',un:1,sub:'Developer · Confirmed'},
- {p:'ev',pv:'Bids are due Nov 15, see the scope.',t:'Yesterday',sub:'GC · Verified'},
- {p:'ls',pv:'Thanks for the intro!',t:'Mon',sub:'Lender · Invited'},
- {p:'tn',pv:'Sounds good, let\'s talk Thursday.',t:'Sun',sub:'Investor · Verified'}
+ {p:'ev',pv:'Bids are due Nov 15, see the scope.',t:'Yesterday',sub:'General Contractor · Verified'},
+ {p:'ls',pv:'Thanks for the intro!',t:'Mon',sub:'Lender / Debt Fund · Invited'},
+ {p:'tn',pv:'Sounds good, let\'s talk Thursday.',t:'Sun',sub:'Investor / Private Equity · Verified'}
 ];
 var POSTS=[{id:'p1',likes:24,comments:9,ini:'DP',name:'Daniel Park',sub:'Broker · Park Atlantic · 1d',text:'Cap rates in NJ garden-apartment holding steady while lenders get pickier on DSCR. Anyone seeing different bridge terms this quarter?'}];
 
 /* ---------- state ---------- */
-var S={liked:{},commented:{},saved:{},requested:{},intro:{},connected:{},filters:{role:'Any',mkt:'Any',size:'Any'},feedTab:'For you',q:'',ob:{step:1,code:'FD-7K2M-91QX',role:'Developer / Sponsor',lic:'',ref:''},obDone:false,unread:{rk:1,pa:1},extra:{}};
-var CYCLE={role:['Any','Developer','GC'],mkt:['Any','NJ','NY'],size:['Any','1-5','5+']};
+var S={liked:{},commented:{},saved:{},requested:{},intro:{},connected:{},filters:{role:'Any',mkt:'Any',size:'Any'},feedTab:'For you',q:'',ob:{step:1,code:'FD-7K2M-91QX',role:'Developer',lic:'',ref:''},obDone:false,unread:{rk:1,pa:1},extra:{}};
+var CYCLE={mkt:['Any','NJ','NY'],size:['Any','1-5','5+']};
 var LBL={role:'Role',mkt:'Market',size:'Size'};
 function sizeLbl(v){return v==='1-5'?'$1–5M':v==='5+'?'$5M+':v}
 
@@ -51,7 +88,7 @@ function deal(id){return DEALS.filter(function(d){return d.id===id})[0]}
 function person(id){return PEOPLE.filter(function(d){return d.id===id})[0]}
 function go(h){location.hash=h}
 function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;phone.appendChild(t);setTimeout(function(){t.remove()},1800)}
-function tag(d){return d.type==='deal'?'<span class="tag t-deal">Deal</span>':'<span class="tag t-seek">Seeking GC</span>'}
+function tag(d){return d.type==='deal'?'<span class="tag t-deal">Deal</span>':'<span class="tag t-seek">Seeking '+(d.ns||'GC')+'</span>'}
 function unreadCount(){var n=0;for(var k in S.unread)n+=S.unread[k];return n}
 
 /* ---------- modal ---------- */
@@ -80,7 +117,7 @@ function sub(title,right,extra){return '<div class="hdr" style="padding:10px 16p
 
 function dealCard(d){
  var liked=S.liked[d.id];
- if(d.type==='seek')return '<div class="card" data-go="deal/'+d.id+'"><div class="who"><div class="av">'+d.ini+'</div><div><div class="nm">'+d.who+' '+ver(d.tier)+'</div><div class="sub">GC wanted · '+esc(d.org)+' · '+d.time+'</div></div>'+tag(d)+'</div><h3>'+esc(d.title.replace(/^Mixed-use, 40k sf — Hoboken NJ/,'Seeking GC — NJ, 40k sf'))+'</h3><p>'+esc(d.blurb)+'</p><div class="chips"><span class="chip">◎ New Jersey</span><span class="chip">40,000 sf</span><span class="chip">Ground-up</span></div><div class="row" style="margin-top:12px"><div class="btn" data-act="intro" data-p="ev" data-d="'+d.id+'">'+(S.intro['ev']?'Intro requested ✓':'Request intro')+'</div><div class="btn o" data-go="deal/'+d.id+'">View details</div></div></div>';
+ if(d.type==='seek')return '<div class="card" data-go="deal/'+d.id+'"><div class="who"><div class="av">'+d.ini+'</div><div><div class="nm">'+d.who+' '+ver(d.tier)+'</div><div class="sub">'+(d.ns||'GC')+' wanted · '+esc(d.org)+' · '+d.time+'</div></div>'+tag(d)+'</div><h3>'+esc(d.need==='General Contractor'?'Seeking GC — NJ, 40k sf':d.title)+'</h3><p>'+esc(d.blurb)+'</p><div class="chips">'+(d.chips||['◎ New Jersey','40,000 sf','Ground-up']).map(function(c){return '<span class="chip">'+esc(c)+'</span>'}).join('')+'</div><div class="row" style="margin-top:12px"><div class="btn" data-act="intro" data-p="'+personId(d)+'" data-d="'+d.id+'">'+(S.intro[personId(d)]?'Intro requested ✓':'Request intro')+'</div><div class="btn o" data-go="deal/'+d.id+'">View details</div></div></div>';
  return '<div class="card deal" data-go="deal/'+d.id+'"><div class="who"><div class="av">'+d.ini+'</div><div><div class="nm">'+d.who+' '+ver(d.tier)+'</div><div class="sub">Developer · '+esc(d.org)+' · '+d.time+'</div></div>'+tag(d)+'</div><h3>Raising '+d.raise+' — '+esc(d.title)+'</h3><p>'+esc(d.blurb)+'</p><div class="stats"><div><b>'+d.mult+'</b><small>Equity mult.</small></div><div><b>'+d.irr+'</b><small>Target IRR</small></div><div><b>'+d.min+'</b><small>Min. invest</small></div></div><div class="row"><div class="btn'+(S.intro[personId(d)]?' done':'')+'" data-act="intro" data-p="'+personId(d)+'" data-d="'+d.id+'">'+(S.intro[personId(d)]?'Intro requested ✓':'Request intro')+'</div><div class="btn o" data-go="deal/'+d.id+'">View deal</div><div class="btn s'+(liked?' on':'')+'" data-act="like" data-id="'+d.id+'" aria-label="like">'+(liked?'♥':'♡')+'</div></div></div>';
 }
 function personId(d){return {MH:'mh',PA:'pa',EV:'ev',DW:'dw'}[d.ini]}
@@ -101,7 +138,7 @@ function vFeed(){
 function filtered(){
  return DEALS.filter(function(d){
   var f=S.filters;
-  if(f.role!=='Any'&&d.role!==f.role)return false;
+  if(f.role!=='Any'&&d.role!==f.role&&d.need!==f.role)return false;
   if(f.mkt!=='Any'&&d.mkt!==f.mkt)return false;
   if(f.size!=='Any'&&d.size!==f.size)return false;
   if(S.q&&(d.title+d.who+d.asset+d.mkt).toLowerCase().indexOf(S.q.toLowerCase())<0)return false;
@@ -114,7 +151,7 @@ function dealsList(sel){
 function vDeals(){
  return hdr('Deals','<div class="ic" data-act="toast" data-m="Post a deal — not in prototype">＋</div>')+
  '<div class="search"><input class="in" id="q" placeholder="⌕  Search deals, markets, members" value="'+esc(S.q)+'" style="border:0;padding:0;background:none"></div>'+
- '<div class="filters">'+['role','mkt','size'].map(function(k){var v=S.filters[k];return '<span class="f'+(v!=='Any'?' on':'')+'" data-act="filter" data-k="'+k+'" data-testid="f-'+k+'">'+LBL[k]+': '+(k==='size'?sizeLbl(v):v)+' ▾</span>'}).join('')+'</div>'+
+ '<div class="filters scrollx" data-testid="deal-roles">'+['Any'].concat(ROLES).map(function(r){return '<span class="f'+(S.filters.role===r?' on':'')+'" data-act="dealrole" data-r="'+esc(r)+'" title="'+esc(r)+'">'+(r==='Any'?'All roles':esc(ROLESHORT(r)))+'</span>'}).join('')+'</div><div class="filters" style="padding-top:8px">'+['mkt','size'].map(function(k){var v=S.filters[k];return '<span class="f'+(v!=='Any'?' on':'')+'" data-act="filter" data-k="'+k+'" data-testid="f-'+k+'">'+LBL[k]+': '+(k==='size'?sizeLbl(v):v)+' ▾</span>'}).join('')+'</div>'+
  '<div class="match"><div class="k">◆ Match suggestions</div><div class="big">3 investors match your raise</div><div class="row"><div class="stack"><div class="av">RK</div><div class="av">LS</div><div class="av">TN</div></div><span class="sub" style="margin-left:18px">$100K–$500K · Multifamily · NJ/NY</span></div><div class="row" style="margin-top:12px"><div class="btn" data-go="network">Review matches</div></div></div>'+
  '<div id="dlist">'+dealsList()+'</div>';
 }
@@ -134,8 +171,8 @@ function vDeal(id){
 
 function vNetwork(){
  return hdr('Network','<div class="ic" data-act="toast" data-m="Invite sent (prototype)">＋</div>')+
- '<div class="filters" style="padding-bottom:0">'+['All','Developer','Investor','GC','Lender','Broker'].map(function(r){return '<span class="f'+((S.netRole||'All')===r?' on':'')+'" data-act="netrole" data-r="'+r+'">'+r+'</span>'}).join('')+'</div>'+
- '<div class="netgrid">'+PEOPLE.filter(function(p){return !S.netRole||S.netRole==='All'||p.role===S.netRole}).map(function(p){var c=S.connected[p.id];return '<div class="ncard" data-go="person/'+p.id+'"><div class="av">'+p.ini+'</div><div class="nm">'+p.name+'</div><div class="sub">'+p.role+' · '+esc(p.org)+'</div>'+ver(p.tier)+'<div class="btn'+(c?' o':'')+'" style="margin-top:10px" data-act="connect" data-id="'+p.id+'">'+(c?'Connected ✓':'Connect')+'</div></div>'}).join('')+'</div>';
+ '<div class="filters scrollx" style="padding-bottom:0" data-testid="net-roles">'+['All'].concat(ROLES).map(function(r){return '<span class="f'+((S.netRole||'All')===r?' on':'')+'" data-act="netrole" data-r="'+esc(r)+'" title="'+esc(r)+'">'+esc(ROLESHORT(r))+'</span>'}).join('')+'</div>'+
+ '<div class="netgrid">'+PEOPLE.filter(function(p){return !S.netRole||S.netRole==='All'||p.role===S.netRole}).map(function(p){var c=S.connected[p.id];return '<div class="ncard" data-go="person/'+p.id+'"><div class="av">'+p.ini+'</div><div class="nm">'+p.name+'</div><div class="sub">'+esc(ROLESHORT(p.role))+' · '+esc(p.org)+'</div>'+ver(p.tier)+'<div class="btn'+(c?' o':'')+'" style="margin-top:10px" data-act="connect" data-id="'+p.id+'">'+(c?'Connected ✓':'Connect')+'</div></div>'}).join('')+'</div>';
 }
 
 function vMessages(sel){
@@ -163,22 +200,21 @@ function threadBody(pid){
 }
 
 function vProfile(pid){
- var me=!pid, p=pid?person(pid):{id:'mh',ini:'MH',name:'Marcus Hale',role:'Developer',org:'Hale Row Partners',loc:'Newark, NJ',tier:'cf'};
+ var me=!pid, p=pid?person(pid):PEOPLE[0];
  var pp=pid?p:p; var tier=p.tier;
  var h='<div class="cover"></div>'+(pid?'<span class="back" data-act="back" style="position:absolute;top:12px;left:14px;color:#fff;z-index:3;font-size:26px">‹</span>':'')+
  '<div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="pav">'+p.ini+'</div><div class="row" style="margin:10px 20px 0"><div class="btn o" style="padding:9px 16px;flex:none" data-go="thread/'+p.id+'">Message</div><div class="btn'+(S.intro[p.id]?' done':'')+'" style="padding:9px 16px;flex:none" data-act="intro" data-p="'+p.id+'" data-d="">'+(S.intro[p.id]?'Requested ✓':'Request intro')+'</div></div></div>'+
- '<div class="sec"><div class="nm" style="font-size:22px;font-family:Georgia,serif;font-weight:400;margin-top:12px">'+p.name+' '+ver(tier)+'</div><div class="sub" style="font-size:13px;margin:4px 0 8px">'+esc(p.org)+' · '+esc(p.loc)+'</div><span class="tag t-deal" style="margin:0">'+p.role+'</span> <span class="chip" style="margin-left:4px">Member since 2024</span>'+
+ '<div class="sec"><div class="nm" style="font-size:22px;font-family:Georgia,serif;font-weight:400;margin-top:12px">'+p.name+' '+ver(tier)+'</div><div class="sub" style="font-size:13px;margin:4px 0 8px">'+esc(p.org)+' · '+esc(p.loc)+'</div><span class="tag t-deal" style="margin:0">'+esc(p.role)+'</span> <span class="chip" style="margin-left:4px">Member since 2024</span>'+
  '<div class="stats" style="margin-top:16px"><div><b>14</b><small>Projects done</small></div><div><b>$186M</b><small>Total value</small></div><div><b>23</b><small>References</small></div></div>'+
- '<h4 style="margin-top:12px">Verification tier</h4><div class="tiers">'+
- [['inv','Invited by a member; light checks at application.'],['v','Public records + references checked.'],['cf','Counterparties vouched for completed deals.']].map(function(t){return '<div class="tier'+(t[0]===tier?' cur':'')+'">'+ver(t[0])+'<small>'+(t[0]===tier?'<b>Current tier.</b> ':'')+t[1]+'</small></div>'}).join('')+'</div>'+
- '<div class="how"><b>How verification works</b><ol><li>Invite code from an existing member.</li><li>Public records: permits, deeds, license lookups.</li><li>Two or more references are contacted.</li><li>Past partners confirm deals by email.</li></ol></div>'+
+ '<h4 style="margin-top:16px">Verification</h4><div class="cred"><small>'+esc(rdef(p.role)[3])+'</small><b>'+esc(p.cred||'Credential on file')+'</b></div><h4 style="margin-top:12px">Verification tier</h4><div class="tiers">'+
+ [['inv','Invited by a member; light checks at application.'],['v','Role credentials (license, bar, or entity) + references checked.'],['cf','Counterparties vouched for completed deals.']].map(function(t){return '<div class="tier'+(t[0]===tier?' cur':'')+'">'+ver(t[0])+'<small>'+(t[0]===tier?'<b>Current tier.</b> ':'')+t[1]+'</small></div>'}).join('')+'</div>'+
+ '<div class="how"><b>How verification works</b><ol><li>Invite code from an existing member.</li><li>Credential check for this role: '+esc(rdef(p.role)[5])+'.</li><li>Two or more references are contacted.</li><li>Past partners confirm deals by email.</li></ol></div>'+
  '<h4 style="margin-top:14px">Confirmed track record</h4><div class="proj"><div class="pt">▦</div><div><b>Ironbound Lofts</b><div class="sub">42-unit multifamily · Newark NJ · 2025</div></div><span class="v">$24M</span></div><div class="proj" style="border:0"><div class="pt">▥</div><div><b>Halsey Commons</b><div class="sub">Mixed-use · Jersey City NJ · 2023</div></div><span class="v">$38M</span></div>'+
  (me?'<div class="row" style="margin-top:16px"><div class="btn o" data-act="restart">Restart onboarding demo</div></div>':'')+'<div style="height:24px"></div></div>';
  return h;
 }
 
 /* onboarding */
-var ROLES=[['Developer / Sponsor','Raising capital or seeking partners'],['Investor','Accredited individual, family office, fund'],['Lender · GC · Broker · Other','']];
 function vOnboard(){
  var o=S.ob,st=o.step,h='';
  if(st===5)st=4;
@@ -186,11 +222,11 @@ function vOnboard(){
  if(st===1){
   h+='<div class="pg"><h3>Welcome to FrontDoor</h3><p>FrontDoor is invite-only. Enter the code a member shared with you.</p></div><div class="fld"><label>Invite code</label><input class="in" id="code" value="'+esc(o.code)+'" placeholder="FD-XXXX-XXXX" autocomplete="off"><div class="sub" id="codeerr" style="color:#D9683F;margin-top:6px;min-height:14px"></div></div><div class="fld"><div class="btn" data-act="obnext" data-testid="next">Continue</div></div><div class="fld"><div class="sub" style="text-align:center">Try the demo code <b>FD-7K2M-91QX</b></div></div>';
  }else if(st===2){
-  h+='<div class="pg"><h3>I am a…</h3><p>Pick the role that best describes you.</p></div>'+ROLES.map(function(r,i){return '<div class="role'+(o.role===r[0]?' sel':'')+'" data-act="role" data-r="'+r[0]+'"><i></i><div>'+r[0]+(r[1]?'<small>'+r[1]+'</small>':'')+'</div></div>'}).join('')+'<div class="fld" style="margin-top:14px"><div class="row"><div class="btn o" data-act="obback">Back</div><div class="btn" data-act="obnext" data-testid="next">Continue</div></div></div>';
+  h+='<div class="pg"><h3>I am a…</h3><p>Pick the role that best describes you. You can verify one role now and add others later.</p></div><div class="rolelist" data-testid="rolelist">'+GROUPS.map(function(g){return '<div class="rgh">'+g+'</div>'+ROLEDEF.filter(function(d){return d[1]===g}).map(function(d){return '<div class="role'+(o.role===d[0]?' sel':'')+'" data-act="role" data-r="'+esc(d[0])+'"><i></i><div>'+esc(d[0])+'<small>'+esc(d[2])+'</small></div></div>'}).join('')}).join('')+'</div><div class="rolebar"><div class="row"><div class="btn o" data-act="obback">Back</div><div class="btn" data-act="obnext" data-testid="next">Continue</div></div></div>';
  }else if(st===3){
-  h+='<div class="pg"><h3>Credentials &amp; references</h3><p>Light checks now. Deeper checks happen only when you access a deal.</p></div><div class="fld"><label>Invite code</label><div class="in" style="border-color:#D9683F">'+esc(o.code)+' <span style="float:right;color:#D9683F">✓ Accepted</span></div></div><div class="role sel"><i></i><div>'+esc(o.role)+'</div></div><div class="fld" style="margin-top:12px"><label>License / entity number</label><input class="in" id="lic" value="'+esc(o.lic)+'" placeholder="NJ-GC-000000 · Hale Row Partners LLC"></div><div class="fld"><label>Reference 1 (email)</label><input class="in" id="ref" type="email" value="'+esc(o.ref)+'" placeholder="reference@example.com"><div class="sub" id="referr" style="color:#D9683F;margin-top:6px;min-height:14px"></div></div><div class="fld" style="margin-bottom:0"><div class="row"><div class="btn o" data-act="obback">Back</div><div class="btn" data-act="obnext" data-testid="next">Submit application</div></div></div><div style="height:20px"></div>';
+  h+='<div class="pg"><h3>Credentials &amp; references</h3><p>Role credential and reference checks now. Deeper checks happen only when you access a deal.</p></div><div class="fld"><label>Invite code</label><div class="in" style="border-color:#D9683F">'+esc(o.code)+' <span style="float:right;color:#D9683F">✓ Accepted</span></div></div><div class="role sel"><i></i><div>'+esc(o.role)+'<small>'+esc(rdef(o.role)[1])+'</small></div></div><div class="fld" style="margin-top:12px"><label>'+esc(rdef(o.role)[3])+'</label><input class="in" id="lic" value="'+esc(o.lic)+'" placeholder="'+esc(rdef(o.role)[4])+'"><div class="sub" style="margin-top:6px">We check: '+esc(rdef(o.role)[5])+'.</div></div><div class="fld"><label>Reference 1 (email)</label><input class="in" id="ref" type="email" value="'+esc(o.ref)+'" placeholder="reference@example.com"><div class="sub" id="referr" style="color:#D9683F;margin-top:6px;min-height:14px"></div></div><div class="fld" style="margin-bottom:0"><div class="row"><div class="btn o" data-act="obback">Back</div><div class="btn" data-act="obnext" data-testid="next">Submit application</div></div></div><div style="height:20px"></div>';
  }else{
-  h+='<div class="pg" style="text-align:center;padding-top:50px"><div class="pav" style="margin:0 auto 18px;border-color:#D9683F;font-size:34px;color:#D9683F">⏳</div><h3>Application under review</h3><p>Our committee reviews applications within 3 business days. We\'ll run light checks and email your references.</p></div><div class="gate"><b>What happens next</b><p style="margin-bottom:0">1. Light identity + entity checks<br>2. Reference emails sent<br>3. Badge issued: <span class="ver inv">Invited</span> → <span class="ver">Verified</span></p></div><div class="fld" style="margin-top:16px"><div class="btn" data-act="enter" data-testid="enter">Enter the app (demo)</div></div>';
+  h+='<div class="pg" style="text-align:center;padding-top:50px"><div class="pav" style="margin:0 auto 18px;border-color:#D9683F;font-size:34px;color:#D9683F">⏳</div><h3>Application under review</h3><p>Our committee reviews applications within 3 business days. We\'ll run light checks and email your references.</p></div><div class="gate"><b>What happens next</b><p style="margin-bottom:0">1. Credential check: '+esc(rdef(o.role)[5])+'<br>2. Reference emails sent<br>3. Badge issued: <span class="ver inv">Invited</span> → <span class="ver">Verified</span></p></div><div class="fld" style="margin-top:16px"><div class="btn" data-act="enter" data-testid="enter">Enter the app (demo)</div></div>';
  }
  return h;
 }
@@ -273,6 +309,7 @@ document.addEventListener('click',function(e){
    case 'feedtab':S.feedTab=d.t;refresh();break;
    case 'filter':var c=CYCLE[d.k];S.filters[d.k]=c[(c.indexOf(S.filters[d.k])+1)%c.length];refresh();break;
    case 'clearfilters':S.filters={role:'Any',mkt:'Any',size:'Any'};S.q='';refresh();break;
+   case 'dealrole':S.filters.role=d.r;refresh();break;
    case 'netrole':S.netRole=d.r;refresh();break;
    case 'connect':S.connected[d.id]=!S.connected[d.id];refresh();toast(S.connected[d.id]?'Connection request sent':'Disconnected');break;
    case 'intro':if(S.intro[d.p]){toast('Already requested');break}introModal(d.p,d.d,'intro');break;
