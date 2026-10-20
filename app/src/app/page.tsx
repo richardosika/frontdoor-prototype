@@ -7,7 +7,7 @@ export default function HomePage() {
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-6 md:py-12">
       <div className="mx-auto flex min-h-dvh w-full max-w-[520px] flex-col bg-paper md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-        <div className="bg-forest px-6 py-5 text-paper">
+        <div className="safe-top bg-forest px-6 pb-5 text-paper md:py-5">
           <Logo tone="paper" />
         </div>
         <div className="flex flex-1 flex-col justify-center px-6 py-10">

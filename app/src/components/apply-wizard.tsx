@@ -64,8 +64,8 @@ export function ApplyWizard() {
   }
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-[520px] overflow-hidden bg-paper md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-      <div className="flex items-center justify-between bg-forest px-5 py-4 text-paper">
+    <div className="safe-bottom mx-auto min-h-dvh w-full max-w-[520px] overflow-hidden bg-paper md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+      <div className="safe-top flex items-center justify-between bg-forest px-5 pb-4 text-paper md:py-4">
         <span className="font-serif text-lg tracking-[0.18em] uppercase">Apply</span>
         <span className="text-xs text-sand">Step {Math.min(step, 4)} of 4</span>
       </div>

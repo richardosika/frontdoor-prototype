@@ -7,6 +7,37 @@ body {
   min-height: 100%;
 }
 
+html {
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
+  scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Phone chrome. Desktop cards sit inside the wash and keep their own padding. */
+@media (max-width: 767px) {
+  .safe-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  /* Keep the status-bar band filled after the in-flow header scrolls away.
+     The band is only the notch inset, so it does not cover the first card. */
+  .safe-top::before,
+  .notch::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: inherit;
+    z-index: 40;
+    pointer-events: none;
+  }
+}
+
 body {
   background: #f4efe4;
   color: #1f3a2e;

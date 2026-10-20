@@ -54,10 +54,10 @@ export function ProfileView({
   ] as const;
 
   return (
-    <article className="overflow-hidden border border-line bg-paper md:rounded">
-      <div className="cover-forest relative h-32 md:h-40">
+    <article className="overflow-hidden border-x border-b border-line bg-paper md:rounded md:border">
+      <div className="cover-forest notch relative h-[calc(8rem+env(safe-area-inset-top,0px))] bg-forest md:h-40">
         {backHref ? (
-          <Link href={backHref} className="absolute left-4 top-4 z-10 font-sans text-sm text-paper md:hidden">
+          <Link href={backHref} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 font-sans text-sm text-paper md:hidden">
             ‹ Network
           </Link>
         ) : null}

@@ -47,7 +47,7 @@ export default async function ThreadPage({
         <ConversationList conversations={conversations} activeId={conversation.id} />
       </div>
       <section className="flex min-h-[70dvh] flex-col bg-cream lg:min-h-dvh lg:bg-paper">
-        <header className="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">
+        <header className="safe-top flex items-center gap-3 border-b border-line bg-paper px-4 pb-3 md:py-3">
           <Link href="/messages" className="text-sm text-mut lg:hidden">
             ‹
           </Link>

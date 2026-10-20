@@ -97,9 +97,9 @@ export function Shell({
         </form>
       </aside>
 
-      <div className="min-w-0 pb-[76px] md:pb-0">
+      <div className="min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         {showMobileWordmark(pathname) ? (
-          <header className="flex items-center justify-between bg-forest px-5 py-3 text-paper md:hidden">
+          <header className="safe-top flex items-center justify-between bg-forest px-5 pb-3.5 text-paper md:hidden">
             <Logo tone="paper" />
             {user.isAdmin ? (
               <Link href="/admin" className="font-sans text-[11px] uppercase tracking-[0.16em] text-brass-pale">
@@ -113,7 +113,7 @@ export function Shell({
         {children}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-paper px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper px-1 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:hidden">
         {TABS.map((tab) => {
           const on = active(pathname, tab.href);
           return (

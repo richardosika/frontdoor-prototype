@@ -29,7 +29,7 @@ export function MobileTitle({
   title: string;
 }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 bg-forest px-4 py-3 text-paper md:hidden">
+    <header className="safe-top flex items-center gap-3 bg-forest px-4 pb-3.5 text-paper md:hidden">
       <Link href={href} className="font-sans text-sm text-sand">
         ‹ {label}
       </Link>
