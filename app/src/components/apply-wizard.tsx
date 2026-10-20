@@ -6,6 +6,7 @@ import { checkInvite, submitApplication } from "@/actions/apply";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
+import { BRAND } from "@/lib/brand";
 
 export function ApplyWizard() {
   const [step, setStep] = useState(1);
@@ -77,8 +78,8 @@ export function ApplyWizard() {
         {error ? <p className="mb-3 text-sm text-terra">{error}</p> : null}
         {step === 1 ? (
           <div>
-            <h1 className="font-serif text-xl">Welcome to FrontDoor</h1>
-            <p className="mt-1 text-sm text-ink">FrontDoor is invite-only. Enter the code a member shared with you.</p>
+            <h1 className="font-serif text-xl">Welcome to {BRAND.name}</h1>
+            <p className="mt-1 text-sm text-ink">{BRAND.name} is invite-only. Enter the code a member shared with you.</p>
             <label className={`${labelCls} mt-4`}>Invite code</label>
             <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="FD-XXXX-XXXX" />
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>

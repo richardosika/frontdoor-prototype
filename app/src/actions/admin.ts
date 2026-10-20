@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { initialsFromName, isTier } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { BRAND } from "@/lib/brand";
 import { appBaseUrl } from "@/lib/url";
 
 export async function reviewApplication(formData: FormData) {
@@ -26,7 +27,7 @@ export async function reviewApplication(formData: FormData) {
     });
     await sendEmail({
       to: application.email,
-      subject: "FrontDoor application update",
+      subject: `${BRAND.name} application update`,
       text: `Hello ${application.name},\n\nThe committee did not approve this application.${note ? ` Note: ${note}` : ""}\n\nDelivered by the console email adapter.`,
     });
     revalidatePath("/admin");
@@ -69,7 +70,7 @@ export async function reviewApplication(formData: FormData) {
   const base = await appBaseUrl();
   await sendEmail({
     to: application.email,
-    subject: "You're in — FrontDoor application approved",
+    subject: `You're in — ${BRAND.name} application approved`,
     text: `Hello ${application.name},\n\nYour application was approved. You are an Invited member. Sign in at ${base}/login with this email and the password you chose.\n\nDelivered by the console email adapter.`,
   });
 

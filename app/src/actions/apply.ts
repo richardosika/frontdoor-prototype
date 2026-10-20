@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { isRoleId } from "@/lib/roles";
 import { isInviteUsable, normalizeInviteCode, validateApplication, type ApplicationInput } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { BRAND } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
 
 export async function checkInvite(code: string): Promise<{ ok: true; note: string } | { ok: false; error: string }> {
@@ -64,8 +65,8 @@ export async function submitApplication(
 
   await sendEmail({
     to: email,
-    subject: "FrontDoor application received",
-    text: `Hello ${input.name.trim()},\n\nWe received your FrontDoor application. A committee member will review your role, credential, and references. You can sign in after the application is approved.\n\nThis note was delivered by the console email adapter.`,
+    subject: `${BRAND.name} application received`,
+    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. A committee member will review your role, credential, and references. You can sign in after the application is approved.\n\nThis note was delivered by the console email adapter.`,
   });
 
   return { ok: true };

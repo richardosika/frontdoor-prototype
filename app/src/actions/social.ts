@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
 import { canConnect, orderedPair } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { BRAND } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
 
 export async function requestConnection(formData: FormData) {
@@ -39,7 +40,7 @@ export async function requestConnection(formData: FormData) {
 
   await sendEmail({
     to: target.email,
-    subject: `${user.name} wants to connect on FrontDoor`,
+    subject: `${user.name} wants to connect on ${BRAND.short}`,
     text: `${user.name} (${user.org}) sent you a connection request. Open Network to accept or decline.\n\nDelivered by the console email adapter.`,
   });
 

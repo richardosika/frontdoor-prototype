@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { BRAND } from "@/lib/brand";
 import {
+  NDA_ACKNOWLEDGEMENT,
   canConnect,
   canRequestDealAccess,
   filterDeals,
@@ -31,6 +33,15 @@ const BRIEF_LABELS = [
   "Accountant / Cost Seg",
   "1031 Exchange Intermediary",
 ];
+
+describe("brand", () => {
+  it("uses the Cornicio Partners placeholder", () => {
+    expect(BRAND.name).toBe("Cornicio Partners");
+    expect(BRAND.short).toBe("Cornicio");
+    expect(NDA_ACKNOWLEDGEMENT).toContain(BRAND.name);
+    expect(NDA_ACKNOWLEDGEMENT).not.toContain("FrontDoor");
+  });
+});
 
 describe("roles", () => {
   it("lists the 16 deal-team roles from the brief", () => {

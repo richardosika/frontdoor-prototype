@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
+import { BRAND } from "@/lib/brand";
 import { tierAfterCounterpartyConfirm } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
@@ -46,8 +47,8 @@ export async function requestConfirmation(formData: FormData) {
   const link = `${await appBaseUrl()}/confirm/${token}`;
   await sendEmail({
     to: counterpartyEmail,
-    subject: `Confirm you worked with ${user.name} on ${project.name}`,
-    text: `${user.name} listed you as a counterparty on ${project.name} (${project.location}, ${project.year}, ${project.valueLabel}).\n\nConfirm or decline (no account required):\n${link}\n\nDelivered by the console email adapter. The link is also printed in the server log.`,
+    subject: `${BRAND.short}: confirm you worked with ${user.name} on ${project.name}`,
+    text: `${user.name} listed you as a counterparty on ${project.name} (${project.location}, ${project.year}, ${project.valueLabel}).\n\nConfirm or decline (no ${BRAND.short} account required):\n${link}\n\nDelivered by the console email adapter. The link is also printed in the server log.`,
   });
 
   revalidatePath("/profile");
@@ -82,8 +83,8 @@ export async function respondConfirmation(formData: FormData) {
     }
     await sendEmail({
       to: confirmation.project.user.email,
-      subject: `${confirmation.counterpartyName} confirmed ${confirmation.project.name}`,
-      text: `${confirmation.counterpartyName} confirmed they worked with you on ${confirmation.project.name}. Your verification tier is now Confirmed.\n\nDelivered by the console email adapter.`,
+      subject: `${BRAND.short}: ${confirmation.counterpartyName} confirmed ${confirmation.project.name}`,
+      text: `${confirmation.counterpartyName} confirmed they worked with you on ${confirmation.project.name}. Your verification tier on ${BRAND.name} is now Confirmed.\n\nDelivered by the console email adapter.`,
     });
   }
 

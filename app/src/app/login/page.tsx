@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/login-form";
 import { Logo } from "@/components/logo";
+import { BRAND } from "@/lib/brand";
 
 export default async function LoginPage({
   searchParams,
@@ -12,7 +13,7 @@ export default async function LoginPage({
     <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_80%_10%,#2A4272,transparent_55%),#14213D] px-4 py-10">
       <div className="w-full max-w-md rounded-[22px] bg-white p-6 text-navy shadow-[0_30px_80px_rgba(0,0,0,.35)]">
         <Logo />
-        <h1 className="mt-5 font-serif text-2xl font-normal">Sign in</h1>
+        <h1 className="mt-5 font-serif text-2xl font-normal">Sign in to {BRAND.name}</h1>
         <p className="mb-4 mt-1 text-sm text-ink">Approved members only. Applications under review cannot sign in yet.</p>
         <LoginForm next={params.next} />
         <p className="mt-4 text-center text-sm text-mut">
@@ -23,7 +24,7 @@ export default async function LoginPage({
           <br />
           marcus.hale@halerow.example
           <br />
-          password <span className="font-semibold">frontdoor-demo</span> (admin)
+          password <span className="font-semibold">cornicio-demo</span> (admin)
         </div>
       </div>
     </main>

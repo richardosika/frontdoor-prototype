@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/brand";
 import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
 
 export const TIERS = ["INVITED", "VERIFIED", "CONFIRMED"] as const;
@@ -13,8 +14,7 @@ export const SIZE_BANDS = [
 
 export type SizeBand = (typeof SIZE_BANDS)[number]["id"];
 
-export const NDA_ACKNOWLEDGEMENT =
-  "I acknowledge that materials in this deal room are confidential, that I will not share them outside FrontDoor, and that FrontDoor does not offer securities, take subscriptions, or process payments.";
+export const NDA_ACKNOWLEDGEMENT = `I acknowledge that materials in this deal room are confidential, that I will not share them outside ${BRAND.name}, and that ${BRAND.name} does not offer securities, take subscriptions, or process payments.`;
 
 export function normalizeInviteCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, "");

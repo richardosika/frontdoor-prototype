@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { respondConfirmation } from "@/actions/profile";
 import { Logo } from "@/components/logo";
+import { BRAND } from "@/lib/brand";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +22,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         <Logo />
         <h1 className="mt-4 font-serif text-2xl font-normal">Confirm a project</h1>
         <p className="mt-2 text-sm text-ink">
-          {project.user.name} ({project.user.org}) listed you, {confirmation.counterpartyName}, as a counterparty on this project. No FrontDoor account is required.
+          {project.user.name} ({project.user.org}) listed you, {confirmation.counterpartyName}, as a counterparty on this project. No {BRAND.short} account is required.
         </p>
         <div className="mt-4 rounded-xl border border-line bg-mist p-3 text-sm">
           <b>{project.name}</b>

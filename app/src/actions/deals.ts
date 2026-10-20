@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
 import { canRequestDealAccess } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { BRAND } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
 
 export async function requestAccess(formData: FormData) {
@@ -54,7 +55,7 @@ export async function requestAccess(formData: FormData) {
   await sendEmail({
     to: deal.sponsor.email,
     subject: `Access request: ${deal.title}`,
-    text: `${user.name} (${user.email}) requested access to "${deal.title}" and acknowledged the NDA. Review the request on the deal page. FrontDoor does not process a subscription or payment.\n\nDelivered by the console email adapter.`,
+    text: `${user.name} (${user.email}) requested access to "${deal.title}" and acknowledged the NDA. Review the request on the deal page. ${BRAND.name} does not process a subscription or payment.\n\nDelivered by the console email adapter.`,
   });
 
   revalidatePath(`/deals/${dealId}`);
@@ -86,7 +87,7 @@ export async function reviewAccess(formData: FormData) {
     subject: decision === "APPROVED" ? `Access approved: ${access.deal.title}` : `Access declined: ${access.deal.title}`,
     text:
       decision === "APPROVED"
-        ? `${user.name} approved your request for "${access.deal.title}". Open the deal room to see the other approved members. FrontDoor does not take a subscription or move funds.\n\nDelivered by the console email adapter.`
+        ? `${user.name} approved your request for "${access.deal.title}". Open the deal room to see the other approved members. ${BRAND.name} does not take a subscription or move funds.\n\nDelivered by the console email adapter.`
         : `${user.name} declined your request for "${access.deal.title}".\n\nDelivered by the console email adapter.`,
   });
 

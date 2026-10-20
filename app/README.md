@@ -1,6 +1,6 @@
-# FrontDoor MVP
+# Cornicio Partners MVP
 
-Invite-only network for real estate deal teams. This app lives in `app/` and does not replace the static prototype at the repository root (`index.html`, `app.js`, `app.css`, `base.css`, `desktop.css`).
+Invite-only network for real estate deal teams. The product name is a placeholder: **Cornicio Partners**, short form **Cornicio**. Both strings live in `src/lib/brand.ts` (`BRAND.name` and `BRAND.short`). Change that constant to rename titles, the logo, emails, and seeded copy. This app lives in `app/` and does not replace the static prototype at the repository root (`index.html`, `app.js`, `app.css`, `base.css`, `desktop.css`).
 
 Members apply with an invite code, pick one of 16 roles, and submit credentials plus references. An admin approves or rejects the application. Approved members start at **Invited**. An admin can set **Verified** or **Confirmed**. A counterparty can also confirm a track-record project from a tokenized link (no account). That vouch sets the member to **Confirmed**.
 
@@ -39,7 +39,7 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 
 ### Demo login
 
-Every seeded member uses the password `frontdoor-demo`.
+Every seeded member uses the password `cornicio-demo`.
 
 | Email | Role |
 | --- | --- |

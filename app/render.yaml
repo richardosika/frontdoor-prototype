@@ -1,4 +1,4 @@
-# FrontDoor MVP Blueprint.
+# Cornicio Partners MVP Blueprint.
 # This file lives at app/render.yaml so it does not replace the static prototype
 # site configured from the repository root. In the Render Dashboard, set the
 # Blueprint path to app/render.yaml. rootDir is relative to the repository root.

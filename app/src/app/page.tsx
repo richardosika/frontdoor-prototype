@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 
 export default function HomePage() {
   return (
@@ -11,7 +12,7 @@ export default function HomePage() {
           A vetted network for real estate deal teams.
         </h1>
         <p className="mt-4 max-w-lg text-base leading-relaxed text-[#C4CCDD]">
-          FrontDoor is invite-only. Members apply with a role and references, a committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
+          {BRAND.name} is invite-only. Members apply with a role and references, a committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/login" className={`${btn} bg-white text-navy`}>
@@ -22,7 +23,7 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="mt-10 max-w-lg text-xs leading-relaxed text-[#C4CCDD]">
-          FrontDoor does not offer securities, take subscriptions, or process payments. Raising posts are member-only notes, not an offer to sell.
+          {BRAND.name} does not offer securities, take subscriptions, or process payments. Raising posts are member-only notes, not an offer to sell.
         </p>
       </div>
     </main>

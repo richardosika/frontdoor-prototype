@@ -8,6 +8,7 @@ import { btn, btnOutline } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { NDA_ACKNOWLEDGEMENT, sizeLabel } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { BRAND } from "@/lib/brand";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ export default async function DealPage({
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink">{deal.blurb}</p>
         <p className="mt-2 text-xs text-mut">
-          This page is a member note. FrontDoor does not offer securities, accept subscriptions, or process payments.
+          This page is a member note. {BRAND.name} does not offer securities, accept subscriptions, or process payments.
         </p>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Sponsor track record</h2>
         {deal.sponsor.projects.length === 0 ? <p className="text-sm text-mut">No projects listed.</p> : null}

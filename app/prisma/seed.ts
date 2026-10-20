@@ -5,9 +5,10 @@ import {
   VerificationTier,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { BRAND } from "../src/lib/brand";
 
 const prisma = new PrismaClient();
-const passwordHash = bcrypt.hashSync("frontdoor-demo", 10);
+const passwordHash = bcrypt.hashSync("cornicio-demo", 10);
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000);
 
@@ -145,7 +146,7 @@ const people: Person[] = [
     location: "New York, NY",
     tier: "CONFIRMED",
     credentialNote: "Admitted to NY Bar (2009) · good standing · disciplinary search clear",
-    bio: "Fund formation counsel. Fictional. FrontDoor itself does not run offerings.",
+    bio: `Fund formation counsel. Fictional. ${BRAND.name} does not run offerings.`,
   },
   {
     id: "user_jw",
@@ -297,7 +298,7 @@ async function main() {
       location: "Jersey City, NJ",
       credentialValue: "NJ architect license no. 21AI001234 (fictional)",
       referenceEmails: ["marcus.hale@halerow.example", "grace.liu@liustudio.example"],
-      statement: "I design ground-up multifamily and would like to meet GCs already on FrontDoor.",
+      statement: `I design ground-up multifamily and would like to meet GCs already on ${BRAND.short}.`,
       status: "PENDING",
     },
   });
@@ -602,7 +603,7 @@ async function main() {
     }
   }
 
-  console.log("Seeded FrontDoor demo data. Password for every member: frontdoor-demo");
+  console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
 }
 
 main()

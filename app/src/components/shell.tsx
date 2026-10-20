@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import { Avatar } from "@/components/avatar";
 import { Logo } from "@/components/logo";
+import { BRAND } from "@/lib/brand";
 import { tierLabel } from "@/lib/format";
 
 const TABS = [
@@ -37,7 +38,7 @@ export function Shell({
       <aside className="hidden bg-navy text-white md:flex md:flex-col md:gap-1 md:px-3 md:py-5 lg:px-4 lg:py-6">
         <Link href="/feed" className="mb-6 flex items-center gap-3 px-2 text-white lg:px-3">
           <Logo light compact />
-          <span className="hidden font-serif text-[17px] uppercase tracking-[0.18em] lg:inline">FrontDoor</span>
+          <span className="hidden font-serif text-[17px] uppercase tracking-[0.18em] lg:inline">{BRAND.short}</span>
         </Link>
         <nav className="flex flex-1 flex-col gap-1">
           {TABS.map((tab) => {
