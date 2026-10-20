@@ -3,7 +3,8 @@ import { respondConnection, requestConnection } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
-import { btn, btnOutline, field } from "@/components/ui";
+import { PageHeader } from "@/components/page-header";
+import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { isRoleId, ROLES, roleLabel, roleShort } from "@/lib/roles";
@@ -50,13 +51,13 @@ export default async function NetworkPage({
   }
 
   return (
-    <div className="mx-auto max-w-[1180px] px-4 py-6 lg:px-8">
-      <h1 className="border-b border-line pb-3 font-serif text-[26px] uppercase tracking-[0.18em]">Network</h1>
+    <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
+      <PageHeader title="Network" />
       <div className="mt-4">
         <Banner error={params.error} notice={params.notice} />
       </div>
       {incoming.length ? (
-        <section className="mb-4 rounded-2xl border border-terra bg-terraSoft p-4">
+        <section className="mb-4 rounded border border-brass bg-brass-soft p-4">
           <h2 className="text-sm font-semibold">Connection requests</h2>
           <ul className="mt-2 space-y-2">
             {incoming.map((item) => (
@@ -106,7 +107,7 @@ export default async function NetworkPage({
         {members.map((member) => {
           const state = stateFor(member.id);
           return (
-            <article key={member.id} className="rounded-2xl border border-line bg-white p-4 text-center">
+            <article key={member.id} className="rounded border border-line bg-paper p-4 text-center transition hover:-translate-y-0.5 hover:shadow-card">
               <Link href={`/members/${member.id}`}>
                 <span className="mx-auto grid w-fit">
                   <Avatar initials={member.initials} size="lg" />
@@ -147,7 +148,7 @@ export default async function NetworkPage({
 
 function RoleChip({ href, on, children }: { href: string; on: boolean; children: React.ReactNode }) {
   return (
-    <Link href={href} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${on ? "border-terra bg-navy text-white" : "border-line bg-white"}`}>
+    <Link href={href} className={on ? chipOn : chipOff}>
       {children}
     </Link>
   );

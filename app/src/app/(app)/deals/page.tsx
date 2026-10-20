@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
-import { field } from "@/components/ui";
+import { PageHeader } from "@/components/page-header";
+import { chipOff, chipOn, dealCard, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { filterDeals, matchScore, sizeLabel } from "@/lib/domain";
 import { dealsQuery } from "@/lib/format";
@@ -34,13 +35,15 @@ export default async function DealsPage({
   );
 
   return (
-    <div className="mx-auto max-w-[1180px] px-4 py-6 lg:px-8">
-      <header className="mb-2 flex items-end justify-between border-b border-line pb-3">
-        <h1 className="font-serif text-[26px] uppercase tracking-[0.18em]">Deals</h1>
-        <Link href="/feed" className="text-sm font-semibold text-terra">
-          Post a deal
-        </Link>
-      </header>
+    <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
+      <PageHeader
+        title="Deals"
+        action={
+          <Link href="/feed" className="text-sm font-semibold text-brass">
+            Post a deal
+          </Link>
+        }
+      />
       <Banner error={params.error} />
       <form className="mt-4 max-w-xl" action="/deals">
         {role ? <input type="hidden" name="role" value={role} /> : null}
@@ -77,7 +80,7 @@ export default async function DealsPage({
         <div className="py-10 text-center text-sm text-mut">
           No deals match these filters.
           <div>
-            <Link href="/deals" className="mt-3 inline-block font-semibold text-navy">
+            <Link href="/deals" className="mt-3 inline-block font-semibold text-forest">
               Clear filters
             </Link>
           </div>
@@ -91,10 +94,10 @@ export default async function DealsPage({
               deal: { kind: deal.kind, roleNeeded: deal.roleNeeded, sponsorRole: deal.sponsorRole, market: deal.market },
             });
             return (
-              <Link key={deal.id} href={`/deals/${deal.id}`} className="flex flex-col rounded-2xl border border-line bg-white p-4 transition hover:-translate-y-0.5 hover:border-terra hover:shadow-card">
+              <Link key={deal.id} href={`/deals/${deal.id}`} className={`flex flex-col p-4 transition hover:-translate-y-0.5 hover:shadow-card ${dealCard}`}>
                 <div className="flex items-center justify-between gap-2">
                   <KindTag kind={deal.kind} roleLabel={roleShort(roleLabel(deal.roleNeeded))} />
-                  <span className="text-xs font-semibold text-terra">{score}% match</span>
+                  <span className="text-xs font-semibold text-brass">{score}% match</span>
                 </div>
                 <h2 className="mt-2 font-serif text-[17px] font-normal leading-snug">{deal.title}</h2>
                 <p className="mt-1 flex items-center gap-2 text-xs text-mut">
@@ -103,13 +106,13 @@ export default async function DealsPage({
                 <p className="mt-2 flex-1 text-[13px] text-ink">{deal.blurb}</p>
                 <div className="mt-3 flex gap-3 border-t border-line pt-3 text-xs text-mut">
                   <span>
-                    <b className="text-navy">{deal.raiseLabel}</b>
+                    <b className="text-forest">{deal.raiseLabel}</b>
                   </span>
                   <span>
-                    <b className="text-navy">{deal.kind === "DEAL" ? deal.targetIrr || "—" : deal.deadline || "Open"}</b>
+                    <b className="text-forest">{deal.kind === "DEAL" ? deal.targetIrr || "—" : deal.deadline || "Open"}</b>
                   </span>
                   <span>
-                    <b className="text-navy">{deal.market}</b>
+                    <b className="text-forest">{deal.market}</b>
                   </span>
                 </div>
               </Link>
@@ -123,7 +126,7 @@ export default async function DealsPage({
 
 function FilterChip({ href, on, children }: { href: string; on: boolean; children: React.ReactNode }) {
   return (
-    <Link href={href} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${on ? "border-terra bg-navy text-white" : "border-line bg-white text-navy"}`}>
+    <Link href={href} className={on ? chipOn : chipOff}>
       {children}
     </Link>
   );

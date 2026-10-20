@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { TierBadge } from "@/components/badge";
+import { MobileTitle } from "@/components/page-header";
+import { card } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
@@ -28,12 +30,14 @@ export default async function DealRoomPage({ params }: { params: Promise<{ id: s
   ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 lg:px-8">
-      <Link href={`/deals/${deal.id}`} className="text-sm text-mut">
+    <div>
+      <MobileTitle href={`/deals/${deal.id}`} label="Deal" title="Room" />
+      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <Link href={`/deals/${deal.id}`} className="hidden text-sm text-mut md:inline">
         ‹ {deal.title}
       </Link>
-      <div className="mt-3 rounded-2xl border border-line bg-white p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Deal room</p>
+      <div className={`mt-3 p-5 ${card}`}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Deal room</p>
         <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
         <p className="mt-2 text-sm text-ink">
           People listed here were approved by {deal.sponsor.name} after an NDA acknowledgement. {BRAND.name} does not host a subscription, wire, or payment.
@@ -52,6 +56,7 @@ export default async function DealRoomPage({ params }: { params: Promise<{ id: s
             </li>
           ))}
         </ul>
+      </div>
       </div>
     </div>
   );

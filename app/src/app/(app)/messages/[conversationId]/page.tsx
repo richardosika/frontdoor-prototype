@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sendMessage } from "@/actions/social";
+import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
+import { TierBadge } from "@/components/badge";
 import { ConversationList } from "@/components/conversation-list";
 import { btn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
@@ -43,15 +46,20 @@ export default async function ThreadPage({
       <div className="hidden lg:block">
         <ConversationList conversations={conversations} activeId={conversation.id} />
       </div>
-      <section className="flex min-h-[70dvh] flex-col bg-white lg:min-h-dvh">
-        <header className="bg-navy px-4 py-3 text-white">
-          <a href="/messages" className="text-sm text-[#C4CCDD] lg:hidden">
-            ‹ Messages
-          </a>
-          <h1 className="font-serif text-lg">{other.name}</h1>
-          <p className="text-xs text-[#C4CCDD]">
-            {roleLabel(other.role)} · {other.location}
-          </p>
+      <section className="flex min-h-[70dvh] flex-col bg-cream lg:min-h-dvh lg:bg-paper">
+        <header className="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">
+          <Link href="/messages" className="text-sm text-mut lg:hidden">
+            ‹
+          </Link>
+          <Avatar initials={other.initials} size="sm" />
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 font-serif text-lg font-normal">
+              {other.name} <TierBadge tier={other.tier} />
+            </h1>
+            <p className="truncate text-xs text-mut">
+              {roleLabel(other.role)} · {other.location}
+            </p>
+          </div>
         </header>
         <div className="flex-1 space-y-2 px-4 py-4">
           <Banner error={query.error} />
@@ -61,8 +69,8 @@ export default async function ThreadPage({
             return (
               <div
                 key={message.id}
-                className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm leading-snug ${
-                  mine ? "ml-auto rounded-tr-sm bg-navy text-white" : "rounded-tl-sm border border-line bg-white"
+                className={`max-w-[78%] rounded px-3 py-2 text-sm leading-snug ${
+                  mine ? "ml-auto rounded-tr-sm bg-forest text-paper" : "rounded-tl-sm border border-line bg-paper"
                 }`}
               >
                 {message.body}
@@ -72,7 +80,7 @@ export default async function ThreadPage({
         </div>
         <form action={sendMessage} className="flex gap-2 border-t border-line p-3">
           <input type="hidden" name="conversationId" value={conversation.id} />
-          <input name="body" className={`${field} rounded-full`} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
+          <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
           <button className={btn} type="submit">
             Send
           </button>

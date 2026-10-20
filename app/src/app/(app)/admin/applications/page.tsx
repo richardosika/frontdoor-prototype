@@ -1,6 +1,7 @@
 import { reviewApplication } from "@/actions/admin";
 import { Banner } from "@/components/banner";
-import { btn, btnOutline, field } from "@/components/ui";
+import { MobileTitle, PageHeader } from "@/components/page-header";
+import { btn, btnOutline, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
@@ -21,15 +22,17 @@ export default async function ApplicationsPage({
   });
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 lg:px-8">
-      <h1 className="font-serif text-2xl font-normal">Application queue</h1>
+    <div>
+      <MobileTitle href="/admin" label="Admin" title="Queue" />
+      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <PageHeader title="Applications" />
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>
       {applications.length === 0 ? <p className="mt-6 text-sm text-mut">No applications waiting.</p> : null}
       <ul className="mt-4 space-y-4">
         {applications.map((application) => (
-          <li key={application.id} className="rounded-2xl border border-line bg-white p-4">
+          <li key={application.id} className={`${card} p-4`}>
             <h2 className="font-serif text-xl font-normal">{application.name}</h2>
             <p className="text-sm text-mut">
               {application.email} · {roleLabel(application.role)} · {application.org} · {application.location}
@@ -59,6 +62,7 @@ export default async function ApplicationsPage({
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }

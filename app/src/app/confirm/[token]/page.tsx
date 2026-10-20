@@ -17,14 +17,17 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
   const project = confirmation.project;
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_80%_10%,#2A4272,transparent_55%),#14213D] px-4 py-10">
-      <div className="w-full max-w-lg rounded-[22px] bg-white p-6 text-navy">
-        <Logo />
-        <h1 className="mt-4 font-serif text-2xl font-normal">Confirm a project</h1>
+    <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-paper text-forest md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+        <div className="bg-forest px-6 py-5">
+          <Logo tone="paper" />
+        </div>
+        <div className="px-6 py-6">
+        <h1 className="font-serif text-2xl font-normal">Confirm a project</h1>
         <p className="mt-2 text-sm text-ink">
           {project.user.name} ({project.user.org}) listed you, {confirmation.counterpartyName}, as a counterparty on this project. No {BRAND.short} account is required.
         </p>
-        <div className="mt-4 rounded-xl border border-line bg-mist p-3 text-sm">
+        <div className="mt-4 rounded border border-line bg-cream p-3 text-sm">
           <b>{project.name}</b>
           <p className="mt-1 text-mut">
             {project.asset} · {project.location} · {project.year} · {project.valueLabel}
@@ -32,7 +35,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
           {project.summary ? <p className="mt-2 text-ink">{project.summary}</p> : null}
         </div>
         {confirmation.status !== "PENDING" ? (
-          <p className="mt-4 rounded-xl border border-terra bg-terraSoft px-3 py-2 text-sm">
+          <p className="mt-4 rounded border border-brass bg-brass-soft px-3 py-2 text-sm">
             Recorded as {confirmation.status === "CONFIRMED" ? "confirmed" : "declined"}.
             {confirmation.note ? ` Note: ${confirmation.note}` : ""}
           </p>
@@ -53,6 +56,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
             </div>
           </form>
         )}
+        </div>
       </div>
     </main>
   );

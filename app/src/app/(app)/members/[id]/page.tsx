@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Banner } from "@/components/banner";
 import { ProfileView } from "@/components/profile-view";
@@ -19,8 +20,13 @@ export default async function MemberPage({
   const loaded = await loadMemberProfile(user.id, id);
   if (!loaded) notFound();
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 lg:px-8">
-      <Banner error={query.error} notice={query.notice} />
+    <div className="mx-auto max-w-3xl md:px-8 md:py-6">
+      <Link href="/network" className="mb-3 hidden px-1 text-sm text-mut md:inline-block">
+        ‹ Network
+      </Link>
+      <div className="md:px-0">
+        <Banner error={query.error} notice={query.notice} />
+      </div>
       <ProfileView
         member={loaded.member}
         projects={loaded.member.projects}
@@ -28,6 +34,7 @@ export default async function MemberPage({
         connection={loaded.connection}
         projectCount={loaded.member.projects.length}
         vouchCount={loaded.vouchCount}
+        backHref="/network"
       />
     </div>
   );

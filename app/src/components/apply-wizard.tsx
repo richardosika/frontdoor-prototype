@@ -64,18 +64,18 @@ export function ApplyWizard() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[520px] overflow-hidden rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-      <div className="flex items-center justify-between bg-navy px-5 py-4 text-white">
+    <div className="mx-auto min-h-dvh w-full max-w-[520px] overflow-hidden bg-paper md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+      <div className="flex items-center justify-between bg-forest px-5 py-4 text-paper">
         <span className="font-serif text-lg tracking-[0.18em] uppercase">Apply</span>
-        <span className="text-xs text-[#C4CCDD]">Step {Math.min(step, 4)} of 4</span>
+        <span className="text-xs text-sand">Step {Math.min(step, 4)} of 4</span>
       </div>
       <div className="flex gap-1.5 px-5 pt-4">
         {[1, 2, 3, 4].map((item) => (
-          <i key={item} className={`h-1 flex-1 rounded ${item <= step ? "bg-terra" : "bg-line"}`} />
+          <i key={item} className={`h-1 flex-1 rounded ${item <= step ? "bg-brass" : "bg-line"}`} />
         ))}
       </div>
       <div className="px-5 py-5">
-        {error ? <p className="mb-3 text-sm text-terra">{error}</p> : null}
+        {error ? <p className="mb-3 text-sm text-brass">{error}</p> : null}
         {step === 1 ? (
           <div>
             <h1 className="font-serif text-xl">Welcome to {BRAND.name}</h1>
@@ -103,13 +103,13 @@ export function ApplyWizard() {
                       key={item.id}
                       type="button"
                       onClick={() => setRole(item.id)}
-                      className={`mb-2 flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm ${
-                        role === item.id ? "border-terra bg-terraSoft" : "border-line bg-white"
+                      className={`mb-2 flex w-full items-center gap-2.5 rounded border px-3 py-2.5 text-left text-sm ${
+                        role === item.id ? "border-brass bg-brass-soft" : "border-line bg-paper"
                       }`}
                     >
                       <i
                         className={`h-4 w-4 shrink-0 rounded-full border ${
-                          role === item.id ? "border-terra bg-terra shadow-[inset_0_0_0_3px_#fff]" : "border-line"
+                          role === item.id ? "border-brass bg-brass shadow-[inset_0_0_0_3px_#FFFDF8]" : "border-line"
                         }`}
                       />
                       <span>
@@ -135,10 +135,10 @@ export function ApplyWizard() {
           <div className="space-y-3">
             <h1 className="font-serif text-xl">Credentials and references</h1>
             <p className="text-sm text-ink">Light checks now. Deeper checks happen when you request a deal room.</p>
-            <div className="rounded-[10px] border border-terra px-3 py-2 text-sm">
-              {code.toUpperCase()} <span className="float-right text-terra">Accepted</span>
+            <div className="rounded-sm border border-brass px-3 py-2 text-sm">
+              {code.toUpperCase()} <span className="float-right text-brass">Accepted</span>
             </div>
-            <div className="rounded-xl border border-terra bg-terraSoft px-3 py-2 text-sm">
+            <div className="rounded border border-brass bg-brass-soft px-3 py-2 text-sm">
               {selected.label}
               <small className="block text-[11px] text-mut">{selected.group}</small>
             </div>
@@ -196,14 +196,14 @@ export function ApplyWizard() {
         ) : null}
         {step === 4 ? (
           <div className="py-6 text-center">
-            <div className="mx-auto mb-4 grid h-[88px] w-[88px] place-items-center rounded-full border-2 border-terra font-serif text-3xl text-terra">
+            <div className="mx-auto mb-4 grid h-[88px] w-[88px] place-items-center rounded-full border-2 border-brass font-serif text-3xl text-brass">
               ⏳
             </div>
             <h1 className="font-serif text-xl">Application under review</h1>
             <p className="mt-2 text-sm text-ink">
               The committee reviews applications within a few business days. Reference notes are written to the server log by the console email adapter.
             </p>
-            <div className="mt-4 rounded-2xl border border-terra bg-terraSoft p-3 text-left text-sm">
+            <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-left text-sm">
               <b>What happens next</b>
               <p className="mt-1 text-ink">
                 1. Credential check: {selected.check}

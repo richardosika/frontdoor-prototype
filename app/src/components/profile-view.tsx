@@ -25,6 +25,7 @@ export function ProfileView({
   connection,
   projectCount,
   vouchCount,
+  backHref,
 }: {
   member: {
     id: string;
@@ -43,6 +44,7 @@ export function ProfileView({
   connection: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING";
   projectCount: number;
   vouchCount: number;
+  backHref?: string;
 }) {
   const role = roleById(member.role);
   const tiers = [
@@ -52,11 +54,19 @@ export function ProfileView({
   ] as const;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-line bg-white">
-      <div className="relative h-36 bg-[radial-gradient(circle_at_70%_20%,rgba(255,255,255,.18),transparent_60%),linear-gradient(135deg,#1E3158,#14213D)]" />
+    <article className="overflow-hidden border border-line bg-paper md:rounded">
+      <div className="cover-forest relative h-32 md:h-40">
+        {backHref ? (
+          <Link href={backHref} className="absolute left-4 top-4 z-10 font-sans text-sm text-paper md:hidden">
+            ‹ Network
+          </Link>
+        ) : null}
+      </div>
       <div className="flex items-end justify-between px-5">
         <div className="-mt-11">
-          <Avatar initials={member.initials} size="lg" />
+          <span className="inline-grid rounded-full shadow-[0_0_0_4px_#F4EFE4]">
+            <Avatar initials={member.initials} size="lg" />
+          </span>
         </div>
         <div className="mb-2 flex gap-2">
           {isSelf ? null : (
@@ -95,37 +105,37 @@ export function ProfileView({
           {member.org} · {member.location}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <span className="rounded-md bg-terra px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="rounded-sm bg-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-paper">
             {roleShort(roleLabel(member.role))}
           </span>
-          <span className="rounded-full border border-line px-2.5 py-1 text-[11px] text-mut">
+          <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
             Member since {member.createdAt.getFullYear()}
           </span>
         </div>
         {member.bio ? <p className="mt-4 text-sm leading-relaxed text-ink">{member.bio}</p> : null}
-        <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-line bg-mist">
+        <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
           <Stat value={String(projectCount)} label="Projects" />
           <Stat value={String(vouchCount)} label="Vouches" />
           <Stat value={tierLabel(member.tier)} label="Tier" />
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Verification</h2>
-        <div className="rounded-xl border border-line border-l-[3px] border-l-terra bg-white px-3 py-2">
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification</h2>
+        <div className="rounded border border-line border-l-[3px] border-l-brass bg-paper px-3 py-2">
           <small className="text-[10.5px] uppercase tracking-wide text-mut">{role?.credentialLabel}</small>
           <b className="mt-0.5 block text-[13px] font-medium">{member.credentialNote || "Credential on file"}</b>
         </div>
-        <h2 className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Verification tier</h2>
-        <div className="overflow-hidden rounded-xl border border-line">
+        <h2 className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification tier</h2>
+        <div className="overflow-hidden rounded border border-line">
           {tiers.map(([id, copy]) => (
-            <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${member.tier === id ? "border-l-[3px] border-l-terra bg-terraSoft" : ""}`}>
+            <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${member.tier === id ? "border-l-[3px] border-l-brass bg-brass-soft" : ""}`}>
               <TierBadge tier={id} />
               <small className="text-[11px] leading-snug text-mut">
-                {member.tier === id ? <b className="text-navy">Current tier. </b> : null}
+                {member.tier === id ? <b className="text-forest">Current tier. </b> : null}
                 {copy}
               </small>
             </div>
           ))}
         </div>
-        <div className="mt-3 rounded-xl border border-line bg-mist px-3 py-2 text-[12px] leading-relaxed text-ink">
+        <div className="mt-3 rounded border border-line bg-cream px-3 py-2 text-[12px] leading-relaxed text-ink">
           <b>How verification works</b>
           <ol className="mt-1 list-decimal pl-4">
             <li>Invite code from an existing member.</li>
@@ -134,7 +144,7 @@ export function ProfileView({
             <li>Past partners confirm projects from a tokenized link.</li>
           </ol>
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Track record</h2>
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>
         {projects.length === 0 ? <p className="text-sm text-mut">No projects listed yet.</p> : null}
         <ul>
           {projects.map((project) => {
@@ -142,7 +152,7 @@ export function ProfileView({
             const pending = project.confirmations.filter((item) => item.status === "PENDING").length;
             return (
               <li key={project.id} className="flex gap-3 border-b border-line py-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[10px] border border-line bg-mist text-navy">▦</span>
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest">▦</span>
                 <div className="min-w-0 flex-1">
                   <b className="text-sm">{project.name}</b>
                   <div className="text-xs text-mut">
@@ -162,13 +172,13 @@ export function ProfileView({
                     </form>
                   ) : null}
                 </div>
-                <span className="font-serif text-sm text-navy">{project.valueLabel}</span>
+                <span className="font-serif text-sm text-forest">{project.valueLabel}</span>
               </li>
             );
           })}
         </ul>
         {isSelf ? (
-          <form action={addProject} className="mt-4 grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-2">
+          <form action={addProject} className="mt-4 grid gap-2 rounded border border-line p-3 sm:grid-cols-2">
             <p className={`${labelCls} sm:col-span-2`}>Add a project</p>
             <input name="name" placeholder="Project name" className={field} required />
             <input name="asset" placeholder="Asset class" className={field} required />

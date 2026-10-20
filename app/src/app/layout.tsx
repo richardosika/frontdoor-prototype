@@ -1,10 +1,20 @@
-import type { Metadata } from "next";
-import { Inter, Libre_Baskerville } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { EB_Garamond, Libre_Franklin } from "next/font/google";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
-const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const serif = Libre_Baskerville({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-serif" });
+const sans = Libre_Franklin({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700"],
+});
+
+const serif = EB_Garamond({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+});
 
 export const metadata: Metadata = {
   title: BRAND.name,
@@ -12,10 +22,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#1F3A2E",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${serif.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>{children}</body>
     </html>
   );
 }

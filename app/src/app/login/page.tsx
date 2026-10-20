@@ -10,21 +10,25 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_80%_10%,#2A4272,transparent_55%),#14213D] px-4 py-10">
-      <div className="w-full max-w-md rounded-[22px] bg-white p-6 text-navy shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-        <Logo />
-        <h1 className="mt-5 font-serif text-2xl font-normal">Sign in to {BRAND.name}</h1>
+    <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-paper text-forest md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+        <div className="bg-forest px-6 py-5">
+          <Logo tone="paper" />
+        </div>
+        <div className="px-6 py-6">
+        <h1 className="font-serif text-2xl font-normal">Sign in to {BRAND.name}</h1>
         <p className="mb-4 mt-1 text-sm text-ink">Approved members only. Applications under review cannot sign in yet.</p>
         <LoginForm next={params.next} />
         <p className="mt-4 text-center text-sm text-mut">
-          Have an invite? <Link className="font-semibold text-terra" href="/apply">Apply</Link>
+          Have an invite? <Link className="font-semibold text-brass" href="/apply">Apply</Link>
         </p>
-        <div className="mt-5 rounded-xl bg-mist p-3 text-xs leading-relaxed text-ink">
+        <div className="mt-5 rounded-sm bg-cream p-3 text-xs leading-relaxed text-ink">
           <b>Demo</b>
           <br />
           marcus.hale@halerow.example
           <br />
           password <span className="font-semibold">cornicio-demo</span> (admin)
+        </div>
         </div>
       </div>
     </main>

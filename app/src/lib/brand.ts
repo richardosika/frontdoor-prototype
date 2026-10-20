@@ -2,4 +2,5 @@
 export const BRAND = {
   name: "Cornicio Partners",
   short: "Cornicio",
+  sub: "Partners",
 } as const;

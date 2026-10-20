@@ -5,21 +5,31 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: "#14213D",
-        navy2: "#1E3158",
-        terra: "#D9683F",
-        terraSoft: "#FDF1EC",
-        mist: "#F4F6FA",
-        line: "#D3DAE8",
-        mut: "#5B6B8C",
-        ink: "#2B3A5C",
+        forest: {
+          DEFAULT: "#1F3A2E",
+          mid: "#2A4A3B",
+          lift: "#2E5242",
+        },
+        cream: "#F4EFE4",
+        paper: "#FFFDF8",
+        brass: {
+          DEFAULT: "#A8843F",
+          soft: "#F6EEDB",
+          pale: "#E9D9B0",
+          line: "#CDBF9F",
+        },
+        parchment: "#F1E8D2",
+        sand: "#C9BFA6",
+        line: "#E0D6C2",
+        mut: "#7A7363",
+        ink: "#3B3A30",
       },
       fontFamily: {
-        serif: ["var(--font-serif)", "Georgia", "serif"],
-        sans: ["var(--font-sans)", "Helvetica Neue", "Arial", "sans-serif"],
+        serif: ["var(--font-serif)", "EB Garamond", "serif"],
+        sans: ["var(--font-sans)", "Libre Franklin", "sans-serif"],
       },
       boxShadow: {
-        card: "0 8px 24px rgba(20,33,61,.08)",
+        card: "0 8px 24px rgba(31,58,46,.08)",
       },
     },
   },

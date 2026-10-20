@@ -1,7 +1,8 @@
 import { setMemberTier } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
-import { btn, field } from "@/components/ui";
+import { MobileTitle, PageHeader } from "@/components/page-header";
+import { btn, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { TIERS } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
@@ -20,19 +21,21 @@ export default async function MembersAdminPage({
   const members = await prisma.user.findMany({ orderBy: { name: "asc" } });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 lg:px-8">
-      <h1 className="font-serif text-2xl font-normal">Members</h1>
+    <div>
+      <MobileTitle href="/admin" label="Admin" title="Members" />
+      <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
+      <PageHeader title="Members" />
       <p className="mt-1 text-sm text-ink">Set Invited, Verified, or Confirmed. Counterparty vouches also promote a member to Confirmed.</p>
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>
-      <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white">
+      <ul className={`mt-4 divide-y divide-line ${card}`}>
         {members.map((member) => (
           <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 {member.name} <TierBadge tier={member.tier} />
-                {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-terra">Admin</span> : null}
+                {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
               </div>
               <p className="text-xs text-mut">
                 {roleShort(roleLabel(member.role))} · {member.org} · {member.email}
@@ -54,6 +57,7 @@ export default async function MembersAdminPage({
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }

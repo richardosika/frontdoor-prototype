@@ -8,11 +8,32 @@ body {
 }
 
 body {
-  background: #f4f6fa;
-  color: #14213d;
+  background: #f4efe4;
+  color: #1f3a2e;
 }
 
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: #c4ccdd transparent;
+  scrollbar-color: #e0d6c2 transparent;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif), "EB Garamond", serif;
+  }
+}
+
+@layer utilities {
+  .wash {
+    background: radial-gradient(circle at 80% 10%, #2e5242, transparent 55%), #1f3a2e;
+  }
+
+  .cover-forest {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 38px, rgba(255, 255, 255, 0.08) 38px 39px),
+      radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.18), transparent 60%),
+      linear-gradient(135deg, #2a4a3b, #1f3a2e);
+  }
 }

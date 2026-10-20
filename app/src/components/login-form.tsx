@@ -21,7 +21,7 @@ export function LoginForm({ next }: { next?: string }) {
   return (
     <form action={onSubmit} className="space-y-3">
       <input type="hidden" name="next" value={next || "/feed"} />
-      {error ? <p className="text-sm text-terra">{error}</p> : null}
+      {error ? <p className="text-sm text-brass">{error}</p> : null}
       <div>
         <label className={labelCls}>Email</label>
         <input className={field} name="email" type="email" autoComplete="username" required placeholder="marcus.hale@halerow.example" />

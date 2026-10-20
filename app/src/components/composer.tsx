@@ -11,7 +11,7 @@ type Kind = "NORMAL" | "DEAL" | "SEEKING";
 export function Composer() {
   const [kind, setKind] = useState<Kind>("NORMAL");
   return (
-    <form action={createPost} className="rounded-2xl border border-line bg-white p-4">
+    <form action={createPost} className="rounded border border-line bg-paper p-4">
       <input type="hidden" name="kind" value={kind} />
       <div className="mb-3 flex gap-2">
         {(
@@ -25,8 +25,8 @@ export function Composer() {
             key={value}
             type="button"
             onClick={() => setKind(value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              kind === value ? "bg-navy text-white" : "border border-line text-mut"
+            className={`rounded-sm px-3 py-1.5 font-sans text-xs font-semibold tracking-[0.06em] [font-variant:all-small-caps] ${
+              kind === value ? "bg-forest text-paper" : "border border-line text-mut"
             }`}
           >
             {label}

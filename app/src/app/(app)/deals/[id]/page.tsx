@@ -4,7 +4,8 @@ import { requestAccess, reviewAccess } from "@/actions/deals";
 import { openConversation } from "@/actions/social";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
-import { btn, btnOutline } from "@/components/ui";
+import { MobileTitle } from "@/components/page-header";
+import { btn, btnOutline, dealCard } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { NDA_ACKNOWLEDGEMENT, sizeLabel } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
@@ -36,12 +37,14 @@ export default async function DealPage({
   const approved = mine?.status === "APPROVED" || isSponsor;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 lg:px-8">
-      <Link href="/deals" className="text-sm text-mut">
+    <div>
+      <MobileTitle href="/deals" label="Deals" title="Deal" />
+      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <Link href="/deals" className="hidden text-sm text-mut md:inline">
         ‹ Deals
       </Link>
       <Banner error={query.error} notice={query.notice} />
-      <div className="mt-3 rounded-2xl border border-line bg-white p-5">
+      <div className={`mt-3 p-5 ${dealCard}`}>
         <div className="flex items-start justify-between gap-3">
           <KindTag kind={deal.kind} roleLabel={roleShort(roleLabel(deal.roleNeeded))} />
           <span className="text-xs text-mut">{deal.market} · {sizeLabel(deal.sizeBand)} · {deal.assetClass}</span>
@@ -50,7 +53,7 @@ export default async function DealPage({
         <Link href={`/members/${deal.sponsorId}`} className="mt-1 inline-flex items-center gap-2 text-sm text-mut">
           Sponsor: {deal.sponsor.name} <TierBadge tier={deal.sponsor.tier} />
         </Link>
-        <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-line bg-mist">
+        <div className="mt-4 grid grid-cols-3 overflow-hidden border border-brass-line">
           <Cell label={deal.kind === "DEAL" ? "Raise" : "Size"} value={deal.raiseLabel} />
           <Cell label={deal.kind === "DEAL" ? "Target IRR" : "Timing"} value={deal.kind === "DEAL" ? deal.targetIrr || "—" : deal.deadline || "Open"} />
           <Cell label={deal.kind === "DEAL" ? "Minimum" : "Needed"} value={deal.kind === "DEAL" ? deal.minCheck || "—" : roleShort(roleLabel(deal.roleNeeded))} />
@@ -59,7 +62,7 @@ export default async function DealPage({
         <p className="mt-2 text-xs text-mut">
           This page is a member note. {BRAND.name} does not offer securities, accept subscriptions, or process payments.
         </p>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Sponsor track record</h2>
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Sponsor track record</h2>
         {deal.sponsor.projects.length === 0 ? <p className="text-sm text-mut">No projects listed.</p> : null}
         <ul>
           {deal.sponsor.projects.map((project) => (
@@ -75,7 +78,7 @@ export default async function DealPage({
           ))}
         </ul>
         {approved ? (
-          <div className="mt-4 rounded-2xl border border-terra bg-terraSoft p-3 text-sm">
+          <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <b>You can open the deal room.</b>
             <p className="mt-1 text-ink">Approved members are listed there. Materials stay among those members.</p>
             <Link href={`/deals/${deal.id}/room`} className={`${btn} mt-3`}>
@@ -83,12 +86,12 @@ export default async function DealPage({
             </Link>
           </div>
         ) : mine?.status === "PENDING" ? (
-          <div className="mt-4 rounded-2xl border border-terra bg-terraSoft p-3 text-sm">
+          <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <b>Request sent</b>
             <p className="mt-1">You acknowledged the NDA. {deal.sponsor.name} still needs to approve access.</p>
           </div>
         ) : (
-          <form action={requestAccess} className="mt-4 rounded-2xl border border-terra bg-terraSoft p-3 text-sm">
+          <form action={requestAccess} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <input type="hidden" name="dealId" value={deal.id} />
             <b>NDA acknowledgement required</b>
             <p className="mt-1 text-ink">{NDA_ACKNOWLEDGEMENT}</p>
@@ -111,7 +114,7 @@ export default async function DealPage({
         </div>
         {isSponsor ? (
           <section className="mt-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Access requests</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Access requests</h2>
             {deal.access.length === 0 ? <p className="mt-2 text-sm text-mut">No requests yet.</p> : null}
             <ul className="mt-2 divide-y divide-line">
               {deal.access.map((access) => (
@@ -146,6 +149,7 @@ export default async function DealPage({
             </ul>
           </section>
         ) : null}
+      </div>
       </div>
     </div>
   );

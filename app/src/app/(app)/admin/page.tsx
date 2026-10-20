@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createInvite } from "@/actions/admin";
 import { Banner } from "@/components/banner";
-import { btn, field, labelCls } from "@/components/ui";
+import { PageHeader } from "@/components/page-header";
+import { btn, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 
@@ -24,8 +25,8 @@ export default async function AdminPage({
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 lg:px-8">
-      <h1 className="font-serif text-[26px] uppercase tracking-[0.16em]">Admin</h1>
+    <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
+      <PageHeader title="Admin" />
       <p className="mt-1 text-sm text-ink">Review applications, set verification tiers, and issue invite codes.</p>
       <div className="mt-4">
         <Banner error={params.error} notice={params.notice} />
@@ -41,8 +42,8 @@ export default async function AdminPage({
         <Mini label="Posts" value={posts} />
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-line bg-white p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">New invite code</h2>
+        <section className={`${card} p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">New invite code</h2>
           <form action={createInvite} className="mt-3 space-y-2">
             <div>
               <label className={labelCls}>Code</label>
@@ -61,8 +62,8 @@ export default async function AdminPage({
             </button>
           </form>
         </section>
-        <section className="rounded-2xl border border-line bg-white p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-terra">Invite codes</h2>
+        <section className={`${card} p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite codes</h2>
           <ul className="mt-3 divide-y divide-line text-sm">
             {invites.map((invite) => (
               <li key={invite.id} className="py-2">
@@ -81,7 +82,7 @@ export default async function AdminPage({
 
 function Stat({ href, label, value }: { href: string; label: string; value: number }) {
   return (
-    <Link href={href} className="rounded-2xl border border-line bg-white p-4">
+    <Link href={href} className={`${card} p-4`}>
       <b className="block font-serif text-3xl font-normal">{value}</b>
       <span className="text-xs uppercase tracking-wider text-mut">{label}</span>
     </Link>
@@ -90,7 +91,7 @@ function Stat({ href, label, value }: { href: string; label: string; value: numb
 
 function Mini({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-line bg-white px-4 py-3">
+    <div className={`${card} px-4 py-3`}>
       <b className="font-serif text-xl font-normal">{value}</b>
       <span className="ml-2 text-xs uppercase tracking-wider text-mut">{label}</span>
     </div>

@@ -1,10 +1,19 @@
 export const btn =
-  "inline-flex items-center justify-center rounded-[10px] bg-navy px-4 py-[11px] text-[13px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center rounded-sm bg-forest px-4 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-paper [font-variant:all-small-caps] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 export const btnOutline =
-  "inline-flex items-center justify-center rounded-[10px] border border-navy bg-white px-4 py-[11px] text-[13px] font-semibold text-navy transition hover:bg-mist";
+  "inline-flex items-center justify-center rounded-sm border border-forest bg-paper px-4 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-forest [font-variant:all-small-caps] transition hover:bg-cream disabled:cursor-not-allowed disabled:opacity-50";
 export const btnGhost =
-  "inline-flex items-center justify-center rounded-[10px] border border-line bg-white px-3 py-[11px] text-[13px] font-semibold text-mut";
+  "inline-flex items-center justify-center rounded-sm border border-line bg-paper px-3 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-mut [font-variant:all-small-caps]";
 export const field =
-  "w-full rounded-[10px] border border-line bg-white px-3 py-[11px] text-sm text-navy outline-none placeholder:text-mut/70 focus:border-terra";
-export const labelCls =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-mut";
+  "w-full rounded-sm border border-line bg-paper px-3 py-[11px] font-sans text-sm text-forest outline-none placeholder:text-mut/70 focus:border-brass";
+export const labelCls = "mb-1.5 block font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-mut";
+export const sectionLabel = "font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-brass";
+export const btnBrass =
+  "inline-flex items-center justify-center rounded-sm bg-brass px-4 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-paper [font-variant:all-small-caps] transition hover:opacity-90";
+export const chip = "shrink-0 rounded-sm border px-3 py-1.5 font-sans text-xs";
+export const chipOn = `${chip} border-brass bg-forest text-paper`;
+export const chipOff = `${chip} border-line bg-paper text-forest`;
+export const card = "rounded border border-line bg-paper";
+export const dealCard = "rounded border border-line border-t-[3px] border-t-brass bg-paper";
+export const matchPanel =
+  "rounded border border-brass bg-forest p-4 text-paper shadow-[inset_0_0_0_4px_#1F3A2E,inset_0_0_0_5px_rgba(168,132,63,0.5)]";
