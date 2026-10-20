@@ -1,7 +1,7 @@
 /* prototype layer */
 html,body{height:100%}
-body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#E9EDF5}
-.frame{padding:12px;background:#0b1327;border-radius:52px;box-shadow:0 30px 80px rgba(20,33,61,.35)}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#EDE6D6}
+.frame{padding:12px;background:#13241C;border-radius:52px;box-shadow:0 30px 80px rgba(31,58,46,.35)}
 .phone{border-radius:40px;max-height:calc(100vh - 24px)}
 .scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}
@@ -9,34 +9,34 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;bac
 .scroll.hasFt{bottom:84px}
 .tb div,.btn,.f,.inb,.mini,.tabs span,.role,.ic,.act span,.back,.card{cursor:pointer;user-select:none}
 .btn{border:0;font:inherit;font-size:13px;font-weight:600}
-.btn.o{border:1px solid #14213D}
+.btn.o{border:1px solid #1F3A2E}
 .btn.s{border:1px solid var(--line)}
-.btn.s.on{color:#D9683F;border-color:#D9683F}
-.btn.done{background:#5B6B8C}
-.act span.on{color:#D9683F;font-weight:600}
+.btn.s.on{color:#A8843F;border-color:#A8843F}
+.btn.done{background:#7A7363}
+.act span.on{color:#A8843F;font-weight:600}
 .back{font-size:22px;padding:0 10px 0 0;line-height:1}
 .ft{z-index:5}
 .ft .row{gap:8px}
 .in{width:100%;font:inherit;font-size:14px;color:var(--tx);outline:none}
-input.in:focus{border-color:#D9683F}
+input.in:focus{border-color:#A8843F}
 .thread{padding-bottom:20px}
 .ft .in{border-radius:20px}
 .send{flex:none;width:44px;padding:11px 0}
 .view{animation:fade .18s ease}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
 .empty{text-align:center;color:var(--mut);padding:40px 20px;font-size:13px}
-.modalbg{position:absolute;inset:0;background:rgba(20,33,61,.55);z-index:20;display:flex;align-items:flex-end;animation:fade .15s}
-.modal{background:#fff;width:100%;border-radius:22px 22px 0 0;padding:20px 20px 34px}
+.modalbg{position:absolute;inset:0;background:rgba(31,58,46,.55);z-index:20;display:flex;align-items:flex-end;animation:fade .15s}
+.modal{background:#FFFDF8;width:100%;border-radius:22px 22px 0 0;padding:20px 20px 34px}
 .modal h3{margin-top:0}
 .modal .row{margin-top:14px}
 .netgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px}
-.ncard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 10px;text-align:center;cursor:pointer}
+.ncard{background:#FFFDF8;border:1px solid var(--line);border-radius:16px;padding:14px 10px;text-align:center;cursor:pointer}
 .ncard .av{margin:0 auto 8px;width:52px;height:52px;font-size:17px}
 .ncard .nm{justify-content:center;font-size:13.5px}
 .ncard .sub{margin-bottom:8px}
 .ncard .btn{padding:8px;font-size:12px}
 .ncard .ver{margin-top:6px}
-.toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);background:#14213D;color:#fff;font-size:12.5px;padding:9px 14px;border-radius:20px;z-index:30;white-space:nowrap;animation:fade .15s}
+.toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);background:#1F3A2E;color:#FFFDF8;font-size:12.5px;padding:9px 14px;border-radius:20px;z-index:30;white-space:nowrap;animation:fade .15s}
 .pg label.x{display:block}
 .role{margin-left:20px;margin-right:20px}
 .hdr .ic{cursor:pointer}
@@ -64,6 +64,6 @@ input.in:focus{border-color:#D9683F}
 .rgh{margin:14px 20px 6px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);font-weight:600}
 .rolelist .role{padding:9px 13px}
 .rolebar{position:sticky;bottom:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);margin-top:6px}
-.cred{background:#fff;border:1px solid var(--line);border-left:3px solid #D9683F;border-radius:12px;padding:9px 12px}
+.cred{background:#FFFDF8;border:1px solid var(--line);border-left:3px solid #A8843F;border-radius:12px;padding:9px 12px}
 .cred small{display:block;font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
-.cred b{display:block;font-size:12.5px;font-weight:500;color:#14213D;line-height:1.4;margin-top:2px}
+.cred b{display:block;font-size:12.5px;font-weight:500;color:#1F3A2E;line-height:1.4;margin-top:2px}

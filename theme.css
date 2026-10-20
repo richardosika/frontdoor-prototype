@@ -1,0 +1,37 @@
+/* Direction A — Private Bank: forest green, cream, brass; editorial serif */
+:root{--bg:#F4EFE4;--card:#FFFDF8;--line:#E0D6C2;--gold:#1F3A2E;--gold2:#1F3A2E;--tx:#1B2A22;--mut:#7A7363}
+body{font-size:14px}
+h3,.mini h5,.match .big,.logo,.brand,.stats b,.proj .v{font-family:EB Garamond,serif!important}
+h3{font-size:21px;font-weight:500;letter-spacing:-.1px}
+.card{border-radius:4px;border-color:var(--line)}
+.card.deal{border-color:#E0D6C2;border-top:3px solid #A8843F}
+.mini,.ncard,.search,.in,.role,.tiers,.how,.gate,.badge,.pt,.cred{border-radius:4px}
+.btn{border-radius:2px;letter-spacing:.8px;font-variant:all-small-caps;font-size:14px!important}
+.btn.s{text-transform:none}
+.f,.chip,.ver,.tag{border-radius:2px}
+.stats{border-radius:0;background:transparent;border-left:0;border-right:0;border-color:#CDBF9F}
+.stats b{font-size:21px;font-weight:500}
+.t-deal{background:#1F3A2E;color:#E9D9B0}
+.ver.cf{background:#A8843F;border-color:#A8843F;color:#FFFDF8}
+.ver.cf:before{color:#A8843F}
+.match{border-radius:4px;background:#1F3A2E;border:1px solid #A8843F;box-shadow:inset 0 0 0 4px #1F3A2E,inset 0 0 0 5px rgba(168,132,63,.5)}
+.match .btn{background:#A8843F;color:#FFFDF8}
+.av,.pav{background:#F1E8D2!important;border-color:#A8843F!important;color:#1F3A2E!important;font-family:EB Garamond,serif}
+.match .av,.tb .me .av{background:#F1E8D2!important}
+.tabs{font-family:EB Garamond,serif;font-size:15px;letter-spacing:.3px}
+.sec h4,.apanel h6,.stats small{letter-spacing:2.2px}
+.hdr .logo{letter-spacing:6px}
+@media (min-width:768px){
+  .tb{background:#1F3A2E;background-image:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.12));border-right:1px solid #A8843F}
+  .tb div[data-tab]{border-radius:2px;font-family:EB Garamond,serif;font-size:17px;color:#D8CFBA}
+  .tb div[data-tab].on{background:rgba(168,132,63,.16)}
+  .brand i{border-color:#A8843F}
+  .wrap:not(.w-onboarding):not(.w-split)>.hdr:not(:has(.back)){border-bottom:3px double #A8843F}
+  .wrap.w-feed.w-feed>.hdr.hdr:not(:has(.back)) .logo:after{font-family:EB Garamond,serif;font-size:34px;letter-spacing:1px;text-transform:none;font-style:italic;content:"The Ledger"}
+  .apanel{border-radius:4px}
+  .card{padding:22px 24px}
+  .card:hover{box-shadow:0 8px 24px rgba(31,58,46,.08)}
+  .phone.onb{background:radial-gradient(circle at 80% 10%,#2E5242,transparent 55%),#1F3A2E}
+  .wrap.w-onboarding{border-radius:4px}
+}
+.stats small{letter-spacing:1.2px}@media (max-width:500px){.stats small{letter-spacing:.6px;font-size:9px}}
