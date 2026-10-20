@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: #f4f6fa;
+  color: #14213d;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #c4ccdd transparent;
+}
