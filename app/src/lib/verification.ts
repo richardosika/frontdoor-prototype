@@ -182,7 +182,7 @@ export function vouchEvidenceNote(input: { counterpartyName: string; projectName
 export const PUBLIC_VERIFICATION_KEYS = ["showBadge", "verifiedOn", "expiresOn", "statusLine"] as const;
 
 export function committeeFileLabel(showBadge: boolean): string {
-  return showBadge ? "Verification file · Verified" : "Verification file · Verification in progress";
+  return showBadge ? "Verified" : "Verification in progress";
 }
 
 export function verificationCaseHeading(input: {

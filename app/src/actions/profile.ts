@@ -1,6 +1,8 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
+import { safeCardFileName, validateBusinessCard } from "@/lib/business-card";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
@@ -12,6 +14,98 @@ import { canOpenProjectToCounterparties, toPublicVerification, type Verification
 import { attachVouchEvidence, ensureVerificationCase } from "@/lib/verification-db";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
+
+export async function saveProfile(formData: FormData) {
+  const user = await requireUser();
+  const bio = String(formData.get("bio") || "").trim().slice(0, 1200);
+  const website = String(formData.get("website") || "").trim().slice(0, 200);
+  const markets = formData.getAll("markets").map((value) => String(value)).filter(Boolean).join(", ");
+  const dealTypes = formData.getAll("dealTypes").map((value) => String(value)).filter(Boolean).join(", ");
+  const assetClasses = formData.getAll("assetClasses").map((value) => String(value)).filter(Boolean).join(", ");
+  const checkSize = String(formData.get("checkSize") || "").trim().slice(0, 80);
+  const lookingFor = String(formData.get("lookingFor") || "").trim().slice(0, 800);
+  const offering = String(formData.get("offering") || "").trim().slice(0, 800);
+  const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { bio, website, markets, dealTypes, assetClasses, checkSize, lookingFor, offering, location },
+  });
+  const upload = formData.get("card");
+  if (upload instanceof File && upload.size > 0) {
+    const bytes = new Uint8Array(await upload.arrayBuffer());
+    const checked = validateBusinessCard({ contentType: upload.type, bytes });
+    if (!checked.ok) redirect(`/profile?error=${encodeURIComponent(checked.error)}`);
+    const application = await prisma.application.findFirst({ where: { userId: user.id }, select: { id: true } });
+    const data = {
+      fileName: safeCardFileName(upload.name),
+      contentType: checked.contentType,
+      sizeBytes: bytes.byteLength,
+      bytes: Buffer.from(bytes),
+      deletedAt: null,
+      userId: user.id,
+      ...(application?.id ? { applicationId: application.id } : {}),
+    };
+    const existing = await prisma.businessCard.findUnique({ where: { userId: user.id } });
+    if (existing) await prisma.businessCard.update({ where: { id: existing.id }, data });
+    else await prisma.businessCard.create({ data });
+  }
+  revalidatePath("/profile");
+  revalidatePath("/network");
+  redirect("/profile?notice=Profile+saved");
+}
+
+export async function saveNotificationPrefs(formData: FormData) {
+  const user = await requireUser();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      notifyMessages: formData.get("notifyMessages") === "on",
+      notifyIntros: formData.get("notifyIntros") === "on",
+      notifyDeals: formData.get("notifyDeals") === "on",
+    },
+  });
+  revalidatePath("/settings");
+  redirect("/settings?notice=Notification+settings+saved");
+}
+
+export async function changePassword(formData: FormData) {
+  const user = await requireUser();
+  const current = String(formData.get("current") || "");
+  const next = String(formData.get("next") || "");
+  if (next.length < 8 || next.length > 72) redirect("/settings?error=Password+must+be+8+to+72+characters");
+  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
+  if (!row || !(await bcrypt.compare(current, row.passwordHash))) {
+    redirect("/settings?error=The+current+password+is+wrong");
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(next, 10) } });
+  redirect("/settings?notice=Password+updated");
+}
+
+export async function requestAccountDeletion(formData: FormData) {
+  const user = await requireUser();
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+  await prisma.user.update({ where: { id: user.id }, data: { deletionRequestedAt: new Date() } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: user.id,
+      action: "DELETION_REQUEST",
+      summary: `${user.name} asked a Private Floor administrator to delete their account. ${note}`,
+    },
+  });
+  await notifyAdmins({
+    title: "Account deletion requested",
+    body: `${user.name} asked to be removed.`,
+    href: `/admin/members/${user.id}`,
+  });
+  const { sendEmail } = await import("@/lib/email");
+  await sendEmail({
+    to: user.email,
+    subject: "Account deletion requested",
+    text: "A Private Floor administrator will review this deletion request. No contact details were sent to other members.",
+  });
+  revalidatePath("/settings");
+  redirect("/settings?notice=Deletion+request+sent+to+a+Private+Floor+administrator");
+}
 
 export async function addProject(formData: FormData) {
   const user = await requireUser();

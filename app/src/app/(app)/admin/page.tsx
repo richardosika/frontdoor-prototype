@@ -21,7 +21,7 @@ export default async function AdminPage({
   const issuedCode = params.issued
     ? await prisma.inviteCode.findUnique({ where: { code: params.issued } })
     : null;
-  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests, outbox, testApps] = await Promise.all([
+  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests, outbox, testApps, funnel, activeMembers, introductions] = await Promise.all([
     prisma.application.count({ where: { status: { in: ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"] } } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
@@ -37,9 +37,14 @@ export default async function AdminPage({
     prisma.inviteRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
     prisma.outboxNotice.count(),
     prisma.application.count({ where: { isTest: true } }),
+    prisma.application.groupBy({ by: ["status"], _count: true }),
+    prisma.user.count({ where: { status: "ACTIVE", isAdmin: false } }),
+    prisma.introduction.groupBy({ by: ["status"], _count: true }),
   ]);
   const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
+  const statusCount = (status: string) => funnel.find((row) => row.status === status)?._count ?? 0;
+  const introCount = (status: string) => introductions.find((row) => row.status === status)?._count ?? 0;
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
@@ -63,6 +68,19 @@ export default async function AdminPage({
           />
         ) : null}
       </div>
+      <section className={`${card} mt-4 p-4`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Floor</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Mini label="Submitted" value={statusCount("SUBMITTED") + statusCount("PENDING")} />
+          <Mini label="In review" value={statusCount("IN_REVIEW") + statusCount("NEEDS_INFO")} />
+          <Mini label="Approved" value={statusCount("APPROVED")} />
+          <Mini label="Declined" value={statusCount("DECLINED")} />
+          <Mini label="Active members" value={activeMembers} />
+          <Mini label="Posts" value={posts} />
+          <Mini label="Open introductions" value={introCount("PENDING")} />
+          <Mini label="Accepted introductions" value={introCount("ACCEPTED")} />
+        </div>
+      </section>
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat href="/admin/applications" label="Open applications" value={pending} />
         <Stat href="/admin/outbox" label="Outbox notices" value={outbox} />
@@ -70,7 +88,7 @@ export default async function AdminPage({
         <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
         <Stat href="/admin/access" label="Open access requests" value={access} />
         <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />
-        <Stat href="/admin/messages" label="Reports for review" value={openReports} />
+        <Stat href="/admin/moderation" label="Reports for review" value={openReports} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Mini label="Invited" value={tierCount("INVITED") + tierCount("VERIFIED")} />

@@ -1,4 +1,4 @@
-import { createCustomTestApplicant, createSampleApplicants, deleteTestData } from "@/actions/owner";
+import { createCustomTestApplicant, createSampleApplicants, deleteTestData, seedMemberNetwork } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
@@ -47,6 +47,17 @@ export default async function TestConsolePage({
               Delete all test data
             </ConfirmSubmitButton>
           </div>
+        </section>
+        <section className={`${card} mt-4 p-4 text-sm text-ink`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Member floor samples</h2>
+          <p className="mt-2">
+            Adds three is_test members (developer, general contractor, and investor), a published seeking post, a post held for review, a pending introduction, and an accepted thread. Password is cornicio-demo. Delete all test data removes them.
+          </p>
+          <form action={seedMemberNetwork} className="mt-3">
+            <button className={btn} type="submit">
+              Seed sample members
+            </button>
+          </form>
         </section>
         <section className={`${card} mt-4 p-4 text-sm text-ink`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Create a test applicant</h2>

@@ -4,7 +4,8 @@ import { Avatar } from "@/components/avatar";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { addProject, requestConfirmation } from "@/actions/profile";
-import { blockMember, introduceMember, openConversation, requestConnection, unblockMember } from "@/actions/social";
+import { blockMember, introduceMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
+import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { membershipTier } from "@/lib/domain";
@@ -34,6 +35,8 @@ export function ProfileView({
   projects,
   isSelf,
   connection,
+  intro,
+  introductionId,
   projectCount,
   vouchCount,
   backHref,
@@ -51,11 +54,20 @@ export function ProfileView({
     role: string;
     tier: string;
     bio: string;
+    website: string;
+    markets: string;
+    dealTypes: string;
+    assetClasses: string;
+    checkSize: string;
+    lookingFor: string;
+    offering: string;
     createdAt: Date;
   };
   projects: Project[];
   isSelf: boolean;
   connection: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING";
+  intro: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING";
+  introductionId: string;
   projectCount: number;
   vouchCount: number;
   backHref?: string;
@@ -87,32 +99,20 @@ export function ProfileView({
           </span>
         </div>
         <div className="mb-2 flex gap-2">
-          {isSelf || messagingClosed ? null : (
-            <>
-              <form action={openConversation}>
-                <input type="hidden" name="userId" value={member.id} />
-                <button className={btnOutline} type="submit">
-                  Message
-                </button>
-              </form>
-              {connection === "ACCEPTED" ? (
-                <span className={`${btnOutline} pointer-events-none`}>Connected</span>
-              ) : connection === "PENDING" ? (
-                <span className={`${btn} pointer-events-none bg-mut`}>Requested</span>
-              ) : connection === "INCOMING" ? (
-                <Link href="/network" className={btn}>
-                  Respond
-                </Link>
-              ) : (
-                <form action={requestConnection}>
-                  <input type="hidden" name="toId" value={member.id} />
-                  <button className={btn} type="submit">
-                    Connect
-                  </button>
-                </form>
-              )}
-            </>
-          )}
+          {isSelf || messagingClosed ? null : intro === "ACCEPTED" || connection === "ACCEPTED" ? (
+            <form action={openConversation}>
+              <input type="hidden" name="userId" value={member.id} />
+              <button className={btn} type="submit">
+                Open messages
+              </button>
+            </form>
+          ) : intro === "PENDING" ? (
+            <span className={`${btn} pointer-events-none bg-mut`}>Introduction requested</span>
+          ) : intro === "INCOMING" ? (
+            <Link href="/network" className={btn}>
+              Respond
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="px-5 pb-6 sm:px-7">
@@ -134,6 +134,51 @@ export function ProfileView({
           </span>
         </div>
         {member.bio ? <p className="mt-4 text-sm leading-relaxed text-ink">{member.bio}</p> : null}
+        <dl className="mt-3 grid gap-2 text-sm text-ink">
+          {member.markets ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Markets</dt>
+              <dd>{member.markets}</dd>
+            </div>
+          ) : null}
+          {member.dealTypes ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Deal types</dt>
+              <dd>{member.dealTypes}</dd>
+            </div>
+          ) : null}
+          {member.assetClasses ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Asset classes</dt>
+              <dd>{member.assetClasses}</dd>
+            </div>
+          ) : null}
+          {member.checkSize ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Check or deal size</dt>
+              <dd>{member.checkSize}</dd>
+            </div>
+          ) : null}
+          {member.lookingFor ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Looking for</dt>
+              <dd>{member.lookingFor}</dd>
+            </div>
+          ) : null}
+          {member.offering ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Offering</dt>
+              <dd>{member.offering}</dd>
+            </div>
+          ) : null}
+          {member.website ? (
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Website</dt>
+              <dd>{member.website}</dd>
+            </div>
+          ) : null}
+        </dl>
+        {isSelf ? <ProfileEditor member={member} /> : null}
         {isSelf ? null : messagingClosed ? (
           <div className="mt-4 rounded border border-line bg-cream px-3 py-3 text-sm text-ink">
             Messaging is closed between these members.
@@ -148,13 +193,39 @@ export function ProfileView({
           </div>
         ) : (
           <div className="mt-4 grid gap-3">
-            <form action={introduceMember} className="grid gap-2">
-              <input type="hidden" name="userId" value={member.id} />
-              <textarea name="note" className={field} rows={2} placeholder="A short introduction. It stays in Messages." required />
-              <button className={btnOutline} type="submit">
-                Send introduction
-              </button>
-            </form>
+            {intro === "INCOMING" ? (
+              <div className="flex gap-2">
+                <form action={respondIntroduction}>
+                  <input type="hidden" name="introductionId" value={introductionId} />
+                  <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+                    Decline introduction
+                  </button>
+                </form>
+                <form action={respondIntroduction}>
+                  <input type="hidden" name="introductionId" value={introductionId} />
+                  <button className={btn} name="decision" value="ACCEPTED" type="submit">
+                    Accept introduction
+                  </button>
+                </form>
+              </div>
+            ) : intro === "PENDING" ? (
+              <p className="text-sm text-ink">Your introduction is waiting. Messaging opens after they accept.</p>
+            ) : intro === "ACCEPTED" || connection === "ACCEPTED" ? (
+              <form action={openConversation}>
+                <input type="hidden" name="userId" value={member.id} />
+                <button className={btn} type="submit">
+                  Open messages
+                </button>
+              </form>
+            ) : (
+              <form action={introduceMember} className="grid gap-2">
+                <input type="hidden" name="userId" value={member.id} />
+                <textarea name="note" className={field} rows={2} placeholder="A short note. It stays inside Private Floor." required />
+                <button className={btn} type="submit">
+                  Request introduction
+                </button>
+              </form>
+            )}
             <div className="flex flex-wrap gap-2">
               <form action={blockMember}>
                 <input type="hidden" name="userId" value={member.id} />

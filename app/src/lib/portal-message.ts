@@ -41,7 +41,7 @@ export async function deliverPortalMessage(input: {
 
   const recipient = await prisma.user.findUnique({
     where: { id: input.toId },
-    select: { id: true, email: true, status: true },
+    select: { id: true, email: true, status: true, notifyMessages: true, notifyIntros: true, notifyDeals: true },
   });
   if (!recipient || recipient.status !== "ACTIVE") return { ok: false, reason: "That member is not available." };
 
@@ -64,8 +64,17 @@ export async function deliverPortalMessage(input: {
     body: "You have a new message on Private Floor.",
     href: `/messages/${conversation.id}`,
   });
-  const mail = portalMessageEmail(`${await appBaseUrl()}/messages`);
-  await sendEmail({ to: recipient.email, subject: mail.subject, text: mail.text });
+  const kind = input.kind ?? "TEXT";
+  const emailOn =
+    kind === "INTRO" || kind === "CONNECTION"
+      ? recipient.notifyIntros
+      : kind === "ACCESS" || kind === "DEAL" || kind === "VOUCH"
+        ? recipient.notifyDeals
+        : recipient.notifyMessages;
+  if (emailOn) {
+    const mail = portalMessageEmail(`${await appBaseUrl()}/messages`);
+    await sendEmail({ to: recipient.email, subject: mail.subject, text: mail.text });
+  }
   return { ok: true, conversationId: conversation.id };
 }
 

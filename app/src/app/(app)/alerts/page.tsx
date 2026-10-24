@@ -24,7 +24,7 @@ export default async function AlertsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Alerts" />
-      <p className="mt-1 text-sm text-ink">Access requests, connections, messages, and tier changes.</p>
+      <p className="mt-1 text-sm text-ink">Introductions, messages, deal rooms, and account notices. Accept or decline an introduction from Network.</p>
       {alerts.length === 0 ? <p className="mt-6 text-sm text-mut">You are caught up.</p> : null}
       <ul className="mt-4 space-y-2">
         {alerts.map((alert) => {

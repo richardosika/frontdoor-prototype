@@ -89,6 +89,20 @@ enum AccessStatus {
   PENDING
   APPROVED
   REJECTED
+  REMOVED
+}
+
+enum PostStatus {
+  PUBLISHED
+  PENDING_REVIEW
+  CLOSED
+  REJECTED
+}
+
+enum IntroductionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
 
 enum ConnectionStatus {
@@ -151,6 +165,18 @@ model User {
   credentialNote String           @default("")
   phone          String           @default("")
   linkedinUrl    String           @default("")
+  website        String           @default("")
+  markets        String           @default("")
+  dealTypes      String           @default("")
+  assetClasses   String           @default("")
+  checkSize      String           @default("")
+  lookingFor     String           @default("")
+  offering       String           @default("")
+  checklistDone  String           @default("")
+  notifyMessages Boolean          @default(true)
+  notifyIntros   Boolean          @default(true)
+  notifyDeals    Boolean          @default(true)
+  deletionRequestedAt DateTime?
   tier           VerificationTier @default(INVITED)
   isAdmin        Boolean          @default(false)
   status         AccountStatus    @default(ACTIVE)
@@ -181,6 +207,8 @@ model User {
   verificationEvents   VerificationEvent[] @relation("VerificationActor")
   blocksMade           Block[]             @relation("BlocksMade")
   blocksReceived       Block[]             @relation("BlocksReceived")
+  introsSent           Introduction[]      @relation("IntroFrom")
+  introsReceived       Introduction[]      @relation("IntroTo")
   reportsMade          Report[]            @relation("ReportsMade")
   reportsReceived      Report[]            @relation("ReportsReceived")
   moderationEvents     ModerationEvent[]
@@ -294,18 +322,31 @@ model Confirmation {
 }
 
 model Post {
-  id        String     @id @default(cuid())
-  authorId  String
-  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  kind      PostKind
-  body      String     @default("")
-  dealId    String?
-  deal      Deal?      @relation(fields: [dealId], references: [id])
-  createdAt DateTime   @default(now())
-  likes     Like[]
-  comments  Comment[]
+  id           String     @id @default(cuid())
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind         PostKind
+  status       PostStatus @default(PUBLISHED)
+  title        String     @default("")
+  intent       String     @default("")
+  body         String     @default("")
+  market       String     @default("")
+  assetClass   String     @default("")
+  sizeRange    String     @default("")
+  rulesVersion String     @default("")
+  rulesAckAt   DateTime?
+  flagReason   String     @default("")
+  expiresAt    DateTime?
+  closedAt     DateTime?
+  isTest       Boolean    @default(false)
+  dealId       String?
+  deal         Deal?      @relation(fields: [dealId], references: [id])
+  createdAt    DateTime   @default(now())
+  likes        Like[]
+  comments     Comment[]
 
   @@index([createdAt])
+  @@index([status, createdAt])
 }
 
 model Like {
@@ -363,6 +404,8 @@ model DealAccess {
   status            AccessStatus @default(PENDING)
   ndaAcknowledged   Boolean      @default(false)
   ndaAcknowledgedAt DateTime?
+  ndaVersion        String       @default("")
+  ndaIpHash         String       @default("")
   createdAt         DateTime     @default(now())
   reviewedAt        DateTime?
 
@@ -403,6 +446,7 @@ model Connection {
   from      User             @relation("ConnFrom", fields: [fromId], references: [id])
   to        User             @relation("ConnTo", fields: [toId], references: [id])
   status    ConnectionStatus @default(PENDING)
+  note      String           @default("")
   createdAt DateTime         @default(now())
 
   @@unique([fromId, toId])
@@ -427,10 +471,13 @@ model DealDocument {
   deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   authorId  String
   author    User     @relation(fields: [authorId], references: [id])
-  title     String
-  url       String
-  note      String   @default("")
-  createdAt DateTime @default(now())
+  title       String
+  url         String
+  note        String   @default("")
+  fileName    String   @default("")
+  contentType String   @default("")
+  sizeBytes   Int      @default(0)
+  createdAt   DateTime @default(now())
 
   @@index([dealId, createdAt])
 }
@@ -517,7 +564,9 @@ model Report {
   targetUserId   String
   target         User     @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
   conversationId String   @default("")
+  postId         String   @default("")
   reason         String
+  status         String   @default("OPEN")
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
@@ -535,10 +584,26 @@ model ModerationEvent {
   @@index([createdAt])
 }
 
+model Introduction {
+  id        String             @id @default(cuid())
+  fromId    String
+  toId      String
+  from      User               @relation("IntroFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User               @relation("IntroTo", fields: [toId], references: [id], onDelete: Cascade)
+  note      String
+  status    IntroductionStatus @default(PENDING)
+  isTest    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  decidedAt DateTime?
+
+  @@index([toId, status])
+  @@index([fromId, createdAt])
+}
+
 model BusinessCard {
   id            String       @id @default(cuid())
-  applicationId String       @unique
-  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicationId String?      @unique
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   userId        String?      @unique
   user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   fileName      String

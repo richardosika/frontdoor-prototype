@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { removeMember, setMemberStatus } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
+import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { card } from "@/components/ui";
+import { btn, btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -11,9 +13,16 @@ import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminMemberPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminMemberPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
+}) {
   await requireAdmin();
   const { id } = await params;
+  const query = await searchParams;
   const member = await prisma.user.findUnique({
     where: { id },
     include: { legalAcceptances: { orderBy: { acceptedAt: "desc" } } },
@@ -25,6 +34,9 @@ export default async function AdminMemberPage({ params }: { params: Promise<{ id
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={member.name} />
         <AdminNav current="/admin/members" />
+        <div className="mt-3">
+          <Banner error={query.error} notice={query.notice} />
+        </div>
         <section className={`${card} mt-4 space-y-2 p-4 text-sm`}>
           <div className="flex items-center gap-2">
             <TierBadge tier={member.tier} />
@@ -34,7 +46,38 @@ export default async function AdminMemberPage({ params }: { params: Promise<{ id
           <p>
             {roleLabel(member.role)} · {member.org} · {member.location}
           </p>
+          <p>
+            Account {member.status.toLowerCase()}
+            {member.deletionRequestedAt ? " · deletion requested" : ""}
+          </p>
           <p>{member.email}</p>
+          {member.isAdmin ? null : (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {member.status === "ACTIVE" ? (
+                <form action={setMemberStatus}>
+                  <input type="hidden" name="userId" value={member.id} />
+                  <input type="hidden" name="status" value="DISABLED" />
+                  <button className={btnOutline} type="submit">
+                    Suspend
+                  </button>
+                </form>
+              ) : (
+                <form action={setMemberStatus}>
+                  <input type="hidden" name="userId" value={member.id} />
+                  <input type="hidden" name="status" value="ACTIVE" />
+                  <button className={btn} type="submit">
+                    Reinstate
+                  </button>
+                </form>
+              )}
+              <form action={removeMember}>
+                <input type="hidden" name="userId" value={member.id} />
+                <button className={btnOutline} type="submit">
+                  Remove member
+                </button>
+              </form>
+            </div>
+          )}
           <p>
             <Link href={`/members/${member.id}`} className="underline decoration-brass">
               Member profile

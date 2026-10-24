@@ -33,6 +33,8 @@ export default async function MemberPage({
         projects={loaded.projects}
         isSelf={user.id === loaded.member.id}
         connection={loaded.connection}
+        intro={loaded.intro}
+        introductionId={loaded.introductionId}
         projectCount={loaded.projects.length}
         vouchCount={loaded.vouchCount}
         backHref="/network"

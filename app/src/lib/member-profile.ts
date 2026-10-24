@@ -9,18 +9,34 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
     },
   });
   if (!member || member.status !== "ACTIVE") return null;
-  const connection = await prisma.connection.findFirst({
-    where: {
-      OR: [
-        { fromId: viewerId, toId: memberId },
-        { fromId: memberId, toId: viewerId },
-      ],
-    },
-  });
+  const [connection, introduction] = await Promise.all([
+    prisma.connection.findFirst({
+      where: {
+        OR: [
+          { fromId: viewerId, toId: memberId },
+          { fromId: memberId, toId: viewerId },
+        ],
+      },
+    }),
+    prisma.introduction.findFirst({
+      where: {
+        status: { in: ["PENDING", "ACCEPTED"] },
+        OR: [
+          { fromId: viewerId, toId: memberId },
+          { fromId: memberId, toId: viewerId },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
   let state: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING" = "NONE";
   if (connection?.status === "ACCEPTED") state = "ACCEPTED";
   else if (connection?.status === "PENDING" && connection.fromId === viewerId) state = "PENDING";
   else if (connection?.status === "PENDING" && connection.toId === viewerId) state = "INCOMING";
+  let intro: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING" = "NONE";
+  if (introduction?.status === "ACCEPTED") intro = "ACCEPTED";
+  else if (introduction?.status === "PENDING" && introduction.fromId === viewerId) intro = "PENDING";
+  else if (introduction?.status === "PENDING" && introduction.toId === viewerId) intro = "INCOMING";
   const vouchCount = member.projects.reduce(
     (sum, project) =>
       sum + project.confirmations.filter((item) => item.status === "CONFIRMED" && item.reviewStatus === "APPROVED").length,
@@ -86,11 +102,20 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       role: member.role,
       tier: member.tier,
       bio: member.bio,
+      website: member.website,
+      markets: member.markets,
+      dealTypes: member.dealTypes,
+      assetClasses: member.assetClasses,
+      checkSize: member.checkSize,
+      lookingFor: member.lookingFor,
+      offering: member.offering,
       createdAt: member.createdAt,
     },
     projects,
     verification,
     connection: state,
+    intro,
+    introductionId: introduction?.id ?? "",
     vouchCount,
     blockedByViewer,
     blockedByThem,

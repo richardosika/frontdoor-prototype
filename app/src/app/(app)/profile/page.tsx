@@ -27,6 +27,8 @@ export default async function ProfilePage({
         projects={loaded.projects}
         isSelf
         connection="NONE"
+        intro="NONE"
+        introductionId=""
         projectCount={loaded.projects.length}
         vouchCount={loaded.vouchCount}
         linkOrigin={linkOrigin}

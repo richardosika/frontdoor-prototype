@@ -43,8 +43,8 @@ describe("queue labels and system notices", () => {
         project: { name: "Newark Ave Mixed-Use", location: "Newark, NJ", year: 2024, user: { name: "Elena Voss" } },
       }),
     ).toBe("Newark Ave Mixed-Use · Elena Voss · Newark, NJ · 2024");
-    expect(committeeFileLabel(true)).toBe("Verification file · Verified");
-    expect(committeeFileLabel(false)).toBe("Verification file · Verification in progress");
+    expect(committeeFileLabel(true)).toBe("Verified");
+    expect(committeeFileLabel(false)).toBe("Verification in progress");
   });
 
   it("renders access, deal, connection, and vouch notices apart from chat", () => {

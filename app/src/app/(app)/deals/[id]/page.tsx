@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminReviewAccess, requestAccess, reviewAccess } from "@/actions/deals";
-import { openConversation } from "@/actions/social";
+import { closePost, updatePost } from "@/actions/feed";
+import { openConversation, reportPost } from "@/actions/social";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
 import { MobileTitle } from "@/components/page-header";
-import { btn, btnOutline, dealCard } from "@/components/ui";
+import { btn, btnOutline, dealCard, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { NDA_ACKNOWLEDGEMENT, sizeLabel } from "@/lib/domain";
+import { sizeLabel } from "@/lib/domain";
 import { plural } from "@/lib/format";
+import { readLegalMarkdown, stripVersionLine } from "@/lib/legal";
+import { renderMarkdown } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -33,6 +36,8 @@ export default async function DealPage({
     },
   });
   if (!deal) notFound();
+  const post = await prisma.post.findFirst({ where: { dealId: deal.id }, orderBy: { createdAt: "desc" } });
+  const ndaHtml = renderMarkdown(stripVersionLine(readLegalMarkdown("deal-room-nda.md")));
   const mine = deal.access.find((item) => item.requesterId === user.id);
   const isSponsor = deal.sponsorId === user.id;
   const approved = mine?.status === "APPROVED" || isSponsor;
@@ -56,8 +61,8 @@ export default async function DealPage({
         </Link>
         <div className="mt-4 grid grid-cols-3 overflow-hidden border border-brass-line">
           <Cell label={deal.kind === "DEAL" ? "Raise" : "Size"} value={deal.raiseLabel} />
-          <Cell label={deal.kind === "DEAL" ? "Target IRR" : "Timing"} value={deal.kind === "DEAL" ? deal.targetIrr || "—" : deal.deadline || "Open"} />
-          <Cell label={deal.kind === "DEAL" ? "Minimum" : "Needed"} value={deal.kind === "DEAL" ? deal.minCheck || "—" : roleShort(roleLabel(deal.roleNeeded))} />
+          <Cell label="State" value={deal.market} />
+          <Cell label={deal.kind === "SEEKING" ? "Needed" : "Asset"} value={deal.kind === "SEEKING" ? roleShort(roleLabel(deal.roleNeeded)) : deal.assetClass} />
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink">{deal.blurb}</p>
         <p className="mt-2 text-xs text-mut">
@@ -86,6 +91,15 @@ export default async function DealPage({
               Open deal room
             </Link>
           </div>
+        ) : mine?.status === "REMOVED" ? (
+          <form action={requestAccess} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
+            <input type="hidden" name="dealId" value={deal.id} />
+            <p className="mb-2">The sponsor removed you from this room. You can request access again after acknowledging the current NDA.</p>
+            <NdaCopy html={ndaHtml} />
+            <button className={`${btn} mt-3`} type="submit">
+              Request access again
+            </button>
+          </form>
         ) : mine?.status === "PENDING" ? (
           <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <b>Pending — not approved</b>
@@ -101,17 +115,40 @@ export default async function DealPage({
                 <b>Request declined.</b> {deal.sponsor.name} did not approve access. You can send a new request.
               </p>
             ) : null}
-            <b>NDA acknowledgement required</b>
-            <p className="mt-1 text-ink">{NDA_ACKNOWLEDGEMENT}</p>
-            <label className="mt-3 flex items-start gap-2 text-ink">
-              <input type="checkbox" name="nda" required className="mt-1" />
-              <span>I acknowledge the statement above.</span>
-            </label>
+            <NdaCopy html={ndaHtml} />
             <button className={`${btn} mt-3`} type="submit">
               Request access
             </button>
           </form>
         )}
+        {isSponsor && post ? (
+          <div className="mt-4 grid gap-2">
+            <form action={updatePost} className="grid gap-2">
+              <input type="hidden" name="postId" value={post.id} />
+              <input name="title" defaultValue={post.title || deal.title} className={field} />
+              <textarea name="body" defaultValue={post.body} rows={3} className={field} />
+              <button className={btnOutline} type="submit">
+                Save post
+              </button>
+            </form>
+            <form action={closePost}>
+              <input type="hidden" name="postId" value={post.id} />
+              <button className={btnOutline} type="submit">
+                Close post
+              </button>
+            </form>
+          </div>
+        ) : null}
+        {!isSponsor && post ? (
+          <form action={reportPost} className="mt-4 flex gap-2">
+            <input type="hidden" name="postId" value={post.id} />
+            <input type="hidden" name="back" value={`/deals/${deal.id}`} />
+            <input name="reason" className={field} placeholder="Report this post" />
+            <button className={btnOutline} type="submit">
+              Report
+            </button>
+          </form>
+        ) : null}
         {isSponsor ? null : (
           <div className="mt-4 flex gap-2">
             <form action={openConversation}>
@@ -138,7 +175,7 @@ export default async function DealPage({
                     </Link>
                     <span className="block text-xs text-mut">
                       {roleShort(roleLabel(access.requester.role))} · {access.status === "PENDING" ? "Pending — not approved" : access.status}
-                      {access.ndaAcknowledged ? " · NDA acknowledged" : ""}
+                      {access.ndaAcknowledged ? ` · NDA ${access.ndaVersion || "acknowledged"}` : ""}
                     </span>
                   </span>
                   {access.status === "PENDING" ? (
@@ -165,6 +202,19 @@ export default async function DealPage({
       </div>
       </div>
     </div>
+  );
+}
+
+function NdaCopy({ html }: { html: string }) {
+  return (
+    <>
+      <b>Deal-room NDA</b>
+      <div className="mt-2 max-h-64 overflow-y-auto rounded border border-line bg-paper p-3" dangerouslySetInnerHTML={{ __html: html }} />
+      <label className="mt-3 flex items-start gap-2 text-ink">
+        <input type="checkbox" name="nda" required className="mt-1" />
+        <span>I accept this NDA. Private Floor records the version, the time, and a hash of my IP address. It does not show that record to other members.</span>
+      </label>
+    </>
   );
 }
 

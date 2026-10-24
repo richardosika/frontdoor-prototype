@@ -4,10 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
 import { canConnect, orderedPair } from "@/lib/domain";
+import { canMessageAfterIntro } from "@/lib/member-network";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
-import { countRecentKind, deliverPortalMessage, isBlocked } from "@/lib/portal-message";
-import { notifyAdmins } from "@/lib/notify";
+import { deliverPortalMessage, isBlocked } from "@/lib/portal-message";
+import { notify, notifyAdmins } from "@/lib/notify";
+import { sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/url";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -94,21 +97,81 @@ export async function introduceMember(formData: FormData) {
   const user = await requireUser();
   const otherId = String(formData.get("userId") || "");
   const note = String(formData.get("note") || "").trim().slice(0, 500);
-  if (note.length < 2) redirect(`/members/${otherId}?error=${encodeURIComponent("Write a short introduction.")}`);
-  const other = await prisma.user.findUnique({ where: { id: otherId } });
+  const back = String(formData.get("back") || `/members/${otherId}`);
+  if (note.length < 2) redirect(`${back}?error=${encodeURIComponent("Write a short note with the introduction.")}`);
+  const other = await prisma.user.findUnique({
+    where: { id: otherId },
+    select: { id: true, status: true, email: true, notifyIntros: true, name: true },
+  });
   if (!other || other.status !== "ACTIVE" || other.id === user.id) redirect("/network");
-  const recent = await countRecentKind(user.id, "INTRO");
+  if (await isBlocked(user.id, otherId)) {
+    redirect(`${back}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+  }
+  const recent = await prisma.introduction.count({
+    where: { fromId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
+  });
   if (!withinRateLimit(recent, RATE_LIMITS.introductionsPerDay)) {
-    redirect(`/members/${otherId}?error=${encodeURIComponent("You have sent too many introductions today.")}`);
+    redirect(`${back}?error=${encodeURIComponent("You have sent too many introductions today.")}`);
+  }
+  const existing = await prisma.introduction.findFirst({
+    where: {
+      status: { in: ["PENDING", "ACCEPTED"] },
+      OR: [
+        { fromId: user.id, toId: otherId },
+        { fromId: otherId, toId: user.id },
+      ],
+    },
+  });
+  if (existing?.status === "ACCEPTED") redirect(`/members/${otherId}?notice=You+already+have+an+introduction`);
+  if (existing?.status === "PENDING") redirect(`${back}?notice=That+introduction+is+already+waiting`);
+  await prisma.introduction.create({ data: { fromId: user.id, toId: otherId, note, isTest: user.isTest } });
+  await notify(other.id, {
+    title: "Introduction request",
+    body: `${user.name} asked for an introduction. Accept or decline in Network.`,
+    href: "/network",
+  });
+  if (other.notifyIntros) {
+    const base = await appBaseUrl();
+    await sendEmail({
+      to: other.email,
+      subject: "You have a new message on Private Floor",
+      text: `You have an introduction request on Private Floor.\n${base}/network\n`,
+    });
+  }
+  revalidatePath("/network");
+  revalidatePath("/alerts");
+  redirect(`${back}?notice=Introduction+requested.+It+stays+inside+Private+Floor+until+they+accept.`);
+}
+
+export async function respondIntroduction(formData: FormData) {
+  const user = await requireUser();
+  const introductionId = String(formData.get("introductionId") || "");
+  const decision = String(formData.get("decision") || "");
+  if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect("/network");
+  const intro = await prisma.introduction.findUnique({ where: { id: introductionId }, include: { from: true } });
+  if (!intro || intro.toId !== user.id || intro.status !== "PENDING") redirect("/network");
+  await prisma.introduction.update({
+    where: { id: intro.id },
+    data: { status: decision, decidedAt: new Date() },
+  });
+  if (decision === "DECLINED") {
+    await notify(intro.fromId, {
+      title: "Introduction declined",
+      body: `${user.name} declined the introduction.`,
+      href: "/network",
+    });
+    revalidatePath("/network");
+    redirect("/network?notice=Introduction+declined");
   }
   const sent = await deliverPortalMessage({
-    from: user,
-    toId: otherId,
+    from: intro.from,
+    toId: user.id,
     kind: "INTRO",
-    body: `${user.name} (${user.org}) sent an introduction. ${note}`,
+    body: `${intro.from.name} requested an introduction. ${intro.note}`,
   });
-  if (!sent.ok) redirect(`/members/${otherId}?error=${encodeURIComponent(sent.reason)}`);
+  revalidatePath("/network");
   revalidatePath("/messages");
+  if (!sent.ok) redirect(`/network?error=${encodeURIComponent(sent.reason)}`);
   redirect(`/messages/${sent.conversationId}`);
 }
 
@@ -120,6 +183,40 @@ export async function openConversation(formData: FormData) {
   if (!other) redirect("/messages");
   if (await isBlocked(user.id, otherId)) {
     redirect(`/members/${otherId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+  }
+  const [intro, connection, existing] = await Promise.all([
+    prisma.introduction.findFirst({
+      where: {
+        status: "ACCEPTED",
+        OR: [
+          { fromId: user.id, toId: otherId },
+          { fromId: otherId, toId: user.id },
+        ],
+      },
+      select: { status: true },
+    }),
+    prisma.connection.findFirst({
+      where: {
+        status: "ACCEPTED",
+        OR: [
+          { fromId: user.id, toId: otherId },
+          { fromId: otherId, toId: user.id },
+        ],
+      },
+      select: { status: true },
+    }),
+    prisma.conversation.findFirst({
+      where: {
+        OR: [
+          { userAId: user.id, userBId: otherId },
+          { userAId: otherId, userBId: user.id },
+        ],
+      },
+      select: { id: true },
+    }),
+  ]);
+  if (!existing && !canMessageAfterIntro({ intro: intro?.status ?? null, connection: connection?.status ?? null })) {
+    redirect(`/members/${otherId}?error=${encodeURIComponent("Request an introduction first. Messaging opens after they accept.")}`);
   }
   const [userAId, userBId] = orderedPair(user.id, otherId);
   const conversation = await prisma.conversation.upsert({
@@ -179,9 +276,42 @@ export async function reportMember(formData: FormData) {
   await notifyAdmins({
     title: "Member report",
     body: "A member filed a report. Open message review.",
-    href: "/admin/messages",
+    href: "/admin/moderation",
   });
-  revalidatePath("/admin/messages");
+  revalidatePath("/admin/moderation");
+  redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
+}
+
+export async function reportPost(formData: FormData) {
+  const user = await requireUser();
+  const postId = String(formData.get("postId") || "");
+  const reason = String(formData.get("reason") || "").trim().slice(0, 500);
+  const back = String(formData.get("back") || "/feed");
+  if (reason.length < 3 || !postId) redirect(`${back}?error=${encodeURIComponent("Add a short reason for the report.")}`);
+  const recent = await prisma.report.count({
+    where: { reporterId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
+  });
+  if (!withinRateLimit(recent, RATE_LIMITS.reportsPerDay)) {
+    redirect(`${back}?error=${encodeURIComponent("You have filed too many reports today.")}`);
+  }
+  const post = await prisma.post.findUnique({ where: { id: postId }, include: { author: { select: { id: true, name: true } } } });
+  if (!post || post.authorId === user.id) redirect(back);
+  await prisma.report.create({
+    data: { reporterId: user.id, targetUserId: post.authorId, postId, reason },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: user.id,
+      action: "REPORT_POST",
+      summary: `${user.name} reported a post by ${post.author.name}.`,
+    },
+  });
+  await notifyAdmins({
+    title: "Post report",
+    body: "A member reported a post.",
+    href: "/admin/moderation",
+  });
+  revalidatePath("/admin/moderation");
   redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
 }
 

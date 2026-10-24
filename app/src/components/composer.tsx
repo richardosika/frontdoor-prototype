@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPost } from "@/actions/feed";
 import { ModeratorNotice } from "@/components/moderator-notice";
 import { btn, field, labelCls } from "@/components/ui";
-import { SIZE_BANDS, MARKETS } from "@/lib/domain";
+import { SIZE_BANDS } from "@/lib/domain";
+import { ASSET_CLASSES, US_STATES } from "@/lib/member-network";
 import { ROLES, roleShort } from "@/lib/roles";
 
 type Kind = "NORMAL" | "DEAL" | "SEEKING";
 
-export function Composer() {
+export function Composer({
+  intents,
+  rulesHtml,
+}: {
+  intents: { id: string; label: string; kind: "DEAL" | "SEEKING" }[];
+  rulesHtml: string;
+}) {
   const [kind, setKind] = useState<Kind>("NORMAL");
+  const choices = useMemo(() => intents.filter((item) => item.kind === kind), [intents, kind]);
+  const structured = kind !== "NORMAL";
+
   return (
     <form action={createPost} className="rounded border border-line bg-paper p-4">
       <input type="hidden" name="kind" value={kind} />
@@ -18,7 +28,7 @@ export function Composer() {
         {(
           [
             ["NORMAL", "Update"],
-            ["DEAL", "Deal"],
+            ["DEAL", "Raising"],
             ["SEEKING", "Seeking"],
           ] as const
         ).map(([value, label]) => (
@@ -34,6 +44,21 @@ export function Composer() {
           </button>
         ))}
       </div>
+      {structured && choices.length === 0 ? (
+        <p className="text-sm text-ink">This post type is not available for your role. Choose the other one, or post an update.</p>
+      ) : null}
+      {structured && choices.length > 0 ? (
+        <div className="mb-3">
+          <label className={labelCls}>What you are posting</label>
+          <select name="intent" className={field} defaultValue={choices[0]?.id} required>
+            {choices.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <label className={labelCls}>{kind === "NORMAL" ? "Update" : "Details"}</label>
       <textarea
         name="body"
@@ -41,31 +66,35 @@ export function Composer() {
         rows={3}
         placeholder={
           kind === "DEAL"
-            ? "What should members know before they request access?"
+            ? "Role, market, asset class, and size. No return targets."
             : kind === "SEEKING"
               ? "Scope, timing, and what a good fit looks like."
               : "Share something your circle can act on."
         }
         className={field}
       />
-      {kind !== "NORMAL" ? (
+      {structured && choices.length > 0 ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className={labelCls}>Title</label>
-            <input name="title" required className={field} placeholder="18-unit multifamily, Newark NJ" />
+            <input name="title" required className={field} placeholder="Multifamily site, Austin TX" />
           </div>
           <div>
-            <label className={labelCls}>{kind === "DEAL" ? "Raising" : "Size"}</label>
-            <input name="raiseLabel" required className={field} placeholder={kind === "DEAL" ? "$2.5M" : "40k sf"} />
+            <label className={labelCls}>{kind === "DEAL" ? "Amount" : "Size"}</label>
+            <input name="raiseLabel" required className={field} placeholder={kind === "DEAL" ? "$2.5M" : "120 units"} />
           </div>
           <div>
             <label className={labelCls}>Asset class</label>
-            <input name="assetClass" required className={field} placeholder="Multifamily" />
+            <select name="assetClass" className={field} defaultValue="Multifamily" required>
+              {ASSET_CLASSES.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </select>
           </div>
           <div>
-            <label className={labelCls}>Market</label>
-            <select name="market" className={field} defaultValue="NJ">
-              {MARKETS.map((market) => (
+            <label className={labelCls}>State</label>
+            <select name="market" className={field} defaultValue="NJ" required>
+              {US_STATES.map((market) => (
                 <option key={market}>{market}</option>
               ))}
             </select>
@@ -79,57 +108,46 @@ export function Composer() {
                 </option>
               ))}
             </select>
-            {kind === "SEEKING" ? (
-              <p className="mt-1 text-[11px] leading-snug text-mut">
-                Square feet, units, and parcels are filed under Other scope, not a dollar band.
-              </p>
-            ) : null}
           </div>
-          {kind === "DEAL" ? (
-            <>
-              <div>
-                <label className={labelCls}>Target IRR</label>
-                <input name="targetIrr" className={field} placeholder="17.4%" />
-              </div>
-              <div>
-                <label className={labelCls}>Minimum</label>
-                <input name="minCheck" className={field} placeholder="$100K" />
-              </div>
-              <div>
-                <label className={labelCls}>Equity multiple</label>
-                <input name="equityMultiple" className={field} placeholder="1.8x" />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Role needed</label>
-                <select name="roleNeeded" className={field} defaultValue="GENERAL_CONTRACTOR">
-                  {ROLES.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {roleShort(role.label)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Deadline</label>
-                <input name="deadline" className={field} placeholder="Bids Nov 15" />
-              </div>
-            </>
-          )}
+          {kind === "SEEKING" ? (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Role needed</label>
+              <select name="roleNeeded" className={field} defaultValue="GENERAL_CONTRACTOR">
+                {ROLES.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {roleShort(role.label)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          <div>
+            <label className={labelCls}>Expires</label>
+            <input name="expiresAt" type="date" className={field} />
+          </div>
+          {kind === "SEEKING" ? (
+            <div>
+              <label className={labelCls}>Timing</label>
+              <input name="deadline" className={field} placeholder="Bids in November" />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {structured && choices.length > 0 ? (
+        <div className="mt-3 rounded border border-line bg-cream p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Seeking and Raising rules</p>
+          <div className="mt-2 max-h-64 overflow-y-auto text-sm" dangerouslySetInnerHTML={{ __html: rulesHtml }} />
+          <label className="mt-3 flex items-start gap-2 text-sm text-ink">
+            <input type="checkbox" name="rulesAck" value="yes" required className="mt-1" />
+            <span>I have read these rules. This post does not offer securities or promise a return. Dues are a flat fee, and none are charged on this test.</span>
+          </label>
         </div>
       ) : null}
       <div className="mt-3 flex justify-end">
-        <button className={btn} type="submit">
-          {kind === "DEAL" ? "Post deal" : kind === "SEEKING" ? "Post need" : "Post"}
+        <button className={btn} type="submit" disabled={structured && choices.length === 0}>
+          {kind === "DEAL" ? "Post raising" : kind === "SEEKING" ? "Post seeking" : "Post"}
         </button>
       </div>
-      {kind === "DEAL" ? (
-        <p className="mt-2 text-[11px] leading-relaxed text-mut">
-          Raise posts stay inside the member network and do not open a subscription. Deal materials stay behind an NDA acknowledgement.
-        </p>
-      ) : null}
       <div className="mt-2">
         <ModeratorNotice />
       </div>

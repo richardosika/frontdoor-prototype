@@ -6,6 +6,7 @@ import { chipOff, chipOn, dealCard, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { filterDeals, matchScore, sizeLabel } from "@/lib/domain";
 import { dealsQuery } from "@/lib/format";
+import { US_STATES, postIsPublic } from "@/lib/member-network";
 import { prisma } from "@/lib/prisma";
 import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 
@@ -19,13 +20,21 @@ export default async function DealsPage({
   const user = await requireUser();
   const params = await searchParams;
   const role = params.role && ROLES.some((item) => item.id === params.role) ? params.role : undefined;
-  const market = params.market === "NJ" || params.market === "NY" || params.market === "CT" ? params.market : undefined;
+  const market = params.market && (US_STATES as readonly string[]).includes(params.market) ? params.market : undefined;
   const size =
     params.size === "under-1" || params.size === "1-5" || params.size === "5+" || params.size === "scope" ? params.size : undefined;
-  const deals = await prisma.deal.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { sponsor: true },
-  });
+  const [dealRows, posts] = await Promise.all([
+    prisma.deal.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { sponsor: true },
+    }),
+    prisma.post.findMany({
+      where: { dealId: { not: null } },
+      select: { dealId: true, status: true, closedAt: true, expiresAt: true },
+    }),
+  ]);
+  const hidden = new Set(posts.filter((post) => post.dealId && !postIsPublic(post)).map((post) => post.dealId));
+  const deals = dealRows.filter((deal) => !hidden.has(deal.id));
   const filtered = filterDeals(
     deals.map((deal) => ({
       ...deal,
@@ -62,6 +71,22 @@ export default async function DealsPage({
           </FilterChip>
         ))}
       </div>
+      <form className="mt-3 flex flex-wrap items-center gap-2" action="/deals">
+        {role ? <input type="hidden" name="role" value={role} /> : null}
+        {size ? <input type="hidden" name="size" value={size} /> : null}
+        {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
+        <select name="market" className="min-h-11 rounded-sm border border-line bg-paper px-3 text-sm" defaultValue={market || ""}>
+          <option value="">Any state</option>
+          {US_STATES.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        <button className="min-h-11 rounded-sm border border-forest px-3 text-sm font-semibold text-forest" type="submit">
+          State
+        </button>
+      </form>
       <div className="mt-2 flex flex-wrap gap-2">
         {(["Any", "NJ", "NY", "CT"] as const).map((item) => (
           <FilterChip key={item} href={dealsQuery({ role, market: item === "Any" ? null : item, size, q: params.q })} on={(market || "Any") === item}>

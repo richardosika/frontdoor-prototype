@@ -131,6 +131,9 @@ export function Shell({
             </span>
           </Link>
         </div>
+        <Link href="/settings" className="mt-2 hidden min-h-11 items-center rounded-sm px-3 font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper lg:flex">
+          Settings
+        </Link>
         <form action={logoutAction} className="mt-2">
           <button className="min-h-11 w-full rounded-sm px-3 py-2 text-left font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper" type="submit">
             Sign out
@@ -195,7 +198,10 @@ export function Shell({
           <div className="absolute inset-x-0 bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] rounded-t border border-line bg-paper px-4 pb-4 pt-4">
             <p className="font-serif text-lg">{user.name}</p>
             <p className="text-xs text-mut">{tierLabel(user.tier)} member</p>
-            <Link href="/alerts" className="mt-3 flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+            <Link href="/settings" className="mt-3 flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+              Settings
+            </Link>
+            <Link href="/alerts" className="flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               Alerts
               {alerts > 0 ? <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{alerts}</span> : null}
             </Link>

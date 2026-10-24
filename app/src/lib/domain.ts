@@ -143,7 +143,7 @@ export function tierAfterAdminApprovesVouch(current: Tier): Tier {
   return "CONFIRMED";
 }
 
-export type AccessState = "PENDING" | "APPROVED" | "REJECTED" | null;
+export type AccessState = "PENDING" | "APPROVED" | "REJECTED" | "REMOVED" | null;
 
 export function canRequestDealAccess(input: {
   isSponsor: boolean;

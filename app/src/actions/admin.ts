@@ -324,6 +324,65 @@ export async function issueInviteForRequest(formData: FormData) {
   );
 }
 
+export async function moderatePost(formData: FormData) {
+  const admin = await requireAdmin();
+  const postId = String(formData.get("postId") || "");
+  const decision = String(formData.get("decision") || "");
+  const post = await prisma.post.findUnique({ where: { id: postId }, include: { author: true } });
+  if (!post) redirect("/admin/moderation");
+  if (decision === "PUBLISH") {
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { status: "PUBLISHED", flagReason: "", closedAt: null },
+    });
+    await notify(post.authorId, {
+      title: "Post published",
+      body: "A Private Floor administrator published your post.",
+      href: "/feed",
+    });
+  } else if (decision === "REJECT") {
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { status: "REJECTED", closedAt: new Date() },
+    });
+    await notify(post.authorId, {
+      title: "Post not published",
+      body: "A Private Floor administrator did not publish this post.",
+      href: "/feed",
+    });
+  } else {
+    redirect("/admin/moderation");
+  }
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "MODERATE_POST",
+      summary: `${admin.name} ${decision === "PUBLISH" ? "published" : "rejected"} a post by ${post.author.name}.`,
+    },
+  });
+  revalidatePath("/admin/moderation");
+  revalidatePath("/feed");
+  revalidatePath("/deals");
+  redirect("/admin/moderation?notice=Post+updated");
+}
+
+export async function resolveReport(formData: FormData) {
+  const admin = await requireAdmin();
+  const reportId = String(formData.get("reportId") || "");
+  const report = await prisma.report.findUnique({ where: { id: reportId } });
+  if (!report || report.status !== "OPEN") redirect("/admin/moderation");
+  await prisma.report.update({ where: { id: report.id }, data: { status: "RESOLVED" } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "RESOLVE_REPORT",
+      summary: `${admin.name} closed a member report.`,
+    },
+  });
+  revalidatePath("/admin/moderation");
+  redirect("/admin/moderation?notice=Report+closed");
+}
+
 export async function declineInviteRequest(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") || "");

@@ -17,7 +17,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 7. Step 5, **Membership dues**. Confirm the amount and the line **Founding member: dues waived during testing**. Both boxes are still required. The helper under **Submit application** is the sentence from the consent draft. Submit. There is no payment form. The acceptance rows store the time and each document’s parsed version.
 8. Open **View application status**. It should say **Application under review** and **Verification in progress**. It must not show a score or a source.
 9. In the admin session, open the application, choose **Needs more info**, and write what you need. Reload the status page, reply with a note, and optionally upload a file. The status returns to in review.
-10. Approve the application as an Invited member. Sign in with the new email and password. The feed shows **Membership status** and, until dismissed, the getting-started list: profile, a project or a search, how introductions work, community guidelines, and inviting a colleague.
+10. Approve the application as an Invited member. Sign in with the new email and password. The feed shows **Membership status** and a first-week checklist: profile, directory, community guidelines, a seeking or raising post, and an introduction. Directory and guidelines have **Mark done**. The other three complete when you save a profile, post, or request an introduction.
 11. Sign in with a wrong password. The message stays generic. Sign in with the right password on an application that is still open. The message says the application is under review. On a declined application the message says it was not approved, with no reasons.
 
 ## Admin side
@@ -38,6 +38,21 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 8. `/admin/members` and a member’s page show legal acceptances after an approval (document, version, time, IP hash).
 9. **Delete all test data** removes `is_test` applications and leftover `is_test` members, including a custom test applicant. It asks for confirmation. Seeded demo members that are not `is_test` stay.
 10. **Create a test applicant** takes a name, company, email, and website, marks the row `is_test`, and queues a live verification run. Use it for a public company or a made-up name without going through `/apply`.
+
+## After signup
+
+Sign in as a member. Nothing here shows another member’s email or phone. Badges say **Verified** or **Verification in progress**. Wording says Private Floor administrator. No dues are charged.
+
+1. **Feed.** Complete the checklist. Post an update, a raising post, or a seeking post. Raising and seeking show the Seeking and Raising rules and require the acknowledgement box. A post that mentions IRR, a percent, accredited investors, a subscription, or similar language is held and does not appear for other members.
+2. **Profile** (`/profile`). Edit markets, deal types, asset classes, check size or deal size, what you are looking for, what you offer, bio, website, and an optional business card.
+3. **Network** (`/network`). Search and filter by role, state, deal type, and asset class. **Request introduction** sends a short note. The other member accepts or declines on Network. Accept opens a thread in Messages. Decline does not.
+4. **Messages.** Reply in the thread. Block and report stay on the member profile and in the thread. Unread messages show on the Messages tab.
+5. **Deals.** Search and filter, including any US state. Open a deal, read the Deal-Room NDA, and request access. The room lists document name, type, and size only. The sponsor can remove a participant. Close or edit your own post from the deal page.
+6. **Alerts** and **Settings** (`/settings`). The bell lists in-app notices. Settings cover email copies of those notices, a password change, **Export my data**, and a deletion request. Email copies still land only in the Outbox for the test recipient.
+7. **Admin.** `/admin` shows the application funnel, active members, posts, and introductions. `/admin/moderation` is the queue for flagged posts and open reports. A member page can suspend, reinstate, or remove a non-admin.
+8. **Test console.** **Seed sample members** adds Dana, Gabe, and Lena Testfloor (`test.dev.floor@example.com`, `test.gc.floor@example.com`, `test.lp.floor@example.com`, password `cornicio-demo`). They are `is_test`. Dana has a published seeking post and a held post, Gabe has an accepted thread with Dana and a pending introduction to Lena, and Gabe can open Dana’s deal room. **Delete all test data** removes them with the other `is_test` rows.
+
+Also open `/legal/seeking-raising` and `/legal/deal-room-nda`. Both show the draft banner and the version line.
 
 ## What the offline samples are for
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { addDealDocument, postDealQuestion } from "@/actions/deals";
+import { addDealDocument, postDealQuestion, removeParticipant } from "@/actions/deals";
 import { TierBadge } from "@/components/badge";
 import { Banner } from "@/components/banner";
 import { MobileTitle } from "@/components/page-header";
@@ -19,7 +19,7 @@ export default async function DealRoomPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
@@ -51,12 +51,12 @@ export default async function DealRoomPage({
         <Link href={`/deals/${deal.id}`} className="hidden min-h-11 items-center text-sm text-mut md:inline-flex">
           ‹ {deal.title}
         </Link>
-        <Banner error={query.error} />
+        <Banner error={query.error} notice={query.notice} />
         <div className={`mt-3 p-5 ${card}`}>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Deal room</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
           <p className="mt-2 text-sm text-ink">
-            Approved members and {deal.sponsor.name} can share links, ask questions, and see what changed. {BRAND.name} does not host a subscription, wire, or file upload.
+            Approved members and {deal.sponsor.name} can list documents, ask questions, and see what changed. {BRAND.name} stores the file name, type, and size. It does not keep the file and does not process a payment.
           </p>
           <ul className="mt-4 divide-y divide-line">
             {members.map((person) => (
@@ -68,7 +68,18 @@ export default async function DealRoomPage({
                     {person.id === deal.sponsorId ? " · Sponsor" : ""}
                   </span>
                 </Link>
-                <TierBadge tier={person.tier} />
+                <span className="flex items-center gap-2">
+                  <TierBadge tier={person.tier} />
+                  {deal.sponsorId === user.id && person.id !== deal.sponsorId ? (
+                    <form action={removeParticipant}>
+                      <input type="hidden" name="dealId" value={deal.id} />
+                      <input type="hidden" name="requesterId" value={person.id} />
+                      <button className={btnOutline} type="submit">
+                        Remove
+                      </button>
+                    </form>
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>
@@ -76,16 +87,14 @@ export default async function DealRoomPage({
 
         <section className={`mt-4 p-5 ${card}`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Documents</h2>
-          <p className="mt-1 text-xs text-mut">Paste a link. Files stay wherever you already keep them.</p>
-          {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">No links yet.</p> : null}
+          <p className="mt-1 text-xs text-mut">PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.</p>
+          {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">No documents listed yet.</p> : null}
           <ul className="mt-3 divide-y divide-line">
             {deal.documents.map((document) => (
               <li key={document.id} className="py-3">
-                <a href={document.url} className="font-semibold text-forest underline decoration-brass underline-offset-2" target="_blank" rel="noreferrer">
-                  {document.title}
-                </a>
+                <p className="font-semibold text-forest">{document.title}</p>
                 <p className="text-xs text-mut">
-                  {document.author.name} · {timeAgo(document.createdAt)}
+                  {document.fileName || "File"} · {document.contentType || "unknown type"} · {document.sizeBytes ? `${Math.ceil(document.sizeBytes / 1024)} KB` : "size not recorded"} · {document.author.name} · {timeAgo(document.createdAt)}
                 </p>
                 {document.note ? <p className="mt-1 text-sm text-ink">{document.note}</p> : null}
               </li>
@@ -95,18 +104,18 @@ export default async function DealRoomPage({
             <input type="hidden" name="dealId" value={deal.id} />
             <div>
               <label className={labelCls}>Title</label>
-              <input name="title" className={field} placeholder="Offering summary" required />
+              <input name="title" className={field} placeholder="Site sketch" required />
             </div>
             <div>
-              <label className={labelCls}>Link</label>
-              <input name="url" type="url" className={field} placeholder="https://" required />
+              <label className={labelCls}>File</label>
+              <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" className="text-sm" required />
             </div>
             <div>
               <label className={labelCls}>Note</label>
-              <input name="note" className={field} placeholder="What this link is for" />
+              <input name="note" className={field} placeholder="What this file is for" />
             </div>
             <button className={btnOutline} type="submit">
-              Add link
+              List document
             </button>
           </form>
         </section>

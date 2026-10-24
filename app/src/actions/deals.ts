@@ -1,9 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireUser } from "@/lib/current-user";
 import { canRequestDealAccess } from "@/lib/domain";
+import { documentVersion, hashClientIp, readLegalMarkdown } from "@/lib/legal";
+import { documentListEntry } from "@/lib/member-network";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
@@ -42,24 +45,23 @@ export async function requestAccess(formData: FormData) {
     redirect(`/deals/${dealId}?error=${encodeURIComponent("You have sent too many access requests today.")}`);
   }
 
+  const headerList = await headers();
+  const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || headerList.get("x-real-ip") || "";
+  const ndaVersion = documentVersion(readLegalMarkdown("deal-room-nda.md"));
+  const nda = {
+    ndaAcknowledged: true,
+    ndaAcknowledgedAt: new Date(),
+    ndaVersion,
+    ndaIpHash: hashClientIp(ip || "unknown"),
+  };
   if (existing) {
     await prisma.dealAccess.update({
       where: { id: existing.id },
-      data: {
-        status: "PENDING",
-        ndaAcknowledged: true,
-        ndaAcknowledgedAt: new Date(),
-        reviewedAt: null,
-      },
+      data: { ...nda, status: "PENDING", reviewedAt: null },
     });
   } else {
     await prisma.dealAccess.create({
-      data: {
-        dealId,
-        requesterId: user.id,
-        ndaAcknowledged: true,
-        ndaAcknowledgedAt: new Date(),
-      },
+      data: { dealId, requesterId: user.id, ...nda },
     });
   }
 
@@ -182,20 +184,32 @@ export async function addDealDocument(formData: FormData) {
   const user = await requireUser();
   const dealId = String(formData.get("dealId") || "");
   const title = String(formData.get("title") || "").trim().slice(0, 120);
-  const url = String(formData.get("url") || "").trim().slice(0, 500);
   const note = String(formData.get("note") || "").trim().slice(0, 500);
   const room = `/deals/${dealId}/room`;
-  if (title.length < 2 || !/^https?:\/\//i.test(url)) {
-    redirect(`${room}?error=${encodeURIComponent("Add a title and a link that starts with http.")}`);
+  const upload = formData.get("file");
+  const file = upload instanceof File ? upload : null;
+  if (!file || title.length < 2) {
+    redirect(`${room}?error=${encodeURIComponent("Add a title and a PDF, JPG, or PNG.")}`);
   }
+  const checked = documentListEntry({ fileName: file.name, contentType: file.type || "application/octet-stream", sizeBytes: file.size });
+  if (!checked.ok) redirect(`${room}?error=${encodeURIComponent(checked.error)}`);
   const deal = await requireRoom(dealId, user.id);
   if (!deal) redirect(`/deals/${dealId}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
 
   await prisma.dealDocument.create({
-    data: { dealId, authorId: user.id, title, url, note },
+    data: {
+      dealId,
+      authorId: user.id,
+      title,
+      url: "",
+      note: note || "Name, type, and size only. The file itself is not stored on this host.",
+      fileName: file.name.slice(0, 180),
+      contentType: (file.type || "application/octet-stream").slice(0, 80),
+      sizeBytes: file.size,
+    },
   });
   await prisma.dealEvent.create({
-    data: { dealId, actorId: user.id, summary: `${user.name} added a document link: ${title}.` },
+    data: { dealId, actorId: user.id, summary: `${user.name} listed a document: ${title} (${file.name}, ${file.size} bytes).` },
   });
   revalidatePath(room);
   redirect(room);
@@ -240,4 +254,20 @@ export async function postDealQuestion(formData: FormData) {
   revalidatePath(room);
   revalidatePath("/alerts");
   redirect(room);
+}
+
+export async function removeParticipant(formData: FormData) {
+  const user = await requireUser();
+  const dealId = String(formData.get("dealId") || "");
+  const requesterId = String(formData.get("requesterId") || "");
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { sponsor: true } });
+  if (!deal || deal.sponsorId !== user.id) redirect("/deals");
+  const access = await prisma.dealAccess.findUnique({ where: { dealId_requesterId: { dealId, requesterId } } });
+  if (!access) redirect(`/deals/${dealId}/room`);
+  await prisma.dealAccess.update({ where: { id: access.id }, data: { status: "REMOVED", reviewedAt: new Date() } });
+  await prisma.dealEvent.create({
+    data: { dealId, actorId: user.id, summary: `${user.name} removed a participant from the room.` },
+  });
+  revalidatePath(`/deals/${dealId}/room`);
+  redirect(`/deals/${dealId}/room?notice=Participant+removed`);
 }

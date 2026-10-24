@@ -9,6 +9,7 @@ const LINKS = [
   ["/admin/sources", "Verification settings"],
   ["/admin/verification", "Verification files"],
   ["/admin/members", "Members"],
+  ["/admin/moderation", "Moderation queue"],
 ] as const;
 
 export function AdminNav({ current }: { current?: string }) {
