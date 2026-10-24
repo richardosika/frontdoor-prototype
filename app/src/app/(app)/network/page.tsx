@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { introduceMember, respondIntroduction } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
@@ -8,7 +9,7 @@ import { ProjectFilterBar } from "@/components/project-filters";
 import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { directoryMatch } from "@/lib/member-network";
-import { cleanProjectQuery, directoryNeedMatch, projectQuery, readQuery, sortDirectory } from "@/lib/project-filter";
+import { directoryNeedMatch, projectQuery, settleProjectQuery, sortDirectory } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
 import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 import { toPublicVerification, type VerificationStatus } from "@/lib/verification";
@@ -22,7 +23,9 @@ export default async function NetworkPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const filters = cleanProjectQuery(readQuery(params), "network");
+  const settled = settleProjectQuery("/network", params, "network");
+  if (settled.redirectTo) redirect(settled.redirectTo);
+  const filters = settled.filters;
   const role = filters.role || "";
   const state = filters.state || "";
   const dealType = filters.dealType || "";

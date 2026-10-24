@@ -11,6 +11,7 @@ import {
   projectQuery,
   queryString,
   safeFilterQuery,
+  settleProjectQuery,
   sortDirectory,
   sortProjects,
 } from "@/lib/project-filter";
@@ -129,6 +130,9 @@ describe("project filters", () => {
     expect(projectQuery("/deals", parsed)).toBe(href);
     expect(new URLSearchParams(href.split("?")[1]).get("size")).toBe("5+");
     expect(projectQuery("/deals", { role: "Any", market: "", q: "" })).toBe("/deals");
+    expect(settleProjectQuery("/deals", { asset: "Multifamily", q: "", size: "" }, "deals").redirectTo).toBe("/deals?asset=Multifamily");
+    expect(settleProjectQuery("/deals", { asset: "Multifamily" }, "deals").redirectTo).toBeNull();
+    expect(settleProjectQuery("/deals", { sort: "newest" }, "deals").redirectTo).toBe("/deals");
     expect(queryString(cleanProjectQuery({ asset: "storage", market: "nj", sort: "newest" }, "deals"))).toBe("market=NJ&asset=Storage");
     expect(cleanProjectQuery({ assetClass: "Condo", state: "CA", dealType: "Equity", sort: "name" }, "network")).toEqual({
       state: "CA",

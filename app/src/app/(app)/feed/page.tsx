@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { addComment, closePost, markChecklist, toggleLike, updatePost } from "@/actions/feed";
 import { reportPost } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
@@ -16,7 +17,7 @@ import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { readLegalMarkdown, stripVersionLine } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 import { checklistProgress, intentsForRole, postIsPublic } from "@/lib/member-network";
-import { cleanProjectQuery, filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, readQuery, sortProjects, stageLabel } from "@/lib/project-filter";
+import { filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, settleProjectQuery, sortProjects, stageLabel } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -36,7 +37,9 @@ export default async function FeedPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const filters = cleanProjectQuery(readQuery(params), "feed");
+  const settled = settleProjectQuery("/feed", params, "feed");
+  if (settled.redirectTo) redirect(settled.redirectTo);
+  const filters = settled.filters;
   const tab = filters.tab || "foryou";
   const error = typeof params.error === "string" ? params.error : undefined;
   const notice = typeof params.notice === "string" ? params.notice : undefined;

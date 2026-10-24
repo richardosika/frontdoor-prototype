@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
 import { PageHeader } from "@/components/page-header";
@@ -9,15 +10,14 @@ import { matchScore } from "@/lib/domain";
 import { postIsPublic } from "@/lib/member-network";
 import { prisma } from "@/lib/prisma";
 import {
-  cleanProjectQuery,
   filterSummary,
   inferNeed,
   needLabel,
+  narrowProjects,
   projectQuery,
-  readQuery,
+  settleProjectQuery,
   sortProjects,
   stageLabel,
-  narrowProjects,
 } from "@/lib/project-filter";
 import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 
@@ -30,7 +30,9 @@ export default async function DealsPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const filters = cleanProjectQuery(readQuery(params), "deals");
+  const settled = settleProjectQuery("/deals", params, "deals");
+  if (settled.redirectTo) redirect(settled.redirectTo);
+  const filters = settled.filters;
   const [dealRows, posts, saved] = await Promise.all([
     prisma.deal.findMany({
       orderBy: { createdAt: "desc" },

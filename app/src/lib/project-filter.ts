@@ -298,6 +298,27 @@ export function sortDirectory<T extends { name: string; createdAt: Date }>(rows:
   return copy;
 }
 
+/** Sends a messy form query to the short shareable URL. A clean query returns null. */
+export function settleProjectQuery(
+  path: "/deals" | "/feed" | "/network",
+  params: { [key: string]: string | string[] | undefined },
+  surface: FilterSurface,
+): { filters: ProjectQuery; redirectTo: string | null } {
+  const filters = cleanProjectQuery(readQuery(params), surface);
+  let dirty = false;
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "error" || key === "notice") continue;
+    const item = (Array.isArray(value) ? value[0] : value) ?? "";
+    if (filters[key as keyof ProjectQuery] !== item) dirty = true;
+  }
+  if (!dirty) return { filters, redirectTo: null };
+  const next = new URLSearchParams(queryString(filters));
+  if (typeof params.notice === "string" && params.notice) next.set("notice", params.notice);
+  if (typeof params.error === "string" && params.error) next.set("error", params.error);
+  const value = next.toString();
+  return { filters, redirectTo: value ? `${path}?${value}` : path };
+}
+
 export function filterSummary(filters: ProjectQuery): string {
   const parts = [
     filters.asset || filters.assetClass,
