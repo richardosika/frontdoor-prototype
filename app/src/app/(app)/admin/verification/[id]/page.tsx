@@ -25,7 +25,7 @@ export default async function VerificationCasePage({
     where: { id },
     include: {
       user: { select: { id: true, name: true, org: true, location: true } },
-      project: { select: { id: true, name: true, location: true, userId: true, user: { select: { name: true } } } },
+      project: { select: { id: true, name: true, location: true, year: true, userId: true, user: { select: { name: true } } } },
       checks: { orderBy: { label: "asc" }, include: { reviewer: { select: { name: true } } } },
       events: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
     },
@@ -51,7 +51,8 @@ export default async function VerificationCasePage({
       </header>
       <div className="mx-auto max-w-3xl px-4 pb-8 pt-3 md:pt-6 lg:px-8">
       <PageHeader title={heading.title} />
-      <p className="mt-1 hidden text-sm text-mut md:block">{heading.detail}</p>
+      <h1 className="font-serif text-2xl font-normal leading-tight md:hidden">{heading.title}</h1>
+      <p className="mt-1 text-sm text-mut">{heading.detail}</p>
       <p className="mt-1 text-sm text-mut">
         <Link href="/admin/verification" className="text-brass">
           Verification queue

@@ -17,6 +17,22 @@ export function membershipTier(tier: string): MembershipTier {
   return tier === "CONFIRMED" ? "CONFIRMED" : "INVITED";
 }
 
+/** Who the match panel should count and link, based on the viewer's role. */
+export function matchAudience(role: string): { role: RoleId; singular: string; plural: string } {
+  if (role === "DEVELOPER") return { role: "INVESTOR_PE", singular: "investor", plural: "investors" };
+  if (role === "INVESTOR_PE" || role === "FAMILY_OFFICE" || role === "LENDER" || role === "MORTGAGE_BROKER") {
+    return { role: "DEVELOPER", singular: "sponsor", plural: "sponsors" };
+  }
+  return { role: "DEVELOPER", singular: "developer", plural: "developers" };
+}
+
+export function marketToken(location: string): string {
+  if (/\bNJ\b/.test(location)) return "NJ";
+  if (/\bNY\b/.test(location)) return "NY";
+  if (/\bCT\b/.test(location)) return "CT";
+  return "";
+}
+
 export const MARKETS = ["NJ", "NY", "CT"] as const;
 
 export const SIZE_BANDS = [

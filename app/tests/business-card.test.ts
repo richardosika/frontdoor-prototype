@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BUSINESS_CARD_MAX_BYTES, sniffBusinessCard, validateBusinessCard } from "@/lib/business-card";
 import { AUDIT_TIME_ZONE, formatAuditTime } from "@/lib/format";
-import { isSystemNotice, systemNoticeLabel } from "@/lib/messaging";
-import { MEMBER_CHECKS, verificationDenial, verificationQueueLabel } from "@/lib/verification";
+import { isRenderedSystemNotice, isSystemNotice, systemNoticeLabel, systemNoticeLabelFor } from "@/lib/messaging";
+import { MEMBER_CHECKS, committeeFileLabel, verificationDenial, verificationQueueLabel } from "@/lib/verification";
 
 describe("business card files", () => {
   it("accepts jpg, png, and pdf only when the type matches the bytes", () => {
@@ -36,6 +36,15 @@ describe("queue labels and system notices", () => {
         project: { name: "Court Street Flats", location: "Newark, NJ", user: { name: "Nora Singh" } },
       }),
     ).toBe("Court Street Flats · Nora Singh · Newark, NJ");
+    expect(
+      verificationQueueLabel({
+        subject: "PROJECT",
+        user: null,
+        project: { name: "Newark Ave Mixed-Use", location: "Newark, NJ", year: 2024, user: { name: "Elena Voss" } },
+      }),
+    ).toBe("Newark Ave Mixed-Use · Elena Voss · Newark, NJ · 2024");
+    expect(committeeFileLabel(true)).toBe("Committee file · Verified");
+    expect(committeeFileLabel(false)).toBe("Committee file · Verification in progress");
   });
 
   it("renders access, deal, connection, and vouch notices apart from chat", () => {
@@ -46,6 +55,11 @@ describe("queue labels and system notices", () => {
     expect(isSystemNotice("TEXT")).toBe(false);
     expect(isSystemNotice("INTRO")).toBe(false);
     expect(systemNoticeLabel("ACCESS")).toBe("Access");
+    expect(isRenderedSystemNotice("TEXT", "Rachel Kim requested access to the deal.")).toBe(true);
+    expect(isRenderedSystemNotice("TEXT", "Marcus Hale approved your request for the room.")).toBe(true);
+    expect(isRenderedSystemNotice("TEXT", "Tara Nguyen asked a question in the deal room for Newark.")).toBe(true);
+    expect(isRenderedSystemNotice("TEXT", "Happy to review the deck.")).toBe(false);
+    expect(systemNoticeLabelFor("TEXT", "asked a question in the deal room")).toBe("Deal room");
   });
 
   it("labels audit times in America/New_York", () => {

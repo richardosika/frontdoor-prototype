@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { reviewApplication } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
+import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 
@@ -33,7 +35,12 @@ export default async function ApplicationsPage({
       <ul className="mt-4 space-y-4">
         {applications.map((application) => (
           <li key={application.id} className={`${card} p-4`}>
-            <h2 className="font-serif text-xl font-normal">{application.name}</h2>
+            <h2 className="font-serif text-xl font-normal">
+              <Link href={`/admin/applications/${application.id}`} className="underline decoration-brass/40">
+                {application.name}
+              </Link>
+            </h2>
+            <p className="text-xs text-mut">Submitted {formatAuditTime(application.createdAt)}</p>
             <p className="text-sm text-mut">
               {application.email}
               {application.phone ? ` · ${application.phone}` : ""}

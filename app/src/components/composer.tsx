@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createPost } from "@/actions/feed";
+import { ModeratorNotice } from "@/components/moderator-notice";
 import { btn, field, labelCls } from "@/components/ui";
 import { SIZE_BANDS, MARKETS } from "@/lib/domain";
 import { ROLES, roleShort } from "@/lib/roles";
@@ -129,6 +130,9 @@ export function Composer() {
           Raise posts stay inside the member network and do not open a subscription. Deal materials stay behind an NDA acknowledgement.
         </p>
       ) : null}
+      <div className="mt-2">
+        <ModeratorNotice />
+      </div>
     </form>
   );
 }

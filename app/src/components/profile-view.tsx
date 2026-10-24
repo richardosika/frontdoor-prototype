@@ -169,18 +169,23 @@ export function ProfileView({
         <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
           <Stat value={String(projectCount)} label="Projects" />
           <Stat value={String(vouchCount)} label="Vouches" />
-          <Stat value={tierLabel(member.tier)} label="Tier" />
+          <Stat value={tierLabel(member.tier)} label="Membership" />
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership tier</h2>
+        {verification.showBadge && shownTier === "INVITED" ? (
+          <p className="mt-3 text-xs leading-relaxed text-ink">
+            This committee file is verified. Membership stays Invited until the committee accepts a vouch.
+          </p>
+        ) : null}
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership</h2>
         <p className="mb-2 text-xs leading-relaxed text-ink">
-          Tier is Invited or Confirmed. The brass Verified badge is a separate committee file. A Confirmed member can still show “Verification in progress” while that file is open.
+          Membership is Invited or Confirmed. The committee-file mark is separate. Marking a file Verified does not change membership. Confirmed follows an accepted vouch.
         </p>
         <div className="overflow-hidden rounded border border-line">
           {tiers.map(([id, copy]) => (
             <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${shownTier === id ? "border-l-[3px] border-l-brass bg-brass-soft" : ""}`}>
               <TierBadge tier={id} />
               <small className="text-[11px] leading-snug text-mut">
-                {shownTier === id ? <b className="text-forest">Current tier. </b> : null}
+                {shownTier === id ? <b className="text-forest">Current membership. </b> : null}
                 {copy}
               </small>
             </div>
@@ -230,7 +235,7 @@ export function ProfileView({
                     : null}
                   {isSelf && !canOpenProjectToCounterparties(project.verification) ? (
                     <p className="mt-2 text-xs leading-relaxed text-ink">
-                      A vouch cannot be requested until the committee marks this project Verified. Until then, counterparties cannot confirm it.
+                      Verification in progress. The vouch form stays hidden until an admin marks this project Verified. Counterparties cannot confirm it before then.
                     </p>
                   ) : null}
                   {isSelf && canOpenProjectToCounterparties(project.verification) ? (

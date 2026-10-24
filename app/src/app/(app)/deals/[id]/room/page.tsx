@@ -4,6 +4,7 @@ import { addDealDocument, postDealQuestion } from "@/actions/deals";
 import { TierBadge } from "@/components/badge";
 import { Banner } from "@/components/banner";
 import { MobileTitle } from "@/components/page-header";
+import { ModeratorNotice } from "@/components/moderator-notice";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
@@ -149,6 +150,7 @@ export default async function DealRoomPage({
             <button className={btn} type="submit">
               Post question
             </button>
+            <ModeratorNotice />
           </form>
         </section>
 

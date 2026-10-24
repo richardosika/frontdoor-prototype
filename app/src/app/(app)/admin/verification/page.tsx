@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card, chipOff, chipOn } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
@@ -27,7 +27,7 @@ export default async function VerificationQueuePage({
     orderBy: { updatedAt: "desc" },
     include: {
       user: { select: { name: true, org: true, location: true } },
-      project: { select: { name: true, location: true, user: { select: { name: true } } } },
+      project: { select: { name: true, location: true, year: true, user: { select: { name: true } } } },
     },
   });
   const awaiting = cases.filter((item) => isAwaitingVerification(item)).length;
@@ -38,8 +38,12 @@ export default async function VerificationQueuePage({
     return true;
   });
 
+  const labels = queueLabels(visible);
+
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
+    <div>
+      <MobileTitle href="/admin" label="Admin" title="Verification" />
+      <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Verification" />
       <p className="mt-1 text-sm text-ink">
         Admin only. Members never see this queue, the checklists, or the internal notes. {awaiting} awaiting review.
@@ -68,7 +72,7 @@ export default async function VerificationQueuePage({
             <li key={item.id}>
               <Link href={`/admin/verification/${item.id}`} className={`${card} flex min-h-11 items-center justify-between gap-3 px-4 py-3`}>
                 <span>
-                  <b className="block text-sm">{verificationQueueLabel(item)}</b>
+                  <b className="block text-sm">{labels.get(item.id)}</b>
                   <span className="text-xs text-mut">{item.subject === "MEMBER" ? "Member" : "Project"}</span>
                 </span>
                 <span className="text-xs font-semibold uppercase tracking-wider text-brass">{verificationStatusLabel(effective)}</span>
@@ -77,8 +81,21 @@ export default async function VerificationQueuePage({
           );
         })}
       </ul>
+      </div>
     </div>
   );
+}
+
+function queueLabels(items: (Parameters<typeof verificationQueueLabel>[0] & { id: string })[]) {
+  const base = items.map((item) => verificationQueueLabel(item));
+  const counts = new Map<string, number>();
+  for (const label of base) counts.set(label, (counts.get(label) ?? 0) + 1);
+  const labels = new Map<string, string>();
+  items.forEach((item, index) => {
+    const label = base[index] ?? "Case";
+    labels.set(item.id, (counts.get(label) ?? 0) > 1 ? `${label} · ${item.id.slice(-4)}` : label);
+  });
+  return labels;
 }
 
 function queueHref(input: { subject?: string; status?: string }) {

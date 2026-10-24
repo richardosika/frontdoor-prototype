@@ -1,8 +1,8 @@
-import { tierLabel } from "@/lib/format";
-import type { PublicVerification } from "@/lib/verification";
+import { membershipChipLabel } from "@/lib/format";
+import { committeeFileLabel, type PublicVerification } from "@/lib/verification";
 
 export function TierBadge({ tier }: { tier: string }) {
-  const label = tierLabel(tier);
+  const label = membershipChipLabel(tier);
   if (tier === "CONFIRMED") {
     return (
       <span className="inline-flex items-center gap-1 rounded-sm border border-brass bg-brass px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-paper">
@@ -29,16 +29,18 @@ export function VerifiedMark({ view }: { view: PublicVerification }) {
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="inline-flex items-center gap-1 rounded-sm border border-brass bg-brass px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-paper">
           <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-paper text-[8px] text-brass">✓</span>
-          Verified
+          {committeeFileLabel(true)}
         </span>
         <span className="text-[11px] text-mut">
-          Verified {verifiedOn}
+          File verified {verifiedOn}
           {expiresOn ? ` · Re-verify by ${expiresOn}` : ""}
         </span>
       </span>
     );
   }
-  return <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-mut">Verification in progress</span>;
+  return (
+    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-mut">{committeeFileLabel(false)}</span>
+  );
 }
 
 export function KindTag({ kind, roleLabel }: { kind: "DEAL" | "SEEKING" | "NORMAL"; roleLabel?: string }) {

@@ -6,7 +6,8 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BRAND } from "../src/lib/brand";
-import { MEMBER_CHECKS, PROJECT_CHECKS, type CheckResult, type VerificationStatus } from "../src/lib/verification";
+import { SEEDED_EXTRA_PROJECTS, SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES } from "../src/lib/seed-coherence";
+import { MEMBER_CHECKS, PROJECT_CHECKS, type VerificationStatus } from "../src/lib/verification";
 
 const prisma = new PrismaClient();
 const passwordHash = bcrypt.hashSync("cornicio-demo", 10);
@@ -145,7 +146,7 @@ const people: Person[] = [
     role: "SECURITIES_ATTORNEY",
     org: "Rao Securities Law",
     location: "New York, NY",
-    tier: "CONFIRMED",
+    tier: "INVITED",
     credentialNote: "Admitted to NY Bar (2009) · good standing · disciplinary search clear",
     bio: `Fund formation counsel. Fictional. ${BRAND.name} does not run offerings.`,
   },
@@ -169,7 +170,7 @@ const people: Person[] = [
     role: "ARCHITECT_ENGINEER",
     org: "Liu Studio Architects",
     location: "Jersey City, NJ",
-    tier: "CONFIRMED",
+    tier: "INVITED",
     credentialNote: "Business card matched to public records",
     bio: "Multifamily and adaptive reuse. Fictional.",
   },
@@ -251,8 +252,8 @@ async function main() {
   const reset = process.env.SEED === "reset";
   const members = await prisma.user.count();
   if (!reset && members > 0) {
-    await ensureMissingVerificationCases();
-    console.log("Database already has members. Skipping seed. Set SEED=reset to wipe and reseed.");
+    await alignSeededDemo();
+    console.log("Database already has members. Aligned seeded verification, tiers, and access. Set SEED=reset to wipe and reseed.");
     return;
   }
   if (reset) {
@@ -732,6 +733,7 @@ async function main() {
     ],
   });
 
+  await ensureExtraProjects();
   await seedVerification();
 
   console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
@@ -767,7 +769,6 @@ async function ensureMissingVerificationCases() {
 }
 
 async function seedVerification() {
-  const reviewedAt = hoursAgo(24 * 12);
   const users = await prisma.user.findMany({ select: { id: true } });
   const projects = await prisma.trackProject.findMany({ select: { id: true } });
   for (const user of users) {
@@ -793,142 +794,213 @@ async function seedVerification() {
     });
   }
 
-  await completeCase(
-    { userId: "user_mh" },
-    {
-      note: "File matches the public record.",
-      evidenceUrl: "https://example.com/hale-row-nj-entity",
-      internalNote: "OFAC and litigation screen clear. NJ entity matched. Do not show this note to the member.",
-      verifiedAt: reviewedAt,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 400),
-    },
-  );
-  await completeCase(
-    { userId: "user_pa" },
-    {
-      note: "Entity and insurance on file.",
-      evidenceUrl: "https://example.com/anand-entity",
-      internalNote: "Screen clear. Internal only.",
-      verifiedAt: reviewedAt,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 400),
-    },
-  );
-  await completeCase(
-    { projectId: "proj_ironbound" },
-    {
-      note: "Title, permits, and the accepted vouch are on file.",
-      evidenceUrl: "https://example.com/ironbound-title",
-      internalNote: "Open to counterparties. Purchase contract reviewed.",
-      verifiedAt: reviewedAt,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 200),
-    },
-  );
-  await completeCase(
-    { projectId: "proj_halsey" },
-    {
-      note: "Entitlements and GC budget reviewed.",
-      evidenceUrl: "https://example.com/halsey-permits",
-      internalNote: "Open to counterparties. Vouch still waiting on Elena Voss.",
-      verifiedAt: hoursAgo(24 * 2),
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
-    },
-  );
-
-  await setCase({ userId: "user_rk" }, "IN_REVIEW", "Identity matched. Business card and screen still open.");
-  await setCheck({ userId: "user_rk" }, "identity", "PASS", "LinkedIn and legal name match.", "https://example.com/rachel-linkedin");
-
-  await setCase({ userId: "user_ev" }, "NEEDS_INFO", "Business card did not match the public record for this name.");
-  await setCheck(
-    { userId: "user_ev" },
-    "license",
-    "NEEDS_INFO",
-    "Public-record match did not line up with the business card.",
-    "https://example.com/public-record",
-  );
-
-  await setCase({ userId: "user_bk" }, "REJECTED", "Sanctions screen did not clear. Internal only.");
-  await setCheck({ userId: "user_bk" }, "sanctions", "FAIL", "Screen hit. Do not describe this to the member.", "https://example.com/screen");
-
-  const expiredAt = hoursAgo(24 * 40);
-  await completeCase(
-    { userId: "user_am" },
-    {
-      note: "Prior file.",
-      evidenceUrl: "https://example.com/moore-file",
-      internalNote: "Expired. Re-verify before treating the badge as current.",
-      verifiedAt: hoursAgo(24 * 400),
-      expiresAt: expiredAt,
-    },
-  );
+  await alignSeedTiers();
+  await applySeedCaseMap();
+  await ensureDemoAccessAndNotices();
 }
 
-async function completeCase(
+async function alignSeededDemo() {
+  await ensureExtraProjects();
+  await ensureMissingVerificationCases();
+  await alignSeedTiers();
+  await applySeedCaseMap();
+  await ensureDemoAccessAndNotices();
+}
+
+async function ensureExtraProjects() {
+  for (const project of SEEDED_EXTRA_PROJECTS) {
+    const owner = await prisma.user.findUnique({ where: { id: project.userId }, select: { id: true } });
+    if (!owner) continue;
+    await prisma.trackProject.upsert({
+      where: { id: project.id },
+      create: { ...project },
+      update: {
+        name: project.name,
+        asset: project.asset,
+        location: project.location,
+        year: project.year,
+        valueLabel: project.valueLabel,
+        summary: project.summary,
+        userId: project.userId,
+      },
+    });
+  }
+  const project = await prisma.trackProject.findUnique({ where: { id: "proj_raritan" }, select: { id: true } });
+  if (!project) return;
+  await prisma.confirmation.upsert({
+    where: { token: "demo-raritan-confirmed" },
+    update: { status: "CONFIRMED", reviewStatus: "APPROVED", projectId: project.id },
+    create: {
+      projectId: project.id,
+      counterpartyName: "Leo Sandoval",
+      counterpartyEmail: "leo.sandoval@gsbridge.example",
+      token: "demo-raritan-confirmed",
+      status: "CONFIRMED",
+      reviewStatus: "APPROVED",
+      note: "We financed the storage hold.",
+      respondedAt: hoursAgo(24 * 15),
+    },
+  });
+}
+
+async function alignSeedTiers() {
+  for (const [id, file] of Object.entries(SEEDED_MEMBER_FILES)) {
+    let tier: "INVITED" | "CONFIRMED" = file.tier;
+    if (tier === "CONFIRMED") {
+      const approved = await prisma.confirmation.count({
+        where: { reviewStatus: "APPROVED", project: { userId: id } },
+      });
+      if (approved === 0) tier = "INVITED";
+    }
+    await prisma.user.updateMany({ where: { id }, data: { tier } });
+  }
+}
+
+async function applySeedCaseMap() {
+  const verifiedAt = hoursAgo(24 * 12);
+  const future = new Date(Date.now() + 1000 * 60 * 60 * 24 * 400);
+  const expiredAt = new Date("2025-06-01T00:00:00.000Z");
+  for (const [userId, file] of Object.entries(SEEDED_MEMBER_FILES)) {
+    await applyOneCase({ userId }, file.status, file.note, Boolean(file.expired), verifiedAt, file.expired ? expiredAt : future);
+  }
+  for (const [projectId, file] of Object.entries(SEEDED_PROJECT_FILES)) {
+    await applyOneCase({ projectId }, file.status, file.note, false, verifiedAt, future);
+  }
+}
+
+async function applyOneCase(
   where: { userId: string } | { projectId: string },
-  input: { note: string; evidenceUrl: string; internalNote: string; verifiedAt: Date; expiresAt: Date },
-) {
-  const record = await prisma.verificationCase.findFirst({ where });
-  if (!record) return;
-  await prisma.verificationCase.update({
-    where: { id: record.id },
-    data: {
-      status: "VERIFIED",
-      internalNote: input.internalNote,
-      verifiedAt: input.verifiedAt,
-      expiresAt: input.expiresAt,
-    },
-  });
-  await prisma.verificationCheck.updateMany({
-    where: { caseId: record.id },
-    data: {
-      result: "PASS",
-      note: input.note,
-      evidenceUrl: input.evidenceUrl,
-      reviewerId: "user_mh",
-      reviewedAt: input.verifiedAt,
-    },
-  });
-  await prisma.verificationEvent.create({
-    data: {
-      caseId: record.id,
-      actorId: "user_mh",
-      fromStatus: "NOT_STARTED",
-      toStatus: "VERIFIED",
-      summary: "Marcus Hale marked the checklist complete.",
-      createdAt: input.verifiedAt,
-    },
-  });
-}
-
-async function setCase(where: { userId: string } | { projectId: string }, status: VerificationStatus, internalNote: string) {
-  const record = await prisma.verificationCase.findFirst({ where });
-  if (!record) return;
-  await prisma.verificationCase.update({
-    where: { id: record.id },
-    data: { status, internalNote },
-  });
-  await prisma.verificationEvent.create({
-    data: {
-      caseId: record.id,
-      actorId: "user_mh",
-      fromStatus: "NOT_STARTED",
-      toStatus: status,
-      summary: `Marcus Hale set the status to ${status}.`,
-    },
-  });
-}
-
-async function setCheck(
-  where: { userId: string } | { projectId: string },
-  key: string,
-  result: CheckResult,
+  status: VerificationStatus,
   note: string,
-  evidenceUrl: string,
+  expired: boolean,
+  verifiedAt: Date,
+  expiresAt: Date,
 ) {
-  const record = await prisma.verificationCase.findFirst({ where });
+  const record = await prisma.verificationCase.findFirst({ where, include: { checks: true } });
   if (!record) return;
-  await prisma.verificationCheck.update({
-    where: { caseId_key: { caseId: record.id, key } },
-    data: { result, note, evidenceUrl, reviewerId: "user_mh", reviewedAt: hoursAgo(6) },
+  const data: {
+    status: VerificationStatus;
+    internalNote: string;
+    verifiedAt?: Date;
+    expiresAt?: Date;
+  } = { status, internalNote: note };
+  if (status === "VERIFIED") {
+    data.verifiedAt = record.verifiedAt ?? verifiedAt;
+    data.expiresAt = expired ? expiresAt : record.expiresAt && record.expiresAt.getTime() > Date.now() ? record.expiresAt : expiresAt;
+  }
+  const changed = record.status !== status || record.internalNote !== note;
+  await prisma.verificationCase.update({ where: { id: record.id }, data });
+  if (status === "VERIFIED") {
+    await prisma.verificationCheck.updateMany({
+      where: { caseId: record.id },
+      data: { result: "PASS", note, reviewerId: "user_mh", reviewedAt: verifiedAt },
+    });
+  }
+  if ("userId" in where && status === "NEEDS_INFO") {
+    await prisma.verificationCheck.updateMany({
+      where: { caseId: record.id, key: "license" },
+      data: { result: "NEEDS_INFO", note, reviewerId: "user_mh", reviewedAt: hoursAgo(6) },
+    });
+  }
+  if ("projectId" in where && status === "NEEDS_INFO") {
+    await prisma.verificationCheck.updateMany({
+      where: { caseId: record.id, key: "title" },
+      data: { result: "NEEDS_INFO", note, reviewerId: "user_mh", reviewedAt: hoursAgo(6) },
+    });
+  }
+  if (status === "REJECTED") {
+    await prisma.verificationCheck.updateMany({
+      where: { caseId: record.id, key: "sanctions" },
+      data: { result: "FAIL", note, reviewerId: "user_mh", reviewedAt: hoursAgo(6) },
+    });
+  }
+  if (changed) {
+    await prisma.verificationEvent.create({
+      data: {
+        caseId: record.id,
+        actorId: "user_mh",
+        fromStatus: record.status,
+        toStatus: status,
+        summary: expired ? "Seed alignment set this file to expired." : `Seed alignment set this file to ${status}.`,
+      },
+    });
+  }
+}
+
+async function ensureDemoAccessAndNotices() {
+  const hoboken = await prisma.deal.findUnique({ where: { id: "deal_hoboken" }, select: { id: true } });
+  if (hoboken) {
+    const daniel = await prisma.user.findUnique({ where: { id: "user_dp" }, select: { id: true } });
+    const julian = await prisma.user.findUnique({ where: { id: "user_jw" }, select: { id: true } });
+    if (daniel) {
+      await prisma.dealAccess.upsert({
+        where: { dealId_requesterId: { dealId: hoboken.id, requesterId: daniel.id } },
+        update: {},
+        create: {
+          dealId: hoboken.id,
+          requesterId: daniel.id,
+          status: "PENDING",
+          ndaAcknowledged: true,
+          ndaAcknowledgedAt: hoursAgo(2),
+        },
+      });
+    }
+    if (julian) {
+      await prisma.dealAccess.upsert({
+        where: { dealId_requesterId: { dealId: hoboken.id, requesterId: julian.id } },
+        update: {},
+        create: {
+          dealId: hoboken.id,
+          requesterId: julian.id,
+          status: "APPROVED",
+          ndaAcknowledged: true,
+          ndaAcknowledgedAt: hoursAgo(30),
+          reviewedAt: hoursAgo(20),
+        },
+      });
+    }
+  }
+  await ensureSystemLine({
+    a: "user_mh",
+    b: "user_rk",
+    from: "user_rk",
+    kind: "ACCESS",
+    body: `Rachel Kim requested access to "18-unit multifamily, Newark NJ" and acknowledged the NDA. Review it on the deal page.`,
+  });
+  await ensureSystemLine({
+    a: "user_mh",
+    b: "user_rk",
+    from: "user_mh",
+    kind: "ACCESS",
+    body: `Marcus Hale approved your request for "18-unit multifamily, Newark NJ". Open the deal room.`,
+  });
+  await ensureSystemLine({
+    a: "user_mh",
+    b: "user_tn",
+    from: "user_tn",
+    kind: "DEAL",
+    body: `Tara Nguyen asked a question in the deal room for 18-unit multifamily, Newark NJ: What is the current occupancy?`,
+  });
+}
+
+async function ensureSystemLine(input: { a: string; b: string; from: string; kind: string; body: string }) {
+  const people = await prisma.user.count({ where: { id: { in: [input.a, input.b, input.from] } } });
+  if (people < 3 && input.from !== input.a && input.from !== input.b) return;
+  if ((await prisma.user.count({ where: { id: { in: [input.a, input.b] } } })) < 2) return;
+  const [userAId, userBId] = input.a < input.b ? [input.a, input.b] : [input.b, input.a];
+  let conversation = await prisma.conversation.findUnique({ where: { userAId_userBId: { userAId, userBId } } });
+  if (!conversation) {
+    conversation = await prisma.conversation.create({ data: { userAId, userBId } });
+  }
+  const existing = await prisma.message.findFirst({ where: { conversationId: conversation.id, body: input.body } });
+  if (existing) {
+    if (existing.kind !== input.kind) {
+      await prisma.message.update({ where: { id: existing.id }, data: { kind: input.kind } });
+    }
+    return;
+  }
+  await prisma.message.create({
+    data: { conversationId: conversation.id, senderId: input.from, body: input.body, kind: input.kind },
   });
 }
 

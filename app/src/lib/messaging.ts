@@ -8,11 +8,33 @@ export function isSystemNotice(kind: string): boolean {
   return (SYSTEM_NOTICE_KINDS as readonly string[]).includes(kind);
 }
 
+const SYSTEM_NOTICE_PHRASES = [
+  "requested access",
+  "approved your request",
+  "declined your request",
+  "asked a question in the deal room",
+  "replied in the deal room",
+];
+
+export function isRenderedSystemNotice(kind: string, body: string): boolean {
+  if (isSystemNotice(kind)) return true;
+  const text = body.toLowerCase();
+  return SYSTEM_NOTICE_PHRASES.some((phrase) => text.includes(phrase));
+}
+
 export function systemNoticeLabel(kind: string): string {
   if (kind === "ACCESS") return "Access";
   if (kind === "DEAL") return "Deal room";
   if (kind === "CONNECTION") return "Connection";
   if (kind === "VOUCH") return "Vouch";
+  return "Notice";
+}
+
+export function systemNoticeLabelFor(kind: string, body: string): string {
+  if (isSystemNotice(kind)) return systemNoticeLabel(kind);
+  const text = body.toLowerCase();
+  if (text.includes("deal room")) return "Deal room";
+  if (text.includes("access") || text.includes("approved your request") || text.includes("declined your request")) return "Access";
   return "Notice";
 }
 

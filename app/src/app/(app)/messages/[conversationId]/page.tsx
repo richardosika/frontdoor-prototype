@@ -9,7 +9,8 @@ import { ReportDialog } from "@/components/report-dialog";
 import { btn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { listConversations } from "@/lib/conversations";
-import { isSystemNotice, systemNoticeLabel } from "@/lib/messaging";
+import { ModeratorNotice } from "@/components/moderator-notice";
+import { isRenderedSystemNotice, systemNoticeLabelFor } from "@/lib/messaging";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 
@@ -97,10 +98,10 @@ export default async function ThreadPage({
           <Banner error={query.error} />
           {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">Say hello to {other.name}.</p> : null}
           {conversation.messages.map((message) => {
-            if (isSystemNotice(message.kind)) {
+            if (isRenderedSystemNotice(message.kind, message.body)) {
               return (
                 <article key={message.id} className="rounded border border-brass border-l-4 bg-cream px-3 py-3 text-sm text-ink">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brass">System · {systemNoticeLabel(message.kind)}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brass">System · {systemNoticeLabelFor(message.kind, message.body)}</p>
                   <p className="mt-1 leading-snug">{message.body}</p>
                 </article>
               );
@@ -122,13 +123,18 @@ export default async function ThreadPage({
           {messagingClosed ? (
             <p className="mb-3 text-sm text-mut">Messaging is closed between these members.</p>
           ) : (
-            <form action={sendMessage} className="mb-3 flex gap-2">
-              <input type="hidden" name="conversationId" value={conversation.id} />
-              <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
-              <button className={btn} type="submit">
-                Send
-              </button>
-            </form>
+            <>
+              <form action={sendMessage} className="mb-3 flex gap-2">
+                <input type="hidden" name="conversationId" value={conversation.id} />
+                <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
+                <button className={btn} type="submit">
+                  Send
+                </button>
+              </form>
+              <div className="mb-3">
+                <ModeratorNotice />
+              </div>
+            </>
           )}
           <ReportDialog userId={other.id} conversationId={conversation.id} label="Report" />
         </div>

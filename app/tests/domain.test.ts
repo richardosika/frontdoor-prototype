@@ -15,10 +15,13 @@ import {
   storedSizeBand,
   tierAfterAdminApprovesVouch,
   tierAfterCounterpartyConfirm,
+  marketToken,
+  matchAudience,
   membershipTier,
   validateApplication,
 } from "@/lib/domain";
-import { plural, tierLabel } from "@/lib/format";
+import { membershipChipLabel, plural, tierLabel } from "@/lib/format";
+import { SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES, seededCaseCount } from "@/lib/seed-coherence";
 import { shouldDiscardInviteRequest, validateInviteRequest, INVITE_REQUESTS_PER_EMAIL_PER_DAY } from "@/lib/invite-request";
 import { withinRateLimit } from "@/lib/messaging";
 import { GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, PENDING_APPROVAL_ERROR, signInFailureCopy } from "@/lib/sign-in";
@@ -251,7 +254,23 @@ describe("network and verification", () => {
     expect(tierLabel("VERIFIED")).toBe("Invited");
     expect(tierLabel("INVITED")).toBe("Invited");
     expect(tierLabel("CONFIRMED")).toBe("Confirmed");
+    expect(membershipChipLabel("INVITED")).toBe("Membership · Invited");
+    expect(membershipChipLabel("VERIFIED")).toBe("Membership · Invited");
+    expect(matchAudience("GENERAL_CONTRACTOR").role).toBe("DEVELOPER");
+    expect(matchAudience("DEVELOPER").role).toBe("INVESTOR_PE");
+    expect(marketToken("Hoboken, NJ")).toBe("NJ");
     expect(plural(1, "investor")).toBe("1 investor");
+    expect(seededCaseCount()).toBe(26);
+    expect(Object.keys(SEEDED_MEMBER_FILES)).toHaveLength(18);
+    expect(Object.keys(SEEDED_PROJECT_FILES)).toHaveLength(8);
+    expect(SEEDED_MEMBER_FILES.user_ev).toMatchObject({ tier: "INVITED", status: "NEEDS_INFO" });
+    expect(SEEDED_MEMBER_FILES.user_gl).toMatchObject({ tier: "INVITED", status: "VERIFIED" });
+    expect(SEEDED_MEMBER_FILES.user_ns.status).toBe("NOT_STARTED");
+    expect(SEEDED_MEMBER_FILES.user_ns.tier).toBe("INVITED");
+    for (const file of Object.values(SEEDED_MEMBER_FILES)) {
+      if (file.status === "NOT_STARTED") expect(file.tier).toBe("INVITED");
+      if (file.tier === "CONFIRMED") expect(file.status).toBe("VERIFIED");
+    }
     expect(plural(0, "investor")).toBe("0 investors");
     expect(ROLES.every((role) => !/licen[cs]e|nmls|bar id|id number/i.test(`${role.credentialLabel} ${role.credentialPlaceholder} ${role.check}`))).toBe(true);
   });

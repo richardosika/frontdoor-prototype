@@ -55,7 +55,7 @@ export default async function AdminPage({
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat href="/admin/applications" label="Pending applications" value={pending} />
         <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
-        <Stat href="/deals" label="Open access requests" value={access} />
+        <Stat href="/admin/access" label="Open access requests" value={access} />
         <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />
         <Stat href="/admin/messages" label="Reports for review" value={openReports} />
       </div>

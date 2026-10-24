@@ -197,11 +197,16 @@ export function ApplyWizard() {
               <label className={labelCls}>Anyone who can speak for you? (optional)</label>
               <textarea className={field} rows={3} value={statement} onChange={(event) => setStatement(event.target.value)} />
             </div>
+            {pending ? (
+              <p role="status" className="text-sm font-semibold text-forest">
+                Submitting your application…
+              </p>
+            ) : null}
             <div className="flex gap-2">
-              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(2)}>
+              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(2)} disabled={pending}>
                 Back
               </button>
-              <button className={`${btn} flex-1`} type="button" disabled={pending} onClick={submit}>
+              <button className={`${btn} flex-1`} type="button" disabled={pending} aria-busy={pending} onClick={submit}>
                 {pending ? "Submitting…" : "Submit application"}
               </button>
             </div>
@@ -221,7 +226,7 @@ export function ApplyWizard() {
               <p className="mt-1 text-ink">
                 1. The committee matches a business card to public records when one was uploaded
                 <br />
-                2. They verify the file internally. You do not need to name anyone.
+                2. Reference emails are optional. The committee keeps them only if you filled them in.
                 <br />
                 3. If approved, you sign in as an Invited member
               </p>

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
+import { matchAudience, marketToken } from "@/lib/domain";
 import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -31,7 +32,9 @@ export default async function FeedPage({
   const params = await searchParams;
   const tab = TABS.some((item) => item.id === params.tab) ? params.tab : "foryou";
 
-  const [posts, suggestions, application] = await Promise.all([
+  const audience = matchAudience(user.role);
+  const market = marketToken(user.location);
+  const [posts, suggestions, application, ownedCodes, matchCount] = await Promise.all([
     prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       take: 40,
@@ -48,7 +51,17 @@ export default async function FeedPage({
       take: 5,
     }),
     prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+    prisma.inviteCode.findMany({ where: { createdById: user.id } }),
+    prisma.user.count({
+      where: {
+        id: { not: user.id },
+        status: "ACTIVE",
+        role: audience.role,
+        ...(market ? { location: { contains: market } } : {}),
+      },
+    }),
   ]);
+  const unusedCodes = ownedCodes.filter((code) => code.uses < code.maxUses).map((code) => ({ code: code.code, note: code.note }));
 
   const connections = await prisma.connection.findMany({
     where: { status: "ACCEPTED", OR: [{ fromId: user.id }, { toId: user.id }] },
@@ -64,8 +77,6 @@ export default async function FeedPage({
     if (tab === "circle") return circle.has(post.authorId);
     return true;
   });
-
-  const investors = suggestions.filter((person) => person.role === "INVESTOR_PE" || person.role === "FAMILY_OFFICE");
 
   return (
     <div className="mx-auto grid max-w-[1180px] gap-6 px-4 pb-6 pt-3 md:pt-6 lg:grid-cols-[minmax(0,760px)_320px] lg:px-8">
@@ -130,7 +141,7 @@ export default async function FeedPage({
               Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
             </p>
           </div>
-          <ColleagueInvite />
+          <ColleagueInvite codes={unusedCodes} />
         </div>
         <div className="mt-4">
           <Composer />
@@ -221,9 +232,9 @@ export default async function FeedPage({
       <aside className="hidden space-y-4 lg:block">
         <div className={matchPanel}>
           <div className="text-[10px] uppercase tracking-[0.16em] text-sand">Match suggestions</div>
-          <p className="mt-1 font-serif text-xl">{plural(investors.length, "investor")} in your markets</p>
+          <p className="mt-1 font-serif text-xl">{plural(matchCount, audience.singular, audience.plural)} in your markets</p>
           <p className="mt-2 text-xs text-sand">Rules match on role, market, and size. This is a directory, not a solicitation.</p>
-          <Link href="/network?role=INVESTOR_PE" className={`${btnBrass} mt-3`}>
+          <Link href={`/network?role=${audience.role}`} className={`${btnBrass} mt-3`}>
             Review matches
           </Link>
         </div>
@@ -250,7 +261,7 @@ export default async function FeedPage({
             Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
           </p>
         </div>
-        <ColleagueInvite />
+        <ColleagueInvite codes={unusedCodes} />
       </aside>
     </div>
   );

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { CopyCode } from "@/components/copy-code";
 import { btn, field } from "@/components/ui";
 import { ROLES } from "@/lib/roles";
 
-export function ColleagueInvite() {
+export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: string }[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [statusUrl, setStatusUrl] = useState("");
@@ -39,6 +40,14 @@ export function ColleagueInvite() {
   return (
     <div className="rounded border border-line bg-paper p-4">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite a colleague</h2>
+      {codes.length ? (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-ink">Unused codes you can pass along. Private Floor does not email them.</p>
+          {codes.map((item) => (
+            <CopyCode key={item.code} code={item.code} caption={item.note || "Invite code"} />
+          ))}
+        </div>
+      ) : null}
       {statusUrl ? (
         <div className="mt-2 text-xs leading-relaxed text-ink">
           <p>Request sent. Share this private status link. It shows pending, issued, or declined, and it does not include an invite code.</p>
@@ -48,7 +57,9 @@ export function ColleagueInvite() {
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
-          <p className="text-xs text-ink">The committee issues the code and passes it along. Private Floor does not email codes.</p>
+          <p className="text-xs text-ink">
+            Request a code. You get a private status link that never includes the code. The committee issues it on Admin, copies it there, and passes it along.
+          </p>
           <label className="absolute -left-[9999px]" aria-hidden="true">
             Website
             <input name="website" tabIndex={-1} autoComplete="off" />

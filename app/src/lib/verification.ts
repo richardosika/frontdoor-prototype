@@ -181,16 +181,21 @@ export function vouchEvidenceNote(input: { counterpartyName: string; projectName
 
 export const PUBLIC_VERIFICATION_KEYS = ["showBadge", "verifiedOn", "expiresOn", "statusLine"] as const;
 
+export function committeeFileLabel(showBadge: boolean): string {
+  return showBadge ? "Committee file · Verified" : "Committee file · Verification in progress";
+}
+
 export function verificationCaseHeading(input: {
   subject: string;
   user: { name: string; org?: string | null; location?: string | null } | null;
-  project: { name: string; location?: string | null; user?: { name: string } | null } | null;
+  project: { name: string; location?: string | null; year?: number | null; user?: { name: string } | null } | null;
 }): { title: string; detail: string } {
   if (input.subject === "PROJECT") {
     const title = input.project?.name?.trim() || "Project";
     const owner = input.project?.user?.name?.trim() || "Owner";
     const city = input.project?.location?.trim() || "";
-    return { title, detail: ["Project", owner, city].filter(Boolean).join(" · ") };
+    const year = input.project?.year ? String(input.project.year) : "";
+    return { title, detail: ["Project", owner, city, year].filter(Boolean).join(" · ") };
   }
   const title = input.user?.name?.trim() || "Member";
   const org = input.user?.org?.trim() || "";
@@ -201,13 +206,14 @@ export function verificationCaseHeading(input: {
 export function verificationQueueLabel(input: {
   subject: string;
   user: { name: string; org?: string | null; location?: string | null } | null;
-  project: { name: string; location?: string | null; user?: { name: string } | null } | null;
+  project: { name: string; location?: string | null; year?: number | null; user?: { name: string } | null } | null;
 }): string {
   if (input.subject === "PROJECT") {
     const name = input.project?.name?.trim() || "Project";
     const owner = input.project?.user?.name?.trim() || "Owner";
     const city = input.project?.location?.trim() || "";
-    return [name, owner, city].filter(Boolean).join(" · ");
+    const year = input.project?.year ? String(input.project.year) : "";
+    return [name, owner, city, year].filter(Boolean).join(" · ");
   }
   const name = input.user?.name?.trim() || "Member";
   const org = input.user?.org?.trim() || "";

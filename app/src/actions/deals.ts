@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/current-user";
+import { requireAdmin, requireUser } from "@/lib/current-user";
 import { canRequestDealAccess } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
@@ -78,55 +78,93 @@ export async function requestAccess(formData: FormData) {
 
 export async function reviewAccess(formData: FormData) {
   const user = await requireUser();
-  const accessId = String(formData.get("accessId") || "");
-  const decision = String(formData.get("decision") || "");
-  if (decision !== "APPROVED" && decision !== "REJECTED") redirect("/deals");
+  await settleAccess({
+    actor: user,
+    accessId: String(formData.get("accessId") || ""),
+    decision: String(formData.get("decision") || ""),
+    onBehalfOfSponsor: false,
+    returnTo: "/deals",
+  });
+}
+
+export async function adminReviewAccess(formData: FormData) {
+  const admin = await requireAdmin();
+  await settleAccess({
+    actor: admin,
+    accessId: String(formData.get("accessId") || ""),
+    decision: String(formData.get("decision") || ""),
+    onBehalfOfSponsor: true,
+    returnTo: "/admin/access",
+  });
+}
+
+async function settleAccess(input: {
+  actor: { id: string; name: string };
+  accessId: string;
+  decision: string;
+  onBehalfOfSponsor: boolean;
+  returnTo: string;
+}) {
+  if (input.decision !== "APPROVED" && input.decision !== "REJECTED") redirect(input.returnTo);
 
   const access = await prisma.dealAccess.findUnique({
-    where: { id: accessId },
-    include: { deal: true, requester: true },
+    where: { id: input.accessId },
+    include: { deal: { include: { sponsor: true } }, requester: true },
   });
-  if (!access || access.deal.sponsorId !== user.id) redirect("/deals");
+  if (!access) redirect(input.returnTo);
+  if (!input.onBehalfOfSponsor && access.deal.sponsorId !== input.actor.id) redirect("/deals");
+  const back = input.onBehalfOfSponsor ? "/admin/access" : `/deals/${access.dealId}`;
   if (!access.ndaAcknowledged) {
-    redirect(`/deals/${access.dealId}?error=${encodeURIComponent("NDA acknowledgement is missing.")}`);
+    redirect(`${back}?error=${encodeURIComponent("NDA acknowledgement is missing.")}`);
   }
 
   await prisma.dealAccess.update({
     where: { id: access.id },
-    data: { status: decision, reviewedAt: new Date() },
+    data: { status: input.decision, reviewedAt: new Date() },
   });
 
-  const decisionBody =
-    decision === "APPROVED"
-      ? `${user.name} approved your request for "${access.deal.title}". Open the deal room. ${BRAND.name} does not take a subscription or move funds.`
-      : `${user.name} declined your request for "${access.deal.title}".`;
+  const decisionBody = input.onBehalfOfSponsor
+    ? input.decision === "APPROVED"
+      ? `${input.actor.name} approved your request for "${access.deal.title}" on behalf of ${access.deal.sponsor.name}. Open the deal room. ${BRAND.name} does not take a subscription or move funds.`
+      : `${input.actor.name} declined your request for "${access.deal.title}" on behalf of ${access.deal.sponsor.name}.`
+    : input.decision === "APPROVED"
+      ? `${input.actor.name} approved your request for "${access.deal.title}". Open the deal room. ${BRAND.name} does not take a subscription or move funds.`
+      : `${input.actor.name} declined your request for "${access.deal.title}".`;
   const sent = await deliverPortalMessage({
-    from: user,
+    from: input.actor,
     toId: access.requesterId,
     kind: "ACCESS",
     body: decisionBody,
   });
   if (!sent.ok) {
     await notify(access.requesterId, {
-      title: decision === "APPROVED" ? "Access approved" : "Access declined",
+      title: input.decision === "APPROVED" ? "Access approved" : "Access declined",
       body: "You have a new message on Private Floor.",
-      href: decision === "APPROVED" ? `/deals/${access.dealId}/room` : `/deals/${access.dealId}`,
+      href: input.decision === "APPROVED" ? `/deals/${access.dealId}/room` : `/deals/${access.dealId}`,
     });
   }
-  if (decision === "APPROVED") {
+  if (input.decision === "APPROVED") {
     await prisma.dealEvent.create({
       data: {
         dealId: access.dealId,
-        actorId: user.id,
-        summary: `${user.name} approved ${access.requester.name} into the room.`,
+        actorId: input.actor.id,
+        summary: input.onBehalfOfSponsor
+          ? `${input.actor.name} approved ${access.requester.name} into the room on behalf of ${access.deal.sponsor.name}.`
+          : `${input.actor.name} approved ${access.requester.name} into the room.`,
       },
     });
   }
 
   revalidatePath(`/deals/${access.dealId}`);
   revalidatePath(`/deals/${access.dealId}/room`);
+  revalidatePath("/admin/access");
+  revalidatePath("/admin");
   revalidatePath("/alerts");
-  redirect(`/deals/${access.dealId}`);
+  const notice =
+    input.decision === "APPROVED"
+      ? `Approved ${access.requester.name} for ${access.deal.title}`
+      : `Declined ${access.requester.name} for ${access.deal.title}`;
+  redirect(`${back}?notice=${encodeURIComponent(notice)}`);
 }
 
 async function requireRoom(dealId: string, userId: string) {

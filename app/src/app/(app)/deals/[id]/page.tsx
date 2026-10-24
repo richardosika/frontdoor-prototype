@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requestAccess, reviewAccess } from "@/actions/deals";
+import { adminReviewAccess, requestAccess, reviewAccess } from "@/actions/deals";
 import { openConversation } from "@/actions/social";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
@@ -88,12 +88,19 @@ export default async function DealPage({
           </div>
         ) : mine?.status === "PENDING" ? (
           <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
-            <b>Request sent</b>
-            <p className="mt-1">You acknowledged the NDA. {deal.sponsor.name} still needs to approve access.</p>
+            <b>Pending — not approved</b>
+            <p className="mt-1">
+              Your request to {deal.sponsor.name} is waiting on sponsor review. It has not been approved. An admin can decide on {deal.sponsor.name}&apos;s behalf.
+            </p>
           </div>
         ) : (
           <form action={requestAccess} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <input type="hidden" name="dealId" value={deal.id} />
+            {mine?.status === "REJECTED" ? (
+              <p className="mb-2">
+                <b>Request declined.</b> {deal.sponsor.name} did not approve access. You can send a new request.
+              </p>
+            ) : null}
             <b>NDA acknowledgement required</b>
             <p className="mt-1 text-ink">{NDA_ACKNOWLEDGEMENT}</p>
             <label className="mt-3 flex items-start gap-2 text-ink">
@@ -115,9 +122,12 @@ export default async function DealPage({
             </form>
           </div>
         )}
-        {isSponsor ? (
+        {isSponsor || user.isAdmin ? (
           <section className="mt-6">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Access requests</h2>
+            {user.isAdmin && !isSponsor ? (
+              <p className="mt-1 text-xs text-ink">You are acting for {deal.sponsor.name}. The requester is told an admin decided.</p>
+            ) : null}
             {deal.access.length === 0 ? <p className="mt-2 text-sm text-mut">No requests yet.</p> : null}
             <ul className="mt-2 divide-y divide-line">
               {deal.access.map((access) => (
@@ -127,19 +137,19 @@ export default async function DealPage({
                       {access.requester.name}
                     </Link>
                     <span className="block text-xs text-mut">
-                      {roleShort(roleLabel(access.requester.role))} · {access.status}
+                      {roleShort(roleLabel(access.requester.role))} · {access.status === "PENDING" ? "Pending — not approved" : access.status}
                       {access.ndaAcknowledged ? " · NDA acknowledged" : ""}
                     </span>
                   </span>
                   {access.status === "PENDING" ? (
                     <span className="flex gap-2">
-                      <form action={reviewAccess}>
+                      <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
                         <button className={btnOutline} name="decision" value="REJECTED" type="submit">
                           Decline
                         </button>
                       </form>
-                      <form action={reviewAccess}>
+                      <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
                         <button className={btn} name="decision" value="APPROVED" type="submit">
                           Approve
