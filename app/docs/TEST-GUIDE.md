@@ -104,6 +104,15 @@ Help is the button on the lower right of signup, the public pages, and the signe
 4. `/admin/help` lists questions, with filters for unanswered, refused, and thumbs down. The list has the question text and the answer. It does not show a name or email. `/admin/help/faq` edits the articles Help retrieves. Unpublished articles drop out. The legal drafts stay in their files.
 5. Help pauses after 20 questions in an hour for that browser session.
 
+## Project filters
+
+Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.
+
+1. On `/deals`, set asset class, a state, project stage (land / entitlement, pre-construction, under construction, stabilized, recap), capital size, what is needed (equity, debt, GC, broker, legal / advisory), the poster’s role, and a posted window (7, 30, or 90 days). Add a keyword. Choose newest, oldest, or best match. Apply. The result count names the filters that are on. Clear returns to every public deal.
+2. Open Saved filters, name the current link, and save it. The named link comes back. Remove deletes only that saved row.
+3. On `/feed`, the same project filters apply to posts. The For you, Deals, Seeking, and My circle tabs keep the filters. A new raising or seeking post asks for stage and what is needed.
+4. On `/network`, filter by asset class (including condo and storage), state, deal type, what is needed, and role. Sort by name or newest. Stage, capital size, and posted date stay on deals and posts.
+
 ## What the offline samples are for
 
 The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or web search. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is unavailable and is listed under “What I could not check for free.” A source that answers with no match is “No data found.” Neither one approves anyone.

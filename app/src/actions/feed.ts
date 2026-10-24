@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { MemberRole } from "@prisma/client";
 import { requireUser } from "@/lib/current-user";
 import { SIZE_BANDS, storedSizeBand } from "@/lib/domain";
+import { isNeedId, isStageId } from "@/lib/project-filter";
 import { documentVersion, readLegalMarkdown } from "@/lib/legal";
 import { US_STATES, flagPostLanguage, intentById, postNeedsRulesAck } from "@/lib/member-network";
 import { notifyAdmins } from "@/lib/notify";
@@ -66,6 +67,10 @@ export async function createPost(formData: FormData) {
   if (band !== "scope" && !SIZE_BANDS.some((item) => item.id === band)) redirect("/feed?error=Choose+a+size");
   if (!assetClass) redirect("/feed?error=Add+an+asset+class");
   if (!raiseLabel) redirect("/feed?error=Add+the+amount+or+size");
+  const stage = String(formData.get("stage") || "");
+  const need = String(formData.get("need") || "");
+  if (!isStageId(stage)) redirect("/feed?error=Choose+a+project+stage");
+  if (!isNeedId(need)) redirect("/feed?error=Choose+what+is+needed");
   if (roleNeededRaw && !isRoleId(roleNeededRaw)) redirect("/feed?error=Choose+the+role+you+need");
   const flag = flagPostLanguage(`${title}\n${blurb}\n${raiseLabel}\n${assetClass}`);
   const rulesVersion = documentVersion(readLegalMarkdown("seeking-raising.md"));
@@ -82,6 +87,8 @@ export async function createPost(formData: FormData) {
       sizeBand: band,
       assetClass,
       raiseLabel,
+      stage,
+      need,
       targetIrr: "",
       minCheck: "",
       equityMultiple: "",
@@ -104,6 +111,8 @@ export async function createPost(formData: FormData) {
       body: blurb || summary,
       market,
       assetClass,
+      stage,
+      need,
       sizeRange: raiseLabel,
       rulesVersion,
       rulesAckAt: new Date(),

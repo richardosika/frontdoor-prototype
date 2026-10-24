@@ -6,6 +6,7 @@ import { ModeratorNotice } from "@/components/moderator-notice";
 import { btn, field, labelCls } from "@/components/ui";
 import { SIZE_BANDS } from "@/lib/domain";
 import { ASSET_CLASSES, US_STATES } from "@/lib/member-network";
+import { PROJECT_NEEDS, PROJECT_STAGES } from "@/lib/project-filter";
 import { ROLES, roleShort } from "@/lib/roles";
 
 type Kind = "NORMAL" | "DEAL" | "SEEKING";
@@ -88,6 +89,26 @@ export function Composer({
             <select name="assetClass" className={field} defaultValue="Multifamily" required>
               {ASSET_CLASSES.map((item) => (
                 <option key={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Project stage</label>
+            <select name="stage" className={field} defaultValue="pre-construction" required>
+              {PROJECT_STAGES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>What is needed</label>
+            <select key={kind} name="need" className={field} defaultValue={kind === "SEEKING" ? "gc" : "equity"} required>
+              {PROJECT_NEEDS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
               ))}
             </select>
           </div>

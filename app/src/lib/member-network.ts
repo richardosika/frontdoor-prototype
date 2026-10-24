@@ -1,6 +1,6 @@
 import type { MemberRole } from "@prisma/client";
 
-export const ASSET_CLASSES = ["Multifamily", "Industrial", "Office", "Retail", "Mixed-use", "Hospitality", "Land", "Other"] as const;
+export const ASSET_CLASSES = ["Multifamily", "Condo", "Industrial", "Office", "Retail", "Mixed-use", "Hospitality", "Land", "Storage", "Other"] as const;
 
 export const DEAL_TYPES = ["Equity", "Debt", "JV", "Sale", "Development", "Recapitalization", "Advisory"] as const;
 

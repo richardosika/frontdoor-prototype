@@ -2,12 +2,23 @@ import Link from "next/link";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
 import { PageHeader } from "@/components/page-header";
-import { chipOff, chipOn, dealCard, field } from "@/components/ui";
+import { ProjectFilterBar } from "@/components/project-filters";
+import { chipOff, chipOn, dealCard } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { filterDeals, matchScore, sizeLabel } from "@/lib/domain";
-import { dealsQuery } from "@/lib/format";
-import { US_STATES, postIsPublic } from "@/lib/member-network";
+import { matchScore } from "@/lib/domain";
+import { postIsPublic } from "@/lib/member-network";
 import { prisma } from "@/lib/prisma";
+import {
+  cleanProjectQuery,
+  filterSummary,
+  inferNeed,
+  needLabel,
+  projectQuery,
+  readQuery,
+  sortProjects,
+  stageLabel,
+  narrowProjects,
+} from "@/lib/project-filter";
 import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +26,12 @@ export const dynamic = "force-dynamic";
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; market?: string; size?: string; q?: string; error?: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const role = params.role && ROLES.some((item) => item.id === params.role) ? params.role : undefined;
-  const market = params.market && (US_STATES as readonly string[]).includes(params.market) ? params.market : undefined;
-  const size =
-    params.size === "under-1" || params.size === "1-5" || params.size === "5+" || params.size === "scope" ? params.size : undefined;
-  const [dealRows, posts] = await Promise.all([
+  const filters = cleanProjectQuery(readQuery(params), "deals");
+  const [dealRows, posts, saved] = await Promise.all([
     prisma.deal.findMany({
       orderBy: { createdAt: "desc" },
       include: { sponsor: true },
@@ -32,17 +40,35 @@ export default async function DealsPage({
       where: { dealId: { not: null } },
       select: { dealId: true, status: true, closedAt: true, expiresAt: true },
     }),
+    prisma.savedFilter.findMany({
+      where: { userId: user.id, surface: "deals" },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
   ]);
   const hidden = new Set(posts.filter((post) => post.dealId && !postIsPublic(post)).map((post) => post.dealId));
   const deals = dealRows.filter((deal) => !hidden.has(deal.id));
-  const filtered = filterDeals(
-    deals.map((deal) => ({
+  const filtered = sortProjects(
+    narrowProjects(
+      deals.map((deal) => ({
+        ...deal,
+        sponsorRole: deal.sponsor.role,
+        sponsorName: deal.sponsor.name,
+      })),
+      filters,
+    ).map((deal) => ({
       ...deal,
-      sponsorRole: deal.sponsor.role,
-      sponsorName: deal.sponsor.name,
+      match: matchScore({
+        memberRole: user.role,
+        memberLocation: user.location,
+        deal: { kind: deal.kind, roleNeeded: deal.roleNeeded, sponsorRole: deal.sponsorRole, market: deal.market },
+      }),
     })),
-    { role, market, size, query: params.q },
+    filters.sort,
   );
+  const summary = filterSummary(filters);
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const notice = typeof params.notice === "string" ? params.notice : undefined;
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
@@ -54,53 +80,21 @@ export default async function DealsPage({
           </Link>
         }
       />
-      <Banner error={params.error} />
-      <form className="mt-4 max-w-xl" action="/deals">
-        {role ? <input type="hidden" name="role" value={role} /> : null}
-        {market ? <input type="hidden" name="market" value={market} /> : null}
-        {size ? <input type="hidden" name="size" value={size} /> : null}
-        <input className={field} name="q" defaultValue={params.q || ""} placeholder="Search deals, markets, members" />
-      </form>
+      <Banner error={error} notice={notice} />
+      <ProjectFilterBar path="/deals" filters={filters} saved={saved} />
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <FilterChip href={dealsQuery({ market, size, q: params.q })} on={!role}>
+        <FilterChip href={projectQuery("/deals", { ...filters, role: undefined })} on={!filters.role}>
           All roles
         </FilterChip>
         {ROLES.map((item) => (
-          <FilterChip key={item.id} href={dealsQuery({ role: item.id, market, size, q: params.q })} on={role === item.id}>
+          <FilterChip key={item.id} href={projectQuery("/deals", { ...filters, role: item.id })} on={filters.role === item.id}>
             {roleShort(item.label)}
-          </FilterChip>
-        ))}
-      </div>
-      <form className="mt-3 flex flex-wrap items-center gap-2" action="/deals">
-        {role ? <input type="hidden" name="role" value={role} /> : null}
-        {size ? <input type="hidden" name="size" value={size} /> : null}
-        {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
-        <select name="market" className="min-h-11 rounded-sm border border-line bg-paper px-3 text-sm" defaultValue={market || ""}>
-          <option value="">Any state</option>
-          {US_STATES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <button className="min-h-11 rounded-sm border border-forest px-3 text-sm font-semibold text-forest" type="submit">
-          State
-        </button>
-      </form>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {(["Any", "NJ", "NY", "CT"] as const).map((item) => (
-          <FilterChip key={item} href={dealsQuery({ role, market: item === "Any" ? null : item, size, q: params.q })} on={(market || "Any") === item}>
-            Market: {item}
-          </FilterChip>
-        ))}
-        {(["Any", "under-1", "1-5", "5+", "scope"] as const).map((item) => (
-          <FilterChip key={item} href={dealsQuery({ role, market, size: item === "Any" ? null : item, q: params.q })} on={(size || "Any") === item}>
-            Size: {item === "Any" ? "Any" : sizeLabel(item)}
           </FilterChip>
         ))}
       </div>
       <p className="mt-4 text-xs text-mut">
         {filtered.length} result{filtered.length === 1 ? "" : "s"}
+        {summary ? ` · ${summary}` : ""}
       </p>
       {filtered.length === 0 ? (
         <div className="py-10 text-center text-sm text-mut">
@@ -114,22 +108,22 @@ export default async function DealsPage({
       ) : (
         <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((deal) => {
-            const score = matchScore({
-              memberRole: user.role,
-              memberLocation: user.location,
-              deal: { kind: deal.kind, roleNeeded: deal.roleNeeded, sponsorRole: deal.sponsorRole, market: deal.market },
-            });
+            const stage = stageLabel(deal.stage);
+            const need = needLabel(inferNeed(deal));
             return (
               <Link key={deal.id} href={`/deals/${deal.id}`} className={`flex flex-col p-4 transition hover:-translate-y-0.5 hover:shadow-card ${dealCard}`}>
                 <div className="flex items-center justify-between gap-2">
                   <KindTag kind={deal.kind} roleLabel={roleShort(roleLabel(deal.roleNeeded))} />
-                  <span className="text-xs font-semibold text-brass">{score}% match</span>
+                  <span className="text-xs font-semibold text-brass">{deal.match}% match</span>
                 </div>
                 <h2 className="mt-2 font-serif text-[17px] font-normal leading-snug">{deal.title}</h2>
                 <p className="mt-1 flex items-center gap-2 text-xs text-mut">
                   {deal.sponsorName} <TierBadge tier={deal.sponsor.tier} />
                 </p>
                 <p className="mt-2 flex-1 text-[13px] text-ink">{deal.blurb}</p>
+                <p className="mt-2 text-xs text-mut">
+                  {[deal.assetClass, stage, need].filter(Boolean).join(" · ")}
+                </p>
                 <div className="mt-3 flex gap-3 border-t border-line pt-3 text-xs text-mut">
                   <span>
                     <b className="text-forest">{deal.raiseLabel}</b>

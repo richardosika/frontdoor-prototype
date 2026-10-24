@@ -39,12 +39,25 @@ export function dealsQuery(input: {
   market?: string | null;
   size?: string | null;
   q?: string | null;
+  asset?: string | null;
+  stage?: string | null;
+  need?: string | null;
+  posted?: string | null;
+  sort?: string | null;
 }): string {
   const params = new URLSearchParams();
-  if (input.role && input.role !== "Any") params.set("role", input.role);
-  if (input.market && input.market !== "Any") params.set("market", input.market);
-  if (input.size && input.size !== "Any") params.set("size", input.size);
-  if (input.q) params.set("q", input.q);
+  const set = (key: string, value: string | null | undefined) => {
+    if (value && value !== "Any" && value !== "All") params.set(key, value);
+  };
+  set("role", input.role);
+  set("market", input.market);
+  set("size", input.size);
+  set("asset", input.asset);
+  set("stage", input.stage);
+  set("need", input.need);
+  set("posted", input.posted);
+  set("sort", input.sort);
+  set("q", input.q);
   const value = params.toString();
   return value ? `/deals?${value}` : "/deals";
 }

@@ -249,6 +249,7 @@ model User {
   crmOwned             CrmPerson[]          @relation("CrmOwner")
   crmProfile           CrmPerson?           @relation("CrmMember")
   crmNotes             CrmNote[]
+  savedFilters         SavedFilter[]
 
   @@index([paymentStatus])
 }
@@ -371,6 +372,8 @@ model Post {
   market       String     @default("")
   assetClass   String     @default("")
   sizeRange    String     @default("")
+  stage        String     @default("")
+  need         String     @default("")
   rulesVersion String     @default("")
   rulesAckAt   DateTime?
   flagReason   String     @default("")
@@ -418,6 +421,8 @@ model Deal {
   sizeBand       String
   assetClass     String
   raiseLabel     String
+  stage          String      @default("")
+  need           String      @default("")
   targetIrr      String      @default("")
   minCheck       String      @default("")
   equityMultiple String      @default("")
@@ -431,6 +436,18 @@ model Deal {
   events         DealEvent[]
 
   @@index([market, sizeBand, kind])
+}
+
+model SavedFilter {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  surface   String
+  query     String
+  createdAt DateTime @default(now())
+
+  @@index([userId, surface])
 }
 
 model DealAccess {

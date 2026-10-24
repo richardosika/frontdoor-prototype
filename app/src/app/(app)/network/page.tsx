@@ -4,11 +4,13 @@ import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { VerifiedMark } from "@/components/badge";
 import { PageHeader } from "@/components/page-header";
+import { ProjectFilterBar } from "@/components/project-filters";
 import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { ASSET_CLASSES, DEAL_TYPES, US_STATES, directoryMatch } from "@/lib/member-network";
+import { directoryMatch } from "@/lib/member-network";
+import { cleanProjectQuery, directoryNeedMatch, projectQuery, readQuery, sortDirectory } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
-import { isRoleId, ROLES, roleLabel, roleShort } from "@/lib/roles";
+import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 import { toPublicVerification, type VerificationStatus } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
@@ -16,32 +18,45 @@ export const dynamic = "force-dynamic";
 export default async function NetworkPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; q?: string; state?: string; dealType?: string; assetClass?: string; error?: string; notice?: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const role = params.role && isRoleId(params.role) ? params.role : "";
-  const state = params.state && (US_STATES as readonly string[]).includes(params.state) ? params.state : "";
-  const dealType = params.dealType && (DEAL_TYPES as readonly string[]).includes(params.dealType) ? params.dealType : "";
-  const assetClass = params.assetClass && (ASSET_CLASSES as readonly string[]).includes(params.assetClass) ? params.assetClass : "";
-  const rows = await prisma.user.findMany({
-    where: { status: "ACTIVE", id: { not: user.id } },
-    orderBy: { name: "asc" },
-  });
-  const members = rows.filter((member) =>
-    directoryMatch(
-      {
-        role: member.role,
-        location: member.location,
-        markets: member.markets,
-        dealTypes: member.dealTypes,
-        assetClasses: member.assetClasses,
-        name: member.name,
-        org: member.org,
-        bio: member.bio,
-      },
-      { role, state, dealType, assetClass, q: params.q },
+  const filters = cleanProjectQuery(readQuery(params), "network");
+  const role = filters.role || "";
+  const state = filters.state || "";
+  const dealType = filters.dealType || "";
+  const assetClass = filters.assetClass || "";
+  const [rows, saved] = await Promise.all([
+    prisma.user.findMany({
+      where: { status: "ACTIVE", id: { not: user.id } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.savedFilter.findMany({
+      where: { userId: user.id, surface: "network" },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+  ]);
+  const members = sortDirectory(
+    rows.filter(
+      (member) =>
+        directoryMatch(
+          {
+            role: member.role,
+            location: member.location,
+            markets: member.markets,
+            dealTypes: member.dealTypes,
+            assetClasses: member.assetClasses,
+            name: member.name,
+            org: member.org,
+            bio: member.bio,
+          },
+          { role, state, dealType, assetClass, q: filters.q },
+        ) &&
+        directoryNeedMatch(member, filters.need),
     ),
+    filters.sort,
   );
   const [introductions, cases] = await Promise.all([
     prisma.introduction.findMany({
@@ -71,19 +86,15 @@ export default async function NetworkPage({
     return toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null);
   }
 
-  const keep = new URLSearchParams();
-  if (role) keep.set("role", role);
-  if (state) keep.set("state", state);
-  if (dealType) keep.set("dealType", dealType);
-  if (assetClass) keep.set("assetClass", assetClass);
-  if (params.q) keep.set("q", params.q);
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const notice = typeof params.notice === "string" ? params.notice : undefined;
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Network" />
       <p className="mt-1 text-sm text-ink">Email and phone stay off this directory. Ask for an introduction. The conversation stays inside Private Floor.</p>
       <div className="mt-4">
-        <Banner error={params.error} notice={params.notice} />
+        <Banner error={error} notice={notice} />
       </div>
       {incoming.length ? (
         <section className="mb-4 rounded border border-brass bg-brass-soft p-4">
@@ -113,43 +124,20 @@ export default async function NetworkPage({
           </ul>
         </section>
       ) : null}
-      <form className="grid gap-3 md:grid-cols-4" action="/network">
-        {role ? <input type="hidden" name="role" value={role} /> : null}
-        <input className={`${field} md:col-span-4`} name="q" defaultValue={params.q || ""} placeholder="Search name, company, or bio" />
-        <select name="state" className={field} defaultValue={state}>
-          <option value="">Any state</option>
-          {US_STATES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select name="dealType" className={field} defaultValue={dealType}>
-          <option value="">Any deal type</option>
-          {DEAL_TYPES.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-        <select name="assetClass" className={field} defaultValue={assetClass}>
-          <option value="">Any asset class</option>
-          {ASSET_CLASSES.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-        <button className={btn} type="submit">
-          Filter
-        </button>
-      </form>
+      <ProjectFilterBar path="/network" filters={filters} saved={saved} />
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <RoleChip href={linkWithout(keep, "role")} on={!role}>
+        <RoleChip href={projectQuery("/network", { ...filters, role: undefined })} on={!role}>
           All
         </RoleChip>
         {ROLES.map((item) => (
-          <RoleChip key={item.id} href={linkWith(keep, "role", item.id)} on={role === item.id}>
+          <RoleChip key={item.id} href={projectQuery("/network", { ...filters, role: item.id })} on={role === item.id}>
             {roleShort(item.label)}
           </RoleChip>
         ))}
       </div>
+      <p className="mt-3 text-xs text-mut">
+        {members.length} member{members.length === 1 ? "" : "s"}
+      </p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {members.map((member) => {
           const intro = introFor(member.id);
@@ -198,19 +186,6 @@ export default async function NetworkPage({
       {members.length === 0 ? <p className="mt-6 text-sm text-mut">No members match those filters.</p> : null}
     </div>
   );
-}
-
-function linkWith(base: URLSearchParams, key: string, value: string) {
-  const next = new URLSearchParams(base);
-  next.set(key, value);
-  return `/network?${next}`;
-}
-
-function linkWithout(base: URLSearchParams, key: string) {
-  const next = new URLSearchParams(base);
-  next.delete(key);
-  const value = next.toString();
-  return value ? `/network?${value}` : "/network";
 }
 
 function RoleChip({ href, on, children }: { href: string; on: boolean; children: React.ReactNode }) {

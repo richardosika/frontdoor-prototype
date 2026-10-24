@@ -5,16 +5,18 @@ import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
 import { Composer } from "@/components/composer";
+import { ProjectFilterBar } from "@/components/project-filters";
 import { ColleagueInvite } from "@/components/colleague-invite";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
-import { matchAudience, marketToken } from "@/lib/domain";
+import { matchAudience, marketToken, matchScore } from "@/lib/domain";
 import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { readLegalMarkdown, stripVersionLine } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 import { checklistProgress, intentsForRole, postIsPublic } from "@/lib/member-network";
+import { cleanProjectQuery, filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, readQuery, sortProjects, stageLabel } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -30,19 +32,22 @@ const TABS = [
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string; error?: string; notice?: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const tab = TABS.some((item) => item.id === params.tab) ? params.tab : "foryou";
-  const query = (params.q || "").trim().toLowerCase();
+  const filters = cleanProjectQuery(readQuery(params), "feed");
+  const tab = filters.tab || "foryou";
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const notice = typeof params.notice === "string" ? params.notice : undefined;
+  const broad = Boolean(filters.q || filters.asset || filters.market || filters.size || filters.stage || filters.need || filters.posted || filters.role);
 
   const audience = matchAudience(user.role);
   const market = marketToken(user.location);
-  const [posts, suggestions, application, ownedCodes, matchCount, postCount, introCount] = await Promise.all([
+  const [posts, suggestions, application, ownedCodes, matchCount, postCount, introCount, saved] = await Promise.all([
     prisma.post.findMany({
       orderBy: { createdAt: "desc" },
-      take: 40,
+      take: broad ? 200 : 40,
       include: {
         author: true,
         deal: true,
@@ -67,6 +72,7 @@ export default async function FeedPage({
     }),
     prisma.post.count({ where: { authorId: user.id } }),
     prisma.introduction.count({ where: { OR: [{ fromId: user.id }, { toId: user.id }] } }),
+    prisma.savedFilter.findMany({ where: { userId: user.id, surface: "feed" }, orderBy: { createdAt: "desc" }, take: 12 }),
   ]);
   const checklist = checklistProgress({
     markets: user.markets,
@@ -87,34 +93,71 @@ export default async function FeedPage({
     circle.add(connection.fromId === user.id ? connection.toId : connection.fromId);
   }
 
-  const visible = posts.filter((post) => {
-    if (!postIsPublic(post) && post.authorId !== user.id && !user.isAdmin) return false;
-    if (query) {
-      const hay = `${post.body} ${post.title} ${post.market} ${post.assetClass} ${post.author.name} ${post.deal?.title ?? ""}`.toLowerCase();
-      if (!hay.includes(query)) return false;
-    }
-    if (tab === "deals") return post.kind === "DEAL";
-    if (tab === "seeking") return post.kind === "SEEKING";
-    if (tab === "circle") return circle.has(post.authorId);
-    return true;
-  });
+  const ranked = sortProjects(
+    narrowProjects(
+      posts.map((post) => ({
+        id: post.id,
+        sponsorRole: post.author.role,
+        roleNeeded: post.deal?.roleNeeded ?? null,
+        market: post.market || post.deal?.market || "",
+        sizeBand: post.deal?.sizeBand || "",
+        title: post.title || post.deal?.title || "",
+        sponsorName: post.author.name,
+        assetClass: post.assetClass || post.deal?.assetClass || "",
+        kind: post.kind === "DEAL" || post.kind === "SEEKING" ? post.kind : undefined,
+        raiseLabel: post.deal?.raiseLabel || post.sizeRange,
+        stage: post.stage || post.deal?.stage || "",
+        need: post.need || post.deal?.need || "",
+        intent: post.intent,
+        createdAt: post.createdAt,
+        keywords: `${post.body} ${post.author.org} ${post.author.name}`,
+        match:
+          post.kind === "DEAL" || post.kind === "SEEKING"
+            ? matchScore({
+                memberRole: user.role,
+                memberLocation: user.location,
+                deal: {
+                  kind: post.kind,
+                  roleNeeded: post.deal?.roleNeeded ?? null,
+                  sponsorRole: post.author.role,
+                  market: post.market || post.deal?.market || "",
+                },
+              })
+            : 0,
+      })),
+      filters,
+    ),
+    filters.sort,
+  );
+  const order = new Map(ranked.map((item, index) => [item.id, index]));
+  const visible = posts
+    .filter((post) => {
+      if (!postIsPublic(post) && post.authorId !== user.id && !user.isAdmin) return false;
+      if (!order.has(post.id)) return false;
+      if (tab === "deals") return post.kind === "DEAL";
+      if (tab === "seeking") return post.kind === "SEEKING";
+      if (tab === "circle") return circle.has(post.authorId);
+      return true;
+    })
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 
   return (
     <div className="mx-auto grid max-w-[1180px] gap-6 px-4 pb-6 pt-3 md:pt-6 lg:grid-cols-[minmax(0,760px)_320px] lg:px-8">
       <section>
         <PageHeader title="The Ledger" ledger />
-        <Banner error={params.error} notice={params.notice} />
+        <Banner error={error} notice={notice} />
         <div className="flex gap-5 overflow-x-auto border-b border-line font-serif text-[15px] text-mut">
           {TABS.map((item) => (
             <Link
               key={item.id}
-              href={item.id === "foryou" ? "/feed" : `/feed?tab=${item.id}`}
+              href={projectQuery("/feed", { ...filters, tab: item.id === "foryou" ? undefined : item.id })}
               className={`inline-flex min-h-11 shrink-0 items-center border-b-2 ${tab === item.id ? "border-brass font-semibold text-forest" : "border-transparent"}`}
             >
               {item.label}
             </Link>
           ))}
         </div>
+        <ProjectFilterBar path="/feed" filters={filters} saved={saved} />
         <section className="mt-4 rounded border border-brass bg-paper p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</p>
           <h2 className="mt-1 font-serif text-2xl font-normal">{tierLabel(user.tier)} member</h2>
@@ -165,9 +208,6 @@ export default async function FeedPage({
         <div className="mt-4 space-y-4 lg:hidden">
           <ColleagueInvite codes={unusedCodes} />
         </div>
-        <form className="mt-4" action={tab && tab !== "foryou" ? `/feed?tab=${tab}` : "/feed"}>
-          <input className="w-full min-h-11 rounded-sm border border-line bg-paper px-3 py-[11px] text-sm outline-none focus:border-brass" name="q" defaultValue={params.q || ""} placeholder="Search posts, markets, members" />
-        </form>
         <div className="mt-4">
           <Composer
             intents={intentsForRole(user.role).map((item) => ({ id: item.id, label: item.label, kind: item.kind }))}
@@ -175,7 +215,9 @@ export default async function FeedPage({
           />
         </div>
         <div className="mt-4 space-y-4">
-          {visible.length === 0 ? <p className="py-10 text-center text-sm text-mut">Nothing here yet.</p> : null}
+          {visible.length === 0 ? (
+            <p className="py-10 text-center text-sm text-mut">{filterSummary(filters) ? "No posts match these filters." : "Nothing here yet."}</p>
+          ) : null}
           {visible.map((post) => {
             const liked = post.likes.some((like) => like.userId === user.id);
             const seeking = post.kind === "SEEKING" ? roleShort(roleLabel(post.deal?.roleNeeded)) : undefined;
@@ -217,6 +259,14 @@ export default async function FeedPage({
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.market}</span>
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.assetClass}</span>
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.raiseLabel}</span>
+                    {stageLabel(post.stage || post.deal.stage) ? (
+                      <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{stageLabel(post.stage || post.deal.stage)}</span>
+                    ) : null}
+                    {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded })) ? (
+                      <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
+                        {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded }))}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="mt-3 flex items-center gap-4 border-t border-line pt-2 text-xs text-mut">

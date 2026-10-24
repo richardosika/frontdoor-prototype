@@ -428,6 +428,8 @@ async function main() {
     equityMultiple?: string;
     roleNeeded?: MemberRole;
     deadline?: string;
+    stage: string;
+    need: string;
     hours: number;
   }[] = [
     {
@@ -443,6 +445,8 @@ async function main() {
       targetIrr: "17.4%",
       minCheck: "$100K",
       equityMultiple: "1.8x",
+      stage: "stabilized",
+      need: "equity",
       hours: 2,
     },
     {
@@ -458,6 +462,8 @@ async function main() {
       targetIrr: "15.1%",
       minCheck: "$250K",
       equityMultiple: "1.6x",
+      stage: "stabilized",
+      need: "equity",
       hours: 26,
     },
     {
@@ -472,6 +478,8 @@ async function main() {
       raiseLabel: "40k sf",
       roleNeeded: "GENERAL_CONTRACTOR",
       deadline: "Bids Nov 15",
+      stage: "pre-construction",
+      need: "gc",
       hours: 5,
     },
     {
@@ -487,6 +495,8 @@ async function main() {
       targetIrr: "16.2%",
       minCheck: "$500K",
       equityMultiple: "1.9x",
+      stage: "construction",
+      need: "equity",
       hours: 72,
     },
     {
@@ -502,6 +512,8 @@ async function main() {
       targetIrr: "13.8%",
       minCheck: "$50K",
       equityMultiple: "1.5x",
+      stage: "stabilized",
+      need: "equity",
       hours: 96,
     },
     {
@@ -516,6 +528,8 @@ async function main() {
       raiseLabel: "64 units",
       roleNeeded: "ARCHITECT_ENGINEER",
       deadline: "RFP Dec 1",
+      stage: "construction",
+      need: "advisory",
       hours: 6,
     },
     {
@@ -530,6 +544,8 @@ async function main() {
       raiseLabel: "1 parcel",
       roleNeeded: "ZONING_ATTORNEY",
       deadline: "Hearing Jan 14",
+      stage: "land",
+      need: "advisory",
       hours: 48,
     },
     {
@@ -544,6 +560,8 @@ async function main() {
       raiseLabel: "$3.2M",
       roleNeeded: "LENDER",
       deadline: "Term sheets Nov 30",
+      stage: "pre-construction",
+      need: "debt",
       hours: 70,
     },
   ];
@@ -556,7 +574,13 @@ async function main() {
         authorId: data.sponsorId,
         kind: data.kind,
         dealId: data.id,
+        title: data.title,
         body: data.blurb,
+        market: data.market,
+        assetClass: data.assetClass,
+        stage: data.stage,
+        need: data.need,
+        sizeRange: data.raiseLabel,
         createdAt: hoursAgo(hours),
       },
     });
@@ -799,7 +823,47 @@ async function seedVerification() {
   await ensureDemoAccessAndNotices();
 }
 
+const DEMO_PROJECT_FIELDS: Record<string, { stage: string; need: string }> = {
+  deal_newark: { stage: "stabilized", need: "equity" },
+  deal_edison: { stage: "stabilized", need: "equity" },
+  deal_hoboken: { stage: "pre-construction", need: "gc" },
+  deal_brooklyn: { stage: "construction", need: "equity" },
+  deal_jc: { stage: "stabilized", need: "equity" },
+  deal_brarch: { stage: "construction", need: "advisory" },
+  deal_nzone: { stage: "land", need: "advisory" },
+  deal_edlend: { stage: "pre-construction", need: "debt" },
+};
+
+async function fillDemoProjectFields() {
+  for (const [id, fields] of Object.entries(DEMO_PROJECT_FIELDS)) {
+    const deal = await prisma.deal.findUnique({
+      where: { id },
+      select: { id: true, stage: true, market: true, assetClass: true, title: true },
+    });
+    if (!deal) continue;
+    if (!deal.stage) await prisma.deal.update({ where: { id }, data: fields });
+    const posts = await prisma.post.findMany({
+      where: { dealId: id },
+      select: { id: true, stage: true, need: true, market: true, title: true, assetClass: true },
+    });
+    for (const post of posts) {
+      if (post.stage && post.need && post.market && post.title && post.assetClass) continue;
+      await prisma.post.update({
+        where: { id: post.id },
+        data: {
+          stage: post.stage || fields.stage,
+          need: post.need || fields.need,
+          market: post.market || deal.market,
+          title: post.title || deal.title,
+          assetClass: post.assetClass || deal.assetClass,
+        },
+      });
+    }
+  }
+}
+
 async function alignSeededDemo() {
+  await fillDemoProjectFields();
   await ensureExtraProjects();
   await ensureMissingVerificationCases();
   await alignSeedTiers();
