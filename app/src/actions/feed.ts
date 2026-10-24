@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { MemberRole } from "@prisma/client";
 import { requireUser } from "@/lib/current-user";
-import { MARKETS } from "@/lib/domain";
+import { MARKETS, SIZE_BANDS, storedSizeBand } from "@/lib/domain";
 import { isRoleId, roleLabel } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
@@ -21,6 +21,7 @@ export async function createPost(formData: FormData) {
   }
 
   if (kind !== "DEAL" && kind !== "SEEKING") redirect("/feed?error=Choose+a+post+type");
+  const postKind = kind === "SEEKING" ? "SEEKING" : "DEAL";
 
   const title = String(formData.get("title") || "").trim();
   const market = String(formData.get("market") || "");
@@ -32,7 +33,8 @@ export async function createPost(formData: FormData) {
 
   if (title.length < 3) redirect("/feed?error=Add+a+title");
   if (!(MARKETS as readonly string[]).includes(market)) redirect("/feed?error=Choose+a+market");
-  if (!["under-1", "1-5", "5+"].includes(sizeBand)) redirect("/feed?error=Choose+a+size");
+  const band = storedSizeBand(postKind, sizeBand, raiseLabel);
+  if (band !== "scope" && !SIZE_BANDS.some((item) => item.id === band)) redirect("/feed?error=Choose+a+size");
   if (!assetClass) redirect("/feed?error=Add+an+asset+class");
   if (!raiseLabel) redirect("/feed?error=Add+the+amount+or+size");
   if (kind === "SEEKING" && !isRoleId(roleNeededRaw)) redirect("/feed?error=Choose+the+role+you+need");
@@ -40,11 +42,11 @@ export async function createPost(formData: FormData) {
   const deal = await prisma.deal.create({
     data: {
       sponsorId: user.id,
-      kind,
+      kind: postKind,
       title,
       blurb: blurb || title,
       market,
-      sizeBand,
+      sizeBand: band,
       assetClass,
       raiseLabel,
       targetIrr: String(formData.get("targetIrr") || "").trim(),
@@ -63,7 +65,7 @@ export async function createPost(formData: FormData) {
   await prisma.post.create({
     data: {
       authorId: user.id,
-      kind,
+      kind: postKind,
       body: blurb || summary,
       dealId: deal.id,
     },
@@ -72,6 +74,12 @@ export async function createPost(formData: FormData) {
   revalidatePath("/feed");
   revalidatePath("/deals");
   redirect("/feed");
+}
+
+export async function dismissWelcome() {
+  const user = await requireUser();
+  await prisma.user.update({ where: { id: user.id }, data: { seenWelcome: true } });
+  revalidatePath("/feed");
 }
 
 export async function toggleLike(formData: FormData) {

@@ -21,7 +21,8 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
   else if (connection?.status === "PENDING" && connection.fromId === viewerId) state = "PENDING";
   else if (connection?.status === "PENDING" && connection.toId === viewerId) state = "INCOMING";
   const vouchCount = member.projects.reduce(
-    (sum, project) => sum + project.confirmations.filter((item) => item.status === "CONFIRMED").length,
+    (sum, project) =>
+      sum + project.confirmations.filter((item) => item.status === "CONFIRMED" && item.reviewStatus === "APPROVED").length,
     0,
   );
   return { member, connection: state, vouchCount };

@@ -46,9 +46,9 @@ export default async function ThreadPage({
       <div className="hidden lg:block">
         <ConversationList conversations={conversations} activeId={conversation.id} />
       </div>
-      <section className="flex min-h-[70dvh] flex-col bg-cream lg:min-h-dvh lg:bg-paper">
+      <section className="flex flex-col bg-cream max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:z-20 max-md:bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] md:min-h-dvh md:bg-paper">
         <header className="safe-top flex items-center gap-3 border-b border-line bg-paper px-4 pb-3 md:py-3">
-          <Link href="/messages" className="text-sm text-mut lg:hidden">
+          <Link href="/messages" className="inline-flex min-h-11 min-w-11 items-center text-sm text-mut lg:hidden">
             ‹
           </Link>
           <Avatar initials={other.initials} size="sm" />
@@ -61,7 +61,7 @@ export default async function ThreadPage({
             </p>
           </div>
         </header>
-        <div className="flex-1 space-y-2 px-4 py-4">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
           <Banner error={query.error} />
           {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">Say hello to {other.name}.</p> : null}
           {conversation.messages.map((message) => {
@@ -78,7 +78,7 @@ export default async function ThreadPage({
             );
           })}
         </div>
-        <form action={sendMessage} className="flex gap-2 border-t border-line p-3">
+        <form action={sendMessage} className="flex gap-2 border-t border-line bg-paper p-3">
           <input type="hidden" name="conversationId" value={conversation.id} />
           <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
           <button className={btn} type="submit">

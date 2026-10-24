@@ -20,7 +20,8 @@ export default async function DealsPage({
   const params = await searchParams;
   const role = params.role && ROLES.some((item) => item.id === params.role) ? params.role : undefined;
   const market = params.market === "NJ" || params.market === "NY" || params.market === "CT" ? params.market : undefined;
-  const size = params.size === "under-1" || params.size === "1-5" || params.size === "5+" ? params.size : undefined;
+  const size =
+    params.size === "under-1" || params.size === "1-5" || params.size === "5+" || params.size === "scope" ? params.size : undefined;
   const deals = await prisma.deal.findMany({
     orderBy: { createdAt: "desc" },
     include: { sponsor: true },
@@ -67,7 +68,7 @@ export default async function DealsPage({
             Market: {item}
           </FilterChip>
         ))}
-        {(["Any", "under-1", "1-5", "5+"] as const).map((item) => (
+        {(["Any", "under-1", "1-5", "5+", "scope"] as const).map((item) => (
           <FilterChip key={item} href={dealsQuery({ role, market, size: item === "Any" ? null : item, q: params.q })} on={(size || "Any") === item}>
             Size: {item === "Any" ? "Any" : sizeLabel(item)}
           </FilterChip>

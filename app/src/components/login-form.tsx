@@ -24,7 +24,7 @@ export function LoginForm({ next }: { next?: string }) {
       {error ? <p className="text-sm text-brass">{error}</p> : null}
       <div>
         <label className={labelCls}>Email</label>
-        <input className={field} name="email" type="email" autoComplete="username" required placeholder="marcus.hale@halerow.example" />
+        <input className={field} name="email" type="email" autoComplete="username" required placeholder="you@firm.com" />
       </div>
       <div>
         <label className={labelCls}>Password</label>

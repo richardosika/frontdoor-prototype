@@ -72,6 +72,13 @@ enum ConfirmationStatus {
   DECLINED
 }
 
+enum VouchReview {
+  OPEN
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+}
+
 model User {
   id             String           @id @default(cuid())
   email          String           @unique
@@ -86,6 +93,7 @@ model User {
   tier           VerificationTier @default(INVITED)
   isAdmin        Boolean          @default(false)
   status         AccountStatus    @default(ACTIVE)
+  seenWelcome    Boolean          @default(false)
   createdAt      DateTime         @default(now())
 
   posts                Post[]
@@ -102,6 +110,10 @@ model User {
   invitesCreated       InviteCode[]
   applicationsReviewed Application[]    @relation("Reviewer")
   ownedApplication     Application?     @relation("ApplicantUser")
+  notifications        Notification[]
+  dealDocuments        DealDocument[]
+  dealMessages         DealMessage[]
+  dealEvents           DealEvent[]
 }
 
 model InviteCode {
@@ -130,6 +142,7 @@ model Application {
   credentialValue String
   referenceEmails String[]
   statement       String            @default("")
+  statusToken     String            @unique
   status          ApplicationStatus @default(PENDING)
   reviewerNote    String            @default("")
   reviewedAt      DateTime?
@@ -165,6 +178,7 @@ model Confirmation {
   counterpartyEmail String
   token             String             @unique
   status            ConfirmationStatus @default(PENDING)
+  reviewStatus      VouchReview        @default(OPEN)
   note              String             @default("")
   respondedAt       DateTime?
   createdAt         DateTime           @default(now())
@@ -224,6 +238,9 @@ model Deal {
   createdAt      DateTime    @default(now())
   posts          Post[]
   access         DealAccess[]
+  documents      DealDocument[]
+  messages       DealMessage[]
+  events         DealEvent[]
 
   @@index([market, sizeBand, kind])
 }
@@ -279,4 +296,58 @@ model Connection {
   createdAt DateTime         @default(now())
 
   @@unique([fromId, toId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String    @default("")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DealDocument {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  title     String
+  url       String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model DealMessage {
+  id        String        @id @default(cuid())
+  dealId    String
+  deal      Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  parentId  String?
+  parent    DealMessage?  @relation("DealThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   DealMessage[] @relation("DealThread")
+  createdAt DateTime      @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
 }

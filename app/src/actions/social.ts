@@ -7,6 +7,7 @@ import { canConnect, orderedPair } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
+import { notify } from "@/lib/notify";
 
 export async function requestConnection(formData: FormData) {
   const user = await requireUser();
@@ -41,7 +42,12 @@ export async function requestConnection(formData: FormData) {
   await sendEmail({
     to: target.email,
     subject: `${user.name} wants to connect on ${BRAND.name}`,
-    text: `${user.name} (${user.org}) sent you a connection request. Open Network to accept or decline.\n\nDelivered by the console email adapter.`,
+    text: `${user.name} (${user.org}) sent you a connection request. Open Network to accept or decline.\n`,
+  });
+  await notify(target.id, {
+    title: "Connection request",
+    body: `${user.name} wants to connect.`,
+    href: "/network",
   });
 
   revalidatePath("/network");
@@ -98,6 +104,12 @@ export async function sendMessage(formData: FormData) {
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { updatedAt: new Date() },
+  });
+  const recipientId = conversation.userAId === user.id ? conversation.userBId : conversation.userAId;
+  await notify(recipientId, {
+    title: "New message",
+    body: `${user.name}: ${body.slice(0, 140)}`,
+    href: `/messages/${conversationId}`,
   });
   revalidatePath(`/messages/${conversationId}`);
   revalidatePath("/messages");

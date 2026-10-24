@@ -4,6 +4,7 @@ import { Banner } from "@/components/banner";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
+import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function MemberPage({
   const user = await requireUser();
   const { id } = await params;
   const query = await searchParams;
-  const loaded = await loadMemberProfile(user.id, id);
+  const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
   if (!loaded) notFound();
   return (
     <div className="mx-auto max-w-3xl md:px-8 md:py-6">
@@ -35,6 +36,7 @@ export default async function MemberPage({
         projectCount={loaded.member.projects.length}
         vouchCount={loaded.vouchCount}
         backHref="/network"
+        linkOrigin={linkOrigin}
       />
     </div>
   );

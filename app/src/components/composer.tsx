@@ -25,7 +25,7 @@ export function Composer() {
             key={value}
             type="button"
             onClick={() => setKind(value)}
-            className={`rounded-sm px-3 py-1.5 font-sans text-xs font-semibold tracking-[0.06em] [font-variant:all-small-caps] ${
+            className={`min-h-11 rounded-sm px-3 font-sans text-xs font-semibold tracking-[0.06em] [font-variant:all-small-caps] ${
               kind === value ? "bg-forest text-paper" : "border border-line text-mut"
             }`}
           >
@@ -70,7 +70,7 @@ export function Composer() {
             </select>
           </div>
           <div>
-            <label className={labelCls}>Size band</label>
+            <label className={labelCls}>{kind === "SEEKING" ? "Dollar band" : "Size band"}</label>
             <select name="sizeBand" className={field} defaultValue="1-5">
               {SIZE_BANDS.map((band) => (
                 <option key={band.id} value={band.id}>
@@ -78,6 +78,11 @@ export function Composer() {
                 </option>
               ))}
             </select>
+            {kind === "SEEKING" ? (
+              <p className="mt-1 text-[11px] leading-snug text-mut">
+                Square feet, units, and parcels are filed under Other scope, not a dollar band.
+              </p>
+            ) : null}
           </div>
           {kind === "DEAL" ? (
             <>

@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { MemberRole, VerificationTier } from "@prisma/client";
 import { requireAdmin } from "@/lib/current-user";
-import { initialsFromName, isTier } from "@/lib/domain";
+import { initialsFromName, isTier, tierAfterAdminApprovesVouch } from "@/lib/domain";
+import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { notify } from "@/lib/notify";
 import { BRAND } from "@/lib/brand";
 import { appBaseUrl } from "@/lib/url";
 
@@ -28,7 +30,7 @@ export async function reviewApplication(formData: FormData) {
     await sendEmail({
       to: application.email,
       subject: `${BRAND.name} application update`,
-      text: `Hello ${application.name},\n\nThe committee did not approve this application.${note ? ` Note: ${note}` : ""}\n\nDelivered by the console email adapter.`,
+      text: `Hello ${application.name},\n\nThe committee did not approve this application.${note ? ` Note: ${note}` : ""}\n\nYou can read the decision here: ${await appBaseUrl()}/apply/status/${application.statusToken}\n`,
     });
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
@@ -71,7 +73,7 @@ export async function reviewApplication(formData: FormData) {
   await sendEmail({
     to: application.email,
     subject: `You're in — ${BRAND.name} application approved`,
-    text: `Hello ${application.name},\n\nYour application was approved. You are an Invited member. Sign in at ${base}/login with this email and the password you chose.\n\nDelivered by the console email adapter.`,
+    text: `Hello ${application.name},\n\nYour application was approved. You are an Invited member.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
   });
 
   revalidatePath("/admin");
@@ -85,14 +87,75 @@ export async function setMemberTier(formData: FormData) {
   const userId = String(formData.get("userId") || "");
   const tier = String(formData.get("tier") || "");
   if (!isTier(tier)) redirect("/admin/members?error=Unknown+tier");
-  await prisma.user.update({
-    where: { id: userId },
-    data: { tier: tier as VerificationTier },
-  });
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member) redirect("/admin/members?error=Member+not+found");
+  if (member.tier !== tier) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tier: tier as VerificationTier },
+    });
+    await notify(userId, {
+      title: "Verification tier updated",
+      body: `Your tier is now ${tierLabel(tier)}.`,
+      href: "/profile",
+    });
+  }
   revalidatePath("/admin/members");
   revalidatePath(`/members/${userId}`);
   revalidatePath("/profile");
+  revalidatePath("/alerts");
   redirect("/admin/members?notice=Tier+updated");
+}
+
+export async function reviewVouch(formData: FormData) {
+  const admin = await requireAdmin();
+  const confirmationId = String(formData.get("confirmationId") || "");
+  const decision = String(formData.get("decision") || "");
+  if (decision !== "APPROVED" && decision !== "REJECTED") redirect("/admin");
+
+  const confirmation = await prisma.confirmation.findUnique({
+    where: { id: confirmationId },
+    include: { project: { include: { user: true } } },
+  });
+  if (!confirmation || confirmation.status !== "CONFIRMED" || confirmation.reviewStatus !== "PENDING_ADMIN") {
+    redirect("/admin?error=That+vouch+is+not+waiting+for+review");
+  }
+
+  const member = confirmation.project.user;
+  if (decision === "APPROVED") {
+    const nextTier = tierAfterAdminApprovesVouch(member.tier);
+    await prisma.$transaction([
+      prisma.confirmation.update({
+        where: { id: confirmation.id },
+        data: { reviewStatus: "APPROVED" },
+      }),
+      prisma.user.update({
+        where: { id: member.id },
+        data: { tier: nextTier },
+      }),
+    ]);
+    await notify(member.id, {
+      title: "Vouch accepted",
+      body: `${admin.name} accepted the vouch on ${confirmation.project.name}. Your tier is now ${tierLabel(nextTier)}.`,
+      href: "/profile",
+    });
+  } else {
+    await prisma.confirmation.update({
+      where: { id: confirmation.id },
+      data: { reviewStatus: "REJECTED" },
+    });
+    await notify(member.id, {
+      title: "Vouch not accepted",
+      body: `The committee did not accept the vouch on ${confirmation.project.name}. Your tier is unchanged.`,
+      href: "/profile",
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/profile");
+  revalidatePath(`/members/${member.id}`);
+  revalidatePath("/alerts");
+  redirect("/admin?notice=Vouch+reviewed");
 }
 
 export async function createInvite(formData: FormData) {

@@ -38,7 +38,7 @@ const people: Person[] = [
     tier: "CONFIRMED",
     isAdmin: true,
     credentialNote: "Hale Row Partners LLC · NJ entity in good standing · deeds and permits matched",
-    bio: "Sponsor of small multifamily and mixed-use projects in the NY/NJ market. Fictional demo member.",
+    bio: "Sponsor of small multifamily and mixed-use projects in the NY/NJ market. Fictional.",
   },
   {
     id: "user_pa",
@@ -218,7 +218,7 @@ const people: Person[] = [
     location: "Newark, NJ",
     tier: "INVITED",
     credentialNote: "Entity records checked · owner references pending",
-    bio: "Multifamily operations. Fictional. A demo vouch link can move this profile to Confirmed.",
+    bio: "Multifamily operations. Fictional.",
   },
   {
     id: "user_am",
@@ -247,19 +247,32 @@ const people: Person[] = [
 ];
 
 async function main() {
-  await prisma.message.deleteMany();
-  await prisma.conversation.deleteMany();
-  await prisma.connection.deleteMany();
-  await prisma.dealAccess.deleteMany();
-  await prisma.comment.deleteMany();
-  await prisma.like.deleteMany();
-  await prisma.post.deleteMany();
-  await prisma.deal.deleteMany();
-  await prisma.confirmation.deleteMany();
-  await prisma.trackProject.deleteMany();
-  await prisma.application.deleteMany();
-  await prisma.inviteCode.deleteMany();
-  await prisma.user.deleteMany();
+  const reset = process.env.SEED === "reset";
+  const members = await prisma.user.count();
+  if (!reset && members > 0) {
+    console.log("Database already has members. Skipping seed. Set SEED=reset to wipe and reseed.");
+    return;
+  }
+  if (reset) {
+    await prisma.notification.deleteMany();
+    await prisma.dealEvent.deleteMany();
+    await prisma.dealMessage.deleteMany({ where: { parentId: { not: null } } });
+    await prisma.dealMessage.deleteMany();
+    await prisma.dealDocument.deleteMany();
+    await prisma.message.deleteMany();
+    await prisma.conversation.deleteMany();
+    await prisma.connection.deleteMany();
+    await prisma.dealAccess.deleteMany();
+    await prisma.comment.deleteMany();
+    await prisma.like.deleteMany();
+    await prisma.post.deleteMany();
+    await prisma.deal.deleteMany();
+    await prisma.confirmation.deleteMany();
+    await prisma.trackProject.deleteMany();
+    await prisma.application.deleteMany();
+    await prisma.inviteCode.deleteMany();
+    await prisma.user.deleteMany();
+  }
 
   for (const person of people) {
     await prisma.user.create({
@@ -299,6 +312,7 @@ async function main() {
       credentialValue: "NJ architect license no. 21AI001234 (fictional)",
       referenceEmails: ["marcus.hale@halerow.example", "grace.liu@liustudio.example"],
       statement: `I design ground-up multifamily and would like to meet GCs already in the ${BRAND.club}.`,
+      statusToken: "demo-jordan-ellis-status",
       status: "PENDING",
     },
   });
@@ -319,6 +333,7 @@ async function main() {
           counterpartyEmail: "leo.sandoval@gsbridge.example",
           token: "demo-ironbound-confirmed",
           status: "CONFIRMED",
+          reviewStatus: "APPROVED",
           note: "We provided the construction loan.",
           respondedAt: hoursAgo(24 * 20),
         },
@@ -420,7 +435,7 @@ async function main() {
       title: "Mixed-use, 40k sf — Hoboken NJ",
       blurb: "Ground-up mixed-use, entitled. Union-friendly, bid by Nov 15.",
       market: "NJ",
-      sizeBand: "5+",
+      sizeBand: "scope",
       assetClass: "Mixed-use",
       raiseLabel: "40k sf",
       roleNeeded: "GENERAL_CONTRACTOR",
@@ -464,7 +479,7 @@ async function main() {
       title: "Design team for 64-unit conversion, Brooklyn NY",
       blurb: "Seeking a NY-licensed architect and structural engineer. State license required.",
       market: "NY",
-      sizeBand: "5+",
+      sizeBand: "scope",
       assetClass: "Multifamily",
       raiseLabel: "64 units",
       roleNeeded: "ARCHITECT_ENGINEER",
@@ -478,7 +493,7 @@ async function main() {
       title: "Variance counsel for Newark mixed-use site",
       blurb: "Need NJ-admitted land use counsel for a use variance hearing.",
       market: "NJ",
-      sizeBand: "1-5",
+      sizeBand: "scope",
       assetClass: "Mixed-use",
       raiseLabel: "1 parcel",
       roleNeeded: "ZONING_ATTORNEY",
@@ -602,6 +617,81 @@ async function main() {
       });
     }
   }
+
+  await prisma.dealDocument.create({
+    data: {
+      dealId: "deal_newark",
+      authorId: "user_mh",
+      title: "Offering summary",
+      url: "https://example.com/newark-summary",
+      note: "Link placeholder. Nothing is uploaded to Private Floor.",
+      createdAt: hoursAgo(12),
+    },
+  });
+  const question = await prisma.dealMessage.create({
+    data: {
+      dealId: "deal_newark",
+      authorId: "user_tn",
+      body: "Is the rent roll the trailing twelve, or a pro forma?",
+      createdAt: hoursAgo(9),
+    },
+  });
+  await prisma.dealMessage.create({
+    data: {
+      dealId: "deal_newark",
+      authorId: "user_mh",
+      parentId: question.id,
+      body: "Trailing twelve. Happy to walk the line items in the room.",
+      createdAt: hoursAgo(8),
+    },
+  });
+  await prisma.dealEvent.createMany({
+    data: [
+      {
+        dealId: "deal_newark",
+        actorId: "user_mh",
+        summary: "Marcus Hale approved Tara Nguyen into the room.",
+        createdAt: hoursAgo(8),
+      },
+      {
+        dealId: "deal_newark",
+        actorId: "user_mh",
+        summary: "Marcus Hale added a document link: Offering summary.",
+        createdAt: hoursAgo(12),
+      },
+      {
+        dealId: "deal_newark",
+        actorId: "user_tn",
+        summary: "Tara Nguyen asked a question.",
+        createdAt: hoursAgo(9),
+      },
+    ],
+  });
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: "user_mh",
+        title: "Access request",
+        body: "Rachel Kim requested access to 18-unit multifamily, Newark NJ.",
+        href: "/deals/deal_newark",
+        createdAt: hoursAgo(3),
+      },
+      {
+        userId: "user_mh",
+        title: "Connection request",
+        body: "Tara Nguyen wants to connect.",
+        href: "/network",
+        createdAt: hoursAgo(2),
+      },
+      {
+        userId: "user_mh",
+        title: "New message",
+        body: "Rachel Kim: Happy to review the deck. Can you send the latest numbers?",
+        href: "/messages",
+        createdAt: hoursAgo(1),
+      },
+    ],
+  });
 
   console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
 }

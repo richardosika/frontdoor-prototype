@@ -8,6 +8,7 @@ import { BRAND } from "@/lib/brand";
 import { tierAfterCounterpartyConfirm } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
 
 export async function addProject(formData: FormData) {
@@ -48,11 +49,11 @@ export async function requestConfirmation(formData: FormData) {
   await sendEmail({
     to: counterpartyEmail,
     subject: `${BRAND.name}: confirm you worked with ${user.name} on ${project.name}`,
-    text: `${user.name} listed you as a counterparty on ${project.name} (${project.location}, ${project.year}, ${project.valueLabel}).\n\nConfirm or decline (no ${BRAND.name} account required):\n${link}\n\nDelivered by the console email adapter. The link is also printed in the server log.`,
+    text: `${user.name} listed you as a counterparty on ${project.name} (${project.location}, ${project.year}, ${project.valueLabel}).\n\nConfirm or decline (no ${BRAND.name} account required):\n${link}\n`,
   });
 
   revalidatePath("/profile");
-  redirect("/profile?notice=Confirmation+link+sent+to+the+server+log");
+  redirect("/profile?notice=The+link+is+on+this+project.+Copy+it+and+send+it+to+your+counterparty.");
 }
 
 export async function respondConfirmation(formData: FormData) {
@@ -68,23 +69,45 @@ export async function respondConfirmation(formData: FormData) {
   if (!confirmation) redirect("/");
   if (confirmation.status !== "PENDING") redirect(`/confirm/${token}`);
 
+  const nextTier = tierAfterCounterpartyConfirm(confirmation.project.user.tier);
   await prisma.confirmation.update({
     where: { id: confirmation.id },
-    data: { status: decision, note, respondedAt: new Date() },
+    data: {
+      status: decision,
+      reviewStatus: decision === "CONFIRMED" ? "PENDING_ADMIN" : "OPEN",
+      note,
+      respondedAt: new Date(),
+    },
   });
 
+  if (nextTier !== confirmation.project.user.tier) {
+    await prisma.user.update({
+      where: { id: confirmation.project.userId },
+      data: { tier: nextTier },
+    });
+  }
+
   if (decision === "CONFIRMED") {
-    const nextTier = tierAfterCounterpartyConfirm(confirmation.project.user.tier);
-    if (nextTier !== confirmation.project.user.tier) {
-      await prisma.user.update({
-        where: { id: confirmation.project.userId },
-        data: { tier: nextTier },
-      });
-    }
+    await notify(confirmation.project.userId, {
+      title: "Vouch received",
+      body: `${confirmation.counterpartyName} confirmed ${confirmation.project.name}. Your tier stays ${confirmation.project.user.tier === "CONFIRMED" ? "Confirmed" : "unchanged"} until the committee reviews the vouch.`,
+      href: "/profile",
+    });
+    await notifyAdmins({
+      title: "Vouch to review",
+      body: `${confirmation.counterpartyName} confirmed ${confirmation.project.name} for ${confirmation.project.user.name}.`,
+      href: "/admin",
+    });
     await sendEmail({
       to: confirmation.project.user.email,
       subject: `${BRAND.name}: ${confirmation.counterpartyName} confirmed ${confirmation.project.name}`,
-      text: `${confirmation.counterpartyName} confirmed they worked with you on ${confirmation.project.name}. Your verification tier on ${BRAND.name} is now Confirmed.\n\nDelivered by the console email adapter.`,
+      text: `${confirmation.counterpartyName} confirmed they worked with you on ${confirmation.project.name}. A committee member still needs to accept the vouch before your tier can become Confirmed.\n`,
+    });
+  } else {
+    await notify(confirmation.project.userId, {
+      title: "Vouch declined",
+      body: `${confirmation.counterpartyName} declined ${confirmation.project.name}. Your tier is unchanged.`,
+      href: "/profile",
     });
   }
 

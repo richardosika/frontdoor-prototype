@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TierBadge } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
+import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { addProject, requestConfirmation } from "@/actions/profile";
 import { openConversation, requestConnection } from "@/actions/social";
@@ -15,7 +16,13 @@ type Project = {
   year: number;
   valueLabel: string;
   summary: string;
-  confirmations: { id: string; status: string; counterpartyName: string }[];
+  confirmations: {
+    id: string;
+    status: string;
+    reviewStatus: string;
+    counterpartyName: string;
+    token: string;
+  }[];
 };
 
 export function ProfileView({
@@ -26,6 +33,7 @@ export function ProfileView({
   projectCount,
   vouchCount,
   backHref,
+  linkOrigin,
 }: {
   member: {
     id: string;
@@ -45,26 +53,27 @@ export function ProfileView({
   projectCount: number;
   vouchCount: number;
   backHref?: string;
+  linkOrigin: string;
 }) {
   const role = roleById(member.role);
   const tiers = [
     ["INVITED", "Invited by a member; light checks at application."],
     ["VERIFIED", "Role credentials and references checked by an admin."],
-    ["CONFIRMED", "A counterparty vouched for a completed project."],
+    ["CONFIRMED", "The committee accepted a counterparty vouch."],
   ] as const;
 
   return (
-    <article className="overflow-hidden border-x border-b border-line bg-paper md:rounded md:border">
-      <div className="cover-forest notch relative h-[calc(8rem+env(safe-area-inset-top,0px))] bg-forest md:h-40">
+    <article className="border-x border-b border-line bg-paper md:overflow-hidden md:rounded md:border">
+      <div className="cover-forest notch relative z-0 h-[calc(8rem+env(safe-area-inset-top,0px))] overflow-hidden bg-forest md:h-40">
         {backHref ? (
-          <Link href={backHref} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 font-sans text-sm text-paper md:hidden">
+          <Link href={backHref} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 inline-flex min-h-11 items-center font-sans text-sm text-paper md:hidden">
             ‹ Network
           </Link>
         ) : null}
       </div>
-      <div className="flex items-end justify-between px-5">
+      <div className="relative z-10 flex items-end justify-between px-5">
         <div className="-mt-11">
-          <span className="inline-grid rounded-full shadow-[0_0_0_4px_#F4EFE4]">
+          <span className="relative z-10 inline-grid rounded-full shadow-[0_0_0_4px_#FFFDF8]">
             <Avatar initials={member.initials} size="lg" />
           </span>
         </div>
@@ -141,15 +150,17 @@ export function ProfileView({
             <li>Invite code from an existing member.</li>
             <li>Credential check for this role: {role?.check}.</li>
             <li>References are on the application.</li>
-            <li>Past partners confirm projects from a tokenized link.</li>
+            <li>Past partners confirm projects from a link you send them. The committee reviews that vouch before Confirmed.</li>
           </ol>
         </div>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>
         {projects.length === 0 ? <p className="text-sm text-mut">No projects listed yet.</p> : null}
         <ul>
           {projects.map((project) => {
-            const confirmed = project.confirmations.filter((item) => item.status === "CONFIRMED").length;
-            const pending = project.confirmations.filter((item) => item.status === "PENDING").length;
+            const confirmed = project.confirmations.filter((item) => item.reviewStatus === "APPROVED").length;
+            const pending = project.confirmations.filter(
+              (item) => item.status === "PENDING" || item.reviewStatus === "PENDING_ADMIN",
+            ).length;
             return (
               <li key={project.id} className="flex gap-3 border-b border-line py-3">
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest">▦</span>
@@ -161,6 +172,17 @@ export function ProfileView({
                     {pending ? ` · ${pending} pending` : ""}
                   </div>
                   {project.summary ? <p className="mt-1 text-xs text-ink">{project.summary}</p> : null}
+                  {isSelf
+                    ? project.confirmations.map((item) => (
+                        <div key={item.id} className="mt-2 text-xs text-ink">
+                          <span className="font-semibold">{item.counterpartyName}</span>
+                          <span className="text-mut"> · {vouchState(item)}</span>
+                          {item.status === "PENDING" ? (
+                            <CopyLink url={`${linkOrigin}/confirm/${item.token}`} />
+                          ) : null}
+                        </div>
+                      ))
+                    : null}
                   {isSelf ? (
                     <form action={requestConfirmation} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                       <input type="hidden" name="projectId" value={project.id} />
@@ -194,6 +216,15 @@ export function ProfileView({
       </div>
     </article>
   );
+}
+
+function vouchState(item: { status: string; reviewStatus: string }) {
+  if (item.status === "PENDING") return "link ready to send";
+  if (item.status === "DECLINED") return "counterparty declined";
+  if (item.reviewStatus === "PENDING_ADMIN") return "confirmed, awaiting committee review";
+  if (item.reviewStatus === "APPROVED") return "vouch accepted";
+  if (item.reviewStatus === "REJECTED") return "committee did not accept this vouch";
+  return "recorded";
 }
 
 function Stat({ value, label }: { value: string; label: string }) {

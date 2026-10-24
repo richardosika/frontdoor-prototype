@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { createInvite } from "@/actions/admin";
+import { createInvite, reviewVouch } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
-import { btn, card, field, labelCls } from "@/components/ui";
+import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 
@@ -15,12 +15,17 @@ export default async function AdminPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [pending, members, invites, posts, access] = await Promise.all([
+  const [pending, members, invites, posts, access, vouches] = await Promise.all([
     prisma.application.count({ where: { status: "PENDING" } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     prisma.post.count(),
     prisma.dealAccess.count({ where: { status: "PENDING" } }),
+    prisma.confirmation.findMany({
+      where: { status: "CONFIRMED", reviewStatus: "PENDING_ADMIN" },
+      include: { project: { include: { user: true } } },
+      orderBy: { respondedAt: "desc" },
+    }),
   ]);
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
 
@@ -41,6 +46,32 @@ export default async function AdminPage({
         <Mini label="Verified" value={tierCount("VERIFIED")} />
         <Mini label="Posts" value={posts} />
       </div>
+      <section className={`${card} mt-6 p-4`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Vouches waiting for review</h2>
+        <p className="mt-1 text-sm text-ink">A counterparty yes does not change a member&apos;s tier until you accept it.</p>
+        {vouches.length === 0 ? <p className="mt-3 text-sm text-mut">None waiting.</p> : null}
+        <ul className="mt-3 divide-y divide-line">
+          {vouches.map((vouch) => (
+            <li key={vouch.id} className="py-3 text-sm">
+              <b>{vouch.project.user.name}</b>
+              <span className="text-mut"> · {vouch.project.name}</span>
+              <p className="text-xs text-ink">
+                {vouch.counterpartyName} ({vouch.counterpartyEmail}) confirmed.
+                {vouch.note ? ` Note: ${vouch.note}` : ""}
+              </p>
+              <form action={reviewVouch} className="mt-2 flex gap-2">
+                <input type="hidden" name="confirmationId" value={vouch.id} />
+                <button className={btnOutline} name="decision" value="REJECTED" type="submit">
+                  Decline
+                </button>
+                <button className={btn} name="decision" value="APPROVED" type="submit">
+                  Accept vouch
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </section>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className={`${card} p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">New invite code</h2>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
@@ -28,13 +29,16 @@ function showMobileWordmark(pathname: string) {
 export function Shell({
   user,
   unread,
+  alerts,
   children,
 }: {
   user: { name: string; initials: string; tier: string; isAdmin: boolean };
   unread: number;
+  alerts: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-dvh bg-cream text-forest md:grid md:grid-cols-[84px_minmax(0,1fr)] lg:grid-cols-[248px_minmax(0,1fr)]">
@@ -55,7 +59,7 @@ export function Shell({
                 key={tab.href}
                 href={tab.href}
                 data-testid={tab.test}
-                className={`relative flex items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
+                className={`relative flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
                   on ? "bg-brass/15 font-medium text-paper" : "text-sand hover:bg-paper/10 hover:text-paper"
                 }`}
               >
@@ -68,10 +72,23 @@ export function Shell({
               </Link>
             );
           })}
+          <Link
+            href="/alerts"
+            className={`relative mt-2 flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
+              pathname.startsWith("/alerts") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
+            }`}
+          >
+            {pathname.startsWith("/alerts") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
+            <span className="grid h-6 w-6 place-items-center text-lg">◉</span>
+            <span className="hidden lg:inline">Alerts</span>
+            {alerts > 0 ? (
+              <span className="ml-auto hidden rounded-sm bg-brass px-1.5 text-[10px] font-sans font-bold lg:inline">{alerts}</span>
+            ) : null}
+          </Link>
           {user.isAdmin ? (
             <Link
               href="/admin"
-              className={`relative mt-2 flex items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
+              className={`relative flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
                 pathname.startsWith("/admin") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
               }`}
             >
@@ -91,7 +108,7 @@ export function Shell({
           </Link>
         </div>
         <form action={logoutAction} className="mt-2">
-          <button className="w-full rounded-sm px-3 py-2 text-left font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper" type="submit">
+          <button className="min-h-11 w-full rounded-sm px-3 py-2 text-left font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper" type="submit">
             Sign out
           </button>
         </form>
@@ -101,19 +118,23 @@ export function Shell({
         {showMobileWordmark(pathname) ? (
           <header className="safe-top flex items-center justify-between bg-forest px-5 pb-3.5 text-paper md:hidden">
             <Logo tone="paper" />
-            {user.isAdmin ? (
-              <Link href="/admin" className="font-sans text-[11px] uppercase tracking-[0.16em] text-brass-pale">
-                Admin
-              </Link>
-            ) : (
-              <span className="grid h-8 w-8 place-items-center rounded-full border border-paper/40 text-sm">⌕</span>
-            )}
+            <button
+              type="button"
+              aria-label="Account menu"
+              className="relative grid h-11 w-11 place-items-center rounded-full border border-paper/40 font-sans text-xs"
+              onClick={() => setMenuOpen(true)}
+            >
+              {user.initials}
+              {alerts > 0 ? (
+                <span className="absolute -right-1 -top-1 rounded-sm bg-brass px-1 text-[9px] font-bold text-paper">{alerts}</span>
+              ) : null}
+            </button>
           </header>
         ) : null}
         {children}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper px-1 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper px-1 pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom,0px))] md:hidden">
         {TABS.map((tab) => {
           const on = active(pathname, tab.href);
           return (
@@ -121,7 +142,7 @@ export function Shell({
               key={tab.href}
               href={tab.href}
               data-testid={tab.test}
-              className={`relative flex-1 text-center font-serif text-[11px] ${on ? "text-forest" : "text-mut"}`}
+              className={`relative flex min-h-11 flex-1 flex-col items-center justify-center text-center font-serif text-[11px] ${on ? "text-forest" : "text-mut"}`}
             >
               <span className="block text-xl leading-none">{tab.icon}</span>
               {tab.label}
@@ -131,7 +152,42 @@ export function Shell({
             </Link>
           );
         })}
+        <button
+          type="button"
+          data-testid="tab-more"
+          className="relative flex min-h-11 flex-1 flex-col items-center justify-center font-serif text-[11px] text-mut"
+          onClick={() => setMenuOpen(true)}
+        >
+          <span className="block text-xl leading-none">⋯</span>
+          More
+          {alerts > 0 ? (
+            <span className="absolute right-[18%] top-0 rounded-sm bg-brass px-1 text-[9px] font-sans font-bold text-paper">{alerts}</span>
+          ) : null}
+        </button>
       </nav>
+      {menuOpen ? (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button type="button" className="absolute inset-0 bg-forest/40" aria-label="Close account menu" onClick={() => setMenuOpen(false)} />
+          <div className="absolute inset-x-0 bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] rounded-t border border-line bg-paper px-4 pb-4 pt-4">
+            <p className="font-serif text-lg">{user.name}</p>
+            <p className="text-xs text-mut">{tierLabel(user.tier)} member</p>
+            <Link href="/alerts" className="mt-3 flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+              Alerts
+              {alerts > 0 ? <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{alerts}</span> : null}
+            </Link>
+            {user.isAdmin ? (
+              <Link href="/admin" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+                Admin
+              </Link>
+            ) : null}
+            <form action={logoutAction} className="border-t border-line">
+              <button className="min-h-11 w-full text-left text-sm font-semibold" type="submit">
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

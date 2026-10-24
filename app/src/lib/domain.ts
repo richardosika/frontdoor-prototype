@@ -14,6 +14,9 @@ export const SIZE_BANDS = [
 
 export type SizeBand = (typeof SIZE_BANDS)[number]["id"];
 
+/** Seeking posts whose size is square feet, units, or parcels, not a dollar raise. */
+export const SCOPE_SIZE = "scope";
+
 export const NDA_ACKNOWLEDGEMENT = `I acknowledge that materials in this deal room are confidential, that I will not share them outside the ${BRAND.club}, and that ${BRAND.name} does not offer securities, take subscriptions, or process payments.`;
 
 export function normalizeInviteCode(code: string): string {
@@ -45,7 +48,27 @@ export type FilterableDeal = {
   title: string;
   sponsorName: string;
   assetClass: string;
+  kind?: "DEAL" | "SEEKING";
+  raiseLabel?: string | null;
 };
+
+export function isDollarRaise(raiseLabel: string | null | undefined): boolean {
+  const value = (raiseLabel ?? "").trim();
+  if (!value) return false;
+  if (/\b(sf|sq\.?\s*ft|square feet|units?|parcels?|acres?|keys|beds|lots?)\b/i.test(value)) return false;
+  return /\$/.test(value) || /\b\d+(?:\.\d+)?\s*m\b/i.test(value);
+}
+
+export function isNonDollarSeeking(deal: FilterableDeal): boolean {
+  if (deal.kind !== "SEEKING") return false;
+  if (deal.sizeBand === SCOPE_SIZE) return true;
+  return Boolean(deal.raiseLabel) && !isDollarRaise(deal.raiseLabel);
+}
+
+export function storedSizeBand(kind: "DEAL" | "SEEKING", sizeBand: string, raiseLabel: string): string {
+  if (kind === "SEEKING" && !isDollarRaise(raiseLabel)) return SCOPE_SIZE;
+  return sizeBand;
+}
 
 export function filterDeals<T extends FilterableDeal>(deals: T[], filter: DealFilterInput): T[] {
   const query = (filter.query ?? "").trim().toLowerCase();
@@ -56,7 +79,7 @@ export function filterDeals<T extends FilterableDeal>(deals: T[], filter: DealFi
   return deals.filter((deal) => {
     if (role && deal.sponsorRole !== role && deal.roleNeeded !== role) return false;
     if (market && deal.market !== market) return false;
-    if (size && deal.sizeBand !== size) return false;
+    if (size && !matchesSize(deal, size)) return false;
     if (query) {
       const haystack = `${deal.title} ${deal.sponsorName} ${deal.assetClass} ${deal.market}`.toLowerCase();
       if (!haystack.includes(query)) return false;
@@ -65,7 +88,14 @@ export function filterDeals<T extends FilterableDeal>(deals: T[], filter: DealFi
   });
 }
 
+function matchesSize(deal: FilterableDeal, size: string): boolean {
+  if (isNonDollarSeeking(deal)) return size === SCOPE_SIZE;
+  if (size === SCOPE_SIZE) return false;
+  return deal.sizeBand === size;
+}
+
 export function sizeLabel(id: string | null | undefined): string {
+  if (id === SCOPE_SIZE) return "Other scope";
   return SIZE_BANDS.find((band) => band.id === id)?.label ?? id ?? "";
 }
 
@@ -73,7 +103,13 @@ export function isTier(value: string): value is Tier {
   return (TIERS as readonly string[]).includes(value);
 }
 
+/** A counterparty reply never changes tier. An arbitrary typed email cannot promote a member. */
 export function tierAfterCounterpartyConfirm(current: Tier): Tier {
+  return current;
+}
+
+/** Confirmed is only granted after an admin accepts the vouch. */
+export function tierAfterAdminApprovesVouch(current: Tier): Tier {
   if (current === "CONFIRMED") return "CONFIRMED";
   return "CONFIRMED";
 }
@@ -142,7 +178,7 @@ export function initialsFromName(name: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2);
-  if (!parts.length) return "FD";
+  if (!parts.length) return "PF";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 

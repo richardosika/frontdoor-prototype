@@ -13,7 +13,8 @@ export function ApplyWizard() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
-  const [code, setCode] = useState("PF-7K2M-91QX");
+  const [statusToken, setStatusToken] = useState("");
+  const [code, setCode] = useState("");
   const [role, setRole] = useState<RoleId>("DEVELOPER");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,6 +60,7 @@ export function ApplyWizard() {
       setError(result.error);
       return;
     }
+    setStatusToken(result.statusToken);
     setDone(true);
     setStep(4);
   }
@@ -85,9 +87,6 @@ export function ApplyWizard() {
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>
               Continue
             </button>
-            <p className="mt-3 text-center text-xs text-mut">
-              Demo code <b>PF-7K2M-91QX</b>
-            </p>
           </div>
         ) : null}
         {step === 2 ? (
@@ -201,19 +200,24 @@ export function ApplyWizard() {
             </div>
             <h1 className="font-serif text-xl">Application under review</h1>
             <p className="mt-2 text-sm text-ink">
-              The committee reviews applications within a few business days. Reference notes are written to the server log by the console email adapter.
+              The committee reviews applications within a few business days. Keep the status link. The note from the committee appears there when they decide.
             </p>
             <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-left text-sm">
               <b>What happens next</b>
               <p className="mt-1 text-ink">
                 1. Credential check: {selected.check}
                 <br />
-                2. Reference emails logged
+                2. References reviewed with the application
                 <br />
-                3. Badge issued: Invited, then Verified or Confirmed after review
+                3. If approved, you sign in as an Invited member
               </p>
             </div>
-            <Link href="/login" className={`${btn} mt-4 w-full`}>
+            {statusToken ? (
+              <Link href={`/apply/status/${statusToken}`} className={`${btn} mt-4 w-full`}>
+                View application status
+              </Link>
+            ) : null}
+            <Link href="/login" className={`${btnOutline} mt-2 w-full`}>
               Back to sign in
             </Link>
           </div>

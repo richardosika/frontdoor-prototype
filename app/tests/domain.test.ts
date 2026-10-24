@@ -6,10 +6,14 @@ import {
   canRequestDealAccess,
   filterDeals,
   initialsFromName,
+  isDollarRaise,
   isInviteUsable,
+  isNonDollarSeeking,
   matchScore,
   normalizeInviteCode,
   orderedPair,
+  storedSizeBand,
+  tierAfterAdminApprovesVouch,
   tierAfterCounterpartyConfirm,
   validateApplication,
 } from "@/lib/domain";
@@ -105,6 +109,34 @@ describe("deals", () => {
     expect(filterDeals(deals, { role: "Any", market: "Any", size: "Any" })).toHaveLength(3);
   });
 
+  it("keeps non-dollar seeking posts out of dollar size bands", () => {
+    const seeking = {
+      title: "Hoboken GC need",
+      sponsorName: "Elena Voss",
+      sponsorRole: "DEVELOPER",
+      roleNeeded: "GENERAL_CONTRACTOR",
+      market: "NJ",
+      sizeBand: "5+",
+      assetClass: "Mixed-use",
+      kind: "SEEKING" as const,
+      raiseLabel: "40k sf",
+    };
+    expect(isDollarRaise("$2.5M")).toBe(true);
+    expect(isDollarRaise("40k sf")).toBe(false);
+    expect(isDollarRaise("64 units")).toBe(false);
+    expect(isDollarRaise("1 parcel")).toBe(false);
+    expect(isNonDollarSeeking(seeking)).toBe(true);
+    expect(storedSizeBand("SEEKING", "5+", "40k sf")).toBe("scope");
+    expect(storedSizeBand("SEEKING", "1-5", "$3.2M")).toBe("1-5");
+    expect(storedSizeBand("DEAL", "1-5", "$2.5M")).toBe("1-5");
+    expect(filterDeals([seeking], { size: "5+" })).toHaveLength(0);
+    expect(filterDeals([seeking], { size: "scope" })).toHaveLength(1);
+    expect(filterDeals([seeking], {})).toHaveLength(1);
+    const dollarSeeking = { ...seeking, raiseLabel: "$3.2M", sizeBand: "1-5" };
+    expect(filterDeals([dollarSeeking], { size: "1-5" })).toHaveLength(1);
+    expect(filterDeals([dollarSeeking], { size: "scope" })).toHaveLength(0);
+  });
+
   it("scores a matching trade higher than an unrelated role", () => {
     const seeking = { kind: "SEEKING" as const, roleNeeded: "GENERAL_CONTRACTOR", sponsorRole: "DEVELOPER", market: "NJ" };
     const gc = matchScore({ memberRole: "GENERAL_CONTRACTOR", memberLocation: "Hoboken, NJ", deal: seeking });
@@ -131,10 +163,16 @@ describe("network and verification", () => {
     expect(canConnect("user_a", "user_b").ok).toBe(true);
   });
 
-  it("promotes a member to Confirmed after a counterparty vouch", () => {
-    expect(tierAfterCounterpartyConfirm("INVITED")).toBe("CONFIRMED");
-    expect(tierAfterCounterpartyConfirm("VERIFIED")).toBe("CONFIRMED");
+  it("does not promote a member when a counterparty vouches", () => {
+    expect(tierAfterCounterpartyConfirm("INVITED")).toBe("INVITED");
+    expect(tierAfterCounterpartyConfirm("VERIFIED")).toBe("VERIFIED");
     expect(tierAfterCounterpartyConfirm("CONFIRMED")).toBe("CONFIRMED");
+  });
+
+  it("promotes to Confirmed only after an admin accepts the vouch", () => {
+    expect(tierAfterAdminApprovesVouch("INVITED")).toBe("CONFIRMED");
+    expect(tierAfterAdminApprovesVouch("VERIFIED")).toBe("CONFIRMED");
+    expect(tierAfterAdminApprovesVouch("CONFIRMED")).toBe("CONFIRMED");
   });
 
   it("validates applications", () => {

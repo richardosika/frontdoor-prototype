@@ -1,11 +1,13 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { isRoleId } from "@/lib/roles";
 import { isInviteUsable, normalizeInviteCode, validateApplication, type ApplicationInput } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { sendEmail } from "@/lib/email";
+import { appBaseUrl } from "@/lib/url";
 
 export async function checkInvite(code: string): Promise<{ ok: true; note: string } | { ok: false; error: string }> {
   const normalized = normalizeInviteCode(code);
@@ -19,7 +21,7 @@ export async function checkInvite(code: string): Promise<{ ok: true; note: strin
 
 export async function submitApplication(
   input: ApplicationInput,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; statusToken: string } | { ok: false; error: string }> {
   const errors = validateApplication(input);
   if (errors.length) return { ok: false, error: errors[0] };
   if (!isRoleId(input.role)) return { ok: false, error: "Pick the role that best describes you." };
@@ -41,12 +43,14 @@ export async function submitApplication(
 
   const references = input.referenceEmails.map((item) => item.trim().toLowerCase()).filter(Boolean);
   const passwordHash = await bcrypt.hash(input.password, 10);
+  const statusToken = randomBytes(24).toString("hex");
 
   await prisma.$transaction([
     prisma.application.create({
       data: {
         inviteCodeId: invite.id,
         email,
+        statusToken,
         name: input.name.trim(),
         passwordHash,
         role: input.role,
@@ -66,8 +70,8 @@ export async function submitApplication(
   await sendEmail({
     to: email,
     subject: `${BRAND.name} application received`,
-    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. A committee member will review your role, credential, and references. You can sign in after the application is approved.\n\nThis note was delivered by the console email adapter.`,
+    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. A committee member will review your role, credential, and references. You can sign in after the application is approved.\n\nFollow the decision here: ${await appBaseUrl()}/apply/status/${statusToken}\n`,
   });
 
-  return { ok: true };
+  return { ok: true, statusToken };
 }
