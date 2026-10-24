@@ -1,4 +1,4 @@
-export const EVIDENCE_STATUSES = ["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN"] as const;
+export const EVIDENCE_STATUSES = ["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN", "UNAVAILABLE"] as const;
 export type EvidenceStatus = (typeof EVIDENCE_STATUSES)[number];
 
 export const VERDICTS = ["LEGIT", "NOT_LEGIT", "NEEDS_OWNER_DECISION"] as const;
@@ -32,6 +32,7 @@ export type ApplicantFacts = {
   inviteNote: string;
   testProfile: string;
   cardText: string;
+  cardUploaded: boolean;
   duplicateOfMember: boolean;
   duplicateOfDeclined: boolean;
   recentApplications: number;

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { reviewApplication } from "@/actions/admin";
-import { rerunVerification, saveInternalNote } from "@/actions/owner";
+import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
+import { DecisionForm } from "@/components/decision-form";
+import { EvidenceChip } from "@/components/evidence-chip";
+import { RunAndReload } from "@/components/run-and-reload";
 import { VerdictChip } from "@/components/verdict-chip";
-import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
+import { btnOutline, card, field, labelCls } from "@/components/ui";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { DUES_WAIVED, duesLabel } from "@/lib/dues";
@@ -50,7 +52,7 @@ export default async function ApplicationDetailPage({
   return (
     <div>
       <MobileTitle href="/admin/applications" label="Applications" title={application.name} />
-      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <div className="mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={application.name} />
         <AdminNav current="/admin/applications" />
         <div className="mt-3">
@@ -140,15 +142,20 @@ export default async function ApplicationDetailPage({
             <p className="mt-2 text-sm text-mut">No business card uploaded.</p>
           )}
         </section>
+        {!report ? (
+          <p className="mt-4 text-sm text-ink">No verification report yet. Run it to replace the “verification in progress” placeholder.</p>
+        ) : null}
         <Report title="Automated verification report" run={report} />
         <Report title="Company report" run={company} />
-        <form action={rerunVerification} className="mt-4">
-          <input type="hidden" name="applicationId" value={application.id} />
-          <button className={btnOutline} type="submit">
-            Re-run verification
-          </button>
+        <div className="mt-4">
+          <RunAndReload
+            className={btnOutline}
+            label={report ? "Re-run verification" : "Run verification"}
+            pendingLabel="Running verification…"
+            run={() => rerunVerification(application.id)}
+          />
           <p className="mt-2 text-xs text-mut">Re-run uses live free sources and can take a minute. Sample LEGIT rows use offline fixtures until you re-run.</p>
-        </form>
+        </div>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Internal note</h2>
           <form action={saveInternalNote} className="mt-3 space-y-2">
@@ -174,22 +181,7 @@ export default async function ApplicationDetailPage({
           <section className={`${card} mt-4 p-4`}>
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your decision</h2>
             <p className="mt-1 text-sm text-ink">Automation does not approve or decline. A decline does not show the reason to the applicant.</p>
-            <form action={reviewApplication} className="mt-3 space-y-2">
-              <input type="hidden" name="applicationId" value={application.id} />
-              <label className={labelCls}>Note</label>
-              <textarea name="note" className={field} rows={3} placeholder="Shown if you approve or ask for more info. Hidden if you decline." />
-              <div className="flex flex-wrap gap-2">
-                <button className={btn} name="decision" value="APPROVED" type="submit">
-                  Approve as Invited member
-                </button>
-                <button className={btnOutline} name="decision" value="NEEDS_INFO" type="submit">
-                  Needs more info
-                </button>
-                <button className={btnOutline} name="decision" value="DECLINED" type="submit">
-                  Decline
-                </button>
-              </div>
-            </form>
+            <DecisionForm applicationId={application.id} notLegit={report?.verdict === "NOT_LEGIT"} />
           </section>
         ) : null}
         <section className={`${card} mt-4 p-4`}>
@@ -203,6 +195,19 @@ export default async function ApplicationDetailPage({
               </li>
             ))}
           </ul>
+        </section>
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete applicant</h2>
+          <p className="mt-2 text-sm text-ink">Removes this application, its card, notices, verification runs, and the member account created from it. An administrator account is left in place.</p>
+          <div className="mt-3">
+            <RunAndReload
+              className={btnOutline}
+              label="Delete this applicant and all their data"
+              pendingLabel="Deleting…"
+              confirmMessage={`Delete ${application.name} and all of their data? This cannot be undone.`}
+              run={() => deleteOneApplication(application.id)}
+            />
+          </div>
         </section>
       </div>
     </div>
@@ -234,8 +239,16 @@ function Report({
             <span className="ml-2 text-xs text-mut">{run.status}{run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-ink">{run.summary || "The report is still running."}</p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="mt-3 flex flex-wrap gap-2">
+            {run.evidence.map((row) => (
+              <span key={`${row.id}-chip`} className="inline-flex items-center gap-1 text-[11px] text-ink">
+                <EvidenceChip status={row.status} />
+                {row.checkKey}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 max-w-full overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-left text-xs">
               <thead>
                 <tr className="border-b border-line text-mut">
                   <th className="py-2 pr-2">Check</th>
@@ -249,8 +262,10 @@ function Report({
                 {run.evidence.map((row) => (
                   <tr key={row.id} className="border-b border-line align-top">
                     <td className="py-2 pr-2">{row.checkKey}</td>
-                    <td className="py-2 pr-2">{row.status}</td>
                     <td className="py-2 pr-2">
+                      <EvidenceChip status={row.status} />
+                    </td>
+                    <td className="max-w-xs py-2 pr-2 break-words">
                       {row.finding}
                       {row.url ? (
                         <>

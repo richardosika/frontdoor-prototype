@@ -58,6 +58,7 @@ enum EvidenceStatus {
   FAIL
   INCONCLUSIVE
   NOT_RUN
+  UNAVAILABLE
 }
 
 enum RunStatus {

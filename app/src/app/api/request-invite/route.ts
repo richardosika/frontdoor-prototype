@@ -3,6 +3,7 @@ import { INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validate
 import { withinRateLimit } from "@/lib/messaging";
 import { prisma } from "@/lib/prisma";
 import { isRoleId } from "@/lib/roles";
+import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,6 @@ export async function POST(request: Request) {
       statusToken,
     },
   });
-  const statusUrl = new URL(`/invite-status/${statusToken}`, request.url).toString();
+  const statusUrl = `${await appBaseUrl()}/invite-status/${statusToken}`;
   return Response.json({ ok: true, statusUrl });
 }

@@ -2,6 +2,7 @@ import { refreshWatchlists } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
+import { RunAndReload } from "@/components/run-and-reload";
 import { btn, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
@@ -45,11 +46,9 @@ export default async function VerificationSettingsPage({
           <p>
             OFAC SDN cache: {cache ? `${names} names, refreshed ${formatAuditTime(cache.fetchedAt)}` : "not downloaded yet"}. A local test name, Alexei Sanctionhit, is always included so the sample hit still works if the download fails.
           </p>
-          <form action={refreshWatchlists} className="mt-3">
-            <button className={btn} type="submit">
-              Refresh watchlists now
-            </button>
-          </form>
+          <div className="mt-3">
+            <RunAndReload className={btn} label="Refresh watchlists now" pendingLabel="Refreshing watchlists…" run={refreshWatchlists} />
+          </div>
         </section>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Sources</h2>

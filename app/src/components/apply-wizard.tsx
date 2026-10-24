@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -69,6 +69,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
 
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[0];
   const dues = duesForRole(role);
+
+  useEffect(() => {
+    if (!error) return;
+    document.getElementById("apply-error")?.scrollIntoView({ block: "center" });
+  }, [error]);
 
   function onCard(file: File | undefined) {
     setCardFile(file ?? null);
@@ -187,7 +192,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ))}
       </ol>
       <div className="px-5 py-5">
-        {error ? <p className="mb-3 text-sm text-brass">{error}</p> : null}
+        {error ? (
+          <p id="apply-error" className="mb-3 text-sm text-brass">
+            {error}
+          </p>
+        ) : null}
         {done ? (
           <div className="py-4">
             <h1 className="font-serif text-2xl">Application under review</h1>
@@ -387,6 +396,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         {!done && step === 4 ? (
           <div>
             <div className="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: consent.beforeHtml }} />
+            <p className="mt-3 text-xs leading-relaxed text-ink">Bracketed text such as [amounts to be confirmed] is still a draft placeholder.</p>
             <ul className="mt-4 space-y-2 text-sm">
               {LEGAL_LINKS.map(([href, label]) => (
                 <li key={href}>

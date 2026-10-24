@@ -6,7 +6,7 @@ import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/api/health", "/api/auth", "/api/request-invite"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/api/health", "/api/auth", "/api/request-invite"];
 
 export default auth((req) => {
   const path = req.nextUrl.pathname;
@@ -39,5 +39,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

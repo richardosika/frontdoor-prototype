@@ -21,7 +21,7 @@ export async function reviewApplication(formData: FormData) {
   const admin = await requireAdmin();
   const applicationId = String(formData.get("applicationId") || "");
   const decision = String(formData.get("decision") || "");
-  const note = String(formData.get("note") || "").trim().slice(0, 500);
+  let note = String(formData.get("note") || "").trim().slice(0, 500);
   const normalized = decision === "REJECTED" ? "DECLINED" : decision;
   if (normalized !== "APPROVED" && normalized !== "DECLINED" && normalized !== "NEEDS_INFO") {
     redirect("/admin/applications");
@@ -39,6 +39,23 @@ export async function reviewApplication(formData: FormData) {
     const existing = await prisma.user.findUnique({ where: { email: application.email } });
     if (existing) {
       redirect(`/admin/applications/${application.id}?error=That+email+is+already+a+member`);
+    }
+    const latest = await prisma.verificationRun.findFirst({
+      where: { applicationId: application.id, subject: "APPLICATION", status: "DONE" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (latest?.verdict === "NOT_LEGIT" && String(formData.get("confirmNotLegit") || "") !== "yes") {
+      redirect(`/admin/applications/${application.id}?error=${encodeURIComponent("Confirm the NOT LEGIT recommendation before approving.")}`);
+    }
+    if (latest?.verdict === "NOT_LEGIT") {
+      note = [note, "Approved despite recommendation NOT LEGIT."].filter(Boolean).join(" ");
+      await prisma.moderationEvent.create({
+        data: {
+          actorId: admin.id,
+          action: "APPROVE_NOT_LEGIT",
+          summary: `${admin.name} approved ${application.name} (${application.email}) despite recommendation NOT LEGIT.`,
+        },
+      });
     }
   }
 

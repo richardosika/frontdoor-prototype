@@ -42,16 +42,16 @@ The summary is a template. It is not a language model. It always includes:
 - `Recommendation: LEGIT`, `Recommendation: NOT LEGIT`, or `Recommendation: NEEDS YOUR DECISION`
 - The strongest support
 - The strongest concern
-- What is missing
-- `What I could not check for free`
+- `No data found` for sources that responded without a match
+- `What I could not check for free`, including any source marked unavailable (blocked, timed out, or errored)
 
 ## Jobs
 
-Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A failed source is `INCONCLUSIVE` or `NOT_RUN`. It does not fail the whole job.
+Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A source that answers with nothing relevant is `INCONCLUSIVE` (“No data found”). A source that is blocked, times out, or errors is `UNAVAILABLE` and is left out of the score. Neither one fails the job by itself. Each check shows a status chip.
 
-Test-console samples run with the network off. The strong sample adds three local fixture checks so a `LEGIT` recommendation is visible without outside sites. **Re-run verification** turns the network on and does not add those fixtures. The verdict can change.
+Test-console samples run with the network off. The strong sample adds three local fixture checks so a `LEGIT` recommendation is visible without outside sites. **Re-run verification** turns the network on and does not add those fixtures. The verdict can change. The test console can also create one `is_test` applicant with a name, company, email, and website you type, then queue a live run.
 
-Image OCR is not installed. Card images are compared by hand. If card text is supplied to the checker, it scores name and company consistency.
+Image OCR is not installed, and this host does not add a WASM OCR package. An uploaded card with no extracted text is `UNAVAILABLE`: the summary says the image could not be checked and an administrator should read the file. If card text is already on the application, the checker scores name and company consistency. No upload is `NOT_RUN`.
 
 ## Free sources
 
@@ -61,13 +61,14 @@ Image OCR is not installed. Card images are compared by hand. If card text is su
 | MX | DNS | Skipped on offline passes and disposable domains |
 | Website, /about, /team | Public HTTP | No company site and the email is a free provider |
 | RDAP | rdap.org | No company host |
-| Sanctions | OFAC SDN CSV cached in `SourceCache`, plus the local name Alexei Sanctionhit | Empty cache still has the test overlay |
-| EDGAR | efts.sec.gov full-text search | Non-200 response is `NOT_RUN` |
-| Courts | CourtListener public search | 401, 403, or no response is `NOT_RUN` |
-| Web | DuckDuckGo HTML | Block, captcha, or no response is inconclusive |
-| LinkedIn | Public page only | A block is inconclusive. Logged-in pages are not scraped |
+| Sanctions | Full OFAC SDN CSV plus the alternate-names file, cached in `SourceCache`, plus the local name Alexei Sanctionhit | Empty cache still has the test overlay. A name match is `NOT_LEGIT` only when the country or a date of birth also lines up. |
+| EDGAR | efts.sec.gov full-text search | A block or timeout is `UNAVAILABLE`. A response with zero hits is `INCONCLUSIVE`. |
+| Courts | CourtListener public search, per result | 401, 403, or no response is `UNAVAILABLE`. A severe word in a different result is ignored. A full-name hit without the company is “possible match, needs review” and is not a failure. |
+| Web | DuckDuckGo HTML, then Wikipedia, Wikidata, GDELT, and Bing | A page title that only repeats the query does not count. If every provider is blocked or empty, the check is `UNAVAILABLE`. |
+| LinkedIn | Public page only | A block is `UNAVAILABLE`. A response without the name is `INCONCLUSIVE`. Logged-in pages are not scraped. |
+| RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404 is “No data found”. |
 | State registry | Deep link only | Always `NOT_RUN` with a manual link for NJ, NY, DE, FL, and TX |
-| Business card | Local text compare | `NOT_RUN` when there is no text |
+| Business card | Local text compare | `NOT_RUN` when nothing was uploaded. `UNAVAILABLE` when an image was uploaded and OCR is not installed. |
 
 State registry links:
 

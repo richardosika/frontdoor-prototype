@@ -1,6 +1,9 @@
 import { annualDuesCents } from "@/lib/dues";
+import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
+import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
+import { webFootprintCheck } from "@/lib/verify/web-search";
 
 const DISPOSABLE = new Set([
   "mailinator.com",
@@ -71,7 +74,7 @@ const AREA_TO_STATE: Record<string, string> = {
 /** Local overlay so the test console can show a corroborated sanctions hit without a paid list. */
 export const TEST_WATCHLIST = [{ name: "Alexei Sanctionhit", location: "Newark United States" }];
 
-export type WatchlistEntry = { name: string; location: string };
+export type WatchlistEntry = { name: string; location: string; dob?: string; aliasOf?: string };
 
 export type CheckContext = {
   facts: ApplicantFacts;
@@ -282,7 +285,8 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
       url: "https://ofac.treasury.gov/sanctions-list-service",
     });
   }
-  const corroborated = locationsCorroborate(facts.location, best.entry.location);
+  const byLocation = locationsCorroborate(facts.location, best.entry.location);
+  const corroborated = sanctionsCorroborated(facts, best.entry);
   return check({
     key: "sanctions",
     status: "FAIL",
@@ -290,8 +294,10 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
     hardFlag: corroborated,
     reviewFlag: !corroborated,
     finding: corroborated
-      ? `Watchlist name match on ${best.entry.name} (${best.field}) and the application location lines up with ${best.entry.location}.`
-      : `Possible watchlist match on ${best.entry.name} without location corroboration. Owner review, not an automatic red flag.`,
+      ? byLocation
+        ? `Watchlist name match on ${best.entry.name} (${best.field}) and the application location lines up with ${best.entry.location}.`
+        : `Watchlist name match on ${best.entry.name} (${best.field}) and a date of birth in the file lines up with ${best.entry.dob}.`
+      : `Possible watchlist match on ${best.entry.name} without country or date-of-birth corroboration. Owner review, not an automatic red flag.`,
     source: "OFAC cache plus Private Floor test overlay",
     url: "https://ofac.treasury.gov/sanctions-list-service",
   });
@@ -321,14 +327,32 @@ export function linkedinFormatCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+export function sanctionsCorroborated(facts: ApplicantFacts, entry: WatchlistEntry): boolean {
+  if (locationsCorroborate(facts.location, entry.location)) return true;
+  const year = (entry.dob || "").match(/\b(?:19|20)\d{2}\b/)?.[0];
+  if (!year) return false;
+  return new RegExp(`\\b(?:dob|born)\\b[^\\n]{0,40}\\b${year}\\b`, "i").test(`${facts.statement} ${facts.location}`);
+}
+
 export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
   const card = facts.cardText.trim();
   if (!card) {
+    if (facts.cardUploaded) {
+      return check({
+        key: "business-card",
+        status: "UNAVAILABLE",
+        weight: 10,
+        finding:
+          "The business card image could not be checked for free. OCR is not installed on this host, so the image was not read. The file is on the application for a Private Floor administrator to read.",
+        source: "Card text compare",
+        url: "",
+      });
+    }
     return check({
       key: "business-card",
       status: "NOT_RUN",
       weight: 10,
-      finding: "No card text was available. Image OCR is not run on this host. Compare the card on the application if one was uploaded.",
+      finding: "No business card was uploaded.",
       source: "Card text compare",
       url: "",
     });
@@ -539,9 +563,9 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       out.push(
         check({
           key: "mx",
-          status: "INCONCLUSIVE",
+          status: "UNAVAILABLE",
           weight: 6,
-          finding: `MX lookup for ${domain} did not complete. Marked inconclusive.`,
+          finding: `MX lookup for ${domain} timed out or did not complete. The source could not be checked.`,
           source: "DNS MX lookup",
           url: "",
         }),
@@ -566,18 +590,22 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   } catch {
     host = "";
   }
-  if (host && !FREE_PROVIDERS.has(host)) {
-    const rdap = await pageText(fetchText, `https://rdap.org/domain/${host}`);
+  const rdapHost = host ? registrableHost(host) : "";
+  if (rdapHost && !FREE_PROVIDERS.has(rdapHost)) {
+    const rdap = await pageText(fetchText, `https://rdap.org/domain/${rdapHost}`);
+    const rdapMissing = rdap.status === 404;
     out.push(
       check({
         key: "rdap",
-        status: rdap.ok ? "PASS" : "INCONCLUSIVE",
+        status: rdap.ok ? "PASS" : rdapMissing ? "INCONCLUSIVE" : "UNAVAILABLE",
         weight: 4,
         finding: rdap.ok
-          ? `RDAP responded for ${host}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`
-          : `RDAP did not respond for ${host}. Marked inconclusive.`,
+          ? `RDAP responded for ${rdapHost}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`
+          : rdapMissing
+            ? `RDAP responded for ${rdapHost}. No data found for that domain.`
+            : `RDAP was blocked, timed out, or did not respond for ${rdapHost}. This source could not be checked.`,
         source: "RDAP",
-        url: `https://rdap.org/domain/${host}`,
+        url: `https://rdap.org/domain/${rdapHost}`,
       }),
     );
   }
@@ -587,21 +615,22 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const about = await pageText(fetchText, new URL("/about", base).toString());
     const team = await pageText(fetchText, new URL("/team", base).toString());
     const blob = `${home.text} ${about.text} ${team.text}`;
-    const reachable = home.ok || home.status > 0;
+    const unreachable = home.status === 0 || home.status >= 500;
+    const reachable = !unreachable && (home.ok || home.status > 0);
     const first = ctx.facts.name.split(" ")[0]?.toLowerCase() || "";
     const nameHit = first.length > 2 && blob.includes(first);
     const orgHit = ctx.facts.org.length > 3 && blob.includes(ctx.facts.org.slice(0, 8).toLowerCase());
     out.push(
       check({
         key: "website",
-        status: !reachable ? "INCONCLUSIVE" : nameHit || orgHit ? "PASS" : "FAIL",
+        status: unreachable ? "UNAVAILABLE" : nameHit || orgHit ? "PASS" : reachable ? "FAIL" : "INCONCLUSIVE",
         weight: 14,
         reviewFlag: reachable && !(nameHit || orgHit),
-        finding: !reachable
-          ? "The website could not be fetched. Marked inconclusive."
+        finding: unreachable
+          ? "The website timed out or did not respond. This source could not be checked."
           : nameHit || orgHit
             ? "The site responded. Homepage, /about, or /team text includes the person or company name."
-            : "The site responded, but the person and company names were not on the homepage, /about, or /team. Look at the site yourself.",
+            : "The site responded, but the person and company names were not on the homepage, /about, or /team. No data found on those pages.",
         source: "Public website fetch",
         url: base,
         corroborates: Boolean(nameHit || orgHit),
@@ -631,13 +660,13 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   out.push(
     check({
       key: "edgar",
-      status: !edgar.ok ? "NOT_RUN" : edgarHits > 0 ? "PASS" : "INCONCLUSIVE",
+      status: !edgar.ok ? "UNAVAILABLE" : edgarHits > 0 ? "PASS" : "INCONCLUSIVE",
       weight: 12,
       finding: !edgar.ok
-        ? "EDGAR search did not respond. Marked not run."
+        ? "EDGAR was blocked, timed out, or did not respond. This source could not be checked."
         : edgarHits > 0
           ? `EDGAR full-text search returned ${edgarHits} hit(s) for the company name. Open the link and confirm it is the same firm.`
-          : "EDGAR responded and did not show a hit count for this company name.",
+          : "EDGAR responded. No data found for this company name.",
       source: "SEC EDGAR",
       url: edgarUrl,
       corroborates: edgar.ok && edgarHits > 0,
@@ -645,67 +674,24 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   );
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
   const court = await fetchText(courtUrl);
-  const courtText = stripHtml(court.text);
-  const courtSevere = /bankruptcy|fraud|indicted|ponzi/.test(courtText) && courtText.includes((ctx.facts.name.split(" ")[0] || "").toLowerCase());
-  out.push(
-    check({
-      key: "courts",
-      status: court.status === 401 || court.status === 403 || !court.ok ? "NOT_RUN" : courtSevere ? "FAIL" : "INCONCLUSIVE",
-      weight: 8,
-      reviewFlag: courtSevere,
-      finding:
-        court.status === 401 || court.status === 403
-          ? "CourtListener refused an anonymous search. Not run."
-          : !court.ok
-            ? "CourtListener did not respond. Not run."
-            : courtSevere
-              ? "CourtListener text includes a severe term near this name. Confirm the docket before you treat it as a red flag. This is not an automatic decline."
-              : "CourtListener returned a public search payload. Read it before treating any case as fraud.",
-      source: "CourtListener",
-      url: courtUrl,
-    }),
-  );
-  const query = `"${ctx.facts.name}" "${ctx.facts.org}"`;
-  const webUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-  const web = await fetchText(webUrl);
-  const webText = stripHtml(web.text);
-  const blocked = web.status === 202 || web.status === 403 || /captcha|anomaly/.test(webText);
-  const firstName = (ctx.facts.name.split(" ")[0] || "").toLowerCase();
-  const negative = /fraud|lawsuit|indicted|scam|ponzi/.test(webText) && firstName.length > 2 && webText.includes(firstName);
-  const named = firstName.length > 2 && webText.includes(firstName) && ctx.facts.org.length > 3 && webText.includes(ctx.facts.org.slice(0, 8).toLowerCase());
-  out.push(
-    check({
-      key: "web-footprint",
-      status: blocked || !web.ok ? "INCONCLUSIVE" : negative ? "FAIL" : named ? "PASS" : "INCONCLUSIVE",
-      weight: 12,
-      reviewFlag: Boolean(negative),
-      finding: blocked || !web.ok
-        ? "Public web search was blocked or unreachable. Marked inconclusive."
-        : negative
-          ? "A free web search page mentions a negative term near this name. Confirm the snippet before you treat it as a red flag."
-          : named
-            ? "A free web search page includes both the person and the company."
-            : "A free web search responded, but the person and company were not both in the fetched text.",
-      source: "DuckDuckGo HTML",
-      url: webUrl,
-      corroborates: Boolean(named) && !negative,
-    }),
-  );
+  out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
+  out.push(await webFootprintCheck(ctx.facts, fetchText));
   if (ctx.facts.linkedinUrl) {
     const linked = await fetchText(ctx.facts.linkedinUrl);
     const linkedText = stripHtml(linked.text);
-    const blockedLinked = linked.status === 999 || linked.status === 403 || linked.status === 401 || !linked.ok;
+    const blockedLinked = linked.status === 999 || linked.status === 403 || linked.status === 401 || linked.status === 0 || !linked.ok;
+    const firstName = (ctx.facts.name.split(" ")[0] || "").toLowerCase();
     const titleHit = firstName.length > 2 && linkedText.includes(firstName);
     out.push(
       check({
         key: "linkedin-fetch",
-        status: blockedLinked ? "INCONCLUSIVE" : titleHit ? "PASS" : "INCONCLUSIVE",
+        status: blockedLinked ? "UNAVAILABLE" : titleHit ? "PASS" : "INCONCLUSIVE",
         weight: 8,
         finding: blockedLinked
-          ? "LinkedIn blocked a public fetch. Marked inconclusive. Logged-in pages are not scraped."
+          ? "LinkedIn blocked or did not return a public page. This source could not be checked. Logged-in pages are not scraped."
           : titleHit
             ? "A public fetch of the LinkedIn URL returned a page that includes the person's name."
-            : "A public fetch returned a page, but the name was not in the title or text.",
+            : "LinkedIn responded, but the name was not in the page. No data found.",
         source: "LinkedIn public page",
         url: ctx.facts.linkedinUrl,
         corroborates: Boolean(titleHit) && !blockedLinked,

@@ -30,14 +30,15 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
    - Thin Gmail file
    - Disposable email with no site or LinkedIn
    - Duplicate of Marcus Hale
-3. `/admin/applications`. Use the filters New, In review, Needs info, Recommended legit, Recommended not legit, Needs your decision, Approved, and Declined. Sort by submitted time and by score. Times are America/New_York.
+3. `/admin/applications`. The default filter is **Needs action** (open applications, including ones that already have a verdict). Other filters: New, In review, Needs info, Recommended legit, Recommended not legit, Needs your decision, Approved, and Declined. Sort by submitted time and by score. Times are America/New_York. Select rows and **Delete selected**, or open a row and **Delete this applicant and all their data**. Both write an audit event.
 4. Open a row. Read the applicant, the business card if one was uploaded, the automated report, the company report, and the evidence table. Save an internal note. **Re-run verification** calls the live free sources and can change a sample verdict. Approve, decline, or ask for more info. The decision log records who, when, and the note. A decline does not put that note on the member status page.
 5. `/admin/outbox` lists every test notice.
 6. `/admin/audit` lists decisions, verification runs, and moderation events.
 7. `/admin/sources` lists sources, the OFAC cache time, and **Refresh watchlists now**.
 8. `/admin/members` and a member’s page show legal acceptances after an approval (document, version, time, IP hash).
-9. **Delete all test data** removes only `is_test` applications and `is_test` members. Seeded members stay.
+9. **Delete all test data** removes `is_test` applications and leftover `is_test` members, including a custom test applicant. It asks for confirmation. Seeded demo members that are not `is_test` stay.
+10. **Create a test applicant** takes a name, company, email, and website, marks the row `is_test`, and queues a live verification run. Use it for a public company or a made-up name without going through `/apply`.
 
 ## What the offline samples are for
 
-The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or DuckDuckGo. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is inconclusive or not run. It does not fail the job, and it does not approve anyone.
+The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or web search. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is unavailable and is listed under “What I could not check for free.” A source that answers with no match is “No data found.” Neither one approves anyone.

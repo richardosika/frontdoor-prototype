@@ -2,8 +2,9 @@ import type { CheckOutput, ScoredReport, Verdict } from "@/lib/verify/types";
 
 /**
  * Score is the share of weight earned by PASS checks.
- * NOT_RUN checks are left out. INCONCLUSIVE and FAIL earn nothing and stay in the denominator,
- * so a thin file cannot look strong.
+ * NOT_RUN and UNAVAILABLE checks are left out. INCONCLUSIVE and FAIL earn nothing and stay in the denominator,
+ * so a thin file cannot look strong. UNAVAILABLE means the source was blocked or timed out.
+ * INCONCLUSIVE means the source responded and no matching data was found.
  * Thresholds are also described in app/docs/VERIFICATION.md.
  */
 export const LEGIT_SCORE = 72;
@@ -11,7 +12,7 @@ export const CORROBORATION_WEIGHT = 8;
 export const CORROBORATION_COUNT = 3;
 
 export function scoreOf(checks: CheckOutput[]): number {
-  const counted = checks.filter((check) => check.status !== "NOT_RUN");
+  const counted = checks.filter((check) => check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE");
   const possible = counted.reduce((sum, check) => sum + Math.max(0, check.weight), 0);
   if (!possible) return 0;
   const earned = counted.filter((check) => check.status === "PASS").reduce((sum, check) => sum + check.weight, 0);
@@ -36,14 +37,21 @@ export function buildSummary(checks: CheckOutput[], score: number, verdict: Verd
         : `Recommendation: ${label}. The file is thin or the checks conflict. The score is ${score} out of 100. Richard Osika should look at the items below before deciding.`;
   const support = checks.filter((check) => check.status === "PASS").slice(0, 2).map((check) => check.finding);
   const against = checks.filter((check) => check.hardFlag || check.reviewFlag || check.status === "FAIL").slice(0, 2).map((check) => check.finding);
-  const missing = checks.filter((check) => check.status === "INCONCLUSIVE" || check.status === "NOT_RUN").map((check) => check.key);
+  const noData = checks.filter((check) => check.status === "INCONCLUSIVE").map((check) => check.key);
+  const unavailable = checks.filter((check) => check.status === "UNAVAILABLE");
   const forLine = support.length ? `Strongest support: ${support.join(" ")}` : "Strongest support: no corroborating pass yet.";
   const againstLine = against.length ? `Strongest concern: ${against.join(" ")}` : "Strongest concern: no hard conflict in the checks that ran.";
-  const missingLine = missing.length
-    ? `What is missing: ${missing.slice(0, 6).join(", ")}.`
-    : "What is missing: the checks that ran all returned a result.";
-  const free = "What I could not check for free: paid people-search, credit, full court dockets, logged-in LinkedIn, and state registries that have no stable free API.";
-  return [opinion, forLine, againstLine, missingLine, free].join(" ");
+  const noDataLine = noData.length
+    ? `No data found: ${noData.slice(0, 8).join(", ")}.`
+    : "No data found: the sources that responded had a result or a pass.";
+  const unavailableText = unavailable.length
+    ? unavailable
+        .slice(0, 4)
+        .map((check) => `${check.key}: ${check.finding}`)
+        .join(" ")
+    : "none of the free sources were blocked on this run";
+  const free = `What I could not check for free: paid people-search, credit, full court dockets, logged-in LinkedIn, state registries that have no stable free API, and any source marked unavailable. ${unavailableText}`;
+  return [opinion, forLine, againstLine, noDataLine, free].join(" ");
 }
 
 export function scoreReport(checks: CheckOutput[]): ScoredReport {

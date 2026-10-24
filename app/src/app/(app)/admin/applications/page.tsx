@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { deleteSelectedApplications } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { VerdictChip } from "@/components/verdict-chip";
-import { card } from "@/components/ui";
+import { btnOutline, card } from "@/components/ui";
 import {
   APPLICATION_FILTERS,
   type ApplicationFilter,
@@ -24,7 +26,7 @@ export default async function ApplicationsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const filter = APPLICATION_FILTERS.some((item) => item.id === params.filter) ? (params.filter as ApplicationFilter) : "new";
+  const filter = APPLICATION_FILTERS.some((item) => item.id === params.filter) ? (params.filter as ApplicationFilter) : "action";
   const sort = params.sort === "score" ? "score" : "submitted";
   const applications = await prisma.application.findMany({
     orderBy: { createdAt: "desc" },
@@ -43,7 +45,7 @@ export default async function ApplicationsPage({
   return (
     <div>
       <MobileTitle href="/admin" label="Admin" title="Applications" />
-      <div className="mx-auto max-w-5xl px-4 py-4 md:py-6 lg:px-8">
+      <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Applications" />
         <AdminNav current="/admin/applications" />
         <p className="mt-3 text-sm text-ink">Recommendations only. Richard Osika approves every member.</p>
@@ -71,11 +73,22 @@ export default async function ApplicationsPage({
             Sort by score
           </Link>
         </div>
+        <form id="bulk-delete" action={deleteSelectedApplications} />
+        <div className="mt-4">
+          <ConfirmSubmitButton
+            form="bulk-delete"
+            className={btnOutline}
+            message="Delete the selected applicants and all of their data? This cannot be undone."
+          >
+            Delete selected
+          </ConfirmSubmitButton>
+        </div>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">Nothing in this filter.</p> : null}
         <ul className="mt-4 space-y-3">
           {rows.map((application) => (
-            <li key={application.id}>
-              <Link href={`/admin/applications/${application.id}`} className={`${card} block p-4`}>
+            <li key={application.id} className="flex items-start gap-2">
+              <input form="bulk-delete" className="mt-5 h-4 w-4 shrink-0" type="checkbox" name="applicationId" value={application.id} aria-label={`Select ${application.name}`} />
+              <Link href={`/admin/applications/${application.id}`} className={`${card} block min-w-0 flex-1 p-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <h2 className="font-serif text-xl font-normal">{application.name}</h2>

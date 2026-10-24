@@ -14,7 +14,7 @@ export default async function OutboxPage() {
   return (
     <div>
       <MobileTitle href="/admin" label="Admin" title="Outbox" />
-      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <div className="mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Outbox" />
         <AdminNav current="/admin/outbox" />
         <p className="mt-3 text-sm text-ink">
@@ -23,7 +23,7 @@ export default async function OutboxPage() {
         {notices.length === 0 ? <p className="mt-6 text-sm text-mut">No notices yet.</p> : null}
         <ul className="mt-4 space-y-3">
           {notices.map((notice) => (
-            <li key={notice.id} className={`${card} p-4 text-sm`}>
+            <li key={notice.id} className={`${card} min-w-0 overflow-hidden p-4 text-sm`}>
               <p className="text-xs text-mut">{formatAuditTime(notice.createdAt)}</p>
               <p>
                 <b>{notice.subject}</b>
@@ -31,7 +31,7 @@ export default async function OutboxPage() {
               <p className="text-xs text-ink">
                 Intended: {notice.intendedTo} · Delivered only to: {notice.deliveredTo}
               </p>
-              <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-ink">{notice.body}</pre>
+              <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{notice.body}</pre>
             </li>
           ))}
         </ul>

@@ -106,6 +106,7 @@ async function factsForRun(run: {
     statement: string;
     testProfile: string;
     inviteCode: { note: string; code: string } | null;
+    businessCard?: { deletedAt: Date | null; sizeBytes: number } | null;
   } | null;
 }): Promise<ApplicantFacts> {
   const application = run.application;
@@ -143,6 +144,7 @@ async function factsForRun(run: {
     inviteNote: application?.inviteCode ? `${application.inviteCode.code} · ${application.inviteCode.note}` : "",
     testProfile: application?.testProfile || "",
     cardText: "",
+    cardUploaded: Boolean(application?.businessCard && !application.businessCard.deletedAt && application.businessCard.sizeBytes > 0),
     duplicateOfMember: run.subject === "APPLICATION" ? duplicateOfMember : false,
     duplicateOfDeclined,
     recentApplications,

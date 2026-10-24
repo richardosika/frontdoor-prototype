@@ -43,6 +43,7 @@ export function verdictLabel(verdict: string | null | undefined): string {
 }
 
 export type ApplicationFilter =
+  | "action"
   | "new"
   | "review"
   | "needs"
@@ -53,6 +54,7 @@ export type ApplicationFilter =
   | "declined";
 
 export const APPLICATION_FILTERS: { id: ApplicationFilter; label: string }[] = [
+  { id: "action", label: "Needs action" },
   { id: "new", label: "New" },
   { id: "review", label: "In review" },
   { id: "needs", label: "Needs info" },
@@ -70,6 +72,7 @@ export function matchesApplicationFilter(
   status: string,
   verdict: string | null | undefined,
 ): boolean {
+  if (filter === "action") return (OPEN_APPLICATION_STATUSES as readonly string[]).includes(status);
   if (filter === "new") return status === "PENDING" || status === "SUBMITTED";
   if (filter === "review") return status === "IN_REVIEW";
   if (filter === "needs") return status === "NEEDS_INFO";
