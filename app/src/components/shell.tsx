@@ -89,12 +89,24 @@ export function Shell({
             <Link
               href="/admin"
               className={`relative flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
-                pathname.startsWith("/admin") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
+                pathname.startsWith("/admin") && !pathname.startsWith("/admin/verification") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
               }`}
             >
-              {pathname.startsWith("/admin") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
+              {pathname.startsWith("/admin") && !pathname.startsWith("/admin/verification") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
               <span className="grid h-6 w-6 place-items-center text-lg">▣</span>
               <span className="hidden lg:inline">Admin</span>
+            </Link>
+          ) : null}
+          {user.isAdmin ? (
+            <Link
+              href="/admin/verification"
+              className={`relative flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
+                pathname.startsWith("/admin/verification") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
+              }`}
+            >
+              {pathname.startsWith("/admin/verification") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
+              <span className="grid h-6 w-6 place-items-center text-lg">✓</span>
+              <span className="hidden lg:inline">Verification</span>
             </Link>
           ) : null}
         </nav>
@@ -178,6 +190,11 @@ export function Shell({
             {user.isAdmin ? (
               <Link href="/admin" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
                 Admin
+              </Link>
+            ) : null}
+            {user.isAdmin ? (
+              <Link href="/admin/verification" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+                Verification
               </Link>
             ) : null}
             <form action={logoutAction} className="border-t border-line">

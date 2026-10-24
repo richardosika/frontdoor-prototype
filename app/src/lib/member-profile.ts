@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
 export async function loadMemberProfile(viewerId: string, memberId: string) {
   const member = await prisma.user.findUnique({
@@ -25,5 +26,33 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       sum + project.confirmations.filter((item) => item.status === "CONFIRMED" && item.reviewStatus === "APPROVED").length,
     0,
   );
-  return { member, connection: state, vouchCount };
+  const cases = await prisma.verificationCase.findMany({
+    where: {
+      OR: [{ userId: memberId }, { projectId: { in: member.projects.map((project) => project.id) } }],
+    },
+    select: {
+      userId: true,
+      projectId: true,
+      status: true,
+      verifiedAt: true,
+      expiresAt: true,
+      checks: { select: { result: true } },
+    },
+  });
+  const memberCase = cases.find((item) => item.userId === memberId);
+  const verification = toPublicVerification(
+    memberCase
+      ? { ...memberCase, status: memberCase.status as VerificationStatus }
+      : null,
+  );
+  const projects = member.projects.map((project) => {
+    const record = cases.find((item) => item.projectId === project.id);
+    return {
+      ...project,
+      verification: toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null),
+    };
+  });
+  return { member, projects, verification, connection: state, vouchCount };
 }
+
+export type { PublicVerification };

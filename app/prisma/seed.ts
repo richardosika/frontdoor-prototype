@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BRAND } from "../src/lib/brand";
+import { MEMBER_CHECKS, PROJECT_CHECKS, type CheckResult, type VerificationStatus } from "../src/lib/verification";
 
 const prisma = new PrismaClient();
 const passwordHash = bcrypt.hashSync("cornicio-demo", 10);
@@ -250,10 +251,14 @@ async function main() {
   const reset = process.env.SEED === "reset";
   const members = await prisma.user.count();
   if (!reset && members > 0) {
+    await ensureMissingVerificationCases();
     console.log("Database already has members. Skipping seed. Set SEED=reset to wipe and reseed.");
     return;
   }
   if (reset) {
+    await prisma.verificationEvent.deleteMany();
+    await prisma.verificationCheck.deleteMany();
+    await prisma.verificationCase.deleteMany();
     await prisma.notification.deleteMany();
     await prisma.dealEvent.deleteMany();
     await prisma.dealMessage.deleteMany({ where: { parentId: { not: null } } });
@@ -693,7 +698,204 @@ async function main() {
     ],
   });
 
+  await seedVerification();
+
   console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
+}
+
+async function ensureMissingVerificationCases() {
+  const users = await prisma.user.findMany({ select: { id: true, memberVerification: { select: { id: true } } } });
+  for (const user of users) {
+    if (user.memberVerification) continue;
+    await prisma.verificationCase.create({
+      data: {
+        subject: "MEMBER",
+        userId: user.id,
+        status: "NOT_STARTED",
+        checks: { create: MEMBER_CHECKS.map((item) => ({ key: item.key, label: item.label })) },
+        events: { create: { toStatus: "NOT_STARTED", summary: "Verification case opened." } },
+      },
+    });
+  }
+  const projects = await prisma.trackProject.findMany({ select: { id: true, verification: { select: { id: true } } } });
+  for (const project of projects) {
+    if (project.verification) continue;
+    await prisma.verificationCase.create({
+      data: {
+        subject: "PROJECT",
+        projectId: project.id,
+        status: "NOT_STARTED",
+        checks: { create: PROJECT_CHECKS.map((item) => ({ key: item.key, label: item.label })) },
+        events: { create: { toStatus: "NOT_STARTED", summary: "Verification case opened." } },
+      },
+    });
+  }
+}
+
+async function seedVerification() {
+  const reviewedAt = hoursAgo(24 * 12);
+  const users = await prisma.user.findMany({ select: { id: true } });
+  const projects = await prisma.trackProject.findMany({ select: { id: true } });
+  for (const user of users) {
+    await prisma.verificationCase.create({
+      data: {
+        subject: "MEMBER",
+        userId: user.id,
+        status: "NOT_STARTED",
+        checks: { create: MEMBER_CHECKS.map((item) => ({ key: item.key, label: item.label })) },
+        events: { create: { actorId: "user_mh", toStatus: "NOT_STARTED", summary: "Verification case opened." } },
+      },
+    });
+  }
+  for (const project of projects) {
+    await prisma.verificationCase.create({
+      data: {
+        subject: "PROJECT",
+        projectId: project.id,
+        status: "NOT_STARTED",
+        checks: { create: PROJECT_CHECKS.map((item) => ({ key: item.key, label: item.label })) },
+        events: { create: { actorId: "user_mh", toStatus: "NOT_STARTED", summary: "Verification case opened." } },
+      },
+    });
+  }
+
+  await completeCase(
+    { userId: "user_mh" },
+    {
+      note: "File matches the public record.",
+      evidenceUrl: "https://example.com/hale-row-nj-entity",
+      internalNote: "OFAC and litigation screen clear. NJ entity matched. Do not show this note to the member.",
+      verifiedAt: reviewedAt,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 400),
+    },
+  );
+  await completeCase(
+    { userId: "user_pa" },
+    {
+      note: "Entity and insurance on file.",
+      evidenceUrl: "https://example.com/anand-entity",
+      internalNote: "Screen clear. Internal only.",
+      verifiedAt: reviewedAt,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 400),
+    },
+  );
+  await completeCase(
+    { projectId: "proj_ironbound" },
+    {
+      note: "Title, permits, and the accepted vouch are on file.",
+      evidenceUrl: "https://example.com/ironbound-title",
+      internalNote: "Open to counterparties. Purchase contract reviewed.",
+      verifiedAt: reviewedAt,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 200),
+    },
+  );
+  await completeCase(
+    { projectId: "proj_halsey" },
+    {
+      note: "Entitlements and GC budget reviewed.",
+      evidenceUrl: "https://example.com/halsey-permits",
+      internalNote: "Open to counterparties. Vouch still waiting on Elena Voss.",
+      verifiedAt: hoursAgo(24 * 2),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+    },
+  );
+
+  await setCase({ userId: "user_rk" }, "IN_REVIEW", "Identity matched. License and screen still open.");
+  await setCheck({ userId: "user_rk" }, "identity", "PASS", "LinkedIn and legal name match.", "https://example.com/rachel-linkedin");
+
+  await setCase({ userId: "user_ev" }, "NEEDS_INFO", "Asked for the NJ license number after the lookup missed.");
+  await setCheck(
+    { userId: "user_ev" },
+    "license",
+    "NEEDS_INFO",
+    "NJ license lookup did not match the name on the file.",
+    "https://example.com/nj-license-lookup",
+  );
+
+  await setCase({ userId: "user_bk" }, "REJECTED", "Sanctions screen did not clear. Internal only.");
+  await setCheck({ userId: "user_bk" }, "sanctions", "FAIL", "Screen hit. Do not describe this to the member.", "https://example.com/screen");
+
+  const expiredAt = hoursAgo(24 * 40);
+  await completeCase(
+    { userId: "user_am" },
+    {
+      note: "Prior file.",
+      evidenceUrl: "https://example.com/moore-file",
+      internalNote: "Expired. Re-verify before treating the badge as current.",
+      verifiedAt: hoursAgo(24 * 400),
+      expiresAt: expiredAt,
+    },
+  );
+}
+
+async function completeCase(
+  where: { userId: string } | { projectId: string },
+  input: { note: string; evidenceUrl: string; internalNote: string; verifiedAt: Date; expiresAt: Date },
+) {
+  const record = await prisma.verificationCase.findFirst({ where });
+  if (!record) return;
+  await prisma.verificationCase.update({
+    where: { id: record.id },
+    data: {
+      status: "VERIFIED",
+      internalNote: input.internalNote,
+      verifiedAt: input.verifiedAt,
+      expiresAt: input.expiresAt,
+    },
+  });
+  await prisma.verificationCheck.updateMany({
+    where: { caseId: record.id },
+    data: {
+      result: "PASS",
+      note: input.note,
+      evidenceUrl: input.evidenceUrl,
+      reviewerId: "user_mh",
+      reviewedAt: input.verifiedAt,
+    },
+  });
+  await prisma.verificationEvent.create({
+    data: {
+      caseId: record.id,
+      actorId: "user_mh",
+      fromStatus: "NOT_STARTED",
+      toStatus: "VERIFIED",
+      summary: "Marcus Hale marked the checklist complete.",
+      createdAt: input.verifiedAt,
+    },
+  });
+}
+
+async function setCase(where: { userId: string } | { projectId: string }, status: VerificationStatus, internalNote: string) {
+  const record = await prisma.verificationCase.findFirst({ where });
+  if (!record) return;
+  await prisma.verificationCase.update({
+    where: { id: record.id },
+    data: { status, internalNote },
+  });
+  await prisma.verificationEvent.create({
+    data: {
+      caseId: record.id,
+      actorId: "user_mh",
+      fromStatus: "NOT_STARTED",
+      toStatus: status,
+      summary: `Marcus Hale set the status to ${status}.`,
+    },
+  });
+}
+
+async function setCheck(
+  where: { userId: string } | { projectId: string },
+  key: string,
+  result: CheckResult,
+  note: string,
+  evidenceUrl: string,
+) {
+  const record = await prisma.verificationCase.findFirst({ where });
+  if (!record) return;
+  await prisma.verificationCheck.update({
+    where: { caseId_key: { caseId: record.id, key } },
+    data: { result, note, evidenceUrl, reviewerId: "user_mh", reviewedAt: hoursAgo(6) },
+  });
 }
 
 main()

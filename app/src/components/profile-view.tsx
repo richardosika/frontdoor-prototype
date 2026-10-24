@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TierBadge } from "@/components/badge";
+import { TierBadge, VerifiedMark } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -7,6 +7,7 @@ import { addProject, requestConfirmation } from "@/actions/profile";
 import { openConversation, requestConnection } from "@/actions/social";
 import { roleById, roleLabel, roleShort } from "@/lib/roles";
 import { tierLabel } from "@/lib/format";
+import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
 
 type Project = {
   id: string;
@@ -23,6 +24,7 @@ type Project = {
     counterpartyName: string;
     token: string;
   }[];
+  verification: PublicVerification;
 };
 
 export function ProfileView({
@@ -34,6 +36,7 @@ export function ProfileView({
   vouchCount,
   backHref,
   linkOrigin,
+  verification,
 }: {
   member: {
     id: string;
@@ -54,6 +57,7 @@ export function ProfileView({
   vouchCount: number;
   backHref?: string;
   linkOrigin: string;
+  verification: PublicVerification;
 }) {
   const role = roleById(member.role);
   const tiers = [
@@ -110,6 +114,9 @@ export function ProfileView({
         <h1 className="mt-3 flex flex-wrap items-center gap-2 font-serif text-[26px] font-normal">
           {member.name} <TierBadge tier={member.tier} />
         </h1>
+        <div className="mt-2">
+          <VerifiedMark view={verification} />
+        </div>
         <p className="mt-1 text-sm text-mut">
           {member.org} · {member.location}
         </p>
@@ -150,7 +157,7 @@ export function ProfileView({
             <li>Invite code from an existing member.</li>
             <li>Credential check for this role: {role?.check}.</li>
             <li>References are on the application.</li>
-            <li>Past partners confirm projects from a link you send them. The committee reviews that vouch before Confirmed.</li>
+            <li>The committee finishes the file before a project is open to counterparties. A vouch is reviewed before Confirmed.</li>
           </ol>
         </div>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>
@@ -166,6 +173,9 @@ export function ProfileView({
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest">▦</span>
                 <div className="min-w-0 flex-1">
                   <b className="text-sm">{project.name}</b>
+                  <div className="mt-1">
+                    <VerifiedMark view={project.verification} />
+                  </div>
                   <div className="text-xs text-mut">
                     {project.asset} · {project.location} · {project.year}
                     {confirmed ? ` · ${confirmed} confirmed` : ""}
@@ -177,13 +187,13 @@ export function ProfileView({
                         <div key={item.id} className="mt-2 text-xs text-ink">
                           <span className="font-semibold">{item.counterpartyName}</span>
                           <span className="text-mut"> · {vouchState(item)}</span>
-                          {item.status === "PENDING" ? (
+                          {item.status === "PENDING" && canOpenProjectToCounterparties(project.verification) ? (
                             <CopyLink url={`${linkOrigin}/confirm/${item.token}`} />
                           ) : null}
                         </div>
                       ))
                     : null}
-                  {isSelf ? (
+                  {isSelf && canOpenProjectToCounterparties(project.verification) ? (
                     <form action={requestConfirmation} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                       <input type="hidden" name="projectId" value={project.id} />
                       <input name="counterpartyName" placeholder="Counterparty name" className={field} required />

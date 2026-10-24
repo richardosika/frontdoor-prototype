@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { isAwaitingVerification } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function AdminPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [pending, members, invites, posts, access, vouches] = await Promise.all([
+  const [pending, members, invites, posts, access, vouches, verificationCases] = await Promise.all([
     prisma.application.count({ where: { status: "PENDING" } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
@@ -26,7 +27,9 @@ export default async function AdminPage({
       include: { project: { include: { user: true } } },
       orderBy: { respondedAt: "desc" },
     }),
+    prisma.verificationCase.findMany({ select: { status: true, expiresAt: true } }),
   ]);
+  const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
 
   return (
@@ -36,10 +39,11 @@ export default async function AdminPage({
       <div className="mt-4">
         <Banner error={params.error} notice={params.notice} />
       </div>
-      <div className="mt-2 grid gap-3 sm:grid-cols-3">
+      <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat href="/admin/applications" label="Pending applications" value={pending} />
         <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
         <Stat href="/deals" label="Open access requests" value={access} />
+        <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Mini label="Invited" value={tierCount("INVITED")} />

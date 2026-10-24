@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/current-user";
 import { BRAND } from "@/lib/brand";
 import { tierAfterCounterpartyConfirm } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { canOpenProjectToCounterparties, toPublicVerification, type VerificationStatus } from "@/lib/verification";
+import { attachVouchEvidence, ensureVerificationCase } from "@/lib/verification-db";
 import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
@@ -22,9 +24,10 @@ export async function addProject(formData: FormData) {
   if (name.length < 2 || !asset || !location || !valueLabel || year < 1980 || year > 2100) {
     redirect("/profile?error=Add+a+name,+asset,+location,+year,+and+value");
   }
-  await prisma.trackProject.create({
+  const project = await prisma.trackProject.create({
     data: { userId: user.id, name, asset, location, year, valueLabel, summary },
   });
+  await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
   revalidatePath("/profile");
   redirect("/profile");
 }
@@ -37,8 +40,21 @@ export async function requestConfirmation(formData: FormData) {
   if (!counterpartyName || !counterpartyEmail.includes("@")) {
     redirect("/profile?error=Add+the+counterparty+name+and+email");
   }
-  const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
+  const project = await prisma.trackProject.findUnique({
+    where: { id: projectId },
+    include: { verification: { include: { checks: { select: { result: true } } } } },
+  });
   if (!project || project.userId !== user.id) redirect("/profile");
+  const open = canOpenProjectToCounterparties(
+    toPublicVerification(
+      project.verification
+        ? { ...project.verification, status: project.verification.status as VerificationStatus }
+        : null,
+    ),
+  );
+  if (!open) {
+    redirect("/profile?error=This+project+is+not+open+to+counterparties+until+verification+is+complete");
+  }
 
   const token = randomBytes(24).toString("hex");
   await prisma.confirmation.create({
@@ -96,7 +112,14 @@ export async function respondConfirmation(formData: FormData) {
     await notifyAdmins({
       title: "Vouch to review",
       body: `${confirmation.counterpartyName} confirmed ${confirmation.project.name} for ${confirmation.project.user.name}.`,
-      href: "/admin",
+      href: "/admin/verification",
+    });
+    await attachVouchEvidence({
+      memberId: confirmation.project.userId,
+      projectName: confirmation.project.name,
+      counterpartyName: confirmation.counterpartyName,
+      note,
+      evidenceUrl: `${await appBaseUrl()}/confirm/${token}`,
     });
     await sendEmail({
       to: confirmation.project.user.email,

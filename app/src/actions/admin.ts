@@ -9,6 +9,8 @@ import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
+import { canPromoteTierFromVouch } from "@/lib/verification";
+import { ensureVerificationCase, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { BRAND } from "@/lib/brand";
 import { appBaseUrl } from "@/lib/url";
 
@@ -58,6 +60,8 @@ export async function reviewApplication(formData: FormData) {
     },
   });
 
+  await ensureVerificationCase({ subject: "MEMBER", userId: user.id, actorId: admin.id });
+
   await prisma.application.update({
     where: { id: application.id },
     data: {
@@ -89,6 +93,14 @@ export async function setMemberTier(formData: FormData) {
   if (!isTier(tier)) redirect("/admin/members?error=Unknown+tier");
   const member = await prisma.user.findUnique({ where: { id: userId } });
   if (!member) redirect("/admin/members?error=Member+not+found");
+  if (tier === "CONFIRMED" && member.tier !== "CONFIRMED") {
+    const approved = await prisma.confirmation.count({
+      where: { reviewStatus: "APPROVED", project: { userId } },
+    });
+    if (!canPromoteTierFromVouch({ adminReviewed: approved > 0 })) {
+      redirect("/admin/members?error=Accept+a+counterparty+vouch+before+promoting+to+Confirmed");
+    }
+  }
   if (member.tier !== tier) {
     await prisma.user.update({
       where: { id: userId },
@@ -139,6 +151,14 @@ export async function reviewVouch(formData: FormData) {
       body: `${admin.name} accepted the vouch on ${confirmation.project.name}. Your tier is now ${tierLabel(nextTier)}.`,
       href: "/profile",
     });
+    await reviewVouchOnChecklist({
+      memberId: member.id,
+      adminId: admin.id,
+      adminName: admin.name,
+      accepted: true,
+      projectName: confirmation.project.name,
+      counterpartyName: confirmation.counterpartyName,
+    });
   } else {
     await prisma.confirmation.update({
       where: { id: confirmation.id },
@@ -148,6 +168,14 @@ export async function reviewVouch(formData: FormData) {
       title: "Vouch not accepted",
       body: `The committee did not accept the vouch on ${confirmation.project.name}. Your tier is unchanged.`,
       href: "/profile",
+    });
+    await reviewVouchOnChecklist({
+      memberId: member.id,
+      adminId: admin.id,
+      adminName: admin.name,
+      accepted: false,
+      projectName: confirmation.project.name,
+      counterpartyName: confirmation.counterpartyName,
     });
   }
 

@@ -61,7 +61,8 @@ All people, projects, and deals are fictional.
 
 - Apply with an invite code, role, credential, and references.
 - Admin queue at `/admin/applications`: approve (creates an Invited member) or reject.
-- Admin member list at `/admin/members`: set Invited / Verified / Confirmed.
+- Admin member list at `/admin/members`: set Invited / Verified / Confirmed. Promoting someone to Confirmed requires an accepted counterparty vouch.
+- Admin-only verification queue at `/admin/verification`. Members and anonymous callers get 404 on the pages and 403 on `/api/admin/verification` when signed in as a non-admin. Checklists, internal notes, and the audit log stay on those routes. A profile shows a Verified badge only after an admin marks the full checklist complete and the file has not expired. Otherwise members see “Verification in progress.” A project cannot collect a new counterparty vouch until its file is Verified.
 - Profiles with a track record. Request a counterparty vouch and copy the link from the project. A counterparty yes waits for admin review before the tier becomes Confirmed. The member is notified in Alerts.
 - Feed with updates, **Deal** posts (raising an amount), and **Seeking** posts (role needed), plus likes and comments.
 - Deals board filtered by role, market (NJ/NY/CT), and size.
@@ -77,7 +78,7 @@ npm test
 npm run typecheck
 ```
 
-`npm test` covers invite rules, the 16 roles, deal filters (including non-dollar seeking sizes), NDA gating, connection rules, and the vouch tier rules. A counterparty confirmation does not change tier. An admin acceptance does. It does not need a database.
+`npm test` covers invite rules, the 16 roles, deal filters (including non-dollar seeking sizes), NDA gating, connection rules, the vouch tier rules, and the verification module. A counterparty confirmation does not change tier. An admin acceptance does. Non-admins are denied the verification pages and API. It does not need a database.
 
 ## Deploy on Render
 
@@ -97,7 +98,7 @@ The Blueprint is `app/render.yaml`. It defines a Node web service (`private-floo
    npx prisma migrate deploy && npm run db:seed
    ```
 
-   `npm run db:seed` writes fictional rows only when the database has no members. It does not call `deleteMany` on a normal deploy. To wipe and reseed from a shell, run `SEED=reset npm run db:seed`. Do not set `SEED=reset` on the Render service.
+   `npm run db:seed` writes fictional rows only when the database has no members. It does not call `deleteMany` on a normal deploy. If members already exist, the seed only opens a Not started verification file for any member or project that does not have one. To wipe and reseed from a shell, run `SEED=reset npm run db:seed`. Do not set `SEED=reset` on the Render service.
 4. After the first deploy, set `APP_URL` and `AUTH_URL` to that service's origin with no trailing slash. Private Floor does not have a registered domain; use whatever host the platform assigns. The Blueprint marks both as `sync: false` so later Blueprint syncs do not wipe them. `AUTH_SECRET` is generated. `DATABASE_URL` comes from the database.
 5. Health check: `GET /api/health`.
 

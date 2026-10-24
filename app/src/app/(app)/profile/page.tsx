@@ -24,12 +24,13 @@ export default async function ProfilePage({
       ) : null}
       <ProfileView
         member={loaded.member}
-        projects={loaded.member.projects}
+        projects={loaded.projects}
         isSelf
         connection="NONE"
-        projectCount={loaded.member.projects.length}
+        projectCount={loaded.projects.length}
         vouchCount={loaded.vouchCount}
         linkOrigin={linkOrigin}
+        verification={loaded.verification}
       />
     </div>
   );

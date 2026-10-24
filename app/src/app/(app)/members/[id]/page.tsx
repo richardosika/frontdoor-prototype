@@ -30,13 +30,14 @@ export default async function MemberPage({
       </div>
       <ProfileView
         member={loaded.member}
-        projects={loaded.member.projects}
+        projects={loaded.projects}
         isSelf={user.id === loaded.member.id}
         connection={loaded.connection}
-        projectCount={loaded.member.projects.length}
+        projectCount={loaded.projects.length}
         vouchCount={loaded.vouchCount}
         backHref="/network"
         linkOrigin={linkOrigin}
+        verification={loaded.verification}
       />
     </div>
   );
