@@ -201,7 +201,7 @@ export async function addComment(formData: FormData) {
   const user = await requireUser();
   const postId = String(formData.get("postId") || "");
   const body = String(formData.get("body") || "").trim();
-  if (body.length < 1 || body.length > 1000) redirect("/feed?error=Comment+must+be+1–1000+characters");
+  if (body.length < 1 || body.length > 1000) redirect("/feed?error=Comment+must+be+1-1000+characters");
   const post = await prisma.post.findUnique({ where: { id: postId } });
   if (!post) redirect("/feed");
   await prisma.comment.create({ data: { postId, authorId: user.id, body } });
