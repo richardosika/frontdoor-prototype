@@ -25,7 +25,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         <div className="px-6 py-6">
         <h1 className="font-serif text-2xl font-normal">Confirm a project</h1>
         <p className="mt-2 text-sm text-ink">
-          {project.user.name} ({project.user.org}) listed you, {confirmation.counterpartyName}, as a counterparty on this project. No {BRAND.short} account is required.
+          {project.user.name} ({project.user.org}) listed you, {confirmation.counterpartyName}, as a counterparty on this project. No {BRAND.name} account is required.
         </p>
         <div className="mt-4 rounded border border-line bg-cream p-3 text-sm">
           <b>{project.name}</b>

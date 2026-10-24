@@ -40,7 +40,7 @@ export async function requestConnection(formData: FormData) {
 
   await sendEmail({
     to: target.email,
-    subject: `${user.name} wants to connect on ${BRAND.short}`,
+    subject: `${user.name} wants to connect on ${BRAND.name}`,
     text: `${user.name} (${user.org}) sent you a connection request. Open Network to accept or decline.\n\nDelivered by the console email adapter.`,
   });
 

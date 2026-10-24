@@ -18,7 +18,7 @@ const serif = EB_Garamond({
 
 export const metadata: Metadata = {
   title: BRAND.name,
-  description: `${BRAND.name} is an invite-only network for real estate deal teams.`,
+  description: BRAND.tagline,
   robots: { index: false, follow: false },
 };
 

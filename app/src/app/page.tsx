@@ -11,9 +11,9 @@ export default function HomePage() {
           <Logo tone="paper" />
         </div>
         <div className="flex flex-1 flex-col justify-center px-6 py-10">
-          <h1 className="font-serif text-4xl font-normal leading-tight">A vetted network for real estate deal teams.</h1>
+          <h1 className="font-serif text-4xl font-normal leading-tight">{BRAND.tagline}</h1>
           <p className="mt-4 text-base leading-relaxed text-ink">
-            {BRAND.name} is invite-only. Members apply with a role and references, a committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
+            The {BRAND.club} is invite-only. Members apply with a role and references, a committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/login" className={btn}>

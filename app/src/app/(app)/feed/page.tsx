@@ -205,7 +205,7 @@ export default async function FeedPage({
                 Your code <b>{invite.code}</b> has {Math.max(invite.maxUses - invite.uses, 0)} uses left.
               </>
             ) : (
-              <>Ask an admin for a code, or use the demo code FD-7K2M-91QX.</>
+              <>Ask an admin for a code, or use the demo code PF-7K2M-91QX.</>
             )}
           </p>
         </div>

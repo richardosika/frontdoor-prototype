@@ -13,7 +13,7 @@ export function ApplyWizard() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
-  const [code, setCode] = useState("FD-7K2M-91QX");
+  const [code, setCode] = useState("PF-7K2M-91QX");
   const [role, setRole] = useState<RoleId>("DEVELOPER");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -78,15 +78,15 @@ export function ApplyWizard() {
         {error ? <p className="mb-3 text-sm text-brass">{error}</p> : null}
         {step === 1 ? (
           <div>
-            <h1 className="font-serif text-xl">Welcome to {BRAND.name}</h1>
-            <p className="mt-1 text-sm text-ink">{BRAND.name} is invite-only. Enter the code a member shared with you.</p>
+            <h1 className="font-serif text-xl">Welcome to the {BRAND.club}</h1>
+            <p className="mt-1 text-sm text-ink">{BRAND.tagline} Enter the code a member shared with you.</p>
             <label className={`${labelCls} mt-4`}>Invite code</label>
-            <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="FD-XXXX-XXXX" />
+            <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="PF-XXXX-XXXX" />
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>
               Continue
             </button>
             <p className="mt-3 text-center text-xs text-mut">
-              Demo code <b>FD-7K2M-91QX</b>
+              Demo code <b>PF-7K2M-91QX</b>
             </p>
           </div>
         ) : null}

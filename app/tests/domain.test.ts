@@ -35,11 +35,13 @@ const BRIEF_LABELS = [
 ];
 
 describe("brand", () => {
-  it("uses the Cornicio Partners placeholder", () => {
-    expect(BRAND.name).toBe("Cornicio Partners");
-    expect(BRAND.short).toBe("Cornicio");
-    expect(NDA_ACKNOWLEDGEMENT).toContain(BRAND.name);
+  it("uses the Private Floor name", () => {
+    expect(BRAND.name).toBe("Private Floor");
+    expect(BRAND.club).toBe("Private Floor Club");
+    expect(BRAND.tagline).toBe("The vetted circle for real estate deal teams.");
+    expect(NDA_ACKNOWLEDGEMENT).toContain(BRAND.club);
     expect(NDA_ACKNOWLEDGEMENT).not.toContain("FrontDoor");
+    expect(NDA_ACKNOWLEDGEMENT).not.toContain("Cornicio");
   });
 });
 
@@ -54,7 +56,7 @@ describe("roles", () => {
 
 describe("invites", () => {
   it("normalizes codes", () => {
-    expect(normalizeInviteCode("  fd-7k2m-91qx ")).toBe("FD-7K2M-91QX");
+    expect(normalizeInviteCode("  pf-7k2m-91qx ")).toBe("PF-7K2M-91QX");
   });
 
   it("rejects exhausted and expired codes", () => {
@@ -138,7 +140,7 @@ describe("network and verification", () => {
   it("validates applications", () => {
     expect(
       validateApplication({
-        code: "FD-1",
+        code: "PF-1",
         role: "DEVELOPER",
         name: "Ada Lovelace",
         email: "ada@example.com",

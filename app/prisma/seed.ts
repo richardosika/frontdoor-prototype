@@ -270,7 +270,7 @@ async function main() {
   await prisma.inviteCode.create({
     data: {
       id: "invite_founding",
-      code: "FD-7K2M-91QX",
+      code: "PF-7K2M-91QX",
       maxUses: 40,
       uses: 1,
       note: "Founding demo code",
@@ -279,7 +279,7 @@ async function main() {
   });
   await prisma.inviteCode.create({
     data: {
-      code: "FD-HALE-3LEFT",
+      code: "PF-HALE-3LEFT",
       maxUses: 3,
       uses: 0,
       note: "Marcus Hale personal invites",
@@ -298,7 +298,7 @@ async function main() {
       location: "Jersey City, NJ",
       credentialValue: "NJ architect license no. 21AI001234 (fictional)",
       referenceEmails: ["marcus.hale@halerow.example", "grace.liu@liustudio.example"],
-      statement: `I design ground-up multifamily and would like to meet GCs already on ${BRAND.short}.`,
+      statement: `I design ground-up multifamily and would like to meet GCs already in the ${BRAND.club}.`,
       status: "PENDING",
     },
   });

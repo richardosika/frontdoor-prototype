@@ -1,6 +1,6 @@
-# Cornicio Partners MVP
+# Private Floor MVP
 
-Invite-only network for real estate deal teams. The product name is a placeholder: **Cornicio Partners**, short form **Cornicio**. Both strings live in `src/lib/brand.ts` (`BRAND.name` and `BRAND.short`). Change that constant to rename titles, the logo, emails, and seeded copy. This app lives in `app/` and does not replace the static prototype at the repository root (`index.html`, `app.js`, `app.css`, `base.css`, `desktop.css`).
+The vetted circle for real estate deal teams. The display name is **Private Floor**. The community is the **Private Floor Club** where a longer name is needed. Both strings, the tagline, and the wordmark live in `src/lib/brand.ts`. Change that constant to rename titles, the logo, emails, and seeded copy. This app lives in `app/` and does not replace the static prototype at the repository root.
 
 Members apply with an invite code, pick one of 16 roles, and submit credentials plus references. An admin approves or rejects the application. Approved members start at **Invited**. An admin can set **Verified** or **Confirmed**. A counterparty can also confirm a track-record project from a tokenized link (no account). That vouch sets the member to **Confirmed**.
 
@@ -34,7 +34,8 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Auth.js signing secret |
-| `AUTH_URL` | Public origin, no trailing slash (`http://localhost:3000` locally) |
+| `APP_URL` | Public origin used in email links, no trailing slash. Placeholder until you host the app. No domain is registered for Private Floor. |
+| `AUTH_URL` | Auth.js origin. Use the same value as `APP_URL`. |
 | `AUTH_TRUST_HOST` | Set to `true` behind Render's proxy |
 
 ### Demo login
@@ -46,7 +47,7 @@ Every seeded member uses the password `cornicio-demo`.
 | marcus.hale@halerow.example | Developer, admin, Confirmed |
 | jordan.ellis@ellisarch.example | Pending application (cannot sign in yet) |
 
-Invite code: `FD-7K2M-91QX`.
+Invite code: `PF-7K2M-91QX`.
 
 Counterparty links (no login):
 
@@ -79,11 +80,11 @@ npm run typecheck
 
 ## Deploy on Render
 
-The Blueprint is `app/render.yaml`. It defines a Node web service (`frontdoor-mvp`, `rootDir: app`) and Postgres (`frontdoor-db`) in Oregon. It is intentionally not at the repository root, so it does not replace a Blueprint or static site already configured from `main`.
+The Blueprint is `app/render.yaml`. It defines a Node web service (`private-floor`, `rootDir: app`) and Postgres (`private-floor-db`) in Oregon. It is intentionally not at the repository root, so it does not replace a Blueprint or static site already configured from `main`.
 
 1. In the Render Dashboard, create a Blueprint and set the Blueprint path to `app/render.yaml`.
 2. Apply it. Render builds from `app/`, runs `prisma migrate deploy` before the new instance goes live, and starts `npm start` (`next start -H 0.0.0.0`, which listens on `PORT`).
-3. After the first deploy, set `AUTH_URL` to the service URL (for example `https://frontdoor-mvp.onrender.com`) with no trailing slash. The Blueprint marks `AUTH_URL` as `sync: false` so later Blueprint syncs do not wipe it. `AUTH_SECRET` is generated. `DATABASE_URL` comes from the database.
+3. After the first deploy, set `APP_URL` and `AUTH_URL` to that service's origin with no trailing slash. Private Floor does not have a registered domain; use whatever host the platform assigns. The Blueprint marks both as `sync: false` so later Blueprint syncs do not wipe them. `AUTH_SECRET` is generated. `DATABASE_URL` comes from the database.
 4. Seed once from a shell with `DATABASE_URL` set, from the `app/` directory: `npm run db:seed`. Do not run the seed on every deploy; it clears and rewrites demo rows.
 5. Health check: `GET /api/health`.
 

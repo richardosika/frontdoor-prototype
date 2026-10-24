@@ -12,8 +12,8 @@ export function Logo({ tone = "ink", compact = false }: { tone?: "ink" | "paper"
       </i>
       {compact ? null : (
         <span className="flex flex-col leading-none">
-          <span className="font-serif text-[18px] uppercase tracking-[0.22em]">{BRAND.short}</span>
-          <span className="mt-[3px] font-sans text-[8px] uppercase tracking-[0.32em] opacity-75">{BRAND.sub}</span>
+          <span className="font-serif text-[18px] uppercase tracking-[0.16em]">{BRAND.mark[0]}</span>
+          <span className="mt-[3px] font-serif text-[13px] uppercase tracking-[0.28em] opacity-80">{BRAND.mark[1]}</span>
         </span>
       )}
     </span>

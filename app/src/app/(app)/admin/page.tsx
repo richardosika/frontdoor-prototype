@@ -47,7 +47,7 @@ export default async function AdminPage({
           <form action={createInvite} className="mt-3 space-y-2">
             <div>
               <label className={labelCls}>Code</label>
-              <input name="code" className={field} placeholder="FD-NEW-CODE" required />
+              <input name="code" className={field} placeholder="PF-NEW-CODE" required />
             </div>
             <div>
               <label className={labelCls}>Max uses</label>

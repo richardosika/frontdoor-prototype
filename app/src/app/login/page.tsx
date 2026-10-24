@@ -23,11 +23,9 @@ export default async function LoginPage({
           Have an invite? <Link className="font-semibold text-brass" href="/apply">Apply</Link>
         </p>
         <div className="mt-5 rounded-sm bg-cream p-3 text-xs leading-relaxed text-ink">
-          <b>Demo</b>
+          <b>Demo admin</b>
           <br />
           marcus.hale@halerow.example
-          <br />
-          password <span className="font-semibold">cornicio-demo</span> (admin)
         </div>
         </div>
       </div>

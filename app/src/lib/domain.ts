@@ -14,7 +14,7 @@ export const SIZE_BANDS = [
 
 export type SizeBand = (typeof SIZE_BANDS)[number]["id"];
 
-export const NDA_ACKNOWLEDGEMENT = `I acknowledge that materials in this deal room are confidential, that I will not share them outside ${BRAND.name}, and that ${BRAND.name} does not offer securities, take subscriptions, or process payments.`;
+export const NDA_ACKNOWLEDGEMENT = `I acknowledge that materials in this deal room are confidential, that I will not share them outside the ${BRAND.club}, and that ${BRAND.name} does not offer securities, take subscriptions, or process payments.`;
 
 export function normalizeInviteCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, "");
