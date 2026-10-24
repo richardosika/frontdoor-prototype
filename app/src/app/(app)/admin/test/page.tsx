@@ -1,4 +1,4 @@
-import { createCustomTestApplicant, createSampleApplicants, deleteTestData, seedMemberNetwork } from "@/actions/owner";
+import { createCustomTestApplicant, createSampleApplicants, deleteTestData, seedMemberNetwork, seedPaymentDueMember } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
@@ -56,6 +56,17 @@ export default async function TestConsolePage({
           <form action={seedMemberNetwork} className="mt-3">
             <button className={btn} type="submit">
               Seed sample members
+            </button>
+          </form>
+        </section>
+        <section className={`${card} mt-4 p-4 text-sm text-ink`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Payment due sample</h2>
+          <p className="mt-2">
+            Adds Gina Paytest, an is_test general contractor already approved with payment due (test.gc.pay@example.com, password cornicio-demo, $2,400). Sign-in stops on the Pay dues page. The button does not charge a card. Delete all test data removes her.
+          </p>
+          <form action={seedPaymentDueMember} className="mt-3">
+            <button className={btn} type="submit">
+              Seed payment-due member
             </button>
           </form>
         </section>

@@ -4,6 +4,7 @@ import { removeMember, setMemberStatus } from "@/actions/owner";
 import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
+import { PaymentPanel } from "@/components/payment-admin";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
@@ -84,6 +85,18 @@ export default async function AdminMemberPage({
             </Link>
           </p>
         </section>
+        <PaymentPanel
+          userId={member.id}
+          role={member.role}
+          status={member.paymentStatus}
+          duesCents={member.duesCents}
+          renewalAt={member.renewalAt}
+          paidAt={member.paidAt}
+          paymentMode={member.paymentMode}
+          waiverReason={member.waiverReason}
+          refundNote={member.refundNote}
+          back={`/admin/members/${member.id}`}
+        />
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Legal acceptances</h2>
           {member.legalAcceptances.length === 0 ? <p className="mt-2 text-sm text-mut">None recorded on this account.</p> : null}

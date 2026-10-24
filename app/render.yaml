@@ -34,3 +34,13 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_GC
+        sync: false
+      - key: STRIPE_PRICE_BROKER
+        sync: false
+      - key: STRIPE_PRICE_ADVISOR
+        sync: false

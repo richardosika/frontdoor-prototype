@@ -6,6 +6,7 @@ export function applicationStatusLabel(status: string): string {
   if (status === "IN_REVIEW") return "In review";
   if (status === "NEEDS_INFO") return "Needs more info";
   if (status === "APPROVED") return "Approved";
+  if (status === "PAYMENT_DUE") return "Approved, payment due";
   if (status === "REJECTED" || status === "DECLINED") return "Declined";
   return status;
 }
@@ -21,6 +22,12 @@ export function memberStatusCopy(status: string): { title: string; body: string 
     return {
       title: "You're an Invited member",
       body: "Richard Osika approved this application. Sign in with the email and password you chose. Your membership starts as Invited.",
+    };
+  }
+  if (status === "PAYMENT_DUE") {
+    return {
+      title: "Approved, payment due",
+      body: "Richard Osika approved this application. Sign in and pay the flat annual dues to open the floor. Nothing else is charged.",
     };
   }
   if (status === "REJECTED" || status === "DECLINED") {
@@ -65,7 +72,7 @@ export const APPLICATION_FILTERS: { id: ApplicationFilter; label: string }[] = [
   { id: "declined", label: "Declined" },
 ];
 
-const TERMINAL = new Set(["APPROVED", "REJECTED", "DECLINED"]);
+const TERMINAL = new Set(["APPROVED", "PAYMENT_DUE", "REJECTED", "DECLINED"]);
 
 export function matchesApplicationFilter(
   filter: ApplicationFilter,
@@ -76,7 +83,7 @@ export function matchesApplicationFilter(
   if (filter === "new") return status === "PENDING" || status === "SUBMITTED";
   if (filter === "review") return status === "IN_REVIEW";
   if (filter === "needs") return status === "NEEDS_INFO";
-  if (filter === "approved") return status === "APPROVED";
+  if (filter === "approved") return status === "APPROVED" || status === "PAYMENT_DUE";
   if (filter === "declined") return status === "REJECTED" || status === "DECLINED";
   if (TERMINAL.has(status)) return false;
   if (filter === "legit") return verdict === "LEGIT";

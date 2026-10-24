@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { moderationDenial } from "@/lib/messaging";
+import { blocksMembership } from "@/lib/payments";
 import { verificationDenial } from "@/lib/verification";
 
 export async function currentUser() {
@@ -10,9 +11,15 @@ export async function currentUser() {
   return prisma.user.findUnique({ where: { id: session.user.id } });
 }
 
-export async function requireUser() {
+export async function requireAccount() {
   const user = await currentUser();
   if (!user || user.status !== "ACTIVE") redirect("/login");
+  return user;
+}
+
+export async function requireUser() {
+  const user = await requireAccount();
+  if (!user.isAdmin && blocksMembership(user.paymentStatus)) redirect("/pay");
   return user;
 }
 

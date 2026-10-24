@@ -74,6 +74,7 @@ export default async function AdminPage({
           <Mini label="Submitted" value={statusCount("SUBMITTED") + statusCount("PENDING")} />
           <Mini label="In review" value={statusCount("IN_REVIEW") + statusCount("NEEDS_INFO")} />
           <Mini label="Approved" value={statusCount("APPROVED")} />
+          <Mini label="Payment due" value={statusCount("PAYMENT_DUE")} />
           <Mini label="Declined" value={statusCount("DECLINED")} />
           <Mini label="Active members" value={activeMembers} />
           <Mini label="Posts" value={posts} />

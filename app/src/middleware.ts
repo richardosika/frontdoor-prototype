@@ -6,7 +6,7 @@ import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/api/health", "/api/auth", "/api/request-invite"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/pay", "/api/health", "/api/auth", "/api/request-invite", "/api/stripe"];
 
 export default auth((req) => {
   const path = req.nextUrl.pathname;

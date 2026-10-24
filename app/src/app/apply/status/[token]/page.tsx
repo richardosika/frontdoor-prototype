@@ -16,7 +16,11 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
   if (!application) notFound();
   const copy = memberStatusCopy(application.status);
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
-  const showNote = !declined && Boolean(application.reviewerNote) && (application.status === "NEEDS_INFO" || application.status === "APPROVED");
+  const showNote =
+    !declined &&
+    Boolean(application.reviewerNote) &&
+    (application.status === "NEEDS_INFO" || application.status === "APPROVED" || application.status === "PAYMENT_DUE");
+  const canSignIn = application.status === "APPROVED" || application.status === "PAYMENT_DUE";
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
@@ -47,7 +51,7 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
             </div>
           ) : null}
           {application.status === "NEEDS_INFO" ? <ApplyReply token={application.statusToken} /> : null}
-          {application.status === "APPROVED" ? (
+          {canSignIn ? (
             <Link href="/login" className={`${btn} mt-4 w-full`}>
               Sign in
             </Link>

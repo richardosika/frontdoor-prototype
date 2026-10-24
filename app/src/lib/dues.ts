@@ -1,6 +1,6 @@
 import type { RoleId } from "@/lib/roles";
 
-/** Annual dues in cents. Nothing is charged during this test. */
+/** Annual dues in cents. Live charges wait on Stripe test keys. No card number is stored. */
 export function annualDuesCents(role: string): number {
   if (role === "DEVELOPER" || role === "INVESTOR_PE" || role === "FAMILY_OFFICE" || role === "LENDER") return 0;
   if (role === "GENERAL_CONTRACTOR") return 240_000;

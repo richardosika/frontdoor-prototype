@@ -43,8 +43,18 @@ enum ApplicationStatus {
   IN_REVIEW
   NEEDS_INFO
   APPROVED
+  PAYMENT_DUE
   REJECTED
   DECLINED
+}
+
+enum PaymentStatus {
+  NOT_REQUIRED
+  DUE
+  PAID
+  WAIVED
+  FAILED
+  REFUNDED
 }
 
 enum Verdict {
@@ -182,6 +192,17 @@ model User {
   status         AccountStatus    @default(ACTIVE)
   seenWelcome    Boolean          @default(false)
   isTest         Boolean          @default(false)
+  paymentStatus  PaymentStatus    @default(NOT_REQUIRED)
+  duesCents      Int              @default(0)
+  paymentToken   String?          @unique
+  paidAt         DateTime?
+  renewalAt      DateTime?
+  stripeCustomerId String         @default("")
+  stripeSubscriptionId String     @default("")
+  paymentMode    String           @default("")
+  waiverReason   String           @default("")
+  refundNote     String           @default("")
+  lastRenewalReminderAt DateTime?
   createdAt      DateTime         @default(now())
 
   posts                Post[]
@@ -215,6 +236,9 @@ model User {
   businessCard         BusinessCard?
   legalAcceptances     LegalAcceptance[]
   applicationDecisions ApplicationDecision[] @relation("DecisionActor")
+  paymentEvents        PaymentEvent[]
+
+  @@index([paymentStatus])
 }
 
 model InviteCode {
@@ -598,6 +622,16 @@ model Introduction {
 
   @@index([toId, status])
   @@index([fromId, createdAt])
+}
+
+model PaymentEvent {
+  id        String   @id
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model BusinessCard {

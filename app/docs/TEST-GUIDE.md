@@ -14,10 +14,10 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 4. Step 3, **Your details**. Fill name, email, a password of at least 8 characters, company, and city/state. Phone, LinkedIn, website, social links, references, and the track-record note are optional. Upload a JPG or PNG business card and confirm the screen shows the file name, type, size, and a preview.
 5. Still on step 3, **Confirm your email**. Send the code. Open `/admin/outbox` in the admin session and read the 6-digit code. Confirm it, then continue. The code is not sent to the address you typed.
 6. Step 4, **Terms**. The page shows the “Before you submit” text and two unchecked boxes, using the sentences in `src/content/legal/applicant-consent.md`. Open `/legal/terms`, `/legal/privacy`, `/legal/disclosures`, `/legal/guidelines`, `/legal/applicant-consent`, and `/legal/verification-policy`. Each page shows **Draft - pending attorney review** and the version from the file’s `Version:` line. Continue stays disabled until both boxes are checked.
-7. Step 5, **Membership dues**. Confirm the amount and the line **Founding member: dues waived during testing**. Both boxes are still required. The helper under **Submit application** is the sentence from the consent draft. Submit. There is no payment form. The acceptance rows store the time and each document’s parsed version.
+7. Step 5, **Membership dues**. Confirm the amount and the line **Founding member: dues waived during testing**. A paying role also says the flat amount is due after approval and that no card is collected on the form. Both boxes are still required. The helper under **Submit application** is the sentence from the consent draft. Submit. There is no payment form on the application. The acceptance rows store the time and each document’s parsed version.
 8. Open **View application status**. It should say **Application under review** and **Verification in progress**. It must not show a score or a source.
 9. In the admin session, open the application, choose **Needs more info**, and write what you need. Reload the status page, reply with a note, and optionally upload a file. The status returns to in review.
-10. Approve the application as an Invited member. Sign in with the new email and password. The feed shows **Membership status** and a first-week checklist: profile, directory, community guidelines, a seeking or raising post, and an introduction. Directory and guidelines have **Mark done**. The other three complete when you save a profile, post, or request an introduction.
+10. Approve the application as an Invited member. A developer, investor, family office, or lender can sign in and open the floor. A general contractor, broker, or attorney is **Approved, payment due** and the sign-in stops on Pay dues until the test payment, a manual mark-paid, or a waiver. After the floor opens, the feed shows **Membership status** and a first-week checklist: profile, directory, community guidelines, a seeking or raising post, and an introduction. Directory and guidelines have **Mark done**. The other three complete when you save a profile, post, or request an introduction.
 11. Sign in with a wrong password. The message stays generic. Sign in with the right password on an application that is still open. The message says the application is under review. On a declined application the message says it was not approved, with no reasons.
 
 ## Admin side
@@ -41,7 +41,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 
 ## After signup
 
-Sign in as a member. Nothing here shows another member’s email or phone. Badges say **Verified** or **Verification in progress**. Wording says Private Floor administrator. No dues are charged.
+Sign in as a member whose dues are not outstanding. Nothing here shows another member’s email or phone. Badges say **Verified** or **Verification in progress**. Wording says Private Floor administrator. A paying role that has not paid sees only the Pay dues page.
 
 1. **Feed.** Complete the checklist. Post an update, a raising post, or a seeking post. Raising and seeking show the Seeking and Raising rules and require the acknowledgement box. A post that mentions IRR, a percent, accredited investors, a subscription, or similar language is held and does not appear for other members.
 2. **Profile** (`/profile`). Edit markets, deal types, asset classes, check size or deal size, what you are looking for, what you offer, bio, website, and an optional business card.
@@ -53,6 +53,22 @@ Sign in as a member. Nothing here shows another member’s email or phone. Badge
 8. **Test console.** **Seed sample members** adds Dana, Gabe, and Lena Testfloor (`test.dev.floor@example.com`, `test.gc.floor@example.com`, `test.lp.floor@example.com`, password `cornicio-demo`). They are `is_test`. Dana has a published seeking post and a held post, Gabe has an accepted thread with Dana and a pending introduction to Lena, and Gabe can open Dana’s deal room. **Delete all test data** removes them with the other `is_test` rows.
 
 Also open `/legal/seeking-raising` and `/legal/deal-room-nda`. Both show the draft banner and the version line.
+
+## Dues after approval
+
+Nothing in this section charges a real card. If `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the matching `STRIPE_PRICE_GC`, `STRIPE_PRICE_BROKER`, or `STRIPE_PRICE_ADVISOR` are all set, Pay dues uses Stripe Checkout in test mode (annual subscription). If any of those is missing, the page is labelled **TEST** and uses the simulated payment buttons. Private Floor stores no card number.
+
+Flat annual dues, chosen from the approved role: general contractor $2,400, broker or mortgage broker $1,800, attorney or advisor $1,200. Developers, investors and LPs, family offices, and lenders are free and become active as soon as you approve them. The fee is never based on a deal.
+
+1. On `/admin/test`, choose **Seed payment-due member**. Gina Paytest (`test.gc.pay@example.com`, password `cornicio-demo`) is an is_test general contractor with status **Approved, payment due**.
+2. `/admin/applications` (filter **Approved**) shows a payment status column. Open her row or `/admin/members`. The dues panel shows **Payment due**, $2,400 a year, and no renewal date yet.
+3. `/admin/outbox` is where the approval notice goes when you approve a new paying applicant. The notice is addressed only to the test recipient and contains `/pay/` plus a token. **Resend payment link** writes another Outbox notice.
+4. Sign out of the admin session. Open that `/pay/…` link, or sign in as Gina. The floor redirects to **Pay dues**. The page shows the amount, what the year covers, the founding-member line, and a link to `/legal/membership-dues`. The rest of the floor stays closed, including the feed, directory, and settings. **Sign out** is on the page.
+5. Choose **Simulate a failed payment**. The status becomes **Payment failed**. The Outbox gets a failed-payment notice. Sign-in still stops on Pay dues.
+6. Choose **Pay dues (test)**. The notice says no card was charged. The floor opens, the application moves to **Approved**, and a welcome notice is in the Outbox. Signing in again lands on the feed and the first-week checklist.
+7. **Settings** shows the receipt: amount, simulated TEST mode, paid time, renewal date one year out, and **No card on file**. The billing portal button appears only after a Stripe test checkout that stored a customer id.
+8. As admin, **Mark paid** records a manual payment and an audit event. **Waive dues** asks for a reason, comps the membership, and writes an audit event. **Save refund note** asks for a note, sets the status to refund noted, and closes the floor again until dues are paid. **Send renewal reminder** and **Send failed-payment notice** write Outbox notices. The renewal reminder needs a renewal date.
+9. Approve a developer. The status is **Approved** immediately, the welcome notice does not include a payment link, and sign-in opens the floor.
 
 ## What the offline samples are for
 

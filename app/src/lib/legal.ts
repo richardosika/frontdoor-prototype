@@ -12,6 +12,7 @@ export const LEGAL_DOCS = [
   { slug: "verification-policy", title: "Verification Policy", file: "verification-policy.md" },
   { slug: "seeking-raising", title: "Seeking and Raising Post Rules", file: "seeking-raising.md" },
   { slug: "deal-room-nda", title: "Deal Room NDA Acknowledgement", file: "deal-room-nda.md" },
+  { slug: "membership-dues", title: "Membership Dues and Refund Terms", file: "membership-dues.md" },
 ] as const;
 
 /** Documents recorded when both signup boxes are checked. */

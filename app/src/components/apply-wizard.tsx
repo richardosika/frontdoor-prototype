@@ -433,7 +433,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               <p className="mt-1 font-serif text-3xl">{dues.label}</p>
               <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p>
             </div>
-            <p className="mt-3 text-sm text-ink">No payment is collected on this test. Submitting sends the application to Richard Osika.</p>
+            <p className="mt-3 text-sm text-ink">
+              {dues.cents > 0
+                ? "No card is collected on this form. After approval, this flat annual amount is due. It is never based on a deal."
+                : "This role has no annual dues. Approval opens the floor. Nothing is charged."}
+            </p>
             <ConsentBoxes
               consent={consent}
               acceptTerms={acceptTerms}

@@ -172,7 +172,7 @@ export async function submitApplication(
         status: "SUBMITTED",
         emailVerifiedAt: verified.verifiedAt,
         duesCents: annualDuesCents(role),
-        duesWaived: true,
+        duesWaived: annualDuesCents(role) === 0,
       },
     });
     if (card) {

@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { openBillingPortal } from "@/actions/payments";
 import { changePassword, requestAccountDeletion, saveNotificationPrefs } from "@/actions/profile";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
+import { duesLabel } from "@/lib/dues";
+import { formatAuditTime } from "@/lib/format";
+import { paymentStatusLabel } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,38 @@ export default async function SettingsPage({
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>
+      <section className={`${card} mt-4 p-4 text-sm`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Billing</h2>
+        {user.paymentStatus === "NOT_REQUIRED" ? (
+          <p className="mt-2 text-ink">No annual dues are due on this membership. Private Floor does not charge a fee on a deal.</p>
+        ) : (
+          <div className="mt-2 space-y-1 text-ink">
+            <p>
+              <b>Receipt.</b> {paymentStatusLabel(user.paymentStatus)} · {duesLabel(user.duesCents)}
+            </p>
+            <p>{receiptLine(user.paymentMode)}</p>
+            <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>
+            <p>Renewal date {user.renewalAt ? user.renewalAt.toISOString().slice(0, 10) : "not set"}.</p>
+            {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}
+            {user.refundNote ? <p>Refund note: {user.refundNote}</p> : null}
+            <p>No card on file. Private Floor does not store a card number.</p>
+          </div>
+        )}
+        <p className="mt-3">
+          <Link href="/legal/membership-dues" className="underline decoration-brass">
+            Membership Dues and Refund Terms
+          </Link>
+        </p>
+        {user.stripeCustomerId && process.env.STRIPE_SECRET_KEY ? (
+          <form action={openBillingPortal} className="mt-3">
+            <button className={btnOutline} type="submit">
+              Open billing portal
+            </button>
+          </form>
+        ) : (
+          <p className="mt-3 text-mut">A Stripe billing portal link appears after a Stripe test checkout. This test does not store a card.</p>
+        )}
+      </section>
       <section className={`${card} mt-4 p-4`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Notifications</h2>
         <p className="mt-1 text-sm text-ink">The bell always records an alert. Email copies go only to the test recipient, and only when the box is on.</p>
@@ -80,4 +116,12 @@ export default async function SettingsPage({
       </section>
     </div>
   );
+}
+
+function receiptLine(mode: string): string {
+  if (mode === "simulated") return "Recorded as a simulated TEST payment. No card was charged.";
+  if (mode === "stripe") return "Recorded from Stripe test mode. The card number stays at Stripe.";
+  if (mode === "manual") return "Marked paid by a Private Floor administrator. No card is stored.";
+  if (mode === "waived") return "Dues waived by a Private Floor administrator.";
+  return "No card is stored.";
 }

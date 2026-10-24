@@ -15,6 +15,7 @@ import {
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { paymentStatusLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function ApplicationsPage({
     take: 200,
     include: {
       runs: { where: { subject: "APPLICATION" }, orderBy: { createdAt: "desc" }, take: 1 },
+      user: { select: { paymentStatus: true, renewalAt: true } },
     },
   });
   const rows = applications
@@ -97,6 +99,8 @@ export default async function ApplicationsPage({
                     </p>
                     <p className="text-xs text-mut">
                       {formatAuditTime(application.createdAt)} · {applicationStatusLabel(application.status)}
+                      {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
+                      {application.user?.renewalAt ? ` · renews ${application.user.renewalAt.toISOString().slice(0, 10)}` : ""}
                       {application.isTest ? " · TEST" : ""}
                     </p>
                   </div>

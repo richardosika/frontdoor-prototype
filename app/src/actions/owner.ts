@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -159,7 +160,7 @@ export async function insertSampleApplicants(actorId: string): Promise<{ ok: tru
         status: "SUBMITTED",
         emailVerifiedAt: new Date(),
         duesCents: annualDuesCents(sample.role),
-        duesWaived: true,
+        duesWaived: annualDuesCents(sample.role) === 0,
         isTest: true,
         testProfile: sample.testProfile,
         statusToken: `test-${sample.email.replace(/[^a-z0-9]/gi, "").slice(0, 24)}-${Date.now().toString(36)}`,
@@ -570,6 +571,70 @@ export async function seedMemberNetwork() {
   revalidatePath("/network");
   revalidatePath("/admin/moderation");
   redirect("/admin/test?notice=Sample+members,+posts,+and+a+thread+are+ready.+Password+is+cornicio-demo.");
+}
+
+export async function seedPaymentDueMember() {
+  const admin = await requireAdmin();
+  const email = "test.gc.pay@example.com";
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    redirect("/admin/test?notice=Gina+Paytest+is+already+on+the+floor.+Password+is+cornicio-demo.");
+  }
+  const invite = await prisma.inviteCode.findFirst({ orderBy: { createdAt: "asc" } });
+  if (!invite) redirect("/admin/test?error=Create+an+invite+code+first");
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const paymentToken = randomBytes(24).toString("hex");
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      name: "Gina Paytest",
+      initials: initialsFromName("Gina Paytest"),
+      role: "GENERAL_CONTRACTOR",
+      org: "TEST Pay Builders",
+      location: "Newark, NJ",
+      bio: "Sample member waiting on annual dues. Contact details stay inside Private Floor.",
+      isTest: true,
+      status: "ACTIVE",
+      tier: "INVITED",
+      paymentStatus: "DUE",
+      duesCents: annualDuesCents("GENERAL_CONTRACTOR"),
+      paymentToken,
+    },
+  });
+  await prisma.application.create({
+    data: {
+      inviteCodeId: invite.id,
+      email,
+      name: user.name,
+      passwordHash,
+      role: "GENERAL_CONTRACTOR",
+      org: user.org,
+      location: user.location,
+      credentialValue: "No business card uploaded.",
+      statement: "Test member approved with payment due. isTest is set so this row can be deleted with the other test data.",
+      status: "PAYMENT_DUE",
+      emailVerifiedAt: new Date(),
+      reviewedAt: new Date(),
+      reviewerId: admin.id,
+      duesCents: user.duesCents,
+      duesWaived: false,
+      isTest: true,
+      statusToken: `test-pay-${randomBytes(6).toString("hex")}`,
+      userId: user.id,
+    },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "SEED_PAYMENT",
+      summary: "Seeded Gina Paytest, an is_test general contractor with payment due.",
+    },
+  });
+  revalidatePath("/admin/test");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/members");
+  redirect("/admin/test?notice=Gina+Paytest+is+approved+with+payment+due.+Password+is+cornicio-demo.");
 }
 
 export async function deleteTestData() {

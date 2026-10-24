@@ -5,6 +5,7 @@ import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DecisionForm } from "@/components/decision-form";
+import { PaymentPanel } from "@/components/payment-admin";
 import { EvidenceChip } from "@/components/evidence-chip";
 import { RunAndReload } from "@/components/run-and-reload";
 import { VerdictChip } from "@/components/verdict-chip";
@@ -36,6 +37,7 @@ export default async function ApplicationDetailPage({
       reviewer: { select: { name: true } },
       decisions: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
       legalAcceptances: { orderBy: { document: "asc" } },
+      user: true,
       runs: { orderBy: { createdAt: "desc" }, include: { evidence: { orderBy: { checkKey: "asc" } } } },
     },
   });
@@ -72,7 +74,7 @@ export default async function ApplicationDetailPage({
             <b>Role:</b> {roleLabel(application.role)} · {application.org} · {application.location}
           </p>
           <p>
-            <b>Dues:</b> {duesLabel(application.duesCents)}. {application.duesWaived ? DUES_WAIVED : ""}
+            <b>Dues:</b> {duesLabel(application.duesCents)}. {application.duesWaived ? DUES_WAIVED : "Billed after approval. Never a deal fee."}
           </p>
           {application.phone ? (
             <p>
@@ -177,6 +179,20 @@ export default async function ApplicationDetailPage({
             ))}
           </ul>
         </section>
+        {application.user ? (
+          <PaymentPanel
+            userId={application.user.id}
+            role={application.user.role}
+            status={application.user.paymentStatus}
+            duesCents={application.user.duesCents}
+            renewalAt={application.user.renewalAt}
+            paidAt={application.user.paidAt}
+            paymentMode={application.user.paymentMode}
+            waiverReason={application.user.waiverReason}
+            refundNote={application.user.refundNote}
+            back={`/admin/applications/${application.id}`}
+          />
+        ) : null}
         {open ? (
           <section className={`${card} mt-4 p-4`}>
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your decision</h2>

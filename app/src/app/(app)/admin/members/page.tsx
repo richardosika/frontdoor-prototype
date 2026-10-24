@@ -7,6 +7,7 @@ import { btn, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { MEMBERSHIP_TIERS, membershipTier } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
+import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -42,7 +43,8 @@ export default async function MembersAdminPage({
                 {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
               </div>
               <p className="text-xs text-mut">
-                {roleShort(roleLabel(member.role))} · {member.org} · {member.email}
+                {roleShort(roleLabel(member.role))} · {member.org} · {paymentStatusLabel(member.paymentStatus)}
+                {member.renewalAt ? ` · renews ${member.renewalAt.toISOString().slice(0, 10)}` : ""}
                 {member.phone ? ` · ${member.phone}` : ""}
                 {member.linkedinUrl ? ` · ${member.linkedinUrl}` : ""}
               </p>

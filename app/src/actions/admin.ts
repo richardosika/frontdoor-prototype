@@ -14,7 +14,9 @@ import { canPromoteTierFromVouch } from "@/lib/verification";
 import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
+import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { sendNotice } from "@/lib/notices";
+import { paymentRequired } from "@/lib/payments";
 import { appBaseUrl } from "@/lib/url";
 
 export async function reviewApplication(formData: FormData) {
@@ -104,6 +106,9 @@ export async function reviewApplication(formData: FormData) {
     where: { applicationId: application.id },
     select: { id: true, deletedAt: true },
   });
+  const paying = paymentRequired(application.role);
+  const duesCents = annualDuesCents(application.role);
+  const paymentToken = paying ? randomBytes(24).toString("hex") : null;
   const user = await prisma.user.create({
     data: {
       email: application.email,
@@ -120,6 +125,9 @@ export async function reviewApplication(formData: FormData) {
       tier: "INVITED",
       status: "ACTIVE",
       isTest: application.isTest,
+      paymentStatus: paying ? "DUE" : "NOT_REQUIRED",
+      duesCents,
+      paymentToken,
     },
   });
   if (card) {
@@ -139,7 +147,8 @@ export async function reviewApplication(formData: FormData) {
   await prisma.application.update({
     where: { id: application.id },
     data: {
-      status: "APPROVED",
+      status: paying ? "PAYMENT_DUE" : "APPROVED",
+      duesCents,
       reviewerNote: note,
       reviewedAt: new Date(),
       reviewerId: admin.id,
@@ -151,17 +160,28 @@ export async function reviewApplication(formData: FormData) {
     data: { userId: user.id },
   });
 
-  await sendNotice({
-    intendedTo: application.email,
-    applicationId: application.id,
-    subject: `You're in — ${BRAND.name} application approved`,
-    text: `Hello ${application.name},\n\nRichard Osika approved your application. You are an Invited member.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
-  });
+  if (paying && paymentToken) {
+    await sendNotice({
+      intendedTo: application.email,
+      applicationId: application.id,
+      subject: `Approved — ${BRAND.name} annual dues are due`,
+      text: `Hello ${application.name},\n\nRichard Osika approved your application. Annual dues are ${duesLabel(duesCents)}. This is a flat membership fee. Private Floor does not charge a fee on a deal, and it does not store a card number.${note ? `\n\nNote: ${note}` : ""}\n\nPay here: ${base}/pay/${paymentToken}\n\nYou can sign in at ${base}/login with this email and the password you chose. Until the dues are recorded, the floor stays on the payment page.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
+    });
+  } else {
+    await sendNotice({
+      intendedTo: application.email,
+      applicationId: application.id,
+      subject: `You're in — ${BRAND.name} application approved`,
+      text: `Hello ${application.name},\n\nRichard Osika approved your application. You are an Invited member. This role has no annual dues.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
+    });
+  }
 
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
   revalidatePath("/network");
-  redirect(`/admin/applications/${application.id}?notice=${encodeURIComponent(`Approved ${application.name}`)}`);
+  redirect(
+    `/admin/applications/${application.id}?notice=${encodeURIComponent(paying ? `Approved, payment due — ${application.name}` : `Approved ${application.name}`)}`,
+  );
 }
 
 export async function setMemberTier(formData: FormData) {
