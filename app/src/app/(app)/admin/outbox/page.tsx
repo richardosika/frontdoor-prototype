@@ -1,4 +1,3 @@
-import { AdminNav } from "@/components/admin-nav";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { noticeTestRecipient } from "@/lib/brand";
@@ -16,7 +15,6 @@ export default async function OutboxPage() {
       <MobileTitle href="/admin" label="Admin" title="Outbox" />
       <div className="mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Outbox" />
-        <AdminNav current="/admin/outbox" />
         <p className="mt-3 text-sm text-ink">
           Every notice on this test is stored here and addressed only to {noticeTestRecipient()}. Applicants are not emailed.
         </p>

@@ -81,6 +81,19 @@ Templates are at `/admin/templates`. The people board is at `/admin/crm`.
 5. Open a person. The timeline shows the invite, application, emails, verification run, decision, and payment when those exist. Add a note. Set a follow-up date, tags, and an owner. Check **Do not contact**, write a reason, and save. The next letter to that email is stored in the Outbox as **Not sent** with the reason, and the timeline says the same.
 6. **Add a prospect** mints an invite code and, with the box checked, puts the information email in the Outbox. Issuing a code for an invite request does the same. **Send information email** on a person sends it again. The applicant is not emailed.
 
+## Command center
+
+The admin home is `/admin`. A person who is not an administrator is sent back to the floor. The check runs on the server.
+
+1. The top strip is **Needs your attention**. Each tile is a count and a link: applications awaiting a decision, needs-more-info replies, payments due or failed, reports, flagged posts, introductions and deal rooms, and CRM follow-ups due. A count above zero uses a brass border.
+2. **Funnel** shows submitted, in review, approved, payment due, declined, and active members. **Last 7 days** shows new applications, decisions, Outbox notices, and new members. **Recent activity** is the audit log, newest first, and opens the full log.
+3. The left navigation groups Applications & Verification, Members, Payments, CRM, Email templates & Outbox, Moderation, Content/Legal versions, Settings, Audit log, and Test console. On a phone, open **Admin menu**. The command center link is active only on `/admin`.
+4. **Payments** lists members who owe dues, paid, were waived, failed, or have a refund note. Due and failed rows are marked. Open the member to mark paid, waive, or resend the link.
+5. **Introductions and deal rooms** lists pending introductions by name and note. The member still accepts or declines. Deal-room requests stay on the same page.
+6. **Legal versions** lists each draft, its version line, and a link to the public page. Five of them are marked recorded at signup.
+7. **Settings** shows the test recipient (`NOTICE_TEST_RECIPIENT`) and a Test / Live choice in large type. Test stores notices in the Outbox for that recipient. Live is saved for a later mail provider and still does not email anyone. The dues table shows the flat annual amounts. It is not an editor. **Sources and watchlists** is linked from the same page.
+8. Invite requests and new codes stay on the command center. Issuing a code puts the information email in the Outbox. Copy the code. Applicants are not emailed.
+
 ## What the offline samples are for
 
 The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or web search. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is unavailable and is listed under “What I could not check for free.” A source that answers with no match is “No data found.” Neither one approves anyone.

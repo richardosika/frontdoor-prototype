@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { restoreTemplate, saveTemplate, sendTestTemplate } from "@/actions/crm";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { TemplateEditor } from "@/components/template-editor";
 import { MobileTitle, PageHeader } from "@/components/page-header";
@@ -35,7 +34,6 @@ export default async function TemplateEditPage({
       <MobileTitle href="/admin/templates" label="Templates" title={template.name} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={template.name} />
-        <AdminNav current="/admin/templates" />
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>

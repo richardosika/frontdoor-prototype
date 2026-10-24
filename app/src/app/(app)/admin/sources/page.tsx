@@ -1,5 +1,4 @@
 import { refreshWatchlists } from "@/actions/owner";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { RunAndReload } from "@/components/run-and-reload";
@@ -37,14 +36,13 @@ export default async function VerificationSettingsPage({
     <div>
       <MobileTitle href="/admin" label="Admin" title="Verification" />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
-        <PageHeader title="Verification settings" />
-        <AdminNav current="/admin/sources" />
+        <PageHeader title="Sources and watchlists" />
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>
         <section className={`${card} mt-4 p-4 text-sm`}>
           <p>
-            OFAC SDN cache: {cache ? `${names} names, refreshed ${formatAuditTime(cache.fetchedAt)}` : "not downloaded yet"}. A local test name, Alexei Sanctionhit, is always included so the sample hit still works if the download fails.
+            Verification settings. OFAC SDN cache: {cache ? `${names} names, refreshed ${formatAuditTime(cache.fetchedAt)}` : "not downloaded yet"}. A local test name, Alexei Sanctionhit, is always included so the sample hit still works if the download fails.
           </p>
           <div className="mt-3">
             <RunAndReload className={btn} label="Refresh watchlists now" pendingLabel="Refreshing watchlists…" run={refreshWatchlists} />

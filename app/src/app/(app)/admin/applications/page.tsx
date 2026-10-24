@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { deleteSelectedApplications } from "@/actions/owner";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
@@ -49,7 +48,6 @@ export default async function ApplicationsPage({
       <MobileTitle href="/admin" label="Admin" title="Applications" />
       <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Applications" />
-        <AdminNav current="/admin/applications" />
         <p className="mt-3 text-sm text-ink">Recommendations only. Richard Osika approves every member.</p>
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />

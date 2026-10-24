@@ -1,4 +1,3 @@
-import { AdminNav } from "@/components/admin-nav";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
@@ -31,7 +30,6 @@ export default async function AuditPage() {
       <MobileTitle href="/admin" label="Admin" title="Audit" />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Audit log" />
-        <AdminNav current="/admin/audit" />
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Application decisions</h2>
           <ul className="mt-2 divide-y divide-line text-sm">

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { moderatePost, resolveReport } from "@/actions/admin";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
@@ -33,7 +32,6 @@ export default async function ModerationPage({
   return (
     <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Moderation" />
-      <AdminNav current="/admin/moderation" />
       <p className="mt-3 text-sm text-ink">Flagged posts and member reports wait here. A Private Floor administrator publishes or closes them. Members do not see scores or sources.</p>
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />

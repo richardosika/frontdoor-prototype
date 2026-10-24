@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { removeMember, setMemberStatus } from "@/actions/owner";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { PaymentPanel } from "@/components/payment-admin";
@@ -34,7 +33,6 @@ export default async function AdminMemberPage({
       <MobileTitle href="/admin/members" label="Members" title={member.name} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={member.name} />
-        <AdminNav current="/admin/members" />
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>

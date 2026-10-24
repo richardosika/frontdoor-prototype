@@ -3,11 +3,12 @@ import { createInvite, declineInviteRequest, issueInviteForRequest, reviewVouch 
 import { Banner } from "@/components/banner";
 import { CopyCode } from "@/components/copy-code";
 import { PageHeader } from "@/components/page-header";
-import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
+import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
+import { activitySince, attentionItems, funnelCounts, mergeActivity, type ActivityRow } from "@/lib/admin-home";
 import { requireAdmin } from "@/lib/current-user";
+import { formatAuditTime } from "@/lib/format";
 import { roleLabel } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
-import { isAwaitingVerification } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
 
@@ -18,86 +19,198 @@ export default async function AdminPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const issuedCode = params.issued
-    ? await prisma.inviteCode.findUnique({ where: { code: params.issued } })
-    : null;
-  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests, outbox, testApps, funnel, activeMembers, introductions] = await Promise.all([
-    prisma.application.count({ where: { status: { in: ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"] } } }),
-    prisma.user.groupBy({ by: ["tier"], _count: true }),
-    prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-    prisma.post.count(),
+  const since = activitySince();
+  const issuedCode = params.issued ? await prisma.inviteCode.findUnique({ where: { code: params.issued } }) : null;
+  const [
+    awaitingDecision,
+    infoReplies,
+    paymentsDueOrFailed,
+    reports,
+    flaggedPosts,
+    pendingIntros,
+    pendingDeals,
+    followUpsDue,
+    funnelRows,
+    activeMembers,
+    weekApplications,
+    weekDecisions,
+    weekOutbox,
+    weekMembers,
+    decisions,
+    moderation,
+    runs,
+    vouches,
+    inviteRequests,
+    invites,
+  ] = await Promise.all([
+    prisma.application.count({ where: { status: { in: ["PENDING", "SUBMITTED", "IN_REVIEW"] } } }),
+    prisma.application.count({ where: { status: "IN_REVIEW", statement: { contains: "Member reply" } } }),
+    prisma.user.count({ where: { isAdmin: false, paymentStatus: { in: ["DUE", "FAILED"] } } }),
+    prisma.report.count({ where: { status: "OPEN" } }),
+    prisma.post.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.introduction.count({ where: { status: "PENDING" } }),
     prisma.dealAccess.count({ where: { status: "PENDING" } }),
+    prisma.crmPerson.count({ where: { followUpAt: { lte: new Date() } } }),
+    prisma.application.groupBy({ by: ["status"], _count: true }),
+    prisma.user.count({ where: { status: "ACTIVE", isAdmin: false } }),
+    prisma.application.count({ where: { createdAt: { gte: since } } }),
+    prisma.applicationDecision.count({ where: { createdAt: { gte: since } } }),
+    prisma.outboxNotice.count({ where: { createdAt: { gte: since } } }),
+    prisma.user.count({ where: { isAdmin: false, createdAt: { gte: since } } }),
+    prisma.applicationDecision.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      include: { actor: { select: { name: true } }, application: { select: { name: true } } },
+    }),
+    prisma.moderationEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      include: { actor: { select: { name: true } } },
+    }),
+    prisma.verificationRun.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      select: { id: true, subject: true, status: true, verdict: true, score: true, createdAt: true, application: { select: { name: true } } },
+    }),
     prisma.confirmation.findMany({
       where: { status: "CONFIRMED", reviewStatus: "PENDING_ADMIN" },
       include: { project: { include: { user: true } } },
       orderBy: { respondedAt: "desc" },
     }),
-    prisma.verificationCase.findMany({ select: { status: true, expiresAt: true } }),
-    prisma.report.count(),
     prisma.inviteRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
-    prisma.outboxNotice.count(),
-    prisma.application.count({ where: { isTest: true } }),
-    prisma.application.groupBy({ by: ["status"], _count: true }),
-    prisma.user.count({ where: { status: "ACTIVE", isAdmin: false } }),
-    prisma.introduction.groupBy({ by: ["status"], _count: true }),
+    prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
   ]);
-  const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
-  const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
-  const statusCount = (status: string) => funnel.find((row) => row.status === status)?._count ?? 0;
-  const introCount = (status: string) => introductions.find((row) => row.status === status)?._count ?? 0;
+
+  const attention = attentionItems({
+    awaitingDecision,
+    infoReplies,
+    paymentsDueOrFailed,
+    reports,
+    flaggedPosts,
+    introAndDealIssues: pendingIntros + pendingDeals,
+    followUpsDue,
+  });
+  const funnel = funnelCounts(
+    funnelRows.map((row) => ({ status: row.status, count: row._count })),
+    activeMembers,
+  );
+  const activity = mergeActivity([
+    ...decisions.map(
+      (row): ActivityRow => ({
+        id: `decision-${row.id}`,
+        at: row.createdAt.toISOString(),
+        kind: "decision",
+        text: `${row.actor?.name || "Private Floor"} · ${row.decision} · ${row.application.name}`,
+        href: "/admin/audit",
+      }),
+    ),
+    ...moderation.map(
+      (row): ActivityRow => ({
+        id: `moderation-${row.id}`,
+        at: row.createdAt.toISOString(),
+        kind: "moderation",
+        text: `${row.actor?.name || "Private Floor"} · ${row.summary}`,
+        href: "/admin/audit",
+      }),
+    ),
+    ...runs.map(
+      (row): ActivityRow => ({
+        id: `run-${row.id}`,
+        at: row.createdAt.toISOString(),
+        kind: "verification",
+        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${row.verdict}` : ""}${typeof row.score === "number" ? ` · ${row.score}` : ""} · ${row.application?.name || "No application"}`,
+        href: "/admin/audit",
+      }),
+    ),
+  ]);
+  const week = [
+    { label: "Applications", value: weekApplications },
+    { label: "Decisions", value: weekDecisions },
+    { label: "Outbox notices", value: weekOutbox },
+    { label: "New members", value: weekMembers },
+  ];
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
-      <PageHeader title="Admin" />
+    <div className="mx-auto max-w-5xl px-4 pb-8 pt-3 md:pt-6 lg:px-8">
+      <PageHeader title="Command center" />
+      <p className="font-serif text-2xl text-forest md:hidden">Command center</p>
       <p className="mt-1 text-sm text-ink">
-        Review applications, set membership tier to Invited or Confirmed, and issue invite codes. The Verified badge is a separate file.{" "}
-        <Link href="/admin/sources" className="underline decoration-brass">
-          Verification settings
-        </Link>
-        {" · "}
-        <Link href="/admin/audit" className="underline decoration-brass">
-          Audit log
-        </Link>
+        What is waiting on a Private Floor administrator, then the floor behind it. Members never see this page.
       </p>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4">
         <Banner error={params.error} notice={params.notice} />
         {issuedCode ? (
           <CopyCode
             code={issuedCode.code}
-            caption={`Invite code for ${params.issuedFor || "this request"}. Pass it along. Private Floor does not email codes.`}
+            caption={`Invite code for ${params.issuedFor || "this request"}. The information email is in the Outbox. Copy the code. Applicants are not emailed.`}
           />
         ) : null}
       </div>
-      <section className={`${card} mt-4 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Floor</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Mini label="Submitted" value={statusCount("SUBMITTED") + statusCount("PENDING")} />
-          <Mini label="In review" value={statusCount("IN_REVIEW") + statusCount("NEEDS_INFO")} />
-          <Mini label="Approved" value={statusCount("APPROVED")} />
-          <Mini label="Payment due" value={statusCount("PAYMENT_DUE")} />
-          <Mini label="Declined" value={statusCount("DECLINED")} />
-          <Mini label="Active members" value={activeMembers} />
-          <Mini label="Posts" value={posts} />
-          <Mini label="Open introductions" value={introCount("PENDING")} />
-          <Mini label="Accepted introductions" value={introCount("ACCEPTED")} />
-        </div>
+
+      <section className="mt-6" aria-label="Needs your attention">
+        <h2 className="font-serif text-2xl font-normal text-forest">Needs your attention</h2>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {attention.map((item) => (
+            <li key={item.id}>
+              <Link
+                href={item.href}
+                className={`${card} flex min-h-11 items-center gap-3 px-4 py-3 ${item.hot ? "border-brass" : "border-line"}`}
+              >
+                <b className="font-serif text-3xl font-normal tabular-nums">{item.count}</b>
+                <span className="text-sm text-ink">{item.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
-      <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat href="/admin/applications" label="Open applications" value={pending} />
-        <Stat href="/admin/outbox" label="Outbox notices" value={outbox} />
-        <Stat href="/admin/test" label="Test applications" value={testApps} />
-        <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
-        <Stat href="/admin/access" label="Open access requests" value={access} />
-        <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />
-        <Stat href="/admin/moderation" label="Reports for review" value={openReports} />
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className={`${card} p-4`}>
+          <h2 className={sectionLabel}>Funnel</h2>
+          <ul className="mt-3 grid grid-cols-2 gap-3">
+            {funnel.map((item) => (
+              <li key={item.label}>
+                <b className="font-serif text-2xl font-normal">{item.value}</b>
+                <span className="mt-1 block text-xs uppercase tracking-wider text-mut">{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className={`${card} p-4`}>
+          <h2 className={sectionLabel}>Last 7 days</h2>
+          <ul className="mt-3 grid grid-cols-2 gap-3">
+            {week.map((item) => (
+              <li key={item.label}>
+                <b className="font-serif text-2xl font-normal">{item.value}</b>
+                <span className="mt-1 block text-xs uppercase tracking-wider text-mut">{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <Mini label="Invited" value={tierCount("INVITED") + tierCount("VERIFIED")} />
-        <Mini label="Confirmed" value={tierCount("CONFIRMED")} />
-        <Mini label="Posts" value={posts} />
-      </div>
+
+      <section className={`${card} mt-4 p-4`}>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className={sectionLabel}>Recent activity</h2>
+          <Link href="/admin/audit" className="text-sm underline decoration-brass">
+            Audit log
+          </Link>
+        </div>
+        {activity.length === 0 ? <p className="mt-3 text-sm text-mut">Nothing recorded yet.</p> : null}
+        <ul className="mt-2 divide-y divide-line text-sm">
+          {activity.map((row) => (
+            <li key={row.id} className="py-2">
+              <Link href={row.href} className="block min-h-11">
+                <span className="text-xs text-mut">{formatAuditTime(new Date(row.at))}</span>
+                <span className="mt-0.5 block text-ink">{row.text}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className={`${card} mt-6 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Vouches waiting for review</h2>
+        <h2 className={sectionLabel}>Vouches waiting for review</h2>
         <p className="mt-1 text-sm text-ink">A counterparty yes does not change a member&apos;s tier until you accept it.</p>
         {vouches.length === 0 ? <p className="mt-3 text-sm text-mut">None waiting.</p> : null}
         <ul className="mt-3 divide-y divide-line">
@@ -109,7 +222,7 @@ export default async function AdminPage({
                 {vouch.counterpartyName} ({vouch.counterpartyEmail}) confirmed.
                 {vouch.note ? ` Note: ${vouch.note}` : ""}
               </p>
-              <form action={reviewVouch} className="mt-2 flex gap-2">
+              <form action={reviewVouch} className="mt-2 flex flex-wrap gap-2">
                 <input type="hidden" name="confirmationId" value={vouch.id} />
                 <button className={btnOutline} name="decision" value="REJECTED" type="submit">
                   Decline
@@ -122,9 +235,12 @@ export default async function AdminPage({
           ))}
         </ul>
       </section>
+
       <section className={`${card} mt-6 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite requests</h2>
-        <p className="mt-1 text-sm text-ink">Approve by issuing a one-use code. The code stays on this screen. Private Floor does not email it.</p>
+        <h2 className={sectionLabel}>Invite requests</h2>
+        <p className="mt-1 text-sm text-ink">
+          Issuing a code puts the information email in the Outbox. Copy the code. Applicants are not emailed.
+        </p>
         {inviteRequests.length === 0 ? <p className="mt-3 text-sm text-mut">None waiting.</p> : null}
         <ul className="mt-3 divide-y divide-line">
           {inviteRequests.map((request) => (
@@ -135,7 +251,7 @@ export default async function AdminPage({
                 {roleLabel(request.role)} · {request.org} · {request.location}
               </p>
               {request.note ? <p className="mt-1 text-xs text-ink">{request.note}</p> : null}
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <form action={issueInviteForRequest}>
                   <input type="hidden" name="requestId" value={request.id} />
                   <button className={btn} type="submit">
@@ -153,9 +269,10 @@ export default async function AdminPage({
           ))}
         </ul>
       </section>
+
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className={`${card} p-4`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">New invite code</h2>
+          <h2 className={sectionLabel}>New invite code</h2>
           <form action={createInvite} className="mt-3 space-y-2">
             <div>
               <label className={labelCls}>Code</label>
@@ -175,7 +292,7 @@ export default async function AdminPage({
           </form>
         </section>
         <section className={`${card} p-4`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite codes</h2>
+          <h2 className={sectionLabel}>Invite codes</h2>
           <ul className="mt-3 divide-y divide-line text-sm">
             {invites.map((invite) => (
               <li key={invite.id} className="py-2">
@@ -188,24 +305,6 @@ export default async function AdminPage({
           </ul>
         </section>
       </div>
-    </div>
-  );
-}
-
-function Stat({ href, label, value }: { href: string; label: string; value: number }) {
-  return (
-    <Link href={href} className={`${card} p-4`}>
-      <b className="block font-serif text-3xl font-normal">{value}</b>
-      <span className="text-xs uppercase tracking-wider text-mut">{label}</span>
-    </Link>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: number }) {
-  return (
-    <div className={`${card} px-4 py-3`}>
-      <b className="font-serif text-xl font-normal">{value}</b>
-      <span className="ml-2 text-xs uppercase tracking-wider text-mut">{label}</span>
     </div>
   );
 }

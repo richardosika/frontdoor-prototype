@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addCrmNote, saveCrmPerson, sendPersonInfo } from "@/actions/crm";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
@@ -38,7 +37,6 @@ export default async function CrmPersonPage({
       <MobileTitle href="/admin/crm" label="People" title={person.name} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={person.name} />
-        <AdminNav current="/admin/crm" />
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>

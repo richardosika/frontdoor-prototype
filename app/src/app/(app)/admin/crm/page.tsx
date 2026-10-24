@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { addProspect } from "@/actions/crm";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, card, field, labelCls } from "@/components/ui";
@@ -47,7 +46,6 @@ export default async function CrmPage({
       <MobileTitle href="/admin" label="Admin" title="People" />
       <div className="mx-auto max-w-6xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="People" />
-        <AdminNav current="/admin/crm" />
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>

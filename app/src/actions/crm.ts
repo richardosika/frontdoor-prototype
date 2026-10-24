@@ -3,6 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { safeAdminBack } from "@/lib/admin-home";
 import { requireAdmin } from "@/lib/current-user";
 import { ensureCrmPerson, recordCrmEvent } from "@/lib/crm";
 import { CRM_STAGES } from "@/lib/crm-stage";
@@ -84,8 +85,10 @@ export async function setDeliveryMode(formData: FormData) {
       summary: `${admin.name} set mail delivery to ${delivery}. This build still uses the Outbox.`,
     },
   });
+  const back = safeAdminBack(String(formData.get("back") || ""), "/admin/templates");
   revalidatePath("/admin/templates");
-  redirect("/admin/templates?notice=Delivery+flag+saved.+Notices+still+go+to+the+Outbox.");
+  revalidatePath("/admin/settings");
+  redirect(`${back}?notice=Delivery+flag+saved.+Notices+still+go+to+the+Outbox.`);
 }
 
 export async function saveCrmPerson(formData: FormData) {

@@ -1,5 +1,4 @@
 import { createCustomTestApplicant, createSampleApplicants, deleteTestData, seedMemberNetwork, seedPaymentDueMember } from "@/actions/owner";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
@@ -22,7 +21,6 @@ export default async function TestConsolePage({
       <MobileTitle href="/admin" label="Admin" title="Test console" />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Test console" />
-        <AdminNav current="/admin/test" />
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>

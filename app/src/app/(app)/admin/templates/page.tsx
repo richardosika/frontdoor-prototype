@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { setDeliveryMode } from "@/actions/crm";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, card, field } from "@/components/ui";
@@ -28,7 +27,6 @@ export default async function TemplatesPage({
       <MobileTitle href="/admin" label="Admin" title="Email templates" />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Email templates" />
-        <AdminNav current="/admin/templates" />
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
-import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DecisionForm } from "@/components/decision-form";
@@ -56,7 +55,6 @@ export default async function ApplicationDetailPage({
       <MobileTitle href="/admin/applications" label="Applications" title={application.name} />
       <div className="mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={application.name} />
-        <AdminNav current="/admin/applications" />
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>
