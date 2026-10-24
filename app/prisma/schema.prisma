@@ -1,0 +1,516 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  DEVELOPER
+  INVESTOR_PE
+  FAMILY_OFFICE
+  LENDER
+  MORTGAGE_BROKER
+  GENERAL_CONTRACTOR
+  ARCHITECT_ENGINEER
+  RE_ATTORNEY
+  SECURITIES_ATTORNEY
+  ZONING_ATTORNEY
+  INSURANCE
+  BROKER
+  APPRAISER
+  PROPERTY_MANAGER
+  ACCOUNTANT
+  EXCHANGE_1031
+}
+
+enum VerificationTier {
+  INVITED
+  VERIFIED
+  CONFIRMED
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PostKind {
+  NORMAL
+  DEAL
+  SEEKING
+}
+
+enum DealKind {
+  DEAL
+  SEEKING
+}
+
+enum AccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum VouchReview {
+  OPEN
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+}
+
+enum VerificationSubject {
+  MEMBER
+  PROJECT
+}
+
+enum VerificationCaseStatus {
+  NOT_STARTED
+  IN_REVIEW
+  NEEDS_INFO
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum VerificationCheckResult {
+  PENDING
+  PASS
+  FAIL
+  NEEDS_INFO
+  NOT_PROVIDED
+}
+
+enum InviteRequestStatus {
+  PENDING
+  ISSUED
+  DECLINED
+}
+
+model User {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  passwordHash   String
+  name           String
+  initials       String
+  role           MemberRole
+  org            String
+  location       String
+  bio            String           @default("")
+  credentialNote String           @default("")
+  phone          String           @default("")
+  linkedinUrl    String           @default("")
+  tier           VerificationTier @default(INVITED)
+  isAdmin        Boolean          @default(false)
+  status         AccountStatus    @default(ACTIVE)
+  seenWelcome    Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  deals                Deal[]           @relation("SponsorDeals")
+  accessRequests       DealAccess[]
+  projects             TrackProject[]
+  messages             Message[]
+  conversationsA       Conversation[]   @relation("ConvA")
+  conversationsB       Conversation[]   @relation("ConvB")
+  connectionsFrom      Connection[]     @relation("ConnFrom")
+  connectionsTo        Connection[]     @relation("ConnTo")
+  invitesCreated       InviteCode[]
+  applicationsReviewed Application[]    @relation("Reviewer")
+  ownedApplication     Application?     @relation("ApplicantUser")
+  notifications        Notification[]
+  dealDocuments        DealDocument[]
+  dealMessages         DealMessage[]
+  dealEvents           DealEvent[]
+  memberVerification   VerificationCase?  @relation("MemberVerification")
+  checksReviewed       VerificationCheck[] @relation("CheckReviewer")
+  verificationEvents   VerificationEvent[] @relation("VerificationActor")
+  blocksMade           Block[]             @relation("BlocksMade")
+  blocksReceived       Block[]             @relation("BlocksReceived")
+  reportsMade          Report[]            @relation("ReportsMade")
+  reportsReceived      Report[]            @relation("ReportsReceived")
+  moderationEvents     ModerationEvent[]
+  businessCard         BusinessCard?
+}
+
+model InviteCode {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  maxUses      Int           @default(1)
+  uses         Int           @default(0)
+  note         String        @default("")
+  expiresAt    DateTime?
+  createdAt    DateTime      @default(now())
+  createdById  String?
+  createdBy    User?         @relation(fields: [createdById], references: [id])
+  applications Application[]
+  inviteRequests InviteRequest[]
+}
+
+model InviteRequest {
+  id           String              @id @default(cuid())
+  name         String
+  email        String
+  role         MemberRole
+  org          String
+  location     String
+  note         String              @default("")
+  status       InviteRequestStatus @default(PENDING)
+  statusToken  String              @unique
+  inviteCodeId String?
+  inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
+  createdAt    DateTime            @default(now())
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  inviteCodeId    String
+  inviteCode      InviteCode        @relation(fields: [inviteCodeId], references: [id])
+  email           String
+  name            String
+  passwordHash    String
+  role            MemberRole
+  org             String
+  location        String
+  credentialValue String
+  referenceEmails String[]
+  phone           String            @default("")
+  linkedinUrl     String            @default("")
+  statement       String            @default("")
+  statusToken     String            @unique
+  status          ApplicationStatus @default(PENDING)
+  reviewerNote    String            @default("")
+  reviewedAt      DateTime?
+  reviewerId      String?
+  reviewer        User?             @relation("Reviewer", fields: [reviewerId], references: [id])
+  userId          String?           @unique
+  user            User?             @relation("ApplicantUser", fields: [userId], references: [id])
+  businessCard    BusinessCard?
+  createdAt       DateTime          @default(now())
+
+  @@index([status])
+  @@index([email])
+}
+
+model TrackProject {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  asset      String
+  location   String
+  year       Int
+  valueLabel String
+  summary    String         @default("")
+  createdAt  DateTime       @default(now())
+  confirmations Confirmation[]
+  verification  VerificationCase?
+}
+
+model Confirmation {
+  id                String             @id @default(cuid())
+  projectId         String
+  project           TrackProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  counterpartyName  String
+  counterpartyEmail String
+  token             String             @unique
+  status            ConfirmationStatus @default(PENDING)
+  reviewStatus      VouchReview        @default(OPEN)
+  note              String             @default("")
+  respondedAt       DateTime?
+  createdAt         DateTime           @default(now())
+}
+
+model Post {
+  id        String     @id @default(cuid())
+  authorId  String
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind      PostKind
+  body      String     @default("")
+  dealId    String?
+  deal      Deal?      @relation(fields: [dealId], references: [id])
+  createdAt DateTime   @default(now())
+  likes     Like[]
+  comments  Comment[]
+
+  @@index([createdAt])
+}
+
+model Like {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model Deal {
+  id             String      @id @default(cuid())
+  sponsorId      String
+  sponsor        User        @relation("SponsorDeals", fields: [sponsorId], references: [id])
+  kind           DealKind
+  title          String
+  blurb          String
+  market         String
+  sizeBand       String
+  assetClass     String
+  raiseLabel     String
+  targetIrr      String      @default("")
+  minCheck       String      @default("")
+  equityMultiple String      @default("")
+  roleNeeded     MemberRole?
+  deadline       String      @default("")
+  createdAt      DateTime    @default(now())
+  posts          Post[]
+  access         DealAccess[]
+  documents      DealDocument[]
+  messages       DealMessage[]
+  events         DealEvent[]
+
+  @@index([market, sizeBand, kind])
+}
+
+model DealAccess {
+  id                String       @id @default(cuid())
+  dealId            String
+  deal              Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requesterId       String
+  requester         User         @relation(fields: [requesterId], references: [id])
+  status            AccessStatus @default(PENDING)
+  ndaAcknowledged   Boolean      @default(false)
+  ndaAcknowledgedAt DateTime?
+  createdAt         DateTime     @default(now())
+  reviewedAt        DateTime?
+
+  @@unique([dealId, requesterId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userAId   String
+  userBId   String
+  userA     User      @relation("ConvA", fields: [userAId], references: [id])
+  userB     User      @relation("ConvB", fields: [userBId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String
+  kind           String       @default("TEXT")
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+model Connection {
+  id        String           @id @default(cuid())
+  fromId    String
+  toId      String
+  from      User             @relation("ConnFrom", fields: [fromId], references: [id])
+  to        User             @relation("ConnTo", fields: [toId], references: [id])
+  status    ConnectionStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+
+  @@unique([fromId, toId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String    @default("")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DealDocument {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  title     String
+  url       String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model DealMessage {
+  id        String        @id @default(cuid())
+  dealId    String
+  deal      Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  parentId  String?
+  parent    DealMessage?  @relation("DealThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   DealMessage[] @relation("DealThread")
+  createdAt DateTime      @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model VerificationCase {
+  id           String                 @id @default(cuid())
+  subject      VerificationSubject
+  status       VerificationCaseStatus @default(NOT_STARTED)
+  userId       String?                @unique
+  user         User?                  @relation("MemberVerification", fields: [userId], references: [id], onDelete: Cascade)
+  projectId    String?                @unique
+  project      TrackProject?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  internalNote String                 @default("")
+  verifiedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  checks       VerificationCheck[]
+  events       VerificationEvent[]
+
+  @@index([status, subject])
+}
+
+model VerificationCheck {
+  id          String                  @id @default(cuid())
+  caseId      String
+  case        VerificationCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  result      VerificationCheckResult @default(PENDING)
+  note        String                  @default("")
+  evidenceUrl String                  @default("")
+  reviewerId  String?
+  reviewer    User?                   @relation("CheckReviewer", fields: [reviewerId], references: [id])
+  reviewedAt  DateTime?
+
+  @@unique([caseId, key])
+}
+
+model VerificationEvent {
+  id         String                  @id @default(cuid())
+  caseId     String
+  case       VerificationCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?                   @relation("VerificationActor", fields: [actorId], references: [id])
+  fromStatus VerificationCaseStatus?
+  toStatus   VerificationCaseStatus
+  summary    String
+  createdAt  DateTime                @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reporterId     String
+  reporter       User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId   String
+  target         User     @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  conversationId String   @default("")
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ModerationEvent {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id])
+  action         String
+  summary        String
+  conversationId String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model BusinessCard {
+  id            String       @id @default(cuid())
+  applicationId String       @unique
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userId        String?      @unique
+  user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  contentType   String
+  sizeBytes     Int
+  bytes         Bytes
+  uploadedAt    DateTime     @default(now())
+  deletedAt     DateTime?
+  deletedById   String?
+}
+
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
