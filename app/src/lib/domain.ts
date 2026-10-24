@@ -1,8 +1,21 @@
 import { BRAND } from "@/lib/brand";
 import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
 
+/** Database enum still contains VERIFIED so existing rows can be migrated without dropping a value. */
 export const TIERS = ["INVITED", "VERIFIED", "CONFIRMED"] as const;
 export type Tier = (typeof TIERS)[number];
+
+/** Membership shown in the product is Invited or Confirmed. The brass badge is a separate committee file. */
+export const MEMBERSHIP_TIERS = ["INVITED", "CONFIRMED"] as const;
+export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
+
+export function isMembershipTier(value: string): value is MembershipTier {
+  return (MEMBERSHIP_TIERS as readonly string[]).includes(value);
+}
+
+export function membershipTier(tier: string): MembershipTier {
+  return tier === "CONFIRMED" ? "CONFIRMED" : "INVITED";
+}
 
 export const MARKETS = ["NJ", "NY", "CT"] as const;
 
@@ -146,7 +159,6 @@ export type ApplicationInput = {
   password: string;
   org: string;
   location: string;
-  credentialValue: string;
   referenceEmails?: string[];
   statement?: string;
   phone?: string;
@@ -165,7 +177,6 @@ export function validateApplication(input: ApplicationInput): string[] {
   if (input.password.length > 72) errors.push("Password must be 72 characters or fewer.");
   if (input.org.trim().length < 2) errors.push("Enter your company or firm.");
   if (input.location.trim().length < 2) errors.push("Enter your city and state.");
-  if (input.credentialValue.trim().length < 3) errors.push("Enter the credential for your role.");
   const refs = (input.referenceEmails ?? []).map((email) => email.trim()).filter(Boolean);
   if (refs.some((email) => !EMAIL.test(email))) {
     errors.push("Leave reference emails blank, or enter a valid email.");

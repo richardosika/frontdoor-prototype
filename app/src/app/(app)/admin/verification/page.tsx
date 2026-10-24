@@ -8,6 +8,7 @@ import {
   VERIFICATION_STATUSES,
   effectiveVerificationStatus,
   isAwaitingVerification,
+  verificationQueueLabel,
   verificationStatusLabel,
 } from "@/lib/verification";
 
@@ -24,7 +25,10 @@ export default async function VerificationQueuePage({
   const subject = params.subject === "MEMBER" || params.subject === "PROJECT" ? params.subject : undefined;
   const cases = await prisma.verificationCase.findMany({
     orderBy: { updatedAt: "desc" },
-    include: { user: { select: { name: true } }, project: { select: { name: true } } },
+    include: {
+      user: { select: { name: true, org: true, location: true } },
+      project: { select: { name: true, location: true, user: { select: { name: true } } } },
+    },
   });
   const awaiting = cases.filter((item) => isAwaitingVerification(item)).length;
   const visible = cases.filter((item) => {
@@ -64,7 +68,7 @@ export default async function VerificationQueuePage({
             <li key={item.id}>
               <Link href={`/admin/verification/${item.id}`} className={`${card} flex min-h-11 items-center justify-between gap-3 px-4 py-3`}>
                 <span>
-                  <b className="block text-sm">{item.user?.name ?? item.project?.name}</b>
+                  <b className="block text-sm">{verificationQueueLabel(item)}</b>
                   <span className="text-xs text-mut">{item.subject === "MEMBER" ? "Member" : "Project"}</span>
                 </span>
                 <span className="text-xs font-semibold uppercase tracking-wider text-brass">{verificationStatusLabel(effective)}</span>

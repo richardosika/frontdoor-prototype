@@ -18,7 +18,7 @@ export default async function ApplicationsPage({
   const applications = await prisma.application.findMany({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
-    include: { inviteCode: true },
+    include: { inviteCode: true, businessCard: { select: { id: true, deletedAt: true, sizeBytes: true } } },
   });
 
   return (
@@ -40,7 +40,10 @@ export default async function ApplicationsPage({
               {application.linkedinUrl ? ` · ${application.linkedinUrl}` : ""} · {roleLabel(application.role)} · {application.org} · {application.location}
             </p>
             <p className="mt-2 text-sm text-ink">
-              <b>Credential:</b> {application.credentialValue}
+              <b>Business card:</b>{" "}
+              {application.businessCard && !application.businessCard.deletedAt && application.businessCard.sizeBytes > 0
+                ? "On file. It appears on the verification case after approval, and members never see it."
+                : "No business card uploaded."}
             </p>
             <p className="text-sm text-ink">
               <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}

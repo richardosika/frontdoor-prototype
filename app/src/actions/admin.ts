@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { MemberRole, VerificationTier } from "@prisma/client";
 import { requireAdmin } from "@/lib/current-user";
-import { initialsFromName, isTier, tierAfterAdminApprovesVouch } from "@/lib/domain";
+import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE } from "@/lib/business-card";
+import { initialsFromName, isMembershipTier, tierAfterAdminApprovesVouch } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
@@ -45,6 +46,10 @@ export async function reviewApplication(formData: FormData) {
     redirect("/admin/applications?error=That+email+is+already+a+member");
   }
 
+  const card = await prisma.businessCard.findUnique({
+    where: { applicationId: application.id },
+    select: { id: true, deletedAt: true },
+  });
   const user = await prisma.user.create({
     data: {
       email: application.email,
@@ -54,7 +59,7 @@ export async function reviewApplication(formData: FormData) {
       role: application.role as MemberRole,
       org: application.org,
       location: application.location,
-      credentialNote: application.credentialValue,
+      credentialNote: card && !card.deletedAt ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
       bio: "",
       phone: application.phone,
       linkedinUrl: application.linkedinUrl,
@@ -62,6 +67,12 @@ export async function reviewApplication(formData: FormData) {
       status: "ACTIVE",
     },
   });
+  if (card) {
+    await prisma.businessCard.update({
+      where: { id: card.id },
+      data: { userId: user.id },
+    });
+  }
 
   await noteApplicationReferences({
     userId: user.id,
@@ -91,14 +102,14 @@ export async function reviewApplication(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
   revalidatePath("/network");
-  redirect("/admin/applications?notice=Approved");
+  redirect(`/admin/applications?notice=${encodeURIComponent(`Approved ${application.name}`)}`);
 }
 
 export async function setMemberTier(formData: FormData) {
   await requireAdmin();
   const userId = String(formData.get("userId") || "");
   const tier = String(formData.get("tier") || "");
-  if (!isTier(tier)) redirect("/admin/members?error=Unknown+tier");
+  if (!isMembershipTier(tier)) redirect("/admin/members?error=Unknown+tier");
   const member = await prisma.user.findUnique({ where: { id: userId } });
   if (!member) redirect("/admin/members?error=Member+not+found");
   if (tier === "CONFIRMED" && member.tier !== "CONFIRMED") {
@@ -115,8 +126,8 @@ export async function setMemberTier(formData: FormData) {
       data: { tier: tier as VerificationTier },
     });
     await notify(userId, {
-      title: "Verification tier updated",
-      body: `Your tier is now ${tierLabel(tier)}.`,
+      title: "Membership tier updated",
+      body: `Your membership tier is now ${tierLabel(tier)}. The Verified badge is a separate committee file.`,
       href: "/profile",
     });
   }
@@ -250,7 +261,7 @@ export async function issueInviteForRequest(formData: FormData) {
   });
   revalidatePath("/admin");
   redirect(
-    `/admin?notice=${encodeURIComponent(`Invite code ${code} for ${request.email}. Pass it along. Private Floor does not email codes.`)}`,
+    `/admin?issued=${encodeURIComponent(code)}&issuedFor=${encodeURIComponent(request.email)}&notice=${encodeURIComponent("Invite code issued. Copy it below. Private Floor does not email codes.")}`,
   );
 }
 

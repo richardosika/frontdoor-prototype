@@ -4,11 +4,12 @@ import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
 import { Composer } from "@/components/composer";
+import { ColleagueInvite } from "@/components/colleague-invite";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
-import { timeAgo } from "@/lib/format";
+import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -30,7 +31,7 @@ export default async function FeedPage({
   const params = await searchParams;
   const tab = TABS.some((item) => item.id === params.tab) ? params.tab : "foryou";
 
-  const [posts, suggestions, invite, application] = await Promise.all([
+  const [posts, suggestions, application] = await Promise.all([
     prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       take: 40,
@@ -46,7 +47,6 @@ export default async function FeedPage({
       orderBy: { name: "asc" },
       take: 5,
     }),
-    prisma.inviteCode.findFirst({ where: { createdById: user.id }, orderBy: { createdAt: "desc" } }),
     prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
   ]);
 
@@ -88,20 +88,20 @@ export default async function FeedPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Welcome to {BRAND.name}</p>
             <h2 className="mt-1 font-serif text-2xl font-normal">How the circle works</h2>
             <p className="mt-2 text-sm leading-relaxed text-ink">
-              Your tier is {user.tier === "INVITED" ? "Invited" : user.tier === "VERIFIED" ? "Verified" : "Confirmed"}. Three tiers, in order:
+              Your membership tier is {tierLabel(user.tier)}. Tier and the brass Verified badge are different.
             </p>
             <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-ink">
               <li>
                 <b>Invited.</b> Your application was accepted. Complete your profile and list projects you can stand behind.
               </li>
               <li>
-                <b>Verified.</b> The committee checks the credential for your role.
+                <b>Confirmed.</b> The committee accepts a vouch on a project. A typed email cannot move you here on its own.
               </li>
               <li>
-                <b>Confirmed.</b> A counterparty vouches for a project, then the committee accepts that vouch. A typed email cannot move you here on its own.
+                <b>Verified badge.</b> A separate committee file. It appears only when that file is complete. It is not a membership tier. You can be Confirmed and still see “Verification in progress.”
               </li>
             </ol>
-            <p className="mt-2 text-sm text-ink">Next: open your profile, add a project, and send the vouch link to someone who worked on it.</p>
+            <p className="mt-2 text-sm text-ink">Next: open your profile and add a project. A vouch can be requested after the committee marks that project Verified.</p>
             {application?.reviewerNote ? (
               <p className="mt-3 rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
                 <b>Note from the committee. </b>
@@ -120,14 +120,17 @@ export default async function FeedPage({
             {application.reviewerNote}
           </p>
         ) : null}
-        <div className="mt-4 rounded border border-line bg-paper p-4 lg:hidden">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your verification</h2>
-          <div className="mt-2">
-            <TierBadge tier={user.tier} />
+        <div className="mt-4 space-y-4 lg:hidden">
+          <div className="rounded border border-line bg-paper p-4">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your verification</h2>
+            <div className="mt-2">
+              <TierBadge tier={user.tier} />
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-ink">
+              Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
+            </p>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-ink">
-            Invited means the application was accepted. Verified means the committee checked your credential. Confirmed means the committee accepted a counterparty vouch.
-          </p>
+          <ColleagueInvite />
         </div>
         <div className="mt-4">
           <Composer />
@@ -218,7 +221,7 @@ export default async function FeedPage({
       <aside className="hidden space-y-4 lg:block">
         <div className={matchPanel}>
           <div className="text-[10px] uppercase tracking-[0.16em] text-sand">Match suggestions</div>
-          <p className="mt-1 font-serif text-xl">{Math.max(investors.length, 1)} investors in your markets</p>
+          <p className="mt-1 font-serif text-xl">{plural(investors.length, "investor")} in your markets</p>
           <p className="mt-2 text-xs text-sand">Rules match on role, market, and size. This is a directory, not a solicitation.</p>
           <Link href="/network?role=INVESTOR_PE" className={`${btnBrass} mt-3`}>
             Review matches
@@ -244,21 +247,10 @@ export default async function FeedPage({
             <TierBadge tier={user.tier} />
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink">
-            Invited means the application was accepted. Verified means the committee checked your credential. Confirmed means the committee accepted a counterparty vouch.
+            Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
           </p>
         </div>
-        <div className="rounded border border-line bg-paper p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite a colleague</h2>
-          <p className="mt-2 text-xs text-ink">
-            {invite ? (
-              <>
-                Your code <b>{invite.code}</b> has {Math.max(invite.maxUses - invite.uses, 0)} uses left.
-              </>
-            ) : (
-              <>Ask a member of the committee for an invite code.</>
-            )}
-          </p>
-        </div>
+        <ColleagueInvite />
       </aside>
     </div>
   );

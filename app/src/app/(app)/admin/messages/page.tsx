@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireModerationAdmin } from "@/lib/current-user";
-import { timeAgo } from "@/lib/format";
+import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export default async function ModerationQueuePage() {
               <b>{report.target.name}</b>
               <span className="text-mut"> · {report.target.email}</span>
               <p className="mt-1 text-ink">{report.reason}</p>
-              <p className="text-xs text-mut">{timeAgo(report.createdAt)}</p>
+              <p className="text-xs text-mut">{formatAuditTime(report.createdAt)}</p>
               {report.conversationId ? (
                 <Link href={`/admin/messages/${report.conversationId}`} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-forest">
                   Open thread
@@ -85,7 +85,7 @@ export default async function ModerationQueuePage() {
             <li key={event.id} className="py-2 text-sm text-ink">
               {event.summary}
               <span className="block text-xs text-mut">
-                {event.actor?.name ?? "System"} · {event.action} · {timeAgo(event.createdAt)}
+                {event.actor?.name ?? "System"} · {event.action} · {formatAuditTime(event.createdAt)}
               </span>
             </li>
           ))}

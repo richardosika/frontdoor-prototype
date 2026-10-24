@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
 import { withinRateLimit } from "@/lib/messaging";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Too many requests for that email. Try again tomorrow." }, { status: 429 });
   }
 
+  const statusToken = randomBytes(24).toString("hex");
   await prisma.inviteRequest.create({
     data: {
       name: input.name.trim(),
@@ -48,7 +50,9 @@ export async function POST(request: Request) {
       org: input.company.trim(),
       location: input.city.trim(),
       note: input.note.trim().slice(0, 500),
+      statusToken,
     },
   });
-  return Response.json({ ok: true });
+  const statusUrl = new URL(`/invite-status/${statusToken}`, request.url).toString();
+  return Response.json({ ok: true, statusUrl });
 }

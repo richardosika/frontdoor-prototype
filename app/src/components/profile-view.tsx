@@ -4,8 +4,10 @@ import { Avatar } from "@/components/avatar";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { addProject, requestConfirmation } from "@/actions/profile";
-import { blockMember, introduceMember, openConversation, reportMember, requestConnection, unblockMember } from "@/actions/social";
-import { roleById, roleLabel, roleShort } from "@/lib/roles";
+import { blockMember, introduceMember, openConversation, requestConnection, unblockMember } from "@/actions/social";
+import { ReportDialog } from "@/components/report-dialog";
+import { roleLabel, roleShort } from "@/lib/roles";
+import { membershipTier } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
 
@@ -49,7 +51,6 @@ export function ProfileView({
     role: string;
     tier: string;
     bio: string;
-    credentialNote: string;
     createdAt: Date;
   };
   projects: Project[];
@@ -64,11 +65,10 @@ export function ProfileView({
   blockedByThem: boolean;
 }) {
   const messagingClosed = blockedByViewer || blockedByThem;
-  const role = roleById(member.role);
+  const shownTier = membershipTier(member.tier);
   const tiers = [
-    ["INVITED", "Invited by a member; light checks at application."],
-    ["VERIFIED", "Role credential checked by an admin."],
-    ["CONFIRMED", "The committee accepted a counterparty vouch."],
+    ["INVITED", "The committee accepted the application."],
+    ["CONFIRMED", "An admin accepted a vouch. This is separate from the brass Verified badge."],
   ] as const;
 
   return (
@@ -163,13 +163,7 @@ export function ProfileView({
                 </button>
               </form>
             </div>
-            <form action={reportMember} className="grid gap-2">
-              <input type="hidden" name="userId" value={member.id} />
-              <input name="reason" className={field} placeholder="Report this member to the committee" required />
-              <button className={btnOutline} type="submit">
-                Report
-              </button>
-            </form>
+            <ReportDialog userId={member.id} label="Report" />
           </div>
         )}
         <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
@@ -177,18 +171,16 @@ export function ProfileView({
           <Stat value={String(vouchCount)} label="Vouches" />
           <Stat value={tierLabel(member.tier)} label="Tier" />
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification</h2>
-        <div className="rounded border border-line border-l-[3px] border-l-brass bg-paper px-3 py-2">
-          <small className="text-[10.5px] uppercase tracking-wide text-mut">{role?.credentialLabel}</small>
-          <b className="mt-0.5 block text-[13px] font-medium">{member.credentialNote || "Credential on file"}</b>
-        </div>
-        <h2 className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification tier</h2>
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership tier</h2>
+        <p className="mb-2 text-xs leading-relaxed text-ink">
+          Tier is Invited or Confirmed. The brass Verified badge is a separate committee file. A Confirmed member can still show “Verification in progress” while that file is open.
+        </p>
         <div className="overflow-hidden rounded border border-line">
           {tiers.map(([id, copy]) => (
-            <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${member.tier === id ? "border-l-[3px] border-l-brass bg-brass-soft" : ""}`}>
+            <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${shownTier === id ? "border-l-[3px] border-l-brass bg-brass-soft" : ""}`}>
               <TierBadge tier={id} />
               <small className="text-[11px] leading-snug text-mut">
-                {member.tier === id ? <b className="text-forest">Current tier. </b> : null}
+                {shownTier === id ? <b className="text-forest">Current tier. </b> : null}
                 {copy}
               </small>
             </div>
@@ -198,9 +190,9 @@ export function ProfileView({
           <b>How verification works</b>
           <ol className="mt-1 list-decimal pl-4">
             <li>Invite code from an existing member.</li>
-            <li>Credential check for this role: {role?.check}.</li>
+            <li>A business card is optional. The committee matches it to public records.</li>
             <li>The committee verifies the file. Naming someone who can speak for you is optional.</li>
-            <li>The committee finishes the file before a project is open to counterparties. A vouch is reviewed before Confirmed.</li>
+            <li>A project can request a vouch only after that project file is Verified. Confirmed follows an accepted vouch.</li>
           </ol>
         </div>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>
@@ -236,6 +228,11 @@ export function ProfileView({
                         </div>
                       ))
                     : null}
+                  {isSelf && !canOpenProjectToCounterparties(project.verification) ? (
+                    <p className="mt-2 text-xs leading-relaxed text-ink">
+                      A vouch cannot be requested until the committee marks this project Verified. Until then, counterparties cannot confirm it.
+                    </p>
+                  ) : null}
                   {isSelf && canOpenProjectToCounterparties(project.verification) ? (
                     <form action={requestConfirmation} className="mt-2 grid gap-2">
                       <input type="hidden" name="projectId" value={project.id} />

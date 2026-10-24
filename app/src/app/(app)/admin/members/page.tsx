@@ -4,7 +4,7 @@ import { TierBadge } from "@/components/badge";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
-import { TIERS } from "@/lib/domain";
+import { MEMBERSHIP_TIERS, membershipTier } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -25,7 +25,7 @@ export default async function MembersAdminPage({
       <MobileTitle href="/admin" label="Admin" title="Members" />
       <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
       <PageHeader title="Members" />
-      <p className="mt-1 text-sm text-ink">Set Invited, Verified, or Confirmed. Counterparty vouches also promote a member to Confirmed.</p>
+      <p className="mt-1 text-sm text-ink">Membership tier is Invited or Confirmed. Confirmed requires an accepted vouch. The brass Verified badge is a separate committee file.</p>
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>
@@ -45,8 +45,8 @@ export default async function MembersAdminPage({
             </div>
             <form action={setMemberTier} className="flex items-center gap-2">
               <input type="hidden" name="userId" value={member.id} />
-              <select name="tier" defaultValue={member.tier} className={field}>
-                {TIERS.map((tier) => (
+              <select name="tier" defaultValue={membershipTier(member.tier)} className={field}>
+                {MEMBERSHIP_TIERS.map((tier) => (
                   <option key={tier} value={tier}>
                     {tierLabel(tier)}
                   </option>

@@ -86,7 +86,6 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       role: member.role,
       tier: member.tier,
       bio: member.bio,
-      credentialNote: member.credentialNote,
       createdAt: member.createdAt,
     },
     projects,

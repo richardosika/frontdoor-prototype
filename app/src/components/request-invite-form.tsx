@@ -7,7 +7,7 @@ import { ROLES } from "@/lib/roles";
 export function RequestInviteForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [statusUrl, setStatusUrl] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,20 +27,25 @@ export function RequestInviteForm() {
         website: form.get("website"),
       }),
     });
+    const payload = (await response.json().catch(() => null)) as { error?: string; statusUrl?: string } | null;
     setPending(false);
     if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       setError(payload?.error || "Could not send that request.");
       return;
     }
-    setDone(true);
+    setStatusUrl(payload?.statusUrl || "received");
   }
 
-  if (done) {
+  if (statusUrl) {
     return (
-      <p className="mt-4 text-sm text-ink">
-        Request received. If the committee issues a code, someone will pass it to you. Private Floor does not email invite codes.
-      </p>
+      <div className="mt-4 text-sm text-ink">
+        <p>Request received. Keep this private status link. It shows pending, issued, or declined, and it does not include an invite code. Private Floor does not email codes.</p>
+        {statusUrl.startsWith("http") ? (
+          <a className="mt-2 block break-all text-forest underline" href={statusUrl}>
+            {statusUrl}
+          </a>
+        ) : null}
+      </div>
     );
   }
 

@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { blockMember, reportMember, sendMessage, unblockMember } from "@/actions/social";
+import { blockMember, sendMessage, unblockMember } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { ConversationList } from "@/components/conversation-list";
+import { ReportDialog } from "@/components/report-dialog";
 import { btn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { listConversations } from "@/lib/conversations";
+import { isSystemNotice, systemNoticeLabel } from "@/lib/messaging";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 
@@ -95,6 +97,14 @@ export default async function ThreadPage({
           <Banner error={query.error} />
           {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">Say hello to {other.name}.</p> : null}
           {conversation.messages.map((message) => {
+            if (isSystemNotice(message.kind)) {
+              return (
+                <article key={message.id} className="rounded border border-brass border-l-4 bg-cream px-3 py-3 text-sm text-ink">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brass">System · {systemNoticeLabel(message.kind)}</p>
+                  <p className="mt-1 leading-snug">{message.body}</p>
+                </article>
+              );
+            }
             const mine = message.senderId === user.id;
             return (
               <div
@@ -108,27 +118,20 @@ export default async function ThreadPage({
             );
           })}
         </div>
-        {messagingClosed ? (
-          <p className="border-t border-line bg-paper p-3 text-sm text-mut">Messaging is closed between these members.</p>
-        ) : (
-          <div className="border-t border-line bg-paper p-3">
-            <form action={sendMessage} className="flex gap-2">
+        <div className="border-t border-line bg-paper p-3">
+          {messagingClosed ? (
+            <p className="mb-3 text-sm text-mut">Messaging is closed between these members.</p>
+          ) : (
+            <form action={sendMessage} className="mb-3 flex gap-2">
               <input type="hidden" name="conversationId" value={conversation.id} />
               <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
               <button className={btn} type="submit">
                 Send
               </button>
             </form>
-            <form action={reportMember} className="mt-2 flex gap-2">
-              <input type="hidden" name="userId" value={other.id} />
-              <input type="hidden" name="conversationId" value={conversation.id} />
-              <input name="reason" className={field} placeholder="Report this conversation" required />
-              <button className={btn} type="submit">
-                Report
-              </button>
-            </form>
-          </div>
-        )}
+          )}
+          <ReportDialog userId={other.id} conversationId={conversation.id} label="Report" />
+        </div>
       </section>
     </div>
   );

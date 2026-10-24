@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { checkInvite, submitApplication } from "@/actions/apply";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -21,7 +21,7 @@ export function ApplyWizard() {
   const [password, setPassword] = useState("");
   const [org, setOrg] = useState("");
   const [location, setLocation] = useState("");
-  const [credentialValue, setCredentialValue] = useState("");
+  const cardRef = useRef<HTMLInputElement>(null);
   const [referenceEmail, setReferenceEmail] = useState("");
   const [referenceEmail2, setReferenceEmail2] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,20 +45,22 @@ export function ApplyWizard() {
   async function submit() {
     setPending(true);
     setError("");
-    const result = await submitApplication({
-      code,
-      role,
-      name,
-      email,
-      password,
-      org,
-      location,
-      credentialValue,
-      referenceEmails: [referenceEmail, referenceEmail2],
-      phone,
-      linkedinUrl,
-      statement,
-    });
+    const data = new FormData();
+    data.set("code", code);
+    data.set("role", role);
+    data.set("name", name);
+    data.set("email", email);
+    data.set("password", password);
+    data.set("org", org);
+    data.set("location", location);
+    data.set("referenceEmail", referenceEmail);
+    data.set("referenceEmail2", referenceEmail2);
+    data.set("phone", phone);
+    data.set("linkedinUrl", linkedinUrl);
+    data.set("statement", statement);
+    const file = cardRef.current?.files?.[0];
+    if (file) data.set("businessCard", file);
+    const result = await submitApplication(data);
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -138,7 +140,7 @@ export function ApplyWizard() {
           <div className="space-y-3">
             <h1 className="font-serif text-xl">Your details</h1>
             <p className="text-sm text-ink">
-              Name, email, password, company, city, and the licence or ID for this role. References are optional. The committee checks the file internally.
+              Name, email, password, company, and city. A business card is optional and encouraged. References are optional. The committee checks the file internally.
             </p>
             <div className="rounded-sm border border-brass px-3 py-2 text-sm">
               {code.toUpperCase()} <span className="float-right text-brass">Accepted</span>
@@ -168,14 +170,11 @@ export function ApplyWizard() {
               <input className={field} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Newark, NJ" />
             </div>
             <div>
-              <label className={labelCls}>{selected.credentialLabel}</label>
-              <input
-                className={field}
-                value={credentialValue}
-                onChange={(event) => setCredentialValue(event.target.value)}
-                placeholder={selected.credentialPlaceholder}
-              />
-              <p className="mt-1 text-[11px] text-mut">We check: {selected.check}.</p>
+              <label className={labelCls}>Business card (optional, encouraged)</label>
+              <input ref={cardRef} className={field} type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" />
+              <p className="mt-1 text-[11px] text-mut">
+                JPG, PNG, or PDF, up to 5 MB. The committee matches it to public records. Other members never see the file.
+              </p>
             </div>
             <div>
               <label className={labelCls}>Phone (committee only)</label>
@@ -203,7 +202,7 @@ export function ApplyWizard() {
                 Back
               </button>
               <button className={`${btn} flex-1`} type="button" disabled={pending} onClick={submit}>
-                Submit application
+                {pending ? "Submitting…" : "Submit application"}
               </button>
             </div>
           </div>
@@ -220,7 +219,7 @@ export function ApplyWizard() {
             <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-left text-sm">
               <b>What happens next</b>
               <p className="mt-1 text-ink">
-                1. The committee checks the licence or ID: {selected.check}
+                1. The committee matches a business card to public records when one was uploaded
                 <br />
                 2. They verify the file internally. You do not need to name anyone.
                 <br />

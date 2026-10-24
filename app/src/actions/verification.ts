@@ -105,3 +105,37 @@ export async function updateVerificationCheck(formData: FormData) {
   revalidatePath("/admin/verification");
   redirect(`${back}?notice=Checklist+saved`);
 }
+
+export async function deleteBusinessCard(formData: FormData) {
+  const admin = await requireVerificationAdmin();
+  const caseId = String(formData.get("caseId") || "");
+  const back = `/admin/verification/${caseId}`;
+  const record = await prisma.verificationCase.findUnique({ where: { id: caseId } });
+  if (!record) notFound();
+  if (record.status !== "VERIFIED" || !record.userId) {
+    redirect(`${back}?error=${encodeURIComponent("Delete the business card after the member file is marked Verified.")}`);
+  }
+  const card = await prisma.businessCard.findUnique({ where: { userId: record.userId } });
+  if (!card || card.deletedAt) redirect(`${back}?error=${encodeURIComponent("No business card is on file.")}`);
+
+  await prisma.businessCard.update({
+    where: { id: card.id },
+    data: {
+      bytes: Buffer.alloc(0),
+      sizeBytes: 0,
+      deletedAt: new Date(),
+      deletedById: admin.id,
+    },
+  });
+  await prisma.verificationEvent.create({
+    data: {
+      caseId: record.id,
+      actorId: admin.id,
+      fromStatus: record.status,
+      toStatus: record.status,
+      summary: `${admin.name} deleted the business card after verification.`,
+    },
+  });
+  revalidatePath(back);
+  redirect(`${back}?notice=${encodeURIComponent("Business card deleted.")}`);
+}

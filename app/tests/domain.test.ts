@@ -15,10 +15,13 @@ import {
   storedSizeBand,
   tierAfterAdminApprovesVouch,
   tierAfterCounterpartyConfirm,
+  membershipTier,
   validateApplication,
 } from "@/lib/domain";
+import { plural, tierLabel } from "@/lib/format";
 import { shouldDiscardInviteRequest, validateInviteRequest, INVITE_REQUESTS_PER_EMAIL_PER_DAY } from "@/lib/invite-request";
 import { withinRateLimit } from "@/lib/messaging";
+import { GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, PENDING_APPROVAL_ERROR, signInFailureCopy } from "@/lib/sign-in";
 import { ROLE_IDS, ROLES, roleLabel } from "@/lib/roles";
 
 const BRIEF_LABELS = [
@@ -187,7 +190,6 @@ describe("network and verification", () => {
         password: "long-enough",
         org: "Analytical Engines",
         location: "Newark, NJ",
-        credentialValue: "Entity 123",
         referenceEmails: [],
       }),
     ).toEqual([]);
@@ -200,7 +202,6 @@ describe("network and verification", () => {
         password: "long-enough",
         org: "Analytical Engines",
         location: "Newark, NJ",
-        credentialValue: "Entity 123",
       }).some((error) => /reference/i.test(error)),
     ).toBe(false);
     expect(
@@ -212,7 +213,6 @@ describe("network and verification", () => {
         password: "long-enough",
         org: "Analytical Engines",
         location: "Newark, NJ",
-        credentialValue: "Entity 123",
         referenceEmails: ["not-an-email"],
       }),
     ).toEqual(["Leave reference emails blank, or enter a valid email."]);
@@ -224,7 +224,6 @@ describe("network and verification", () => {
       password: "short",
       org: "",
       location: "",
-      credentialValue: "",
       referenceEmails: [],
     }).length).toBeGreaterThan(3);
   });
@@ -244,6 +243,60 @@ describe("network and verification", () => {
     expect(shouldDiscardInviteRequest("")).toBe(false);
     expect(withinRateLimit(INVITE_REQUESTS_PER_EMAIL_PER_DAY, INVITE_REQUESTS_PER_EMAIL_PER_DAY)).toBe(false);
     expect(withinRateLimit(INVITE_REQUESTS_PER_EMAIL_PER_DAY - 1, INVITE_REQUESTS_PER_EMAIL_PER_DAY)).toBe(true);
+  });
+
+  it("keeps membership tier separate from the verified badge", () => {
+    expect(membershipTier("VERIFIED")).toBe("INVITED");
+    expect(membershipTier("CONFIRMED")).toBe("CONFIRMED");
+    expect(tierLabel("VERIFIED")).toBe("Invited");
+    expect(tierLabel("INVITED")).toBe("Invited");
+    expect(tierLabel("CONFIRMED")).toBe("Confirmed");
+    expect(plural(1, "investor")).toBe("1 investor");
+    expect(plural(0, "investor")).toBe("0 investors");
+    expect(ROLES.every((role) => !/licen[cs]e|nmls|bar id|id number/i.test(`${role.credentialLabel} ${role.credentialPlaceholder} ${role.check}`))).toBe(true);
+  });
+
+  it("mentions a pending application only after the password matches", () => {
+    expect(
+      signInFailureCopy({
+        memberFound: false,
+        memberPasswordMatches: false,
+        memberActive: false,
+        pendingApplicationPasswordMatches: true,
+      }),
+    ).toBe(PENDING_APPROVAL_ERROR);
+    expect(
+      signInFailureCopy({
+        memberFound: false,
+        memberPasswordMatches: false,
+        memberActive: false,
+        pendingApplicationPasswordMatches: false,
+      }),
+    ).toBe(GENERIC_SIGN_IN_ERROR);
+    expect(
+      signInFailureCopy({
+        memberFound: true,
+        memberPasswordMatches: false,
+        memberActive: true,
+        pendingApplicationPasswordMatches: true,
+      }),
+    ).toBe(GENERIC_SIGN_IN_ERROR);
+    expect(
+      signInFailureCopy({
+        memberFound: true,
+        memberPasswordMatches: true,
+        memberActive: false,
+        pendingApplicationPasswordMatches: false,
+      }),
+    ).toBe(INACTIVE_ACCOUNT_ERROR);
+    expect(
+      signInFailureCopy({
+        memberFound: true,
+        memberPasswordMatches: true,
+        memberActive: true,
+        pendingApplicationPasswordMatches: false,
+      }),
+    ).toBeNull();
   });
 
   it("builds initials and role labels", () => {

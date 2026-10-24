@@ -61,7 +61,7 @@ const people: Person[] = [
     role: "FAMILY_OFFICE",
     org: "Kim Family Office",
     location: "New York, NY",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Accredited-investor attestation · family office entity records on file",
     bio: "Direct investor in Tri-State multifamily. Fictional.",
   },
@@ -73,7 +73,7 @@ const people: Person[] = [
     role: "GENERAL_CONTRACTOR",
     org: "Voss & Reed",
     location: "Hoboken, NJ",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "NJ GC registration active · insurance and bonding on file",
     bio: "Ground-up and renovation GC. Fictional.",
   },
@@ -86,7 +86,7 @@ const people: Person[] = [
     org: "Garden State Bridge",
     location: "Princeton, NJ",
     tier: "INVITED",
-    credentialNote: "NJ lender license (fictional) · NMLS lookup matched",
+    credentialNote: "Business card matched to public records",
     bio: "Bridge and construction debt. Fictional.",
   },
   {
@@ -97,7 +97,7 @@ const people: Person[] = [
     role: "INVESTOR_PE",
     org: "Nguyen Capital",
     location: "Jersey City, NJ",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Accredited-investor attestation · fund entity records on file",
     bio: "Private equity checks from $100K. Fictional.",
   },
@@ -109,8 +109,8 @@ const people: Person[] = [
     role: "BROKER",
     org: "Park Atlantic",
     location: "Hackensack, NJ",
-    tier: "VERIFIED",
-    credentialNote: "NJ broker license active · lookup matched",
+    tier: "INVITED",
+    credentialNote: "Business card matched to public records",
     bio: "Investment sales. Fictional.",
   },
   {
@@ -121,7 +121,7 @@ const people: Person[] = [
     role: "DEVELOPER",
     org: "Whitfield Urban",
     location: "Brooklyn, NY",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Whitfield Urban LLC · NY entity in good standing",
     bio: "Adaptive reuse in Brooklyn. Fictional.",
   },
@@ -133,7 +133,7 @@ const people: Person[] = [
     role: "RE_ATTORNEY",
     org: "Cole Brandt LLP",
     location: "Morristown, NJ",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Admitted to NJ Bar (2012) and NY Bar (2013) · good standing",
     bio: "Closings and leases. Fictional.",
   },
@@ -157,7 +157,7 @@ const people: Person[] = [
     role: "ZONING_ATTORNEY",
     org: "Weiss Land Use PC",
     location: "Newark, NJ",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Admitted to NJ Bar (2010) · land-use board appearances reviewed",
     bio: "Variances and land use. Fictional.",
   },
@@ -170,7 +170,7 @@ const people: Person[] = [
     org: "Liu Studio Architects",
     location: "Jersey City, NJ",
     tier: "CONFIRMED",
-    credentialNote: "NJ Registered Architect · state board license active",
+    credentialNote: "Business card matched to public records",
     bio: "Multifamily and adaptive reuse. Fictional.",
   },
   {
@@ -181,8 +181,8 @@ const people: Person[] = [
     role: "INSURANCE",
     org: "Pratt Surety & Risk",
     location: "Parsippany, NJ",
-    tier: "VERIFIED",
-    credentialNote: "NJ insurance producer license active · surety appointments confirmed",
+    tier: "INVITED",
+    credentialNote: "Business card matched to public records",
     bio: "Builder's risk, title, and surety. Fictional.",
   },
   {
@@ -193,8 +193,8 @@ const people: Person[] = [
     role: "MORTGAGE_BROKER",
     org: "Torres Capital Advisors",
     location: "Hoboken, NJ",
-    tier: "VERIFIED",
-    credentialNote: "NMLS ID active · NJ mortgage broker license matched",
+    tier: "INVITED",
+    credentialNote: "Business card matched to public records",
     bio: "Places loans for sponsors. Fictional.",
   },
   {
@@ -205,8 +205,8 @@ const people: Person[] = [
     role: "APPRAISER",
     org: "Alvarez Valuation Group",
     location: "Edison, NJ",
-    tier: "VERIFIED",
-    credentialNote: "NJ Certified General Appraiser · ASC registry lookup matched",
+    tier: "INVITED",
+    credentialNote: "Business card matched to public records",
     bio: "Commercial appraisals. Fictional.",
   },
   {
@@ -218,7 +218,7 @@ const people: Person[] = [
     org: "Singh Property Partners",
     location: "Newark, NJ",
     tier: "INVITED",
-    credentialNote: "Entity records checked · licence on file",
+    credentialNote: "No business card uploaded",
     bio: "Multifamily operations. Fictional.",
   },
   {
@@ -229,8 +229,8 @@ const people: Person[] = [
     role: "ACCOUNTANT",
     org: "Moore & Lind CPAs",
     location: "New York, NY",
-    tier: "VERIFIED",
-    credentialNote: "NJ and NY CPA licenses active · cost seg practice reviewed",
+    tier: "INVITED",
+    credentialNote: "Prior business card on file",
     bio: "Cost segregation. Fictional.",
   },
   {
@@ -241,7 +241,7 @@ const people: Person[] = [
     role: "EXCHANGE_1031",
     org: "Katz Exchange Services",
     location: "Princeton, NJ",
-    tier: "VERIFIED",
+    tier: "INVITED",
     credentialNote: "Qualified intermediary entity checked · fidelity bond and E&O on file",
     bio: "1031 intermediary. Fictional.",
   },
@@ -259,6 +259,7 @@ async function main() {
     await prisma.moderationEvent.deleteMany();
     await prisma.report.deleteMany();
     await prisma.block.deleteMany();
+    await prisma.businessCard.deleteMany();
     await prisma.verificationEvent.deleteMany();
     await prisma.verificationCheck.deleteMany();
     await prisma.verificationCase.deleteMany();
@@ -326,7 +327,7 @@ async function main() {
       role: "ARCHITECT_ENGINEER",
       org: "Ellis Atelier",
       location: "Jersey City, NJ",
-      credentialValue: "NJ architect license no. 21AI001234 (fictional)",
+      credentialValue: "No business card uploaded",
       referenceEmails: [],
       statement: "",
       statusToken: "demo-jordan-ellis-status",
@@ -343,6 +344,7 @@ async function main() {
       location: "Jersey City, NJ",
       note: "Bridge lender looking for a code.",
       status: "PENDING",
+      statusToken: "demo-chris-invite-status",
     },
   });
 
@@ -506,7 +508,7 @@ async function main() {
       sponsorId: "user_dw",
       kind: "SEEKING",
       title: "Design team for 64-unit conversion, Brooklyn NY",
-      blurb: "Seeking a NY-licensed architect and structural engineer. State license required.",
+      blurb: "Seeking an architect and a structural engineer for the conversion.",
       market: "NY",
       sizeBand: "scope",
       assetClass: "Multifamily",
@@ -534,7 +536,7 @@ async function main() {
       sponsorId: "user_pa",
       kind: "SEEKING",
       title: "Construction loan for storage expansion, Edison NJ",
-      blurb: "Seeking a licensed lender for a construction facility on a fourth storage building.",
+      blurb: "Seeking a lender for a construction facility on a fourth storage building.",
       market: "NJ",
       sizeBand: "1-5",
       assetClass: "Storage",
@@ -832,16 +834,16 @@ async function seedVerification() {
     },
   );
 
-  await setCase({ userId: "user_rk" }, "IN_REVIEW", "Identity matched. License and screen still open.");
+  await setCase({ userId: "user_rk" }, "IN_REVIEW", "Identity matched. Business card and screen still open.");
   await setCheck({ userId: "user_rk" }, "identity", "PASS", "LinkedIn and legal name match.", "https://example.com/rachel-linkedin");
 
-  await setCase({ userId: "user_ev" }, "NEEDS_INFO", "Asked for the NJ license number after the lookup missed.");
+  await setCase({ userId: "user_ev" }, "NEEDS_INFO", "Business card did not match the public record for this name.");
   await setCheck(
     { userId: "user_ev" },
     "license",
     "NEEDS_INFO",
-    "NJ license lookup did not match the name on the file.",
-    "https://example.com/nj-license-lookup",
+    "Public-record match did not line up with the business card.",
+    "https://example.com/public-record",
   );
 
   await setCase({ userId: "user_bk" }, "REJECTED", "Sanctions screen did not clear. Internal only.");

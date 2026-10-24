@@ -7,10 +7,27 @@ export function timeAgo(date: Date, now = new Date()): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+export const AUDIT_TIME_ZONE = "America/New_York";
+
 export function tierLabel(tier: string): string {
   if (tier === "CONFIRMED") return "Confirmed";
-  if (tier === "VERIFIED") return "Verified";
   return "Invited";
+}
+
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+export function formatAuditTime(date: Date): string {
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    timeZone: AUDIT_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  return `${formatted} (${AUDIT_TIME_ZONE})`;
 }
 
 export function dealsQuery(input: {

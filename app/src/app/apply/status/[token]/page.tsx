@@ -37,9 +37,8 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
         <div className="px-6 py-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{BRAND.name}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
-          <p className="mt-2 text-sm text-ink">
-            {application.name}, {copy.body}
-          </p>
+          <p className="mt-2 font-serif text-lg">{application.name}</p>
+          <p className="mt-1 text-sm text-ink">{copy.body}</p>
           {application.reviewerNote ? (
             <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm text-ink">
               <b>Note from the committee</b>

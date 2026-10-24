@@ -1,6 +1,21 @@
 export const MESSAGE_KINDS = ["TEXT", "INTRO", "CONNECTION", "ACCESS", "VOUCH", "DEAL"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
+/** Notices the product posts on a member's behalf. They render as cards, not chat bubbles. */
+export const SYSTEM_NOTICE_KINDS = ["CONNECTION", "ACCESS", "VOUCH", "DEAL"] as const;
+
+export function isSystemNotice(kind: string): boolean {
+  return (SYSTEM_NOTICE_KINDS as readonly string[]).includes(kind);
+}
+
+export function systemNoticeLabel(kind: string): string {
+  if (kind === "ACCESS") return "Access";
+  if (kind === "DEAL") return "Deal room";
+  if (kind === "CONNECTION") return "Connection";
+  if (kind === "VOUCH") return "Vouch";
+  return "Notice";
+}
+
 export const RATE_LIMITS = {
   messagesPerHour: 30,
   introductionsPerDay: 20,

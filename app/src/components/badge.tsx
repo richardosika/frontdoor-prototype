@@ -11,17 +11,9 @@ export function TierBadge({ tier }: { tier: string }) {
       </span>
     );
   }
-  if (tier === "INVITED") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-sm border border-mut px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-mut">
-        <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-mut text-[8px] text-paper">○</span>
-        {label}
-      </span>
-    );
-  }
   return (
-    <span className="inline-flex items-center gap-1 rounded-sm border border-brass px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-forest">
-      <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-brass text-[8px] text-paper">✓</span>
+    <span className="inline-flex items-center gap-1 rounded-sm border border-mut px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-mut">
+      <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-mut text-[8px] text-paper">○</span>
       {label}
     </span>
   );

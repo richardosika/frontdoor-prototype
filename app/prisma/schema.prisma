@@ -152,6 +152,7 @@ model User {
   reportsMade          Report[]            @relation("ReportsMade")
   reportsReceived      Report[]            @relation("ReportsReceived")
   moderationEvents     ModerationEvent[]
+  businessCard         BusinessCard?
 }
 
 model InviteCode {
@@ -177,6 +178,7 @@ model InviteRequest {
   location     String
   note         String              @default("")
   status       InviteRequestStatus @default(PENDING)
+  statusToken  String              @unique
   inviteCodeId String?
   inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
   createdAt    DateTime            @default(now())
@@ -208,6 +210,7 @@ model Application {
   reviewer        User?             @relation("Reviewer", fields: [reviewerId], references: [id])
   userId          String?           @unique
   user            User?             @relation("ApplicantUser", fields: [userId], references: [id])
+  businessCard    BusinessCard?
   createdAt       DateTime          @default(now())
 
   @@index([status])
@@ -483,6 +486,21 @@ model ModerationEvent {
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model BusinessCard {
+  id            String       @id @default(cuid())
+  applicationId String       @unique
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userId        String?      @unique
+  user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  contentType   String
+  sizeBytes     Int
+  bytes         Bytes
+  uploadedAt    DateTime     @default(now())
+  deletedAt     DateTime?
+  deletedById   String?
 }
 
 model DealEvent {

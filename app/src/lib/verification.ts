@@ -21,7 +21,7 @@ export type CheckResult = (typeof CHECK_RESULTS)[number]["id"];
 
 export const MEMBER_CHECKS = [
   { key: "identity", label: "Identity and LinkedIn match" },
-  { key: "license", label: "Company and license check (NJ license lookup)" },
+  { key: "license", label: "Match business card to public records" },
   { key: "references", label: "References and vouches" },
   { key: "sanctions", label: "Sanctions, OFAC, and litigation screen" },
   { key: "track", label: "Track-record claims" },
@@ -180,3 +180,37 @@ export function vouchEvidenceNote(input: { counterpartyName: string; projectName
 }
 
 export const PUBLIC_VERIFICATION_KEYS = ["showBadge", "verifiedOn", "expiresOn", "statusLine"] as const;
+
+export function verificationCaseHeading(input: {
+  subject: string;
+  user: { name: string; org?: string | null; location?: string | null } | null;
+  project: { name: string; location?: string | null; user?: { name: string } | null } | null;
+}): { title: string; detail: string } {
+  if (input.subject === "PROJECT") {
+    const title = input.project?.name?.trim() || "Project";
+    const owner = input.project?.user?.name?.trim() || "Owner";
+    const city = input.project?.location?.trim() || "";
+    return { title, detail: ["Project", owner, city].filter(Boolean).join(" · ") };
+  }
+  const title = input.user?.name?.trim() || "Member";
+  const org = input.user?.org?.trim() || "";
+  const city = input.user?.location?.trim() || "";
+  return { title, detail: ["Member", org, city].filter(Boolean).join(" · ") };
+}
+
+export function verificationQueueLabel(input: {
+  subject: string;
+  user: { name: string; org?: string | null; location?: string | null } | null;
+  project: { name: string; location?: string | null; user?: { name: string } | null } | null;
+}): string {
+  if (input.subject === "PROJECT") {
+    const name = input.project?.name?.trim() || "Project";
+    const owner = input.project?.user?.name?.trim() || "Owner";
+    const city = input.project?.location?.trim() || "";
+    return [name, owner, city].filter(Boolean).join(" · ");
+  }
+  const name = input.user?.name?.trim() || "Member";
+  const org = input.user?.org?.trim() || "";
+  const city = input.user?.location?.trim() || "";
+  return [name, org, city].filter(Boolean).join(" · ");
+}

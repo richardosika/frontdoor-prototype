@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:cleanup-walkthrough": "tsx prisma/cleanup-walkthrough.ts",
     "db:reset": "prisma migrate reset --force",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

@@ -8,6 +8,7 @@ import { MobileTitle } from "@/components/page-header";
 import { btn, btnOutline, dealCard } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { NDA_ACKNOWLEDGEMENT, sizeLabel } from "@/lib/domain";
+import { plural } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -70,7 +71,7 @@ export default async function DealPage({
               <span>
                 <b>{project.name}</b>
                 <span className="block text-xs text-mut">
-                  {project.location} · {project.year} · {project.confirmations.filter((item) => item.status === "CONFIRMED").length} counterparties confirmed
+                  {project.location} · {project.year} · {plural(project.confirmations.filter((item) => item.status === "CONFIRMED").length, "counterparty", "counterparties")} confirmed
                 </span>
               </span>
               <span className="font-serif">{project.valueLabel}</span>
@@ -104,14 +105,16 @@ export default async function DealPage({
             </button>
           </form>
         )}
-        <div className="mt-4 flex gap-2">
-          <form action={openConversation}>
-            <input type="hidden" name="userId" value={deal.sponsorId} />
-            <button className={btnOutline} type="submit" disabled={isSponsor}>
-              Message sponsor
-            </button>
-          </form>
-        </div>
+        {isSponsor ? null : (
+          <div className="mt-4 flex gap-2">
+            <form action={openConversation}>
+              <input type="hidden" name="userId" value={deal.sponsorId} />
+              <button className={btnOutline} type="submit">
+                Message sponsor
+              </button>
+            </form>
+          </div>
+        )}
         {isSponsor ? (
           <section className="mt-6">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Access requests</h2>

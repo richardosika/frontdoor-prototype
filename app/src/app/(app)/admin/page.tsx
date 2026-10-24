@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createInvite, declineInviteRequest, issueInviteForRequest, reviewVouch } from "@/actions/admin";
 import { Banner } from "@/components/banner";
+import { CopyCode } from "@/components/copy-code";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
@@ -13,10 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; issued?: string; issuedFor?: string }>;
 }) {
   await requireAdmin();
   const params = await searchParams;
+  const issuedCode = params.issued
+    ? await prisma.inviteCode.findUnique({ where: { code: params.issued } })
+    : null;
   const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests] = await Promise.all([
     prisma.application.count({ where: { status: "PENDING" } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
@@ -38,9 +42,15 @@ export default async function AdminPage({
   return (
     <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Admin" />
-      <p className="mt-1 text-sm text-ink">Review applications, set verification tiers, and issue invite codes.</p>
-      <div className="mt-4">
+      <p className="mt-1 text-sm text-ink">Review applications, set membership tier to Invited or Confirmed, and issue invite codes. The Verified badge is a separate file.</p>
+      <div className="mt-4 space-y-3">
         <Banner error={params.error} notice={params.notice} />
+        {issuedCode ? (
+          <CopyCode
+            code={issuedCode.code}
+            caption={`Invite code for ${params.issuedFor || "this request"}. Pass it along. Private Floor does not email codes.`}
+          />
+        ) : null}
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat href="/admin/applications" label="Pending applications" value={pending} />
@@ -50,8 +60,8 @@ export default async function AdminPage({
         <Stat href="/admin/messages" label="Reports for review" value={openReports} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <Mini label="Invited" value={tierCount("INVITED")} />
-        <Mini label="Verified" value={tierCount("VERIFIED")} />
+        <Mini label="Invited" value={tierCount("INVITED") + tierCount("VERIFIED")} />
+        <Mini label="Confirmed" value={tierCount("CONFIRMED")} />
         <Mini label="Posts" value={posts} />
       </div>
       <section className={`${card} mt-6 p-4`}>
