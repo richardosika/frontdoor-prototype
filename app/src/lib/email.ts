@@ -1,4 +1,4 @@
-import { BRAND } from "@/lib/brand";
+import { sendNotice } from "@/lib/notices";
 
 export type EmailMessage = {
   to: string;
@@ -7,14 +7,14 @@ export type EmailMessage = {
 };
 
 /**
- * Console email adapter. Messages are written to the server log so the
- * confirmation and application flows work without an email provider.
+ * Every notice on this test build is logged and stored in the admin Outbox.
+ * Delivery is limited to NOTICE_TEST_RECIPIENT. Applicants are never emailed.
  */
-export async function sendEmail(message: EmailMessage): Promise<{ delivered: "console" }> {
-  console.log(`\n----- ${BRAND.name} email (console adapter) -----`);
-  console.log(`To: ${message.to}`);
-  console.log(`Subject: ${message.subject}`);
-  console.log(message.text);
-  console.log("---------------------------------------------\n");
-  return { delivered: "console" };
+export async function sendEmail(message: EmailMessage): Promise<{ delivered: "outbox"; id: string }> {
+  const result = await sendNotice({
+    intendedTo: message.to,
+    subject: message.subject,
+    text: message.text,
+  });
+  return { delivered: "outbox", id: result.id };
 }

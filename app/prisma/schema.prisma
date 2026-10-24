@@ -39,8 +39,38 @@ enum AccountStatus {
 
 enum ApplicationStatus {
   PENDING
+  SUBMITTED
+  IN_REVIEW
+  NEEDS_INFO
   APPROVED
   REJECTED
+  DECLINED
+}
+
+enum Verdict {
+  LEGIT
+  NOT_LEGIT
+  NEEDS_OWNER_DECISION
+}
+
+enum EvidenceStatus {
+  PASS
+  FAIL
+  INCONCLUSIVE
+  NOT_RUN
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum RunSubject {
+  APPLICATION
+  COMPANY
+  PROJECT
 }
 
 enum PostKind {
@@ -124,6 +154,7 @@ model User {
   isAdmin        Boolean          @default(false)
   status         AccountStatus    @default(ACTIVE)
   seenWelcome    Boolean          @default(false)
+  isTest         Boolean          @default(false)
   createdAt      DateTime         @default(now())
 
   posts                Post[]
@@ -153,6 +184,8 @@ model User {
   reportsReceived      Report[]            @relation("ReportsReceived")
   moderationEvents     ModerationEvent[]
   businessCard         BusinessCard?
+  legalAcceptances     LegalAcceptance[]
+  applicationDecisions ApplicationDecision[] @relation("DecisionActor")
 }
 
 model InviteCode {
@@ -202,19 +235,32 @@ model Application {
   phone           String            @default("")
   linkedinUrl     String            @default("")
   statement       String            @default("")
+  website         String            @default("")
+  socialLinks     String            @default("")
   statusToken     String            @unique
   status          ApplicationStatus @default(PENDING)
   reviewerNote    String            @default("")
+  internalNote    String            @default("")
   reviewedAt      DateTime?
   reviewerId      String?
   reviewer        User?             @relation("Reviewer", fields: [reviewerId], references: [id])
   userId          String?           @unique
   user            User?             @relation("ApplicantUser", fields: [userId], references: [id])
+  emailVerifiedAt DateTime?
+  duesCents       Int               @default(0)
+  duesWaived      Boolean           @default(true)
+  isTest          Boolean           @default(false)
+  testProfile     String            @default("")
   businessCard    BusinessCard?
+  runs            VerificationRun[]
+  decisions       ApplicationDecision[]
+  notices         OutboxNotice[]
+  legalAcceptances LegalAcceptance[]
   createdAt       DateTime          @default(now())
 
-  @@index([status])
+  @@index([status, createdAt])
   @@index([email])
+  @@index([isTest])
 }
 
 model TrackProject {
@@ -501,6 +547,101 @@ model BusinessCard {
   uploadedAt    DateTime     @default(now())
   deletedAt     DateTime?
   deletedById   String?
+}
+
+model EmailChallenge {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model LegalAcceptance {
+  id            String       @id @default(cuid())
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email         String
+  document      String
+  version       String
+  acceptedAt    DateTime     @default(now())
+  ipHash        String       @default("")
+
+  @@index([applicationId])
+  @@index([userId])
+}
+
+model OutboxNotice {
+  id            String       @id @default(cuid())
+  intendedTo    String
+  deliveredTo   String
+  subject       String
+  body          String
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+
+  @@index([createdAt])
+}
+
+model ApplicationDecision {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?       @relation("DecisionActor", fields: [actorId], references: [id])
+  decision      String
+  reason        String      @default("")
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+model VerificationRun {
+  id            String        @id @default(cuid())
+  subject       RunSubject
+  status        RunStatus     @default(PENDING)
+  applicationId String?
+  application   Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  projectId     String?
+  companyName   String        @default("")
+  score         Int?
+  verdict       Verdict?
+  summary       String        @default("")
+  error         String        @default("")
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  evidence      VerificationEvidence[]
+
+  @@index([applicationId, createdAt])
+  @@index([status])
+}
+
+model VerificationEvidence {
+  id       String         @id @default(cuid())
+  runId    String
+  run      VerificationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  checkKey String
+  status   EvidenceStatus
+  weight   Int            @default(0)
+  finding  String
+  source   String
+  url      String         @default("")
+  ranAt    DateTime       @default(now())
+
+  @@index([runId])
+}
+
+model SourceCache {
+  key       String   @id
+  fetchedAt DateTime @default(now())
+  body      String
 }
 
 model DealEvent {
