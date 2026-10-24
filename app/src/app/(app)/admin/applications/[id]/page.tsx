@@ -152,7 +152,7 @@ export default async function ApplicationDetailPage({
             className={btnOutline}
             label={report ? "Re-run verification" : "Run verification"}
             pendingLabel="Running verification…"
-            run={() => rerunVerification(application.id)}
+            run={rerunVerification.bind(null, application.id)}
           />
           <p className="mt-2 text-xs text-mut">Re-run uses live free sources and can take a minute. Sample LEGIT rows use offline fixtures until you re-run.</p>
         </div>
@@ -205,7 +205,7 @@ export default async function ApplicationDetailPage({
               label="Delete this applicant and all their data"
               pendingLabel="Deleting…"
               confirmMessage={`Delete ${application.name} and all of their data? This cannot be undone.`}
-              run={() => deleteOneApplication(application.id)}
+              run={deleteOneApplication.bind(null, application.id)}
             />
           </div>
         </section>
