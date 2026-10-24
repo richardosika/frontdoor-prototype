@@ -98,6 +98,13 @@ enum VerificationCheckResult {
   PASS
   FAIL
   NEEDS_INFO
+  NOT_PROVIDED
+}
+
+enum InviteRequestStatus {
+  PENDING
+  ISSUED
+  DECLINED
 }
 
 model User {
@@ -158,6 +165,24 @@ model InviteCode {
   createdById  String?
   createdBy    User?         @relation(fields: [createdById], references: [id])
   applications Application[]
+  inviteRequests InviteRequest[]
+}
+
+model InviteRequest {
+  id           String              @id @default(cuid())
+  name         String
+  email        String
+  role         MemberRole
+  org          String
+  location     String
+  note         String              @default("")
+  status       InviteRequestStatus @default(PENDING)
+  inviteCodeId String?
+  inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
+  createdAt    DateTime            @default(now())
+
+  @@index([status, createdAt])
+  @@index([email])
 }
 
 model Application {

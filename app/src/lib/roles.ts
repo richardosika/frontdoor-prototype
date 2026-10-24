@@ -39,7 +39,7 @@ export const ROLES: RoleDef[] = [
     label: "Developer",
     group: "Capital",
     blurb: "Raising capital or seeking partners",
-    credentialLabel: "Entity / project reference",
+    credentialLabel: "Entity name / ID",
     credentialPlaceholder: "Hale Row Partners LLC · NJ entity no.",
     check: "Entity good standing, deeds and permit history",
   },
@@ -158,7 +158,7 @@ export const ROLES: RoleDef[] = [
     blurb: "Operations and asset management",
     credentialLabel: "Management license / entity no.",
     credentialPlaceholder: "Entity no. · NJ broker license",
-    check: "Entity records, license where required, owner references",
+    check: "Entity records and licence where one applies",
   },
   {
     id: "ACCOUNTANT",

@@ -2,7 +2,7 @@
 
 The vetted circle for real estate deal teams. The display name is **Private Floor**. The community is the **Private Floor Club** where a longer name is needed. Both strings, the tagline, and the wordmark live in `src/lib/brand.ts`. Change that constant to rename titles, the logo, emails, and seeded copy. This app lives in `app/` and does not replace the static prototype at the repository root.
 
-Members apply with an invite code, pick one of 16 roles, and submit credentials plus references. An admin approves or rejects the application. Approved members start at **Invited**. An admin can set **Verified** or **Confirmed**. A counterparty can also confirm a track-record project from a tokenized link (no account). That vouch sets the member to **Confirmed**.
+Members apply with an invite code, pick one of 16 roles, and submit a name, email, password, company, city, and the licence or ID for that role. References are optional. An admin approves or rejects the application. Approved members start at **Invited**. An admin can set **Verified** or **Confirmed**. A counterparty can also confirm a track-record project from a tokenized link (no account). That vouch sets the member to **Confirmed**.
 
 The product does not offer securities, take subscriptions, or process payments. Deal posts are member notes. A deal room only lists people the sponsor approved after an NDA acknowledgement.
 
@@ -59,7 +59,8 @@ All people, projects, and deals are fictional.
 
 ## What you can do
 
-- Apply with an invite code, role, credential, and references.
+- Apply with an invite code, role, and licence or ID. Both reference emails and “Anyone who can speak for you?” are optional. An approved member with neither gets a verification file whose references item is Not provided, and the case stays Not started until an admin reviews it.
+- `POST /api/request-invite` with name, email, role, company, city, and a short note. A honeypot field and a per-email daily limit apply. No invite code is required. An admin issues a one-use code from `/admin` and sees it on screen. Private Floor does not email the code.
 - Admin queue at `/admin/applications`: approve (creates an Invited member) or reject.
 - Admin member list at `/admin/members`: set Invited / Verified / Confirmed. Promoting someone to Confirmed requires an accepted counterparty vouch.
 - Admin-only verification queue at `/admin/verification`. Members and anonymous callers get 404 on the pages and 403 on `/api/admin/verification` when signed in as a non-admin. Checklists, internal notes, and the audit log stay on those routes. A profile shows a Verified badge only after an admin marks the full checklist complete and the file has not expired. Otherwise members see “Verification in progress.” A project cannot collect a new counterparty vouch until its file is Verified.

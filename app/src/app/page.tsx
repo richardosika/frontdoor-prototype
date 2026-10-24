@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { RequestInviteForm } from "@/components/request-invite-form";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 
@@ -13,7 +14,7 @@ export default function HomePage() {
         <div className="flex flex-1 flex-col justify-center px-6 py-10">
           <h1 className="font-serif text-4xl font-normal leading-tight">{BRAND.tagline}</h1>
           <p className="mt-4 text-base leading-relaxed text-ink">
-            The {BRAND.club} is invite-only. Members apply with a role and references, a committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
+            The {BRAND.club} is invite-only. Members apply with a role and a licence or ID. A committee reviews them, and deal rooms open only after the sponsor approves an NDA acknowledgement.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/login" className={btn}>
@@ -23,6 +24,7 @@ export default function HomePage() {
               Apply with an invite
             </Link>
           </div>
+          <RequestInviteForm />
           <p className="mt-10 text-xs leading-relaxed text-mut">
             {BRAND.name} does not offer securities, take subscriptions, or process payments. Raising posts are member-only notes, not an offer to sell.
           </p>

@@ -218,7 +218,7 @@ const people: Person[] = [
     org: "Singh Property Partners",
     location: "Newark, NJ",
     tier: "INVITED",
-    credentialNote: "Entity records checked · owner references pending",
+    credentialNote: "Entity records checked · licence on file",
     bio: "Multifamily operations. Fictional.",
   },
   {
@@ -278,6 +278,7 @@ async function main() {
     await prisma.confirmation.deleteMany();
     await prisma.trackProject.deleteMany();
     await prisma.application.deleteMany();
+    await prisma.inviteRequest.deleteMany();
     await prisma.inviteCode.deleteMany();
     await prisma.user.deleteMany();
   }
@@ -326,9 +327,21 @@ async function main() {
       org: "Ellis Atelier",
       location: "Jersey City, NJ",
       credentialValue: "NJ architect license no. 21AI001234 (fictional)",
-      referenceEmails: ["marcus.hale@halerow.example", "grace.liu@liustudio.example"],
-      statement: `I design ground-up multifamily and would like to meet GCs already in the ${BRAND.club}.`,
+      referenceEmails: [],
+      statement: "",
       statusToken: "demo-jordan-ellis-status",
+      status: "PENDING",
+    },
+  });
+
+  await prisma.inviteRequest.create({
+    data: {
+      name: "Chris Adeyemi",
+      email: "chris.adeyemi@adeyemi.example",
+      role: "LENDER",
+      org: "Adeyemi Credit",
+      location: "Jersey City, NJ",
+      note: "Bridge lender looking for a code.",
       status: "PENDING",
     },
   });

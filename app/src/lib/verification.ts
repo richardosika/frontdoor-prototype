@@ -14,6 +14,7 @@ export const CHECK_RESULTS = [
   { id: "PASS", label: "Pass" },
   { id: "FAIL", label: "Fail" },
   { id: "NEEDS_INFO", label: "Needs info" },
+  { id: "NOT_PROVIDED", label: "Not provided" },
 ] as const;
 
 export type CheckResult = (typeof CHECK_RESULTS)[number]["id"];
@@ -36,6 +37,26 @@ export const PROJECT_CHECKS = [
 ] as const;
 
 export const VOUCH_CHECK_KEY = "references";
+
+/** An application with no named references leaves the vouch item Not provided. The case itself stays Not started. */
+export function referenceCheckForApplication(input: { referenceEmails: string[]; speaker?: string }): {
+  result: "PENDING" | "NOT_PROVIDED";
+  note: string;
+} {
+  const emails = input.referenceEmails.map((item) => item.trim()).filter(Boolean);
+  const speaker = (input.speaker ?? "").trim();
+  if (!emails.length && !speaker) {
+    return {
+      result: "NOT_PROVIDED",
+      note: "Not provided. The applicant did not name a reference. Reviewers check this internally.",
+    };
+  }
+  const parts = ["Not started."];
+  if (emails.length) parts.push(`Named emails: ${emails.join(", ")}.`);
+  if (speaker) parts.push(`Anyone who can speak for them: ${speaker}`);
+  parts.push("Reviewers check this internally.");
+  return { result: "PENDING", note: parts.join(" ") };
+}
 
 export type PublicVerification = {
   showBadge: boolean;

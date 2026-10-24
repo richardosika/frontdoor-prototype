@@ -136,8 +136,10 @@ export function ApplyWizard() {
         ) : null}
         {step === 3 && !done ? (
           <div className="space-y-3">
-            <h1 className="font-serif text-xl">Credentials and references</h1>
-            <p className="text-sm text-ink">Light checks now. Deeper checks happen when you request a deal room.</p>
+            <h1 className="font-serif text-xl">Your details</h1>
+            <p className="text-sm text-ink">
+              Name, email, password, company, city, and the licence or ID for this role. References are optional. The committee checks the file internally.
+            </p>
             <div className="rounded-sm border border-brass px-3 py-2 text-sm">
               {code.toUpperCase()} <span className="float-right text-brass">Accepted</span>
             </div>
@@ -185,15 +187,15 @@ export function ApplyWizard() {
               <p className="mt-1 text-[11px] text-mut">Other members never see your email, phone, or LinkedIn URL.</p>
             </div>
             <div>
-              <label className={labelCls}>Reference email</label>
+              <label className={labelCls}>Reference email (optional)</label>
               <input className={field} type="email" value={referenceEmail} onChange={(event) => setReferenceEmail(event.target.value)} />
             </div>
             <div>
-              <label className={labelCls}>Second reference (optional)</label>
+              <label className={labelCls}>Second reference email (optional)</label>
               <input className={field} type="email" value={referenceEmail2} onChange={(event) => setReferenceEmail2(event.target.value)} />
             </div>
             <div>
-              <label className={labelCls}>Short statement</label>
+              <label className={labelCls}>Anyone who can speak for you? (optional)</label>
               <textarea className={field} rows={3} value={statement} onChange={(event) => setStatement(event.target.value)} />
             </div>
             <div className="flex gap-2">
@@ -218,9 +220,9 @@ export function ApplyWizard() {
             <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-left text-sm">
               <b>What happens next</b>
               <p className="mt-1 text-ink">
-                1. Credential check: {selected.check}
+                1. The committee checks the licence or ID: {selected.check}
                 <br />
-                2. References reviewed with the application
+                2. They verify the file internally. You do not need to name anyone.
                 <br />
                 3. If approved, you sign in as an Invited member
               </p>

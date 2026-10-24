@@ -9,7 +9,7 @@ import {
   parseCheckResult,
   writeStatusEvent,
 } from "@/lib/verification-db";
-import { isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
+import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
 export async function updateVerificationCase(formData: FormData) {
   const admin = await requireVerificationAdmin();
@@ -97,7 +97,7 @@ export async function updateVerificationCheck(formData: FormData) {
       actorId: admin.id,
       fromStatus: record.status,
       toStatus: record.status,
-      summary: `${admin.name} set “${check.label}” to ${result === "PASS" ? "Pass" : result === "FAIL" ? "Fail" : result === "NEEDS_INFO" ? "Needs info" : "Not reviewed"}.`,
+      summary: `${admin.name} set “${check.label}” to ${checkResultLabel(result)}.`,
     },
   });
 

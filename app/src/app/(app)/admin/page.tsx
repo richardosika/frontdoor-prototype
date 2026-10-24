@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { createInvite, reviewVouch } from "@/actions/admin";
+import { createInvite, declineInviteRequest, issueInviteForRequest, reviewVouch } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
+import { roleLabel } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { isAwaitingVerification } from "@/lib/verification";
 
@@ -16,7 +17,7 @@ export default async function AdminPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [pending, members, invites, posts, access, vouches, verificationCases, openReports] = await Promise.all([
+  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests] = await Promise.all([
     prisma.application.count({ where: { status: "PENDING" } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
@@ -29,6 +30,7 @@ export default async function AdminPage({
     }),
     prisma.verificationCase.findMany({ select: { status: true, expiresAt: true } }),
     prisma.report.count(),
+    prisma.inviteRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
   ]);
   const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
@@ -74,6 +76,37 @@ export default async function AdminPage({
                   Accept vouch
                 </button>
               </form>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className={`${card} mt-6 p-4`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite requests</h2>
+        <p className="mt-1 text-sm text-ink">Approve by issuing a one-use code. The code stays on this screen. Private Floor does not email it.</p>
+        {inviteRequests.length === 0 ? <p className="mt-3 text-sm text-mut">None waiting.</p> : null}
+        <ul className="mt-3 divide-y divide-line">
+          {inviteRequests.map((request) => (
+            <li key={request.id} className="py-3 text-sm">
+              <b>{request.name}</b>
+              <span className="text-mut"> · {request.email}</span>
+              <p className="text-xs text-ink">
+                {roleLabel(request.role)} · {request.org} · {request.location}
+              </p>
+              {request.note ? <p className="mt-1 text-xs text-ink">{request.note}</p> : null}
+              <div className="mt-2 flex gap-2">
+                <form action={issueInviteForRequest}>
+                  <input type="hidden" name="requestId" value={request.id} />
+                  <button className={btn} type="submit">
+                    Issue code
+                  </button>
+                </form>
+                <form action={declineInviteRequest}>
+                  <input type="hidden" name="requestId" value={request.id} />
+                  <button className={btnOutline} type="submit">
+                    Decline
+                  </button>
+                </form>
+              </div>
             </li>
           ))}
         </ul>

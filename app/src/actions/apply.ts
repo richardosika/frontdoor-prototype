@@ -41,7 +41,7 @@ export async function submitApplication(
     return { ok: false, error: "That invite code is not active." };
   }
 
-  const references = input.referenceEmails.map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const references = (input.referenceEmails ?? []).map((item) => item.trim().toLowerCase()).filter(Boolean);
   const passwordHash = await bcrypt.hash(input.password, 10);
   const statusToken = randomBytes(24).toString("hex");
 
@@ -72,7 +72,7 @@ export async function submitApplication(
   await sendEmail({
     to: email,
     subject: `${BRAND.name} application received`,
-    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. A committee member will review your role, credential, and references. You can sign in after the application is approved.\n\nFollow the decision here: ${await appBaseUrl()}/apply/status/${statusToken}\n`,
+    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. A committee member will review your role and licence or ID. You can sign in after the application is approved.\n\nFollow the decision here: ${await appBaseUrl()}/apply/status/${statusToken}\n`,
   });
 
   return { ok: true, statusToken };

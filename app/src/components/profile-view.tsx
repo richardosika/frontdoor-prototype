@@ -67,7 +67,7 @@ export function ProfileView({
   const role = roleById(member.role);
   const tiers = [
     ["INVITED", "Invited by a member; light checks at application."],
-    ["VERIFIED", "Role credentials and references checked by an admin."],
+    ["VERIFIED", "Role credential checked by an admin."],
     ["CONFIRMED", "The committee accepted a counterparty vouch."],
   ] as const;
 
@@ -199,7 +199,7 @@ export function ProfileView({
           <ol className="mt-1 list-decimal pl-4">
             <li>Invite code from an existing member.</li>
             <li>Credential check for this role: {role?.check}.</li>
-            <li>References are on the application.</li>
+            <li>The committee verifies the file. Naming someone who can speak for you is optional.</li>
             <li>The committee finishes the file before a project is open to counterparties. A vouch is reviewed before Confirmed.</li>
           </ol>
         </div>

@@ -43,12 +43,14 @@ export default async function ApplicationsPage({
               <b>Credential:</b> {application.credentialValue}
             </p>
             <p className="text-sm text-ink">
-              <b>References:</b> {application.referenceEmails.join(", ")}
+              <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}
             </p>
             <p className="text-sm text-ink">
               <b>Invite:</b> {application.inviteCode.code}
             </p>
-            {application.statement ? <p className="mt-2 text-sm text-ink">{application.statement}</p> : null}
+            <p className="text-sm text-ink">
+              <b>Anyone who can speak for you:</b> {application.statement.trim() || "Not provided"}
+            </p>
             <form action={reviewApplication} className="mt-3 space-y-2">
               <input type="hidden" name="applicationId" value={application.id} />
               <input name="note" className={field} placeholder="Note to the applicant (optional)" />

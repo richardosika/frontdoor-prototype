@@ -6,6 +6,7 @@ import {
   VOUCH_CHECK_KEY,
   canMarkCaseVerified,
   isCheckResult,
+  referenceCheckForApplication,
   verificationStatusLabel,
   vouchEvidenceNote,
   type VerificationStatus,
@@ -41,6 +42,31 @@ export async function ensureVerificationCase(input: { subject: VerificationSubje
       },
     },
   });
+}
+
+export async function noteApplicationReferences(input: {
+  userId: string;
+  actorId: string;
+  referenceEmails: string[];
+  speaker?: string;
+}) {
+  const record = await ensureVerificationCase({ subject: "MEMBER", userId: input.userId, actorId: input.actorId });
+  const check = referenceCheckForApplication(input);
+  await prisma.verificationCheck.update({
+    where: { caseId_key: { caseId: record.id, key: VOUCH_CHECK_KEY } },
+    data: { result: check.result, note: check.note },
+  });
+  if (check.result === "NOT_PROVIDED") {
+    await prisma.verificationEvent.create({
+      data: {
+        caseId: record.id,
+        actorId: input.actorId,
+        fromStatus: "NOT_STARTED",
+        toStatus: "NOT_STARTED",
+        summary: "References and vouches marked Not provided. The case stays Not started.",
+      },
+    });
+  }
 }
 
 export async function attachVouchEvidence(input: {

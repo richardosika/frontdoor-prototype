@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { MemberRole, VerificationTier } from "@prisma/client";
@@ -10,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
-import { ensureVerificationCase, reviewVouchOnChecklist } from "@/lib/verification-db";
+import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { BRAND } from "@/lib/brand";
 import { appBaseUrl } from "@/lib/url";
 
@@ -54,7 +55,7 @@ export async function reviewApplication(formData: FormData) {
       org: application.org,
       location: application.location,
       credentialNote: application.credentialValue,
-      bio: application.statement,
+      bio: "",
       phone: application.phone,
       linkedinUrl: application.linkedinUrl,
       tier: "INVITED",
@@ -62,7 +63,12 @@ export async function reviewApplication(formData: FormData) {
     },
   });
 
-  await ensureVerificationCase({ subject: "MEMBER", userId: user.id, actorId: admin.id });
+  await noteApplicationReferences({
+    userId: user.id,
+    actorId: admin.id,
+    referenceEmails: application.referenceEmails,
+    speaker: application.statement,
+  });
 
   await prisma.application.update({
     where: { id: application.id },
@@ -203,4 +209,57 @@ export async function createInvite(formData: FormData) {
   }
   revalidatePath("/admin");
   redirect("/admin?notice=Invite+created");
+}
+
+function mintInviteCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const chunk = (size: number) =>
+    Array.from(randomBytes(size), (byte) => alphabet[byte % alphabet.length]).join("");
+  return `PF-${chunk(4)}-${chunk(4)}`;
+}
+
+export async function issueInviteForRequest(formData: FormData) {
+  const admin = await requireAdmin();
+  const requestId = String(formData.get("requestId") || "");
+  const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
+  if (!request || request.status !== "PENDING") redirect("/admin?error=That+invite+request+is+not+waiting");
+
+  let code = mintInviteCode();
+  let inviteId = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const invite = await prisma.inviteCode.create({
+        data: {
+          code,
+          maxUses: 1,
+          note: `For ${request.name}`,
+          createdById: admin.id,
+        },
+      });
+      inviteId = invite.id;
+      break;
+    } catch {
+      code = mintInviteCode();
+    }
+  }
+  if (!inviteId) redirect("/admin?error=Could+not+issue+a+code.+Try+again.");
+
+  await prisma.inviteRequest.update({
+    where: { id: request.id },
+    data: { status: "ISSUED", inviteCodeId: inviteId },
+  });
+  revalidatePath("/admin");
+  redirect(
+    `/admin?notice=${encodeURIComponent(`Invite code ${code} for ${request.email}. Pass it along. Private Floor does not email codes.`)}`,
+  );
+}
+
+export async function declineInviteRequest(formData: FormData) {
+  await requireAdmin();
+  const requestId = String(formData.get("requestId") || "");
+  const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
+  if (!request || request.status !== "PENDING") redirect("/admin?error=That+invite+request+is+not+waiting");
+  await prisma.inviteRequest.update({ where: { id: request.id }, data: { status: "DECLINED" } });
+  revalidatePath("/admin");
+  redirect("/admin?notice=Invite+request+declined");
 }

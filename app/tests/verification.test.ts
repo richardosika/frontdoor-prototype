@@ -8,6 +8,7 @@ import {
   effectiveVerificationStatus,
   gateVerificationRequest,
   isAwaitingVerification,
+  referenceCheckForApplication,
   toPublicVerification,
   verificationDenial,
   vouchEvidenceNote,
@@ -104,6 +105,7 @@ describe("verification badge", () => {
   it("requires every item to pass before a case can be marked Verified", () => {
     expect(checklistComplete(passed)).toBe(true);
     expect(canMarkCaseVerified([{ result: "PASS" }, { result: "NEEDS_INFO" }]).ok).toBe(false);
+    expect(canMarkCaseVerified([{ result: "PASS" }, { result: "NOT_PROVIDED" }]).ok).toBe(false);
     expect(canMarkCaseVerified(passed).ok).toBe(true);
     expect(canMarkCaseVerified([]).ok).toBe(false);
   });
@@ -115,6 +117,18 @@ describe("verification badge", () => {
     expect(isAwaitingVerification({ status: "VERIFIED", expiresAt: new Date("2020-01-01T00:00:00Z") }, now)).toBe(true);
     expect(isAwaitingVerification({ status: "VERIFIED", expiresAt: new Date("2027-01-01T00:00:00Z") }, now)).toBe(false);
     expect(isAwaitingVerification({ status: "REJECTED", expiresAt: null }, now)).toBe(false);
+  });
+});
+
+describe("application references", () => {
+  it("marks a file with no references as Not provided and leaves the case Not started", () => {
+    const empty = referenceCheckForApplication({ referenceEmails: [], speaker: "" });
+    expect(empty.result).toBe("NOT_PROVIDED");
+    expect(empty.note).toContain("Not provided");
+    const named = referenceCheckForApplication({ referenceEmails: ["ada@example.com"], speaker: "Dana Whitfield" });
+    expect(named.result).toBe("PENDING");
+    expect(named.note).toContain("Not started");
+    expect(named.note).toContain("ada@example.com");
   });
 });
 

@@ -147,7 +147,7 @@ export type ApplicationInput = {
   org: string;
   location: string;
   credentialValue: string;
-  referenceEmails: string[];
+  referenceEmails?: string[];
   statement?: string;
   phone?: string;
   linkedinUrl?: string;
@@ -166,9 +166,9 @@ export function validateApplication(input: ApplicationInput): string[] {
   if (input.org.trim().length < 2) errors.push("Enter your company or firm.");
   if (input.location.trim().length < 2) errors.push("Enter your city and state.");
   if (input.credentialValue.trim().length < 3) errors.push("Enter the credential for your role.");
-  const refs = input.referenceEmails.map((email) => email.trim()).filter(Boolean);
-  if (refs.length < 1 || refs.some((email) => !EMAIL.test(email))) {
-    errors.push("Add at least one valid reference email.");
+  const refs = (input.referenceEmails ?? []).map((email) => email.trim()).filter(Boolean);
+  if (refs.some((email) => !EMAIL.test(email))) {
+    errors.push("Leave reference emails blank, or enter a valid email.");
   }
   if ((input.statement ?? "").length > 1000) errors.push("Keep the statement under 1000 characters.");
   const phone = (input.phone ?? "").trim();

@@ -17,6 +17,8 @@ import {
   tierAfterCounterpartyConfirm,
   validateApplication,
 } from "@/lib/domain";
+import { shouldDiscardInviteRequest, validateInviteRequest, INVITE_REQUESTS_PER_EMAIL_PER_DAY } from "@/lib/invite-request";
+import { withinRateLimit } from "@/lib/messaging";
 import { ROLE_IDS, ROLES, roleLabel } from "@/lib/roles";
 
 const BRIEF_LABELS = [
@@ -186,9 +188,34 @@ describe("network and verification", () => {
         org: "Analytical Engines",
         location: "Newark, NJ",
         credentialValue: "Entity 123",
-        referenceEmails: ["ref@example.com"],
+        referenceEmails: [],
       }),
     ).toEqual([]);
+    expect(
+      validateApplication({
+        code: "PF-1",
+        role: "DEVELOPER",
+        name: "Ada Lovelace",
+        email: "ada@example.com",
+        password: "long-enough",
+        org: "Analytical Engines",
+        location: "Newark, NJ",
+        credentialValue: "Entity 123",
+      }).some((error) => /reference/i.test(error)),
+    ).toBe(false);
+    expect(
+      validateApplication({
+        code: "PF-1",
+        role: "DEVELOPER",
+        name: "Ada Lovelace",
+        email: "ada@example.com",
+        password: "long-enough",
+        org: "Analytical Engines",
+        location: "Newark, NJ",
+        credentialValue: "Entity 123",
+        referenceEmails: ["not-an-email"],
+      }),
+    ).toEqual(["Leave reference emails blank, or enter a valid email."]);
     expect(validateApplication({
       code: "x",
       role: "NOPE",
@@ -200,6 +227,23 @@ describe("network and verification", () => {
       credentialValue: "",
       referenceEmails: [],
     }).length).toBeGreaterThan(3);
+  });
+
+  it("accepts an invite request without an invite code and drops a honeypot", () => {
+    expect(
+      validateInviteRequest({
+        name: "Chris Adeyemi",
+        email: "chris@example.com",
+        role: "LENDER",
+        company: "Adeyemi Credit",
+        city: "Jersey City, NJ",
+        note: "Bridge lender",
+      }),
+    ).toEqual([]);
+    expect(shouldDiscardInviteRequest("http://spam.example")).toBe(true);
+    expect(shouldDiscardInviteRequest("")).toBe(false);
+    expect(withinRateLimit(INVITE_REQUESTS_PER_EMAIL_PER_DAY, INVITE_REQUESTS_PER_EMAIL_PER_DAY)).toBe(false);
+    expect(withinRateLimit(INVITE_REQUESTS_PER_EMAIL_PER_DAY - 1, INVITE_REQUESTS_PER_EMAIL_PER_DAY)).toBe(true);
   });
 
   it("builds initials and role labels", () => {
