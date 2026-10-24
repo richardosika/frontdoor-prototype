@@ -6,8 +6,9 @@ import { requireUser } from "@/lib/current-user";
 import { canRequestDealAccess } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
-import { sendEmail } from "@/lib/email";
+import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
 import { notify } from "@/lib/notify";
+import { deliverPortalMessage, isBlocked } from "@/lib/portal-message";
 
 export async function requestAccess(formData: FormData) {
   const user = await requireUser();
@@ -31,6 +32,15 @@ export async function requestAccess(formData: FormData) {
   if (!decision.ok) {
     redirect(`/deals/${dealId}?error=${encodeURIComponent(decision.reason)}`);
   }
+  if (await isBlocked(user.id, deal.sponsorId)) {
+    redirect(`/deals/${dealId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+  }
+  const recentAccess = await prisma.dealAccess.count({
+    where: { requesterId: user.id, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+  });
+  if (!existing && !withinRateLimit(recentAccess, RATE_LIMITS.accessPerDay)) {
+    redirect(`/deals/${dealId}?error=${encodeURIComponent("You have sent too many access requests today.")}`);
+  }
 
   if (existing) {
     await prisma.dealAccess.update({
@@ -53,16 +63,13 @@ export async function requestAccess(formData: FormData) {
     });
   }
 
-  await sendEmail({
-    to: deal.sponsor.email,
-    subject: `Access request: ${deal.title}`,
-    text: `${user.name} (${user.email}) requested access to "${deal.title}" and acknowledged the NDA. Review the request on the deal page. ${BRAND.name} does not process a subscription or payment.\n`,
+  const sent = await deliverPortalMessage({
+    from: user,
+    toId: deal.sponsorId,
+    kind: "ACCESS",
+    body: `${user.name} requested access to "${deal.title}" and acknowledged the NDA. Review it on the deal page. ${BRAND.name} does not process a subscription or payment.`,
   });
-  await notify(deal.sponsorId, {
-    title: "Access request",
-    body: `${user.name} requested access to ${deal.title}.`,
-    href: `/deals/${deal.id}`,
-  });
+  if (!sent.ok) redirect(`/deals/${dealId}?error=${encodeURIComponent(sent.reason)}`);
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/alerts");
@@ -89,22 +96,23 @@ export async function reviewAccess(formData: FormData) {
     data: { status: decision, reviewedAt: new Date() },
   });
 
-  await sendEmail({
-    to: access.requester.email,
-    subject: decision === "APPROVED" ? `Access approved: ${access.deal.title}` : `Access declined: ${access.deal.title}`,
-    text:
-      decision === "APPROVED"
-        ? `${user.name} approved your request for "${access.deal.title}". Open the deal room to see the other approved members. ${BRAND.name} does not take a subscription or move funds.\n`
-        : `${user.name} declined your request for "${access.deal.title}".\n`,
+  const decisionBody =
+    decision === "APPROVED"
+      ? `${user.name} approved your request for "${access.deal.title}". Open the deal room. ${BRAND.name} does not take a subscription or move funds.`
+      : `${user.name} declined your request for "${access.deal.title}".`;
+  const sent = await deliverPortalMessage({
+    from: user,
+    toId: access.requesterId,
+    kind: "ACCESS",
+    body: decisionBody,
   });
-  await notify(access.requesterId, {
-    title: decision === "APPROVED" ? "Access approved" : "Access declined",
-    body:
-      decision === "APPROVED"
-        ? `${user.name} approved your request for ${access.deal.title}.`
-        : `${user.name} declined your request for ${access.deal.title}.`,
-    href: decision === "APPROVED" ? `/deals/${access.dealId}/room` : `/deals/${access.dealId}`,
-  });
+  if (!sent.ok) {
+    await notify(access.requesterId, {
+      title: decision === "APPROVED" ? "Access approved" : "Access declined",
+      body: "You have a new message on Private Floor.",
+      href: decision === "APPROVED" ? `/deals/${access.dealId}/room` : `/deals/${access.dealId}`,
+    });
+  }
   if (decision === "APPROVED") {
     await prisma.dealEvent.create({
       data: {
@@ -165,13 +173,10 @@ export async function postDealQuestion(formData: FormData) {
   const deal = await requireRoom(dealId, user.id);
   if (!deal) redirect(`/deals/${dealId}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
 
-  if (parentId) {
-    const parent = await prisma.dealMessage.findUnique({ where: { id: parentId } });
-    if (!parent || parent.dealId !== dealId || parent.parentId) {
-      redirect(`${room}?error=${encodeURIComponent("That question is not in this room.")}`);
-    }
+  const parent = parentId ? await prisma.dealMessage.findUnique({ where: { id: parentId } }) : null;
+  if (parentId && (!parent || parent.dealId !== dealId || parent.parentId)) {
+    redirect(`${room}?error=${encodeURIComponent("That question is not in this room.")}`);
   }
-
   await prisma.dealMessage.create({
     data: { dealId, authorId: user.id, body, parentId: parentId || null },
   });
@@ -183,12 +188,15 @@ export async function postDealQuestion(formData: FormData) {
     },
   });
 
-  if (user.id !== deal.sponsorId) {
-    await notify(deal.sponsorId, {
-      title: parentId ? "Deal room reply" : "Deal room question",
-      body: `${user.name} on ${deal.title}: ${body.slice(0, 140)}`,
-      href: room,
-    });
+  const recipients = new Set<string>();
+  if (user.id !== deal.sponsorId) recipients.add(deal.sponsorId);
+  if (parent && parent.authorId !== user.id) recipients.add(parent.authorId);
+  const note = parentId
+    ? `${user.name} replied in the deal room for ${deal.title}: ${body}`
+    : `${user.name} asked a question in the deal room for ${deal.title}: ${body}`;
+  for (const recipientId of recipients) {
+    if (await isBlocked(user.id, recipientId)) continue;
+    await deliverPortalMessage({ from: user, toId: recipientId, kind: "DEAL", body: note });
   }
 
   revalidatePath(room);

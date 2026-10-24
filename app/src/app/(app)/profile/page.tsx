@@ -31,6 +31,8 @@ export default async function ProfilePage({
         vouchCount={loaded.vouchCount}
         linkOrigin={linkOrigin}
         verification={loaded.verification}
+        blockedByViewer={false}
+        blockedByThem={false}
       />
     </div>
   );

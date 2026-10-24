@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { sendMessage } from "@/actions/social";
+import { blockMember, reportMember, sendMessage, unblockMember } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
@@ -26,12 +26,21 @@ export default async function ThreadPage({
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      userA: true,
-      userB: true,
-      messages: { orderBy: { createdAt: "asc" }, include: { sender: true } },
+      userA: { select: { id: true, name: true, initials: true, role: true, location: true, tier: true } },
+      userB: { select: { id: true, name: true, initials: true, role: true, location: true, tier: true } },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!conversation || (conversation.userAId !== user.id && conversation.userBId !== user.id)) notFound();
+  const blocks = await prisma.block.findMany({
+    where: {
+      OR: [
+        { blockerId: user.id, blockedId: conversation.userAId === user.id ? conversation.userBId : conversation.userAId },
+        { blockerId: conversation.userAId === user.id ? conversation.userBId : conversation.userAId, blockedId: user.id },
+      ],
+    },
+    select: { blockerId: true },
+  });
 
   await prisma.message.updateMany({
     where: { conversationId, senderId: { not: user.id }, readAt: null },
@@ -39,6 +48,8 @@ export default async function ThreadPage({
   });
 
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
+  const blockedByViewer = blocks.some((item) => item.blockerId === user.id);
+  const messagingClosed = blocks.length > 0;
   const conversations = await listConversations(user.id);
 
   return (
@@ -60,6 +71,25 @@ export default async function ThreadPage({
               {roleLabel(other.role)} · {other.location}
             </p>
           </div>
+          <div className="ml-auto flex gap-2">
+            {blockedByViewer ? (
+              <form action={unblockMember}>
+                <input type="hidden" name="userId" value={other.id} />
+                <input type="hidden" name="conversationId" value={conversation.id} />
+                <button className={btn} type="submit">
+                  Unblock
+                </button>
+              </form>
+            ) : (
+              <form action={blockMember}>
+                <input type="hidden" name="userId" value={other.id} />
+                <input type="hidden" name="conversationId" value={conversation.id} />
+                <button className={btn} type="submit">
+                  Block
+                </button>
+              </form>
+            )}
+          </div>
         </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
           <Banner error={query.error} />
@@ -78,13 +108,27 @@ export default async function ThreadPage({
             );
           })}
         </div>
-        <form action={sendMessage} className="flex gap-2 border-t border-line bg-paper p-3">
-          <input type="hidden" name="conversationId" value={conversation.id} />
-          <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
-          <button className={btn} type="submit">
-            Send
-          </button>
-        </form>
+        {messagingClosed ? (
+          <p className="border-t border-line bg-paper p-3 text-sm text-mut">Messaging is closed between these members.</p>
+        ) : (
+          <div className="border-t border-line bg-paper p-3">
+            <form action={sendMessage} className="flex gap-2">
+              <input type="hidden" name="conversationId" value={conversation.id} />
+              <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
+              <button className={btn} type="submit">
+                Send
+              </button>
+            </form>
+            <form action={reportMember} className="mt-2 flex gap-2">
+              <input type="hidden" name="userId" value={other.id} />
+              <input type="hidden" name="conversationId" value={conversation.id} />
+              <input name="reason" className={field} placeholder="Report this conversation" required />
+              <button className={btn} type="submit">
+                Report
+              </button>
+            </form>
+          </div>
+        )}
       </section>
     </div>
   );

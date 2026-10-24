@@ -55,6 +55,8 @@ export async function reviewApplication(formData: FormData) {
       location: application.location,
       credentialNote: application.credentialValue,
       bio: application.statement,
+      phone: application.phone,
+      linkedinUrl: application.linkedinUrl,
       tier: "INVITED",
       status: "ACTIVE",
     },

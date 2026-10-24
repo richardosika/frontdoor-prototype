@@ -35,7 +35,9 @@ export default async function ApplicationsPage({
           <li key={application.id} className={`${card} p-4`}>
             <h2 className="font-serif text-xl font-normal">{application.name}</h2>
             <p className="text-sm text-mut">
-              {application.email} · {roleLabel(application.role)} · {application.org} · {application.location}
+              {application.email}
+              {application.phone ? ` · ${application.phone}` : ""}
+              {application.linkedinUrl ? ` · ${application.linkedinUrl}` : ""} · {roleLabel(application.role)} · {application.org} · {application.location}
             </p>
             <p className="mt-2 text-sm text-ink">
               <b>Credential:</b> {application.credentialValue}

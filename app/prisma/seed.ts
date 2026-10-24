@@ -256,6 +256,9 @@ async function main() {
     return;
   }
   if (reset) {
+    await prisma.moderationEvent.deleteMany();
+    await prisma.report.deleteMany();
+    await prisma.block.deleteMany();
     await prisma.verificationEvent.deleteMany();
     await prisma.verificationCheck.deleteMany();
     await prisma.verificationCase.deleteMany();
@@ -279,9 +282,17 @@ async function main() {
     await prisma.user.deleteMany();
   }
 
-  for (const person of people) {
+  for (const [index, person] of people.entries()) {
+    const slug = person.name.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
     await prisma.user.create({
-      data: { ...person, passwordHash, isAdmin: Boolean(person.isAdmin), status: "ACTIVE" },
+      data: {
+        ...person,
+        passwordHash,
+        isAdmin: Boolean(person.isAdmin),
+        status: "ACTIVE",
+        phone: `201-555-${String(1000 + index).slice(-4)}`,
+        linkedinUrl: `https://www.linkedin.com/in/${slug}-example`,
+      },
     });
   }
 
@@ -622,6 +633,14 @@ async function main() {
       });
     }
   }
+
+  await prisma.report.create({
+    data: {
+      reporterId: "user_ev",
+      targetUserId: "user_bk",
+      reason: "Asked to continue the conversation on a personal phone number.",
+    },
+  });
 
   await prisma.dealDocument.create({
     data: {

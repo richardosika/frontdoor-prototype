@@ -4,7 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { addProject, requestConfirmation } from "@/actions/profile";
-import { openConversation, requestConnection } from "@/actions/social";
+import { blockMember, introduceMember, openConversation, reportMember, requestConnection, unblockMember } from "@/actions/social";
 import { roleById, roleLabel, roleShort } from "@/lib/roles";
 import { tierLabel } from "@/lib/format";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
@@ -37,6 +37,8 @@ export function ProfileView({
   backHref,
   linkOrigin,
   verification,
+  blockedByViewer,
+  blockedByThem,
 }: {
   member: {
     id: string;
@@ -58,7 +60,10 @@ export function ProfileView({
   backHref?: string;
   linkOrigin: string;
   verification: PublicVerification;
+  blockedByViewer: boolean;
+  blockedByThem: boolean;
 }) {
+  const messagingClosed = blockedByViewer || blockedByThem;
   const role = roleById(member.role);
   const tiers = [
     ["INVITED", "Invited by a member; light checks at application."],
@@ -82,7 +87,7 @@ export function ProfileView({
           </span>
         </div>
         <div className="mb-2 flex gap-2">
-          {isSelf ? null : (
+          {isSelf || messagingClosed ? null : (
             <>
               <form action={openConversation}>
                 <input type="hidden" name="userId" value={member.id} />
@@ -129,6 +134,44 @@ export function ProfileView({
           </span>
         </div>
         {member.bio ? <p className="mt-4 text-sm leading-relaxed text-ink">{member.bio}</p> : null}
+        {isSelf ? null : messagingClosed ? (
+          <div className="mt-4 rounded border border-line bg-cream px-3 py-3 text-sm text-ink">
+            Messaging is closed between these members.
+            {blockedByViewer ? (
+              <form action={unblockMember} className="mt-2">
+                <input type="hidden" name="userId" value={member.id} />
+                <button className={btnOutline} type="submit">
+                  Unblock
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            <form action={introduceMember} className="grid gap-2">
+              <input type="hidden" name="userId" value={member.id} />
+              <textarea name="note" className={field} rows={2} placeholder="A short introduction. It stays in Messages." required />
+              <button className={btnOutline} type="submit">
+                Send introduction
+              </button>
+            </form>
+            <div className="flex flex-wrap gap-2">
+              <form action={blockMember}>
+                <input type="hidden" name="userId" value={member.id} />
+                <button className={btnOutline} type="submit">
+                  Block
+                </button>
+              </form>
+            </div>
+            <form action={reportMember} className="grid gap-2">
+              <input type="hidden" name="userId" value={member.id} />
+              <input name="reason" className={field} placeholder="Report this member to the committee" required />
+              <button className={btnOutline} type="submit">
+                Report
+              </button>
+            </form>
+          </div>
+        )}
         <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
           <Stat value={String(projectCount)} label="Projects" />
           <Stat value={String(vouchCount)} label="Vouches" />
@@ -194,13 +237,18 @@ export function ProfileView({
                       ))
                     : null}
                   {isSelf && canOpenProjectToCounterparties(project.verification) ? (
-                    <form action={requestConfirmation} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                    <form action={requestConfirmation} className="mt-2 grid gap-2">
                       <input type="hidden" name="projectId" value={project.id} />
-                      <input name="counterpartyName" placeholder="Counterparty name" className={field} required />
-                      <input name="counterpartyEmail" type="email" placeholder="Counterparty email" className={field} required />
-                      <button className={btnOutline} type="submit">
-                        Request vouch
-                      </button>
+                      <p className="text-xs leading-relaxed text-mut">
+                        If this person is a member, the request goes to their inbox. Otherwise a portal link appears here. Private Floor does not email it.
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <input name="counterpartyName" placeholder="Counterparty name" className={field} required />
+                        <input name="counterpartyEmail" type="email" placeholder="Counterparty email, used only to match a member" className={field} required />
+                        <button className={btnOutline} type="submit">
+                          Request vouch
+                        </button>
+                      </div>
                     </form>
                   ) : null}
                 </div>
@@ -229,7 +277,7 @@ export function ProfileView({
 }
 
 function vouchState(item: { status: string; reviewStatus: string }) {
-  if (item.status === "PENDING") return "link ready to send";
+  if (item.status === "PENDING") return "portal link ready";
   if (item.status === "DECLINED") return "counterparty declined";
   if (item.reviewStatus === "PENDING_ADMIN") return "confirmed, awaiting committee review";
   if (item.reviewStatus === "APPROVED") return "vouch accepted";

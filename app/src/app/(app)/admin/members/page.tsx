@@ -39,6 +39,8 @@ export default async function MembersAdminPage({
               </div>
               <p className="text-xs text-mut">
                 {roleShort(roleLabel(member.role))} · {member.org} · {member.email}
+                {member.phone ? ` · ${member.phone}` : ""}
+                {member.linkedinUrl ? ` · ${member.linkedinUrl}` : ""}
               </p>
             </div>
             <form action={setMemberTier} className="flex items-center gap-2">

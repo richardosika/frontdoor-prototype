@@ -58,6 +58,8 @@ export async function submitApplication(
         location: input.location.trim(),
         credentialValue: input.credentialValue.trim(),
         referenceEmails: references,
+        phone: (input.phone ?? "").trim().slice(0, 40),
+        linkedinUrl: (input.linkedinUrl ?? "").trim().slice(0, 300),
         statement: (input.statement ?? "").trim(),
       },
     }),

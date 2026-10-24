@@ -38,6 +38,8 @@ export default async function MemberPage({
         backHref="/network"
         linkOrigin={linkOrigin}
         verification={loaded.verification}
+        blockedByViewer={loaded.blockedByViewer}
+        blockedByThem={loaded.blockedByThem}
       />
     </div>
   );

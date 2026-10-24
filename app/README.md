@@ -63,11 +63,13 @@ All people, projects, and deals are fictional.
 - Admin queue at `/admin/applications`: approve (creates an Invited member) or reject.
 - Admin member list at `/admin/members`: set Invited / Verified / Confirmed. Promoting someone to Confirmed requires an accepted counterparty vouch.
 - Admin-only verification queue at `/admin/verification`. Members and anonymous callers get 404 on the pages and 403 on `/api/admin/verification` when signed in as a non-admin. Checklists, internal notes, and the audit log stay on those routes. A profile shows a Verified badge only after an admin marks the full checklist complete and the file has not expired. Otherwise members see “Verification in progress.” A project cannot collect a new counterparty vouch until its file is Verified.
-- Profiles with a track record. Request a counterparty vouch and copy the link from the project. A counterparty yes waits for admin review before the tier becomes Confirmed. The member is notified in Alerts.
+- Profiles with a track record. A vouch request goes to a member’s inbox, or a unique portal link when the counterparty has no account. Private Floor does not email that link. A counterparty yes waits for admin review before the tier becomes Confirmed. The member is notified in Alerts. The guest confirm page shows the project only, not email, phone, or LinkedIn.
 - Feed with updates, **Deal** posts (raising an amount), and **Seeking** posts (role needed), plus likes and comments.
 - Deals board filtered by role, market (NJ/NY/CT), and size.
 - Deal page: request access with a required NDA checkbox. The sponsor approves or declines and gets an in-app alert. The deal room lists approved members, document links, a Q&A thread, and an activity list. Seeking posts sized in square feet, units, or parcels use the Other scope filter instead of a dollar band.
-- Direct messages.
+- Direct messages. The inbox shows unread badges. Introductions, connection requests, access requests, vouch requests, and deal-room questions are posted there. The email for any of those is only “You have a new message on Private Floor” plus a link to `/messages`. It never includes the message body or a sender’s email, phone, or LinkedIn URL.
+- Members can report or block another member. Messaging stops in either direction after a block. Message, connection, introduction, access, vouch, and report actions have daily or hourly limits.
+- Admin message review at `/admin/messages`, with contact details and an audit log of who opened the queue or a thread. Anonymous callers get 404. Signed-in members get 404 on the page and 403 on `/api/admin/messages`. `GET /api/members/[id]` and `GET /api/messages` omit another member’s email, phone, and LinkedIn URL unless the caller is an admin on the member route.
 - Network directory with role filters and connect requests.
 - Admin dashboard with invite codes and counts.
 
@@ -78,7 +80,7 @@ npm test
 npm run typecheck
 ```
 
-`npm test` covers invite rules, the 16 roles, deal filters (including non-dollar seeking sizes), NDA gating, connection rules, the vouch tier rules, and the verification module. A counterparty confirmation does not change tier. An admin acceptance does. Non-admins are denied the verification pages and API. It does not need a database.
+`npm test` covers invite rules, the 16 roles, deal filters (including non-dollar seeking sizes), NDA gating, connection rules, the vouch tier rules, the verification module, and portal messaging. A counterparty confirmation does not change tier. An admin acceptance does. Non-admins are denied the verification and message-review routes. Member endpoints do not return another member’s email or phone. It does not need a database.
 
 ## Deploy on Render
 

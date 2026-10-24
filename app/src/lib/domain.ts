@@ -149,6 +149,8 @@ export type ApplicationInput = {
   credentialValue: string;
   referenceEmails: string[];
   statement?: string;
+  phone?: string;
+  linkedinUrl?: string;
 };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -169,6 +171,10 @@ export function validateApplication(input: ApplicationInput): string[] {
     errors.push("Add at least one valid reference email.");
   }
   if ((input.statement ?? "").length > 1000) errors.push("Keep the statement under 1000 characters.");
+  const phone = (input.phone ?? "").trim();
+  if (phone && phone.replace(/\D/g, "").length < 7) errors.push("Enter a phone number with at least 7 digits, or leave it blank.");
+  const linkedin = (input.linkedinUrl ?? "").trim();
+  if (linkedin && !/^https?:\/\//i.test(linkedin)) errors.push("LinkedIn URL must start with http.");
   return errors;
 }
 

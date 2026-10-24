@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { moderationDenial } from "@/lib/messaging";
 import { verificationDenial } from "@/lib/verification";
 
 export async function currentUser() {
@@ -30,6 +31,16 @@ export async function verificationActor() {
   });
   if (!user || user.status !== "ACTIVE") return null;
   return user;
+}
+
+export async function requireModerationAdmin() {
+  const actor = await verificationActor();
+  const denied = moderationDenial({
+    path: "/admin/messages",
+    actor: actor ? { isAdmin: actor.isAdmin } : null,
+  });
+  if (denied || !actor) notFound();
+  return actor;
 }
 
 export async function requireVerificationAdmin() {

@@ -24,6 +24,8 @@ export function ApplyWizard() {
   const [credentialValue, setCredentialValue] = useState("");
   const [referenceEmail, setReferenceEmail] = useState("");
   const [referenceEmail2, setReferenceEmail2] = useState("");
+  const [phone, setPhone] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [statement, setStatement] = useState("");
 
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[0];
@@ -53,6 +55,8 @@ export function ApplyWizard() {
       location,
       credentialValue,
       referenceEmails: [referenceEmail, referenceEmail2],
+      phone,
+      linkedinUrl,
       statement,
     });
     setPending(false);
@@ -170,6 +174,15 @@ export function ApplyWizard() {
                 placeholder={selected.credentialPlaceholder}
               />
               <p className="mt-1 text-[11px] text-mut">We check: {selected.check}.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Phone (committee only)</label>
+              <input className={field} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Optional" />
+            </div>
+            <div>
+              <label className={labelCls}>LinkedIn URL (committee only)</label>
+              <input className={field} value={linkedinUrl} onChange={(event) => setLinkedinUrl(event.target.value)} placeholder="https://" />
+              <p className="mt-1 text-[11px] text-mut">Other members never see your email, phone, or LinkedIn URL.</p>
             </div>
             <div>
               <label className={labelCls}>Reference email</label>

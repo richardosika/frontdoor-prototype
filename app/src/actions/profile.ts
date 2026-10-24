@@ -4,12 +4,12 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
-import { BRAND } from "@/lib/brand";
 import { tierAfterCounterpartyConfirm } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
+import { RATE_LIMITS, vouchDelivery, withinRateLimit } from "@/lib/messaging";
+import { deliverPortalMessage, isBlocked, sendPortalNotice } from "@/lib/portal-message";
 import { canOpenProjectToCounterparties, toPublicVerification, type VerificationStatus } from "@/lib/verification";
 import { attachVouchEvidence, ensureVerificationCase } from "@/lib/verification-db";
-import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
 
@@ -55,21 +55,41 @@ export async function requestConfirmation(formData: FormData) {
   if (!open) {
     redirect("/profile?error=This+project+is+not+open+to+counterparties+until+verification+is+complete");
   }
+  const recentVouches = await prisma.confirmation.count({
+    where: { project: { userId: user.id }, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+  });
+  if (!withinRateLimit(recentVouches, RATE_LIMITS.vouchesPerDay)) {
+    redirect("/profile?error=You+have+sent+too+many+vouch+requests+today");
+  }
+
+  const counterparty = await prisma.user.findUnique({ where: { email: counterpartyEmail } });
+  const counterpartyIsMember = Boolean(counterparty && counterparty.status === "ACTIVE" && counterparty.id !== user.id);
+  if (counterpartyIsMember && counterparty && (await isBlocked(user.id, counterparty.id))) {
+    redirect("/profile?error=Messaging+is+closed+between+these+members");
+  }
+  const delivery = vouchDelivery({ counterpartyIsMember });
 
   const token = randomBytes(24).toString("hex");
   await prisma.confirmation.create({
     data: { projectId, counterpartyName, counterpartyEmail, token },
   });
 
-  const link = `${await appBaseUrl()}/confirm/${token}`;
-  await sendEmail({
-    to: counterpartyEmail,
-    subject: `${BRAND.name}: confirm you worked with ${user.name} on ${project.name}`,
-    text: `${user.name} listed you as a counterparty on ${project.name} (${project.location}, ${project.year}, ${project.valueLabel}).\n\nConfirm or decline (no ${BRAND.name} account required):\n${link}\n`,
-  });
+  if (delivery.channel === "portal" && counterparty) {
+    const link = `${await appBaseUrl()}/confirm/${token}`;
+    const sent = await deliverPortalMessage({
+      from: user,
+      toId: counterparty.id,
+      kind: "VOUCH",
+      body: `${user.name} asked you to confirm ${project.name} (${project.location}, ${project.year}). Open the request in Private Floor: ${link}`,
+    });
+    if (!sent.ok) redirect(`/profile?error=${encodeURIComponent(sent.reason)}`);
+    revalidatePath("/profile");
+    revalidatePath("/messages");
+    redirect(`/messages/${sent.conversationId}`);
+  }
 
   revalidatePath("/profile");
-  redirect("/profile?notice=The+link+is+on+this+project.+Copy+it+and+send+it+to+your+counterparty.");
+  redirect("/profile?notice=The+portal+link+is+on+this+project.+Private+Floor+does+not+email+it.");
 }
 
 export async function respondConfirmation(formData: FormData) {
@@ -121,11 +141,7 @@ export async function respondConfirmation(formData: FormData) {
       note,
       evidenceUrl: `${await appBaseUrl()}/confirm/${token}`,
     });
-    await sendEmail({
-      to: confirmation.project.user.email,
-      subject: `${BRAND.name}: ${confirmation.counterpartyName} confirmed ${confirmation.project.name}`,
-      text: `${confirmation.counterpartyName} confirmed they worked with you on ${confirmation.project.name}. A committee member still needs to accept the vouch before your tier can become Confirmed.\n`,
-    });
+    await sendPortalNotice(confirmation.project.userId);
   } else {
     await notify(confirmation.project.userId, {
       title: "Vouch declined",

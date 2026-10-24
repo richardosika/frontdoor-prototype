@@ -16,7 +16,7 @@ export default async function AdminPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [pending, members, invites, posts, access, vouches, verificationCases] = await Promise.all([
+  const [pending, members, invites, posts, access, vouches, verificationCases, openReports] = await Promise.all([
     prisma.application.count({ where: { status: "PENDING" } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
@@ -28,6 +28,7 @@ export default async function AdminPage({
       orderBy: { respondedAt: "desc" },
     }),
     prisma.verificationCase.findMany({ select: { status: true, expiresAt: true } }),
+    prisma.report.count(),
   ]);
   const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
@@ -44,6 +45,7 @@ export default async function AdminPage({
         <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
         <Stat href="/deals" label="Open access requests" value={access} />
         <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />
+        <Stat href="/admin/messages" label="Reports for review" value={openReports} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Mini label="Invited" value={tierCount("INVITED")} />

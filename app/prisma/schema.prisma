@@ -111,6 +111,8 @@ model User {
   location       String
   bio            String           @default("")
   credentialNote String           @default("")
+  phone          String           @default("")
+  linkedinUrl    String           @default("")
   tier           VerificationTier @default(INVITED)
   isAdmin        Boolean          @default(false)
   status         AccountStatus    @default(ACTIVE)
@@ -138,6 +140,11 @@ model User {
   memberVerification   VerificationCase?  @relation("MemberVerification")
   checksReviewed       VerificationCheck[] @relation("CheckReviewer")
   verificationEvents   VerificationEvent[] @relation("VerificationActor")
+  blocksMade           Block[]             @relation("BlocksMade")
+  blocksReceived       Block[]             @relation("BlocksReceived")
+  reportsMade          Report[]            @relation("ReportsMade")
+  reportsReceived      Report[]            @relation("ReportsReceived")
+  moderationEvents     ModerationEvent[]
 }
 
 model InviteCode {
@@ -165,6 +172,8 @@ model Application {
   location        String
   credentialValue String
   referenceEmails String[]
+  phone           String            @default("")
+  linkedinUrl     String            @default("")
   statement       String            @default("")
   statusToken     String            @unique
   status          ApplicationStatus @default(PENDING)
@@ -305,6 +314,7 @@ model Message {
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id])
   body           String
+  kind           String       @default("TEXT")
   createdAt      DateTime     @default(now())
   readAt         DateTime?
 
@@ -412,6 +422,42 @@ model VerificationEvent {
   createdAt  DateTime                @default(now())
 
   @@index([caseId, createdAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reporterId     String
+  reporter       User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId   String
+  target         User     @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  conversationId String   @default("")
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ModerationEvent {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id])
+  action         String
+  summary        String
+  conversationId String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model DealEvent {

@@ -14,7 +14,7 @@ export function ConversationList({
         Messages
       </h1>
       {conversations.length === 0 ? (
-        <p className="px-5 py-8 text-sm text-mut">No messages yet. Open a profile and choose Message.</p>
+        <p className="px-5 py-8 text-sm text-mut">No messages yet. Introductions, connections, access requests, vouches, and deal questions land here.</p>
       ) : null}
       <ul>
         {conversations.map((conversation) => (

@@ -26,6 +26,17 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       sum + project.confirmations.filter((item) => item.status === "CONFIRMED" && item.reviewStatus === "APPROVED").length,
     0,
   );
+  const blocks = await prisma.block.findMany({
+    where: {
+      OR: [
+        { blockerId: viewerId, blockedId: memberId },
+        { blockerId: memberId, blockedId: viewerId },
+      ],
+    },
+    select: { blockerId: true },
+  });
+  const blockedByViewer = blocks.some((item) => item.blockerId === viewerId);
+  const blockedByThem = blocks.some((item) => item.blockerId === memberId);
   const cases = await prisma.verificationCase.findMany({
     where: {
       OR: [{ userId: memberId }, { projectId: { in: member.projects.map((project) => project.id) } }],
@@ -48,11 +59,43 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
   const projects = member.projects.map((project) => {
     const record = cases.find((item) => item.projectId === project.id);
     return {
-      ...project,
+      id: project.id,
+      name: project.name,
+      asset: project.asset,
+      location: project.location,
+      year: project.year,
+      valueLabel: project.valueLabel,
+      summary: project.summary,
+      confirmations: project.confirmations.map((item) => ({
+        id: item.id,
+        status: item.status,
+        reviewStatus: item.reviewStatus,
+        counterpartyName: item.counterpartyName,
+        token: item.token,
+      })),
       verification: toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null),
     };
   });
-  return { member, projects, verification, connection: state, vouchCount };
+  return {
+    member: {
+      id: member.id,
+      name: member.name,
+      initials: member.initials,
+      org: member.org,
+      location: member.location,
+      role: member.role,
+      tier: member.tier,
+      bio: member.bio,
+      credentialNote: member.credentialNote,
+      createdAt: member.createdAt,
+    },
+    projects,
+    verification,
+    connection: state,
+    vouchCount,
+    blockedByViewer,
+    blockedByThem,
+  };
 }
 
 export type { PublicVerification };
