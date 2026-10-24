@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { DECLINED_APPLICATION_STATUSES, OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { GENERIC_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
 
 function safeNext(value: string): string {
@@ -19,12 +20,17 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   const memberPasswordMatches = user ? await bcrypt.compare(password, user.passwordHash) : false;
   let pendingApplicationPasswordMatches = false;
+  let declinedApplicationPasswordMatches = false;
   if (!user && email && password) {
     const application = await prisma.application.findFirst({
-      where: { email, status: "PENDING" },
+      where: { email, status: { in: [...OPEN_APPLICATION_STATUSES, ...DECLINED_APPLICATION_STATUSES] } },
       orderBy: { createdAt: "desc" },
     });
-    if (application) pendingApplicationPasswordMatches = await bcrypt.compare(password, application.passwordHash);
+    if (application && (await bcrypt.compare(password, application.passwordHash))) {
+      const declined = (DECLINED_APPLICATION_STATUSES as readonly string[]).includes(application.status);
+      declinedApplicationPasswordMatches = declined;
+      pendingApplicationPasswordMatches = !declined;
+    }
   }
 
   const failure = signInFailureCopy({
@@ -32,6 +38,7 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
     memberPasswordMatches,
     memberActive: user?.status === "ACTIVE",
     pendingApplicationPasswordMatches,
+    declinedApplicationPasswordMatches,
   });
   if (failure) return { error: failure };
 

@@ -28,6 +28,8 @@ export async function addProject(formData: FormData) {
     data: { userId: user.id, name, asset, location, year, valueLabel, summary },
   });
   await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
+  const { queueProjectVerification } = await import("@/lib/verify/queue");
+  await queueProjectVerification(project.id, name);
   revalidatePath("/profile");
   redirect("/profile");
 }

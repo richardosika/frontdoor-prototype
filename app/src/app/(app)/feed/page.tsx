@@ -94,28 +94,46 @@ export default async function FeedPage({
             </Link>
           ))}
         </div>
+        <section className="mt-4 rounded border border-brass bg-paper p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</p>
+          <h2 className="mt-1 font-serif text-2xl font-normal">{tierLabel(user.tier)} member</h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink">
+            Your account is active. {BRAND.owner} approved membership. Invited and Confirmed are the membership tiers. The brass Verified badge is a separate committee file. You only see “Verified” or “Verification in progress” on that file.
+          </p>
+          <div className="mt-2">
+            <TierBadge tier={user.tier} />
+          </div>
+        </section>
         {!user.seenWelcome ? (
           <section className="mt-4 rounded border border-brass bg-paper p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Welcome to {BRAND.name}</p>
-            <h2 className="mt-1 font-serif text-2xl font-normal">How the circle works</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink">
-              Your membership tier is {tierLabel(user.tier)}. Tier and the brass Verified badge are different.
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-ink">
+            <h2 className="mt-1 font-serif text-2xl font-normal">Getting started</h2>
+            <ol className="mt-2 list-decimal space-y-2 pl-4 text-sm text-ink">
               <li>
-                <b>Invited.</b> Your application was accepted. Complete your profile and list projects you can stand behind.
+                <Link href="/profile" className="underline decoration-brass">
+                  Complete your profile
+                </Link>
+                . Add the work you want other members to see.
               </li>
               <li>
-                <b>Confirmed.</b> The committee accepts a vouch on a project. A typed email cannot move you here on its own.
+                <Link href="/profile" className="underline decoration-brass">
+                  Add a project or what you are looking for
+                </Link>
+                . A vouch can be requested after that project file is verified.
               </li>
+              <li>Introductions stay inside the portal. Ask before you connect two members, and say why it fits.</li>
               <li>
-                <b>Verified badge.</b> A separate committee file. It appears only when that file is complete. It is not a membership tier. You can be Confirmed and still see “Verification in progress.”
+                Read the{" "}
+                <Link href="/legal/guidelines" className="underline decoration-brass">
+                  community guidelines
+                </Link>
+                .
               </li>
+              <li>Invite a colleague from the card on this page. The code is issued to you. Private Floor does not email it.</li>
             </ol>
-            <p className="mt-2 text-sm text-ink">Next: open your profile and add a project. A vouch can be requested after the committee marks that project Verified.</p>
             {application?.reviewerNote ? (
               <p className="mt-3 rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
-                <b>Note from the committee. </b>
+                <b>Note from {BRAND.owner}. </b>
                 {application.reviewerNote}
               </p>
             ) : null}
@@ -127,20 +145,11 @@ export default async function FeedPage({
           </section>
         ) : application?.reviewerNote ? (
           <p className="mt-4 rounded border border-line bg-paper px-3 py-2 text-sm text-ink">
-            <b>Note from the committee. </b>
+            <b>Note from {BRAND.owner}. </b>
             {application.reviewerNote}
           </p>
         ) : null}
         <div className="mt-4 space-y-4 lg:hidden">
-          <div className="rounded border border-line bg-paper p-4">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your verification</h2>
-            <div className="mt-2">
-              <TierBadge tier={user.tier} />
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-ink">
-              Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
-            </p>
-          </div>
           <ColleagueInvite codes={unusedCodes} />
         </div>
         <div className="mt-4">
@@ -253,12 +262,12 @@ export default async function FeedPage({
           </ul>
         </div>
         <div className="rounded border border-line bg-paper p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your verification</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</h2>
           <div className="mt-2">
             <TierBadge tier={user.tier} />
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink">
-            Invited means the application was accepted. Confirmed means the committee accepted a vouch. The brass Verified badge is a separate file, not a third tier.
+            {tierLabel(user.tier)} member. Account active. {BRAND.owner} approves membership. Confirmed follows an accepted vouch. The brass Verified badge is a separate file.
           </p>
         </div>
         <ColleagueInvite codes={unusedCodes} />

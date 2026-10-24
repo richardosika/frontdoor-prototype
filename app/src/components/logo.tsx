@@ -1,15 +1,23 @@
 import { BRAND } from "@/lib/brand";
 
 export function Logo({ tone = "ink", compact = false }: { tone?: "ink" | "paper"; compact?: boolean }) {
-  const onForest = tone === "paper";
+  if (tone === "paper" && compact) {
+    // Brand SVG served as-is. The optimizer does not apply.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src="/brand/pf-mark.svg" alt={BRAND.name} className="h-7 w-7" />;
+  }
+  if (tone === "paper") {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src="/brand/lockup-reversed.svg" alt={BRAND.name} className="h-10 w-auto" />;
+  }
   return (
-    <span className={`inline-flex items-center gap-2.5 ${onForest ? "text-paper" : "text-forest"}`}>
-      <i
-        className={`relative inline-block h-[18px] w-[18px] rotate-45 border ${onForest ? "border-brass" : "border-forest"}`}
-        aria-hidden
-      >
-        <i className={`absolute inset-1 ${onForest ? "bg-brass" : "bg-forest"}`} />
-      </i>
+    <span className="inline-flex items-center gap-2.5 text-forest">
+      <svg viewBox="0 0 32 32" className="h-[22px] w-[22px]" aria-hidden>
+        <rect x="8" y="8" width="16" height="16" fill="none" stroke="#A8843F" strokeWidth="1.4" transform="rotate(45 16 16)" />
+        <text x="16" y="19" textAnchor="middle" fontFamily="Georgia, serif" fontSize="8" fill="#1F3A2E">
+          PF
+        </text>
+      </svg>
       {compact ? null : (
         <span className="flex flex-col leading-none">
           <span className="font-serif text-[18px] uppercase tracking-[0.16em]">{BRAND.mark[0]}</span>

@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { reviewApplication } from "@/actions/admin";
+import { rerunVerification, saveInternalNote } from "@/actions/owner";
+import { AdminNav } from "@/components/admin-nav";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { btn, btnOutline, card, field } from "@/components/ui";
+import { VerdictChip } from "@/components/verdict-chip";
+import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
+import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
+import { DUES_WAIVED, duesLabel } from "@/lib/dues";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
@@ -23,28 +28,49 @@ export default async function ApplicationDetailPage({
   const query = await searchParams;
   const application = await prisma.application.findUnique({
     where: { id },
-    include: { inviteCode: true, businessCard: { select: { id: true, deletedAt: true, sizeBytes: true } }, reviewer: { select: { name: true } } },
+    include: {
+      inviteCode: true,
+      businessCard: { select: { id: true, fileName: true, contentType: true, sizeBytes: true, deletedAt: true } },
+      reviewer: { select: { name: true } },
+      decisions: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
+      legalAcceptances: { orderBy: { document: "asc" } },
+      runs: { orderBy: { createdAt: "desc" }, include: { evidence: { orderBy: { checkKey: "asc" } } } },
+    },
   });
   if (!application) notFound();
+  const report = application.runs.find((run) => run.subject === "APPLICATION");
+  const company = application.runs.find((run) => run.subject === "COMPANY");
+  const card = application.businessCard;
+  const cardOnFile = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
+  const open = ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"].includes(application.status);
   const verification = application.userId
     ? await prisma.verificationCase.findFirst({ where: { userId: application.userId }, select: { id: true } })
     : null;
-  const cardOnFile = Boolean(application.businessCard && !application.businessCard.deletedAt && application.businessCard.sizeBytes > 0);
 
   return (
     <div>
-      <MobileTitle href="/admin/applications" label="Queue" title={application.name} />
+      <MobileTitle href="/admin/applications" label="Applications" title={application.name} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title={application.name} />
+        <AdminNav current="/admin/applications" />
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <VerdictChip verdict={report?.verdict} score={report?.score} />
+          <span className="text-xs uppercase tracking-wide text-mut">{applicationStatusLabel(application.status)}</span>
+          {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
         <section className={`${card} mt-4 space-y-2 p-4 text-sm`}>
           <p>
             <b>Email:</b> {application.email}
+            {application.emailVerifiedAt ? " · email code confirmed" : ""}
           </p>
           <p>
             <b>Role:</b> {roleLabel(application.role)} · {application.org} · {application.location}
+          </p>
+          <p>
+            <b>Dues:</b> {duesLabel(application.duesCents)}. {application.duesWaived ? DUES_WAIVED : ""}
           </p>
           {application.phone ? (
             <p>
@@ -56,51 +82,194 @@ export default async function ApplicationDetailPage({
               <b>LinkedIn:</b> {application.linkedinUrl}
             </p>
           ) : null}
+          {application.website ? (
+            <p>
+              <b>Website:</b> {application.website}
+            </p>
+          ) : null}
+          {application.socialLinks ? (
+            <p>
+              <b>Social:</b> {application.socialLinks}
+            </p>
+          ) : null}
           <p>
             <b>Submitted:</b> {formatAuditTime(application.createdAt)}
           </p>
           <p>
-            <b>Status:</b> {application.status}
-            {application.reviewedAt ? ` · decided ${formatAuditTime(application.reviewedAt)}` : ""}
-            {application.reviewer ? ` by ${application.reviewer.name}` : ""}
-          </p>
-          <p>
-            <b>Business card:</b> {cardOnFile ? "On file. Members never see it." : "No business card uploaded."}
+            <b>Invite:</b> {application.inviteCode.code}
+            {application.inviteCode.note ? ` · ${application.inviteCode.note}` : ""}
           </p>
           <p>
             <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}
           </p>
           <p>
-            <b>Invite:</b> {application.inviteCode.code}
+            <b>Track record:</b> {application.statement.trim() || "Not provided"}
           </p>
-          <p>
-            <b>Anyone who can speak for you:</b> {application.statement.trim() || "Not provided"}
-          </p>
+          {application.reviewedAt ? (
+            <p>
+              <b>Last touch:</b> {formatAuditTime(application.reviewedAt)}
+              {application.reviewer ? ` by ${application.reviewer.name}` : ""}
+            </p>
+          ) : null}
           {verification ? (
             <p>
-              <Link className="font-semibold text-forest underline" href={`/admin/verification/${verification.id}`}>
-                Open verification case
+              <Link href={`/admin/verification/${verification.id}`} className="underline decoration-brass">
+                Committee file
               </Link>
             </p>
+          ) : null}
+        </section>
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Business card</h2>
+          {cardOnFile && card ? (
+            <div className="mt-3">
+              <p className="text-xs text-mut">
+                {card.fileName} · {card.contentType} · {card.sizeBytes} bytes. Members never see this file.
+              </p>
+              {card.contentType.startsWith("image/") ? (
+                // Admin-only authenticated file. The image optimizer cannot send the session.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/admin/verification/cards/${card.id}`} alt="Business card" className="mt-3 max-h-80 rounded border border-line" />
+              ) : (
+                <a className="mt-3 inline-block underline decoration-brass" href={`/api/admin/verification/cards/${card.id}`}>
+                  Open the PDF
+                </a>
+              )}
+            </div>
           ) : (
-            <p className="text-ink">The verification case opens when this application is approved.</p>
+            <p className="mt-2 text-sm text-mut">No business card uploaded.</p>
           )}
         </section>
-        {application.status === "PENDING" ? (
-          <form action={reviewApplication} className={`${card} mt-4 space-y-2 p-4`}>
+        <Report title="Automated verification report" run={report} />
+        <Report title="Company report" run={company} />
+        <form action={rerunVerification} className="mt-4">
+          <input type="hidden" name="applicationId" value={application.id} />
+          <button className={btnOutline} type="submit">
+            Re-run verification
+          </button>
+          <p className="mt-2 text-xs text-mut">Re-run uses live free sources and can take a minute. Sample LEGIT rows use offline fixtures until you re-run.</p>
+        </form>
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Internal note</h2>
+          <form action={saveInternalNote} className="mt-3 space-y-2">
             <input type="hidden" name="applicationId" value={application.id} />
-            <input name="note" className={field} placeholder="Note to the applicant (optional)" />
-            <div className="flex gap-2">
-              <button className={`${btnOutline} flex-1`} name="decision" value="REJECTED" type="submit">
-                Reject
-              </button>
-              <button className={`${btn} flex-1`} name="decision" value="APPROVED" type="submit">
-                Approve as Invited
-              </button>
-            </div>
+            <textarea name="internalNote" className={field} rows={3} defaultValue={application.internalNote} />
+            <button className={btnOutline} type="submit">
+              Save note
+            </button>
           </form>
+        </section>
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Documents accepted</h2>
+          {application.legalAcceptances.length === 0 ? <p className="mt-2 text-sm text-mut">None recorded.</p> : null}
+          <ul className="mt-2 space-y-1 text-sm">
+            {application.legalAcceptances.map((row) => (
+              <li key={row.id}>
+                {row.document} · {row.version} · {formatAuditTime(row.acceptedAt)}
+              </li>
+            ))}
+          </ul>
+        </section>
+        {open ? (
+          <section className={`${card} mt-4 p-4`}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your decision</h2>
+            <p className="mt-1 text-sm text-ink">Automation does not approve or decline. A decline does not show the reason to the applicant.</p>
+            <form action={reviewApplication} className="mt-3 space-y-2">
+              <input type="hidden" name="applicationId" value={application.id} />
+              <label className={labelCls}>Note</label>
+              <textarea name="note" className={field} rows={3} placeholder="Shown if you approve or ask for more info. Hidden if you decline." />
+              <div className="flex flex-wrap gap-2">
+                <button className={btn} name="decision" value="APPROVED" type="submit">
+                  Approve as Invited member
+                </button>
+                <button className={btnOutline} name="decision" value="NEEDS_INFO" type="submit">
+                  Needs more info
+                </button>
+                <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+                  Decline
+                </button>
+              </div>
+            </form>
+          </section>
         ) : null}
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Decision log</h2>
+          {application.decisions.length === 0 ? <p className="mt-2 text-sm text-mut">No decisions yet.</p> : null}
+          <ul className="mt-2 divide-y divide-line text-sm">
+            {application.decisions.map((row) => (
+              <li key={row.id} className="py-2">
+                <b>{row.decision}</b> · {row.actor?.name || "Private Floor"} · {formatAuditTime(row.createdAt)}
+                {row.reason ? <p className="text-ink">{row.reason}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
+  );
+}
+
+function Report({
+  title,
+  run,
+}: {
+  title: string;
+  run?: {
+    status: string;
+    summary: string;
+    verdict: string | null;
+    score: number | null;
+    finishedAt: Date | null;
+    evidence: { id: string; checkKey: string; status: string; finding: string; source: string; url: string; ranAt: Date }[];
+  };
+}) {
+  return (
+    <section className={`${card} mt-4 p-4`}>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{title}</h2>
+      {!run ? <p className="mt-2 text-sm text-mut">No report yet.</p> : null}
+      {run ? (
+        <>
+          <div className="mt-2">
+            <VerdictChip verdict={run.verdict} score={run.score} />
+            <span className="ml-2 text-xs text-mut">{run.status}{run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}</span>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-ink">{run.summary || "The report is still running."}</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-line text-mut">
+                  <th className="py-2 pr-2">Check</th>
+                  <th className="py-2 pr-2">Status</th>
+                  <th className="py-2 pr-2">Finding</th>
+                  <th className="py-2 pr-2">Source</th>
+                  <th className="py-2">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {run.evidence.map((row) => (
+                  <tr key={row.id} className="border-b border-line align-top">
+                    <td className="py-2 pr-2">{row.checkKey}</td>
+                    <td className="py-2 pr-2">{row.status}</td>
+                    <td className="py-2 pr-2">
+                      {row.finding}
+                      {row.url ? (
+                        <>
+                          {" "}
+                          <a className="underline decoration-brass" href={row.url} target="_blank" rel="noreferrer">
+                            Link
+                          </a>
+                        </>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-2">{row.source}</td>
+                    <td className="py-2">{formatAuditTime(row.ranAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+    </section>
   );
 }

@@ -21,8 +21,8 @@ export default async function AdminPage({
   const issuedCode = params.issued
     ? await prisma.inviteCode.findUnique({ where: { code: params.issued } })
     : null;
-  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests] = await Promise.all([
-    prisma.application.count({ where: { status: "PENDING" } }),
+  const [pending, members, invites, posts, access, vouches, verificationCases, openReports, inviteRequests, outbox, testApps] = await Promise.all([
+    prisma.application.count({ where: { status: { in: ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"] } } }),
     prisma.user.groupBy({ by: ["tier"], _count: true }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
     prisma.post.count(),
@@ -35,6 +35,8 @@ export default async function AdminPage({
     prisma.verificationCase.findMany({ select: { status: true, expiresAt: true } }),
     prisma.report.count(),
     prisma.inviteRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
+    prisma.outboxNotice.count(),
+    prisma.application.count({ where: { isTest: true } }),
   ]);
   const awaitingVerification = verificationCases.filter((item) => isAwaitingVerification(item)).length;
   const tierCount = (tier: string) => members.find((row) => row.tier === tier)?._count ?? 0;
@@ -42,7 +44,16 @@ export default async function AdminPage({
   return (
     <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Admin" />
-      <p className="mt-1 text-sm text-ink">Review applications, set membership tier to Invited or Confirmed, and issue invite codes. The Verified badge is a separate file.</p>
+      <p className="mt-1 text-sm text-ink">
+        Review applications, set membership tier to Invited or Confirmed, and issue invite codes. The Verified badge is a separate file.{" "}
+        <Link href="/admin/sources" className="underline decoration-brass">
+          Verification settings
+        </Link>
+        {" · "}
+        <Link href="/admin/audit" className="underline decoration-brass">
+          Audit log
+        </Link>
+      </p>
       <div className="mt-4 space-y-3">
         <Banner error={params.error} notice={params.notice} />
         {issuedCode ? (
@@ -53,7 +64,9 @@ export default async function AdminPage({
         ) : null}
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat href="/admin/applications" label="Pending applications" value={pending} />
+        <Stat href="/admin/applications" label="Open applications" value={pending} />
+        <Stat href="/admin/outbox" label="Outbox notices" value={outbox} />
+        <Stat href="/admin/test" label="Test applications" value={testApps} />
         <Stat href="/admin/members" label="Confirmed members" value={tierCount("CONFIRMED")} />
         <Stat href="/admin/access" label="Open access requests" value={access} />
         <Stat href="/admin/verification" label="Verification awaiting review" value={awaitingVerification} />

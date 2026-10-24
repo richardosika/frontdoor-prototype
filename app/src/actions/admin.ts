@@ -9,11 +9,12 @@ import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE } from "@/lib/business-card";
 import { initialsFromName, isMembershipTier, tierAfterAdminApprovesVouch } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
 import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
+import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
+import { sendNotice } from "@/lib/notices";
 import { appBaseUrl } from "@/lib/url";
 
 export async function reviewApplication(formData: FormData) {
@@ -21,29 +22,65 @@ export async function reviewApplication(formData: FormData) {
   const applicationId = String(formData.get("applicationId") || "");
   const decision = String(formData.get("decision") || "");
   const note = String(formData.get("note") || "").trim().slice(0, 500);
-  if (decision !== "APPROVED" && decision !== "REJECTED") redirect("/admin/applications");
-
-  const application = await prisma.application.findUnique({ where: { id: applicationId } });
-  if (!application || application.status !== "PENDING") redirect("/admin/applications");
-
-  if (decision === "REJECTED") {
-    await prisma.application.update({
-      where: { id: application.id },
-      data: { status: "REJECTED", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
-    });
-    await sendEmail({
-      to: application.email,
-      subject: `${BRAND.name} application update`,
-      text: `Hello ${application.name},\n\nThe committee did not approve this application.${note ? ` Note: ${note}` : ""}\n\nYou can read the decision here: ${await appBaseUrl()}/apply/status/${application.statusToken}\n`,
-    });
-    revalidatePath("/admin");
-    revalidatePath("/admin/applications");
+  const normalized = decision === "REJECTED" ? "DECLINED" : decision;
+  if (normalized !== "APPROVED" && normalized !== "DECLINED" && normalized !== "NEEDS_INFO") {
     redirect("/admin/applications");
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: application.email } });
-  if (existing) {
-    redirect("/admin/applications?error=That+email+is+already+a+member");
+  const application = await prisma.application.findUnique({ where: { id: applicationId } });
+  if (!application || !(OPEN_APPLICATION_STATUSES as readonly string[]).includes(application.status)) {
+    redirect(`/admin/applications/${applicationId}?error=That+application+is+not+open`);
+  }
+
+  if (normalized === "NEEDS_INFO" && note.length < 2) {
+    redirect(`/admin/applications/${application.id}?error=Write+what+you+need+from+the+applicant`);
+  }
+  if (normalized === "APPROVED") {
+    const existing = await prisma.user.findUnique({ where: { email: application.email } });
+    if (existing) {
+      redirect(`/admin/applications/${application.id}?error=That+email+is+already+a+member`);
+    }
+  }
+
+  const base = await appBaseUrl();
+  await prisma.applicationDecision.create({
+    data: {
+      applicationId: application.id,
+      actorId: admin.id,
+      decision: normalized,
+      reason: note,
+    },
+  });
+
+  if (normalized === "DECLINED") {
+    await prisma.application.update({
+      where: { id: application.id },
+      data: { status: "DECLINED", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
+    });
+    await sendNotice({
+      intendedTo: application.email,
+      applicationId: application.id,
+      subject: `${BRAND.name} application update`,
+      text: `Hello ${application.name},\n\nThis application was not approved. Reasons are not included.\n\nYou can read the decision here: ${base}/apply/status/${application.statusToken}\n`,
+    });
+    revalidatePath("/admin");
+    revalidatePath("/admin/applications");
+    redirect(`/admin/applications/${application.id}?notice=Declined`);
+  }
+
+  if (normalized === "NEEDS_INFO") {
+    await prisma.application.update({
+      where: { id: application.id },
+      data: { status: "NEEDS_INFO", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
+    });
+    await sendNotice({
+      intendedTo: application.email,
+      applicationId: application.id,
+      subject: `${BRAND.name} needs a bit more`,
+      text: `Hello ${application.name},\n\nRichard Osika needs more information before deciding.\n\n${note}\n\nReply on this page: ${base}/apply/status/${application.statusToken}\n`,
+    });
+    revalidatePath("/admin/applications");
+    redirect(`/admin/applications/${application.id}?notice=Asked+for+more+info`);
   }
 
   const card = await prisma.businessCard.findUnique({
@@ -65,6 +102,7 @@ export async function reviewApplication(formData: FormData) {
       linkedinUrl: application.linkedinUrl,
       tier: "INVITED",
       status: "ACTIVE",
+      isTest: application.isTest,
     },
   });
   if (card) {
@@ -91,18 +129,22 @@ export async function reviewApplication(formData: FormData) {
       userId: user.id,
     },
   });
+  await prisma.legalAcceptance.updateMany({
+    where: { applicationId: application.id },
+    data: { userId: user.id },
+  });
 
-  const base = await appBaseUrl();
-  await sendEmail({
-    to: application.email,
+  await sendNotice({
+    intendedTo: application.email,
+    applicationId: application.id,
     subject: `You're in — ${BRAND.name} application approved`,
-    text: `Hello ${application.name},\n\nYour application was approved. You are an Invited member.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
+    text: `Hello ${application.name},\n\nRichard Osika approved your application. You are an Invited member.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
   });
 
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
   revalidatePath("/network");
-  redirect(`/admin/applications?notice=${encodeURIComponent(`Approved ${application.name}`)}`);
+  redirect(`/admin/applications/${application.id}?notice=${encodeURIComponent(`Approved ${application.name}`)}`);
 }
 
 export async function setMemberTier(formData: FormData) {

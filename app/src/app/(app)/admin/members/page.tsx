@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { setMemberTier } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
@@ -34,7 +35,10 @@ export default async function MembersAdminPage({
           <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold">
-                {member.name} <TierBadge tier={member.tier} />
+                <Link href={`/admin/members/${member.id}`} className="underline decoration-brass/40">
+                  {member.name}
+                </Link>{" "}
+                <TierBadge tier={member.tier} />
                 {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
               </div>
               <p className="text-xs text-mut">

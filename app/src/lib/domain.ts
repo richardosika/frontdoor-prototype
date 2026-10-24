@@ -179,6 +179,8 @@ export type ApplicationInput = {
   statement?: string;
   phone?: string;
   linkedinUrl?: string;
+  website?: string;
+  socialLinks?: string;
 };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,6 +204,13 @@ export function validateApplication(input: ApplicationInput): string[] {
   if (phone && phone.replace(/\D/g, "").length < 7) errors.push("Enter a phone number with at least 7 digits, or leave it blank.");
   const linkedin = (input.linkedinUrl ?? "").trim();
   if (linkedin && !/^https?:\/\//i.test(linkedin)) errors.push("LinkedIn URL must start with http.");
+  const website = (input.website ?? "").trim();
+  if (website && !/^https?:\/\//i.test(website)) errors.push("Website must start with http.");
+  const social = (input.socialLinks ?? "")
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (social.some((item) => !/^https?:\/\//i.test(item))) errors.push("Social links must start with http.");
   return errors;
 }
 

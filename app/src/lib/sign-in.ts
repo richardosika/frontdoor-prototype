@@ -1,6 +1,7 @@
 export const GENERIC_SIGN_IN_ERROR = "Those credentials were not recognized.";
-export const PENDING_APPROVAL_ERROR = "Your application is pending approval. You can sign in after the committee approves it.";
-export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact the committee if you need help.";
+export const PENDING_APPROVAL_ERROR = "Your application is under review. You can sign in after Richard Osika approves it.";
+export const DECLINED_APPLICATION_ERROR = "This application was not approved.";
+export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact connect@privatefloorclub.com if you need help.";
 
 /**
  * Pending approval is mentioned only after the password matches a pending application.
@@ -12,9 +13,11 @@ export function signInFailureCopy(input: {
   memberPasswordMatches: boolean;
   memberActive: boolean;
   pendingApplicationPasswordMatches: boolean;
+  declinedApplicationPasswordMatches?: boolean;
 }): string | null {
   if (input.memberFound && input.memberPasswordMatches && input.memberActive) return null;
   if (input.memberFound && input.memberPasswordMatches && !input.memberActive) return INACTIVE_ACCOUNT_ERROR;
+  if (!input.memberFound && input.declinedApplicationPasswordMatches) return DECLINED_APPLICATION_ERROR;
   if (!input.memberFound && input.pendingApplicationPasswordMatches) return PENDING_APPROVAL_ERROR;
   return GENERIC_SIGN_IN_ERROR;
 }
