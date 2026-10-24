@@ -44,3 +44,11 @@ services:
         sync: false
       - key: STRIPE_PRICE_ADVISOR
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: HELP_PROVIDER
+        sync: false
+      - key: HELP_MODEL
+        sync: false

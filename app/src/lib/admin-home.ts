@@ -75,6 +75,13 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
     links: [{ href: "/admin/legal", label: "Legal versions" }],
   },
   {
+    label: "Help",
+    links: [
+      { href: "/admin/help", label: "Questions" },
+      { href: "/admin/help/faq", label: "FAQ and knowledge" },
+    ],
+  },
+  {
     label: "Settings",
     links: [
       { href: "/admin/settings", label: "Delivery and dues" },

@@ -87,12 +87,22 @@ The admin home is `/admin`. A person who is not an administrator is sent back to
 
 1. The top strip is **Needs your attention**. Each tile is a count and a link: applications awaiting a decision, needs-more-info replies, payments due or failed, reports, flagged posts, introductions and deal rooms, and CRM follow-ups due. A count above zero uses a brass border.
 2. **Funnel** shows submitted, in review, approved, payment due, declined, and active members. **Last 7 days** shows new applications, decisions, Outbox notices, and new members. **Recent activity** is the audit log, newest first, and opens the full log.
-3. The left navigation groups Applications & Verification, Members, Payments, CRM, Email templates & Outbox, Moderation, Content/Legal versions, Settings, Audit log, and Test console. On a phone, open **Admin menu**. The command center link is active only on `/admin`.
+3. The left navigation groups Applications & Verification, Members, Payments, CRM, Email templates & Outbox, Moderation, Content/Legal versions, Help, Settings, Audit log, and Test console. On a phone, open **Admin menu**. The command center link is active only on `/admin`.
 4. **Payments** lists members who owe dues, paid, were waived, failed, or have a refund note. Due and failed rows are marked. Open the member to mark paid, waive, or resend the link.
 5. **Introductions and deal rooms** lists pending introductions by name and note. The member still accepts or declines. Deal-room requests stay on the same page.
 6. **Legal versions** lists each draft, its version line, and a link to the public page. Five of them are marked recorded at signup.
 7. **Settings** shows the test recipient (`NOTICE_TEST_RECIPIENT`) and a Test / Live choice in large type. Test stores notices in the Outbox for that recipient. Live is saved for a later mail provider and still does not email anyone. The dues table shows the flat annual amounts. It is not an editor. **Sources and watchlists** is linked from the same page.
 8. Invite requests and new codes stay on the command center. Issuing a code puts the information email in the Outbox. Copy the code. Applicants are not emailed.
+
+## Help
+
+Help is the button on the lower right of signup, the public pages, and the signed-in floor.
+
+1. Open Help on `/apply` or after sign-in. Ask what a general contractor pays. The answer includes **$2,400 a year**, says it is not legal, tax, or investment advice, and does not promise approval. With no `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, the answer is the keyword FAQ. If a key is set, Help still answers only from the retrieved pages.
+2. Ask whether you will be approved, ask for legal or investment advice, or ask for a verification score or a source list. Help refuses, does not invent an outcome, and points to **connect@privatefloorclub.com**. A prompt that says to ignore the rules gets the same refusal.
+3. Ask something the pages do not cover. Help says it is not sure and offers the same email. Thumbs up and thumbs down stick to that question in the browser session.
+4. `/admin/help` lists questions, with filters for unanswered, refused, and thumbs down. The list has the question text and the answer. It does not show a name or email. `/admin/help/faq` edits the articles Help retrieves. Unpublished articles drop out. The legal drafts stay in their files.
+5. Help pauses after 20 questions in an hour for that browser session.
 
 ## What the offline samples are for
 

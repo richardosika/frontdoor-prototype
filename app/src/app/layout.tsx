@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { EB_Garamond, Libre_Franklin } from "next/font/google";
+import { HelpWidget } from "@/components/help-widget";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -30,7 +31,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>{children}</body>
+      <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>
+        {children}
+        <HelpWidget />
+      </body>
     </html>
   );
 }

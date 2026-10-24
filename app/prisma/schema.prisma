@@ -846,6 +846,32 @@ model SourceCache {
   body      String
 }
 
+model HelpArticle {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  body      String
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HelpTurn {
+  id         String   @id @default(cuid())
+  sessionKey String
+  question   String
+  answer     String
+  confidence String
+  unanswered Boolean  @default(false)
+  provider   String
+  feedback   String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([sessionKey, createdAt])
+  @@index([unanswered, createdAt])
+  @@index([createdAt])
+}
+
 model DealEvent {
   id        String   @id @default(cuid())
   dealId    String

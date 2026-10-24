@@ -52,6 +52,7 @@ describe("admin command center", () => {
       "Email templates & Outbox",
       "Moderation",
       "Content/Legal versions",
+      "Help",
       "Settings",
       "Audit log",
       "Test console",
