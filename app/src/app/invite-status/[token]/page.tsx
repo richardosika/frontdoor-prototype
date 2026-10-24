@@ -8,15 +8,15 @@ export const dynamic = "force-dynamic";
 const COPY = {
   PENDING: {
     title: "Invite request pending",
-    body: "The committee has not issued a code yet.",
+    body: "A Private Floor administrator has not issued a code yet.",
   },
   ISSUED: {
     title: "Invite code issued",
-    body: "A member of the committee will pass the invite code along. This page does not include the code.",
+    body: "A Private Floor administrator will pass the invite code along. This page does not include the code.",
   },
   DECLINED: {
     title: "Invite request declined",
-    body: "The committee did not issue a code.",
+    body: "A Private Floor administrator did not issue a code.",
   },
 } as const;
 

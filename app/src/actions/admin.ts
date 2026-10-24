@@ -169,7 +169,7 @@ export async function setMemberTier(formData: FormData) {
     });
     await notify(userId, {
       title: "Membership tier updated",
-      body: `Your membership tier is now ${tierLabel(tier)}. The Verified badge is a separate committee file.`,
+      body: `Your membership tier is now ${tierLabel(tier)}. The Verified badge is a separate verification file.`,
       href: "/profile",
     });
   }
@@ -227,7 +227,7 @@ export async function reviewVouch(formData: FormData) {
     });
     await notify(member.id, {
       title: "Vouch not accepted",
-      body: `The committee did not accept the vouch on ${confirmation.project.name}. Your tier is unchanged.`,
+      body: `A Private Floor administrator did not accept the vouch on ${confirmation.project.name}. Your tier is unchanged.`,
       href: "/profile",
     });
     await reviewVouchOnChecklist({

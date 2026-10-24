@@ -13,10 +13,25 @@ const STEPS = [
   { id: 1, label: "Invite code" },
   { id: 2, label: "Choose role" },
   { id: 3, label: "Your details" },
-  { id: 4, label: "Email" },
-  { id: 5, label: "Terms" },
-  { id: 6, label: "Membership dues" },
+  { id: 4, label: "Terms" },
+  { id: 5, label: "Membership dues" },
 ] as const;
+
+const LEGAL_LINKS = [
+  ["/legal/terms", "Terms of Use"],
+  ["/legal/privacy", "Privacy Policy"],
+  ["/legal/disclosures", "Important Disclosures"],
+  ["/legal/verification-policy", "Verification Policy"],
+  ["/legal/applicant-consent", "Applicant consent"],
+  ["/legal/guidelines", "Community guidelines"],
+] as const;
+
+export type ApplyConsentCopy = {
+  beforeHtml: string;
+  termsLabel: string;
+  verificationLabel: string;
+  helper: string;
+};
 
 function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -24,7 +39,7 @@ function fileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ApplyWizard() {
+export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -50,8 +65,7 @@ export function ApplyWizard() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [statement, setStatement] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
-  const [acceptDisclosures, setAcceptDisclosures] = useState(false);
+  const [acceptVerification, setAcceptVerification] = useState(false);
 
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[0];
   const dues = duesForRole(role);
@@ -100,12 +114,29 @@ export function ApplyWizard() {
       return;
     }
     setVerifiedEmail(email.trim().toLowerCase());
-    setStep(5);
+  }
+
+  function continueFromDetails() {
+    if (name.trim().length < 2 || !email.trim() || password.length < 8 || org.trim().length < 2 || location.trim().length < 2) {
+      setError("Enter your name, email, a password of at least 8 characters, company, and city.");
+      return;
+    }
+    if (verifiedEmail !== email.trim().toLowerCase()) {
+      setError("Confirm the email code before you continue.");
+      return;
+    }
+    setError("");
+    setStep(4);
   }
 
   async function submit() {
     if (verifiedEmail !== email.trim().toLowerCase()) {
       setError("Verify the email code before you submit.");
+      setStep(3);
+      return;
+    }
+    if (!acceptTerms || !acceptVerification) {
+      setError("Check both boxes before you submit.");
       setStep(4);
       return;
     }
@@ -127,8 +158,7 @@ export function ApplyWizard() {
     data.set("linkedinUrl", linkedinUrl);
     data.set("statement", statement);
     data.set("accept_terms", acceptTerms ? "yes" : "");
-    data.set("accept_privacy", acceptPrivacy ? "yes" : "");
-    data.set("accept_disclosures", acceptDisclosures ? "yes" : "");
+    data.set("accept_verification", acceptVerification ? "yes" : "");
     if (cardFile) data.set("businessCard", cardFile);
     const result = await submitApplication(data);
     setPending(false);
@@ -146,7 +176,7 @@ export function ApplyWizard() {
         <span className="font-serif text-lg tracking-[0.18em] uppercase">Apply</span>
         <span className="text-xs text-sand">{done ? "Submitted" : `Step ${step} of ${STEPS.length}`}</span>
       </div>
-      <ol className="grid grid-cols-3 gap-2 px-5 pt-4 sm:grid-cols-6">
+      <ol className="grid grid-cols-3 gap-2 px-5 pt-4 sm:grid-cols-5">
         {STEPS.map((item) => (
           <li key={item.id} className="min-w-0">
             <i className={`mb-1 block h-1 rounded ${!done && item.id <= step ? "bg-brass" : done ? "bg-brass" : "bg-line"}`} />
@@ -243,7 +273,15 @@ export function ApplyWizard() {
             </div>
             <div>
               <label className={labelCls}>Email</label>
-              <input className={field} type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+              <input
+                className={field}
+                type="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setVerifiedEmail("");
+                }}
+              />
             </div>
             <div>
               <label className={labelCls}>Password</label>
@@ -312,11 +350,35 @@ export function ApplyWizard() {
               <label className={labelCls}>Tell us about you / your track record</label>
               <textarea className={field} rows={4} value={statement} onChange={(event) => setStatement(event.target.value)} />
             </div>
+            <div className="rounded border border-line bg-cream p-3">
+              <p className="text-sm font-semibold">Confirm your email</p>
+              <p className="mt-1 text-sm text-ink">
+                A 6-digit code proves this inbox is yours. During this test the code is delivered only to the test recipient and is listed in the admin Outbox. It is not sent to the address you typed.
+              </p>
+              {verifiedEmail && verifiedEmail === email.trim().toLowerCase() ? (
+                <p className="mt-2 text-sm text-forest">Email confirmed.</p>
+              ) : (
+                <>
+                  <button className={`${btnOutline} mt-3 w-full`} type="button" disabled={pending || !email.trim()} onClick={sendCode}>
+                    {codeSent ? "Send a new code" : "Send code"}
+                  </button>
+                  {codeSent ? (
+                    <>
+                      <label className={`${labelCls} mt-3`}>6-digit code</label>
+                      <input className={field} inputMode="numeric" value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="000000" />
+                      <button className={`${btn} mt-3 w-full`} type="button" disabled={pending} onClick={confirmCode}>
+                        Confirm code
+                      </button>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </div>
             <div className="flex gap-2">
               <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(2)}>
                 Back
               </button>
-              <button className={`${btn} flex-1`} type="button" onClick={() => setStep(4)}>
+              <button className={`${btn} flex-1`} type="button" onClick={continueFromDetails}>
                 Continue
               </button>
             </div>
@@ -324,84 +386,35 @@ export function ApplyWizard() {
         ) : null}
         {!done && step === 4 ? (
           <div>
-            <h1 className="font-serif text-xl">Confirm your email</h1>
-            <p className="mt-1 text-sm text-ink">
-              A 6-digit code proves this inbox is yours. During this test the code is delivered only to the test recipient and is listed in the admin Outbox. It is not sent to the address you typed.
-            </p>
-            <p className="mt-3 text-sm font-semibold">{email}</p>
-            <button className={`${btnOutline} mt-3 w-full`} type="button" disabled={pending} onClick={sendCode}>
-              {codeSent ? "Send a new code" : "Send code"}
-            </button>
-            {codeSent ? (
-              <>
-                <label className={`${labelCls} mt-4`}>6-digit code</label>
-                <input className={field} inputMode="numeric" value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="000000" />
-                <button className={`${btn} mt-3 w-full`} type="button" disabled={pending} onClick={confirmCode}>
-                  Confirm code
-                </button>
-              </>
-            ) : null}
-            <button className={`${btnOutline} mt-2 w-full`} type="button" onClick={() => setStep(3)}>
-              Back
-            </button>
-          </div>
-        ) : null}
-        {!done && step === 5 ? (
-          <div>
-            <h1 className="font-serif text-xl">Review and accept</h1>
-            <p className="mt-1 text-sm text-ink">
-              Read the drafts. Your acceptance stores the document, the version, the time, and a hash of the IP address.
-            </p>
-            <ul className="mt-3 space-y-2 text-sm">
-              <li>
-                <Link className="underline decoration-brass" href="/legal/terms" target="_blank">
-                  Terms of Use
-                </Link>
-              </li>
-              <li>
-                <Link className="underline decoration-brass" href="/legal/privacy" target="_blank">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link className="underline decoration-brass" href="/legal/disclosures" target="_blank">
-                  Disclosures
-                </Link>
-              </li>
-              <li>
-                <Link className="underline decoration-brass" href="/legal/guidelines" target="_blank">
-                  Community guidelines
-                </Link>
-              </li>
+            <div className="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: consent.beforeHtml }} />
+            <ul className="mt-4 space-y-2 text-sm">
+              {LEGAL_LINKS.map(([href, label]) => (
+                <li key={href}>
+                  <Link className="underline decoration-brass" href={href} target="_blank">
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
-            <label className="mt-4 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} />
-              I accept the Terms of Use.
-            </label>
-            <label className="mt-2 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={acceptPrivacy} onChange={(event) => setAcceptPrivacy(event.target.checked)} />
-              I accept the Privacy Policy.
-            </label>
-            <label className="mt-2 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={acceptDisclosures} onChange={(event) => setAcceptDisclosures(event.target.checked)} />
-              I accept the Disclosures.
-            </label>
+            <ConsentBoxes
+              consent={consent}
+              acceptTerms={acceptTerms}
+              acceptVerification={acceptVerification}
+              onTerms={setAcceptTerms}
+              onVerification={setAcceptVerification}
+            />
             <div className="mt-4 flex gap-2">
-              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(4)}>
+              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(3)}>
                 Back
               </button>
-              <button
-                className={`${btn} flex-1`}
-                type="button"
-                disabled={!acceptTerms || !acceptPrivacy || !acceptDisclosures}
-                onClick={() => setStep(6)}
-              >
+              <button className={`${btn} flex-1`} type="button" disabled={!acceptTerms || !acceptVerification} onClick={() => setStep(5)}>
                 Continue
               </button>
             </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink">{consent.helper}</p>
           </div>
         ) : null}
-        {!done && step === 6 ? (
+        {!done && step === 5 ? (
           <div>
             <h1 className="font-serif text-xl">Membership dues</h1>
             <p className="mt-1 text-sm text-ink">{selected.label}</p>
@@ -411,22 +424,68 @@ export function ApplyWizard() {
               <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p>
             </div>
             <p className="mt-3 text-sm text-ink">No payment is collected on this test. Submitting sends the application to Richard Osika.</p>
+            <ConsentBoxes
+              consent={consent}
+              acceptTerms={acceptTerms}
+              acceptVerification={acceptVerification}
+              onTerms={setAcceptTerms}
+              onVerification={setAcceptVerification}
+            />
             {pending ? (
               <p role="status" className="mt-3 text-sm font-semibold text-forest">
                 Submitting your application…
               </p>
             ) : null}
             <div className="mt-4 flex gap-2">
-              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(5)} disabled={pending}>
+              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(4)} disabled={pending}>
                 Back
               </button>
-              <button className={`${btn} flex-1`} type="button" disabled={pending} aria-busy={pending} onClick={submit}>
+              <button
+                className={`${btn} flex-1`}
+                type="button"
+                disabled={pending || !acceptTerms || !acceptVerification}
+                aria-busy={pending}
+                onClick={submit}
+              >
                 {pending ? "Submitting…" : "Submit application"}
               </button>
             </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink">{consent.helper}</p>
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function ConsentBoxes({
+  consent,
+  acceptTerms,
+  acceptVerification,
+  onTerms,
+  onVerification,
+}: {
+  consent: ApplyConsentCopy;
+  acceptTerms: boolean;
+  acceptVerification: boolean;
+  onTerms: (value: boolean) => void;
+  onVerification: (value: boolean) => void;
+}) {
+  return (
+    <div className="mt-4 space-y-3">
+      <label className="flex items-start gap-2 text-sm leading-relaxed">
+        <input className="mt-1 shrink-0" type="checkbox" checked={acceptTerms} onChange={(event) => onTerms(event.target.checked)} />
+        <span>{consent.termsLabel}</span>
+      </label>
+      <label className="flex items-start gap-2 text-sm leading-relaxed">
+        <input
+          className="mt-1 shrink-0"
+          type="checkbox"
+          checked={acceptVerification}
+          onChange={(event) => onVerification(event.target.checked)}
+        />
+        <span>{consent.verificationLabel}</span>
+      </label>
     </div>
   );
 }

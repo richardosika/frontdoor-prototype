@@ -114,7 +114,7 @@ export default async function ApplicationDetailPage({
           {verification ? (
             <p>
               <Link href={`/admin/verification/${verification.id}`} className="underline decoration-brass">
-                Committee file
+                Verification file
               </Link>
             </p>
           ) : null}

@@ -25,8 +25,8 @@ export function ReportDialog({
     <form action={reportMember} className="grid gap-2 rounded border border-line bg-cream p-3">
       <input type="hidden" name="userId" value={userId} />
       {conversationId ? <input type="hidden" name="conversationId" value={conversationId} /> : null}
-      <p className="text-sm font-semibold">Report to the committee</p>
-      <textarea name="reason" className={field} rows={3} placeholder="What should the committee know?" required />
+      <p className="text-sm font-semibold">Report to a Private Floor administrator</p>
+      <textarea name="reason" className={field} rows={3} placeholder="What should the administrator know?" required />
       <div className="flex gap-2">
         <button className={btnOutline} type="button" onClick={() => setOpen(false)}>
           Cancel

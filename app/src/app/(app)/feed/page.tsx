@@ -98,7 +98,7 @@ export default async function FeedPage({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</p>
           <h2 className="mt-1 font-serif text-2xl font-normal">{tierLabel(user.tier)} member</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink">
-            Your account is active. {BRAND.owner} approved membership. Invited and Confirmed are the membership tiers. The brass Verified badge is a separate committee file. You only see “Verified” or “Verification in progress” on that file.
+            Your account is active. {BRAND.owner} approved membership. Invited and Confirmed are the membership tiers. The brass Verified badge is a separate verification file. You only see “Verified” or “Verification in progress” on that file.
           </p>
           <div className="mt-2">
             <TierBadge tier={user.tier} />

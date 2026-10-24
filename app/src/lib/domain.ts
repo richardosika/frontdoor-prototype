@@ -5,7 +5,7 @@ import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
 export const TIERS = ["INVITED", "VERIFIED", "CONFIRMED"] as const;
 export type Tier = (typeof TIERS)[number];
 
-/** Membership shown in the product is Invited or Confirmed. The brass badge is a separate committee file. */
+/** Membership shown in the product is Invited or Confirmed. The brass badge is a separate verification file. */
 export const MEMBERSHIP_TIERS = ["INVITED", "CONFIRMED"] as const;
 export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
 

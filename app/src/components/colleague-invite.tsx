@@ -58,7 +58,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
           <p className="text-xs text-ink">
-            Request a code. You get a private status link that never includes the code. The committee issues it on Admin, copies it there, and passes it along.
+            Request a code. You get a private status link that never includes the code. A Private Floor administrator issues it on Admin, copies it there, and passes it along.
           </p>
           <label className="absolute -left-[9999px]" aria-hidden="true">
             Website

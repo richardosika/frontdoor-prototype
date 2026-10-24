@@ -67,7 +67,7 @@ export function ProfileView({
   const messagingClosed = blockedByViewer || blockedByThem;
   const shownTier = membershipTier(member.tier);
   const tiers = [
-    ["INVITED", "The committee accepted the application."],
+    ["INVITED", "A Private Floor administrator accepted the application."],
     ["CONFIRMED", "An admin accepted a vouch. This is separate from the brass Verified badge."],
   ] as const;
 
@@ -173,12 +173,12 @@ export function ProfileView({
         </div>
         {verification.showBadge && shownTier === "INVITED" ? (
           <p className="mt-3 text-xs leading-relaxed text-ink">
-            This committee file is verified. Membership stays Invited until the committee accepts a vouch.
+            This verification file is verified. Membership stays Invited until a Private Floor administrator accepts a vouch.
           </p>
         ) : null}
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership</h2>
         <p className="mb-2 text-xs leading-relaxed text-ink">
-          Membership is Invited or Confirmed. The committee-file mark is separate. Marking a file Verified does not change membership. Confirmed follows an accepted vouch.
+          Membership is Invited or Confirmed. The verification-file mark is separate. Marking a file Verified does not change membership. Confirmed follows an accepted vouch.
         </p>
         <div className="overflow-hidden rounded border border-line">
           {tiers.map(([id, copy]) => (
@@ -195,8 +195,8 @@ export function ProfileView({
           <b>How verification works</b>
           <ol className="mt-1 list-decimal pl-4">
             <li>Invite code from an existing member.</li>
-            <li>A business card is optional. The committee matches it to public records.</li>
-            <li>The committee verifies the file. Naming someone who can speak for you is optional.</li>
+            <li>A business card is optional. A Private Floor administrator matches it to public records.</li>
+            <li>A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.</li>
             <li>A project can request a vouch only after that project file is Verified. Confirmed follows an accepted vouch.</li>
           </ol>
         </div>
@@ -281,9 +281,9 @@ export function ProfileView({
 function vouchState(item: { status: string; reviewStatus: string }) {
   if (item.status === "PENDING") return "portal link ready";
   if (item.status === "DECLINED") return "counterparty declined";
-  if (item.reviewStatus === "PENDING_ADMIN") return "confirmed, awaiting committee review";
+  if (item.reviewStatus === "PENDING_ADMIN") return "confirmed, awaiting administrator review";
   if (item.reviewStatus === "APPROVED") return "vouch accepted";
-  if (item.reviewStatus === "REJECTED") return "committee did not accept this vouch";
+  if (item.reviewStatus === "REJECTED") return "an administrator did not accept this vouch";
   return "recorded";
 }
 

@@ -26,7 +26,7 @@ export default async function MembersAdminPage({
       <MobileTitle href="/admin" label="Admin" title="Members" />
       <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
       <PageHeader title="Members" />
-      <p className="mt-1 text-sm text-ink">Membership tier is Invited or Confirmed. Confirmed requires an accepted vouch. The brass Verified badge is a separate committee file.</p>
+      <p className="mt-1 text-sm text-ink">Membership tier is Invited or Confirmed. Confirmed requires an accepted vouch. The brass Verified badge is a separate verification file.</p>
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>

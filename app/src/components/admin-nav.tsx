@@ -7,7 +7,7 @@ const LINKS = [
   ["/admin/audit", "Audit log"],
   ["/admin/test", "Test console"],
   ["/admin/sources", "Verification settings"],
-  ["/admin/verification", "Committee files"],
+  ["/admin/verification", "Verification files"],
   ["/admin/members", "Members"],
 ] as const;
 

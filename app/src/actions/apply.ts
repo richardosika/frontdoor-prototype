@@ -10,7 +10,7 @@ import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE, safeCardFileName, validateBusine
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { annualDuesCents } from "@/lib/dues";
-import { hashClientIp, LEGAL_VERSION } from "@/lib/legal";
+import { acceptanceVersions, hashClientIp } from "@/lib/legal";
 import { sendNotice } from "@/lib/notices";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 import { appBaseUrl } from "@/lib/url";
@@ -106,8 +106,11 @@ export async function submitApplication(
   const errors = validateApplication(input);
   if (errors.length) return { ok: false, error: errors[0] };
   if (!isRoleId(input.role)) return { ok: false, error: "Pick the role that best describes you." };
-  const accepted = ["terms", "privacy", "disclosures"].every((slug) => textField(formData, `accept_${slug}`) === "yes");
-  if (!accepted) return { ok: false, error: "Accept the Terms of Use, Privacy Policy, and Disclosures to continue." };
+  const acceptedTerms = textField(formData, "accept_terms") === "yes";
+  const acceptedVerification = textField(formData, "accept_verification") === "yes";
+  if (!acceptedTerms || !acceptedVerification) {
+    return { ok: false, error: "Check both boxes before you submit. The application needs your agreement and your consent to the verification checks." };
+  }
   const role = input.role;
 
   const upload = formData.get("businessCard");
@@ -184,11 +187,11 @@ export async function submitApplication(
       });
     }
     await tx.legalAcceptance.createMany({
-      data: ["terms", "privacy", "disclosures"].map((document) => ({
+      data: acceptanceVersions().map(({ document, version }) => ({
         applicationId: created.id,
         email,
         document,
-        version: LEGAL_VERSION,
+        version,
         acceptedAt,
         ipHash,
       })),

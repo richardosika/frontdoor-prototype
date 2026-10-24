@@ -7,7 +7,7 @@ import type { MemberRole } from "@prisma/client";
 import { requireAdmin } from "@/lib/current-user";
 import { annualDuesCents } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
-import { LEGAL_VERSION } from "@/lib/legal";
+import { acceptanceVersions } from "@/lib/legal";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 import { refreshWatchlist } from "@/lib/verify/watchlist";
 
@@ -162,11 +162,11 @@ export async function insertSampleApplicants(actorId: string): Promise<{ ok: tru
       },
     });
     await prisma.legalAcceptance.createMany({
-      data: ["terms", "privacy", "disclosures"].map((document) => ({
+      data: acceptanceVersions().map(({ document, version }) => ({
         applicationId: application.id,
         email: sample.email,
         document,
-        version: LEGAL_VERSION,
+        version,
         ipHash: "test",
       })),
     });

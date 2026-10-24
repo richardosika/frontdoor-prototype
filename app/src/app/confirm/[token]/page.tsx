@@ -39,10 +39,10 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
             {confirmation.status === "DECLINED"
               ? "Recorded as declined. Their tier is unchanged."
               : confirmation.reviewStatus === "APPROVED"
-                ? "The committee accepted this vouch."
+                ? "A Private Floor administrator accepted this vouch."
                 : confirmation.reviewStatus === "REJECTED"
-                  ? "The committee did not accept this vouch. Their tier is unchanged."
-                  : "Recorded as confirmed. A committee member still reviews the vouch before the tier can change."}
+                  ? "A Private Floor administrator did not accept this vouch. Their tier is unchanged."
+                  : "Recorded as confirmed. A Private Floor administrator still reviews the vouch before the tier can change."}
             {confirmation.note ? ` Note: ${confirmation.note}` : ""}
           </p>
         ) : (

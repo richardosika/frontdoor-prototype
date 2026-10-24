@@ -8,7 +8,7 @@ A run stores a score from 0 to 100, one verdict, and a short summary. The verdic
 - `NOT_LEGIT`
 - `NEEDS_OWNER_DECISION`
 
-Members never see the score, the verdict, the checklist, the notes, or the sources. They see “Verified” or “Verification in progress” on a committee file, and a plain membership status on the application page.
+Members never see the score, the verdict, the checklist, the notes, or the sources. They see “Verified” or “Verification in progress” on a verification file, and a plain membership status on the application page.
 
 ## Score
 

@@ -52,7 +52,7 @@ export function RequestInviteForm() {
   return (
     <form onSubmit={onSubmit} className="mt-8 grid gap-2 border-t border-line pt-6">
       <h2 className="font-serif text-xl font-normal">Request an invite</h2>
-      <p className="text-sm text-ink">No code yet. The committee can issue one and pass it along. This form does not email you.</p>
+      <p className="text-sm text-ink">No code yet. A Private Floor administrator can issue one and pass it along. This form does not email you.</p>
       <label className="absolute -left-[9999px]" aria-hidden="true">
         Website
         <input name="website" tabIndex={-1} autoComplete="off" />

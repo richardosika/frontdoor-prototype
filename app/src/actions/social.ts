@@ -182,7 +182,7 @@ export async function reportMember(formData: FormData) {
     href: "/admin/messages",
   });
   revalidatePath("/admin/messages");
-  redirect(`${back}?notice=Report+sent+to+the+committee`);
+  redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
 }
 
 export async function blockMember(formData: FormData) {

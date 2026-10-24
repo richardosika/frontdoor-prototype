@@ -1,6 +1,6 @@
 import type { VerificationStatus } from "@/lib/verification";
 
-/** Membership tier and committee-file status for every seeded member. Confirmed only with an accepted vouch. */
+/** Membership tier and verification-file status for every seeded member. Confirmed only with an accepted vouch. */
 export const SEEDED_MEMBER_FILES: Record<string, { tier: "INVITED" | "CONFIRMED"; status: VerificationStatus; expired?: boolean; note: string }> = {
   user_mh: { tier: "CONFIRMED", status: "VERIFIED", note: "File matches the public record. Accepted vouch is on Ironbound Lofts." },
   user_pa: { tier: "CONFIRMED", status: "VERIFIED", note: "File matches the public record. Accepted vouch is on Raritan Self Storage." },
@@ -13,7 +13,7 @@ export const SEEDED_MEMBER_FILES: Record<string, { tier: "INVITED" | "CONFIRMED"
   user_hc: { tier: "INVITED", status: "IN_REVIEW", note: "Counsel file is open. Membership stays Invited." },
   user_sr: { tier: "INVITED", status: "IN_REVIEW", note: "No accepted vouch, so membership stays Invited." },
   user_jw: { tier: "INVITED", status: "IN_REVIEW", note: "Land-use file is open. Membership stays Invited." },
-  user_gl: { tier: "INVITED", status: "VERIFIED", note: "Committee file is verified. Membership stays Invited until a vouch is accepted." },
+  user_gl: { tier: "INVITED", status: "VERIFIED", note: "Verification file is verified. Membership stays Invited until a vouch is accepted." },
   user_op: { tier: "INVITED", status: "IN_REVIEW", note: "Insurance file is open. Membership stays Invited." },
   user_mt: { tier: "INVITED", status: "IN_REVIEW", note: "Mortgage file is open. Membership stays Invited." },
   user_va: { tier: "INVITED", status: "IN_REVIEW", note: "Appraisal file is open. Membership stays Invited." },
