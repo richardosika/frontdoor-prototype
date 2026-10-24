@@ -3,7 +3,7 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
-import { isRoleId } from "@/lib/roles";
+import { isRoleId, roleLabel } from "@/lib/roles";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { isInviteUsable, normalizeInviteCode, validateApplication, type ApplicationInput } from "@/lib/domain";
 import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE, safeCardFileName, validateBusinessCard } from "@/lib/business-card";
@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { annualDuesCents } from "@/lib/dues";
 import { acceptanceVersions, hashClientIp } from "@/lib/legal";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { sendNotice } from "@/lib/notices";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 import { appBaseUrl } from "@/lib/url";
@@ -204,11 +205,22 @@ export async function submitApplication(
   });
 
   const base = await appBaseUrl();
-  await sendNotice({
-    intendedTo: email,
+  await sendTemplate({
+    key: "application_thanks",
+    to: email,
     applicationId: application.id,
-    subject: `${BRAND.name} application received`,
-    text: `Hello ${input.name.trim()},\n\nWe received your ${BRAND.name} application. Richard Osika reviews every application. Nothing was charged. You can sign in after the application is approved.\n\nFollow the decision here: ${base}/apply/status/${statusToken}\n`,
+    vars: buildMailVars({
+      name: input.name.trim(),
+      role: roleLabel(role),
+      org: input.org.trim(),
+      statusLink: `${base}/apply/status/${statusToken}`,
+    }),
+    person: {
+      name: input.name.trim(),
+      role,
+      org: input.org.trim(),
+      location: input.location.trim(),
+    },
   });
   await queueApplicationVerification(application.id, input.org.trim(), { network: true });
 

@@ -9,7 +9,9 @@ import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "
 import { blocksMembership, checkoutModeForRole, paymentRequired, renewalInOneYear, stripePriceForRole } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { createBillingPortal, createDuesCheckout, retrieveCheckoutSession, sessionPaid, sessionUserId } from "@/lib/stripe-checkout";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { sendNotice } from "@/lib/notices";
+import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
 async function payerByToken(token: string) {
@@ -115,10 +117,18 @@ export async function resendPaymentLink(formData: FormData) {
     await prisma.user.update({ where: { id: member.id }, data: { paymentToken: token } });
   }
   const base = await appBaseUrl();
-  await sendNotice({
-    intendedTo: member.email,
-    subject: "Your Private Floor dues link",
-    text: `Hello ${member.name},\n\nRichard Osika approved your application. Annual dues are ${duesLabel(member.duesCents || annualDuesCents(member.role))}. This is a flat membership fee, not a deal fee.\n\nPay here: ${base}/pay/${token}\n\nPrivate Floor does not store a card number. On this test the page is labelled TEST unless Stripe test keys are configured.\n`,
+  await sendTemplate({
+    key: "payment_due",
+    to: member.email,
+    vars: buildMailVars({
+      name: member.name,
+      role: roleLabel(member.role),
+      org: member.org,
+      duesAmount: duesLabel(member.duesCents || annualDuesCents(member.role)),
+      paymentLink: `${base}/pay/${token}`,
+      loginLink: `${base}/login`,
+    }),
+    person: { name: member.name, role: member.role, org: member.org, location: member.location },
   });
   await prisma.moderationEvent.create({
     data: {
@@ -171,10 +181,17 @@ export async function waiveDues(formData: FormData) {
     },
   });
   const base = await appBaseUrl();
-  await sendNotice({
-    intendedTo: member.email,
-    subject: "Private Floor dues waived",
-    text: `Hello ${member.name},\n\nA Private Floor administrator waived the annual dues. Your membership is active. Sign in at ${base}/login.\n`,
+  await sendTemplate({
+    key: "welcome",
+    to: member.email,
+    vars: buildMailVars({
+      name: member.name,
+      role: roleLabel(member.role),
+      org: member.org,
+      loginLink: `${base}/login`,
+      note: reason,
+    }),
+    person: { name: member.name, role: member.role, org: member.org, location: member.location },
   });
   revalidatePath("/admin");
   redirect(withQuery(adminReturn(formData, `/admin/members/${member.id}`), "notice", "Dues waived"));

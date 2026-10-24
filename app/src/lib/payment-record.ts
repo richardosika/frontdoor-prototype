@@ -1,8 +1,9 @@
 import { annualDuesCents, duesLabel } from "@/lib/dues";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { notify } from "@/lib/notify";
-import { sendNotice } from "@/lib/notices";
 import { renewalInOneYear } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
 /** Returns false when this processor event was already recorded. */
@@ -44,10 +45,16 @@ export async function activatePaidMembership(input: {
   });
   if (first && input.welcome !== false) {
     const base = await appBaseUrl();
-    await sendNotice({
-      intendedTo: user.email,
-      subject: "Your Private Floor membership is active",
-      text: `Hello ${user.name},\n\nYour annual dues are recorded and your membership is active. Sign in at ${base}/login. The first-week checklist is on the feed.\n\nNo card number is stored by Private Floor.\n`,
+    await sendTemplate({
+      key: "welcome",
+      to: user.email,
+      vars: buildMailVars({
+        name: user.name,
+        role: roleLabel(user.role),
+        org: user.org,
+        loginLink: `${base}/login`,
+      }),
+      person: { name: user.name, role: user.role, org: user.org, location: user.location },
     });
     await notify(user.id, {
       title: "Membership active",
@@ -64,10 +71,16 @@ export async function markPaymentFailed(userId: string) {
   await prisma.user.update({ where: { id: user.id }, data: { paymentStatus: "FAILED" } });
   const base = await appBaseUrl();
   const link = user.paymentToken ? `${base}/pay/${user.paymentToken}` : `${base}/pay`;
-  await sendNotice({
-    intendedTo: user.email,
-    subject: "Private Floor dues payment did not go through",
-    text: `Hello ${user.name},\n\nThe dues payment did not go through. No card number is stored. You can try again here: ${link}\n\nThe amount is still ${duesLabel(user.duesCents || annualDuesCents(user.role))}, a flat annual fee.\n`,
+  await sendTemplate({
+    key: "dues_reminder",
+    to: user.email,
+    vars: buildMailVars({
+      name: user.name,
+      role: roleLabel(user.role),
+      duesAmount: duesLabel(user.duesCents || annualDuesCents(user.role)),
+      paymentLink: link,
+    }),
+    person: { name: user.name, role: user.role, org: user.org, location: user.location },
   });
   await notify(user.id, {
     title: "Payment did not go through",
@@ -80,10 +93,17 @@ export async function sendRenewalReminder(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.renewalAt) return false;
   const base = await appBaseUrl();
-  await sendNotice({
-    intendedTo: user.email,
-    subject: "Your Private Floor dues renew soon",
-    text: `Hello ${user.name},\n\nYour flat annual dues of ${duesLabel(user.duesCents || annualDuesCents(user.role))} renew on ${user.renewalAt.toISOString().slice(0, 10)}. This is not a deal fee. Write to connect@privatefloorclub.com to cancel before that date.\n\nBilling: ${base}/settings\n`,
+  await sendTemplate({
+    key: "renewal",
+    to: user.email,
+    vars: buildMailVars({
+      name: user.name,
+      role: roleLabel(user.role),
+      duesAmount: duesLabel(user.duesCents || annualDuesCents(user.role)),
+      renewalDate: user.renewalAt.toISOString().slice(0, 10),
+      billingLink: `${base}/settings`,
+    }),
+    person: { name: user.name, role: user.role, org: user.org, location: user.location },
   });
   await prisma.user.update({ where: { id: user.id }, data: { lastRenewalReminderAt: new Date() } });
   return true;

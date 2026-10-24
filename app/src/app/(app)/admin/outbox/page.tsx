@@ -30,6 +30,8 @@ export default async function OutboxPage() {
               </p>
               <p className="text-xs text-ink">
                 Intended: {notice.intendedTo} · Delivered only to: {notice.deliveredTo}
+                {notice.templateKey ? ` · ${notice.templateKey}` : ""}
+                {notice.suppressed ? ` · Not sent: ${notice.suppressedReason}` : ""}
               </p>
               <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{notice.body}</pre>
             </li>

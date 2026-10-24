@@ -13,10 +13,10 @@ import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
 import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { BRAND } from "@/lib/brand";
 import { annualDuesCents, duesLabel } from "@/lib/dues";
-import { sendNotice } from "@/lib/notices";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { paymentRequired } from "@/lib/payments";
+import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
 export async function reviewApplication(formData: FormData) {
@@ -76,11 +76,18 @@ export async function reviewApplication(formData: FormData) {
       where: { id: application.id },
       data: { status: "DECLINED", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
     });
-    await sendNotice({
-      intendedTo: application.email,
+    await sendTemplate({
+      key: "declined",
+      to: application.email,
       applicationId: application.id,
-      subject: `${BRAND.name} application update`,
-      text: `Hello ${application.name},\n\nThis application was not approved. Reasons are not included.\n\nYou can read the decision here: ${base}/apply/status/${application.statusToken}\n`,
+      vars: buildMailVars({
+        name: application.name,
+        role: roleLabel(application.role),
+        org: application.org,
+        statusLink: `${base}/apply/status/${application.statusToken}`,
+        note: "",
+      }),
+      person: { name: application.name, role: application.role, org: application.org, location: application.location },
     });
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
@@ -92,11 +99,18 @@ export async function reviewApplication(formData: FormData) {
       where: { id: application.id },
       data: { status: "NEEDS_INFO", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
     });
-    await sendNotice({
-      intendedTo: application.email,
+    await sendTemplate({
+      key: "needs_info",
+      to: application.email,
       applicationId: application.id,
-      subject: `${BRAND.name} needs a bit more`,
-      text: `Hello ${application.name},\n\nRichard Osika needs more information before deciding.\n\n${note}\n\nReply on this page: ${base}/apply/status/${application.statusToken}\n`,
+      vars: buildMailVars({
+        name: application.name,
+        role: roleLabel(application.role),
+        org: application.org,
+        statusLink: `${base}/apply/status/${application.statusToken}`,
+        note,
+      }),
+      person: { name: application.name, role: application.role, org: application.org, location: application.location },
     });
     revalidatePath("/admin/applications");
     redirect(`/admin/applications/${application.id}?notice=Asked+for+more+info`);
@@ -160,19 +174,38 @@ export async function reviewApplication(formData: FormData) {
     data: { userId: user.id },
   });
 
+  const person = { name: application.name, role: application.role, org: application.org, location: application.location };
   if (paying && paymentToken) {
-    await sendNotice({
-      intendedTo: application.email,
+    await sendTemplate({
+      key: "payment_due",
+      to: application.email,
       applicationId: application.id,
-      subject: `Approved — ${BRAND.name} annual dues are due`,
-      text: `Hello ${application.name},\n\nRichard Osika approved your application. Annual dues are ${duesLabel(duesCents)}. This is a flat membership fee. Private Floor does not charge a fee on a deal, and it does not store a card number.${note ? `\n\nNote: ${note}` : ""}\n\nPay here: ${base}/pay/${paymentToken}\n\nYou can sign in at ${base}/login with this email and the password you chose. Until the dues are recorded, the floor stays on the payment page.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
+      vars: buildMailVars({
+        name: application.name,
+        role: roleLabel(application.role),
+        org: application.org,
+        statusLink: `${base}/apply/status/${application.statusToken}`,
+        paymentLink: `${base}/pay/${paymentToken}`,
+        loginLink: `${base}/login`,
+        duesAmount: duesLabel(duesCents),
+        note,
+      }),
+      person,
     });
   } else {
-    await sendNotice({
-      intendedTo: application.email,
+    await sendTemplate({
+      key: "approved",
+      to: application.email,
       applicationId: application.id,
-      subject: `You're in — ${BRAND.name} application approved`,
-      text: `Hello ${application.name},\n\nRichard Osika approved your application. You are an Invited member. This role has no annual dues.${note ? ` Note: ${note}` : ""} Sign in at ${base}/login with this email and the password you chose.\n\nThe decision is also here: ${base}/apply/status/${application.statusToken}\n`,
+      vars: buildMailVars({
+        name: application.name,
+        role: roleLabel(application.role),
+        org: application.org,
+        statusLink: `${base}/apply/status/${application.statusToken}`,
+        loginLink: `${base}/login`,
+        note,
+      }),
+      person,
     });
   }
 
@@ -333,14 +366,28 @@ export async function issueInviteForRequest(formData: FormData) {
     }
   }
   if (!inviteId) redirect("/admin?error=Could+not+issue+a+code.+Try+again.");
+  const base = await appBaseUrl();
 
   await prisma.inviteRequest.update({
     where: { id: request.id },
     data: { status: "ISSUED", inviteCodeId: inviteId },
   });
+  await sendTemplate({
+    key: "info",
+    to: request.email,
+    vars: buildMailVars({
+      name: request.name,
+      role: roleLabel(request.role),
+      org: request.org,
+      applyLink: `${base}/apply`,
+      inviteCode: code,
+    }),
+    person: { name: request.name, role: request.role, org: request.org, location: request.location, inviteCode: code },
+  });
   revalidatePath("/admin");
+  revalidatePath("/admin/outbox");
   redirect(
-    `/admin?issued=${encodeURIComponent(code)}&issuedFor=${encodeURIComponent(request.email)}&notice=${encodeURIComponent("Invite code issued. Copy it below. Private Floor does not email codes.")}`,
+    `/admin?issued=${encodeURIComponent(code)}&issuedFor=${encodeURIComponent(request.email)}&notice=${encodeURIComponent("Invite code issued. The information email is in the Outbox for the test recipient. Copy the code below.")}`,
   );
 }
 

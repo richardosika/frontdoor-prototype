@@ -162,6 +162,15 @@ enum InviteRequestStatus {
   DECLINED
 }
 
+enum CrmStage {
+  INVITED
+  APPLIED
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  DECLINED
+}
+
 model User {
   id             String           @id @default(cuid())
   email          String           @unique
@@ -237,6 +246,9 @@ model User {
   legalAcceptances     LegalAcceptance[]
   applicationDecisions ApplicationDecision[] @relation("DecisionActor")
   paymentEvents        PaymentEvent[]
+  crmOwned             CrmPerson[]          @relation("CrmOwner")
+  crmProfile           CrmPerson?           @relation("CrmMember")
+  crmNotes             CrmNote[]
 
   @@index([paymentStatus])
 }
@@ -268,6 +280,7 @@ model InviteRequest {
   inviteCodeId String?
   inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
   createdAt    DateTime            @default(now())
+  crmPeople    CrmPerson[]
 
   @@index([status, createdAt])
   @@index([email])
@@ -309,6 +322,7 @@ model Application {
   decisions       ApplicationDecision[]
   notices         OutboxNotice[]
   legalAcceptances LegalAcceptance[]
+  crmPeople       CrmPerson[]
   createdAt       DateTime          @default(now())
 
   @@index([status, createdAt])
@@ -677,16 +691,104 @@ model LegalAcceptance {
 }
 
 model OutboxNotice {
-  id            String       @id @default(cuid())
-  intendedTo    String
-  deliveredTo   String
-  subject       String
-  body          String
-  applicationId String?
-  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  createdAt     DateTime     @default(now())
+  id               String       @id @default(cuid())
+  intendedTo       String
+  deliveredTo      String
+  subject          String
+  body             String
+  applicationId    String?
+  application      Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  templateKey      String       @default("")
+  suppressed       Boolean      @default(false)
+  suppressedReason String       @default("")
+  createdAt        DateTime     @default(now())
 
   @@index([createdAt])
+}
+
+model MailSettings {
+  id        String   @id @default("default")
+  delivery  String   @default("outbox")
+  updatedAt DateTime @updatedAt
+}
+
+model EmailTemplate {
+  id        String                   @id @default(cuid())
+  key       String                   @unique
+  name      String
+  subject   String
+  body      String
+  updatedAt DateTime                 @updatedAt
+  versions  EmailTemplateVersion[]
+}
+
+model EmailTemplateVersion {
+  id         String        @id @default(cuid())
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version    Int
+  subject    String
+  body       String
+  savedById  String        @default("")
+  createdAt  DateTime      @default(now())
+
+  @@unique([templateId, version])
+}
+
+model CrmPerson {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  role               String    @default("")
+  org                String    @default("")
+  location           String    @default("")
+  stage              CrmStage  @default(INVITED)
+  manualStage        CrmStage?
+  tags               String    @default("")
+  doNotContact       Boolean   @default(false)
+  doNotContactReason String    @default("")
+  ownerId            String?
+  owner              User?     @relation("CrmOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  followUpAt         DateTime?
+  followUpNote       String    @default("")
+  inviteCode         String    @default("")
+  inviteRequestId    String?   @unique
+  inviteRequest      InviteRequest? @relation(fields: [inviteRequestId], references: [id], onDelete: SetNull)
+  applicationId      String?   @unique
+  application        Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  userId             String?   @unique
+  user               User?     @relation("CrmMember", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  notes              CrmNote[]
+  events             CrmEvent[]
+
+  @@index([stage])
+  @@index([followUpAt])
+}
+
+model CrmNote {
+  id        String    @id @default(cuid())
+  personId  String
+  person    CrmPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime  @default(now())
+
+  @@index([personId, createdAt])
+}
+
+model CrmEvent {
+  id        String    @id @default(cuid())
+  personId  String
+  person    CrmPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  kind      String
+  summary   String
+  sourceKey String?   @unique
+  createdAt DateTime  @default(now())
+
+  @@index([personId, createdAt])
 }
 
 model ApplicationDecision {

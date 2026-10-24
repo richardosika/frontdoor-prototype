@@ -70,6 +70,17 @@ Flat annual dues, chosen from the approved role: general contractor $2,400, brok
 8. As admin, **Mark paid** records a manual payment and an audit event. **Waive dues** asks for a reason, comps the membership, and writes an audit event. **Save refund note** asks for a note, sets the status to refund noted, and closes the floor again until dues are paid. **Send renewal reminder** and **Send failed-payment notice** write Outbox notices. The renewal reminder needs a renewal date.
 9. Approve a developer. The status is **Approved** immediately, the welcome notice does not include a payment link, and sign-in opens the floor.
 
+## Email templates and people
+
+Templates are at `/admin/templates`. The people board is at `/admin/crm`.
+
+1. `/admin/templates` lists nine letters: information, thank you, welcome, needs more info, approved, declined, payment due, dues reminder, and renewal. The delivery flag offers **Outbox (test)** and **Live (not connected)**. Saving Live still writes only to the Outbox for the test recipient. It does not email the person.
+2. Open a template. The preview fills `{first_name}` and the other tokens with sample values, and the letter ends with **Richard Osika, Founder**. Change a sentence, **Save version**, and the version list grows. **Restore** saves that older text as a new version. **Send test to the test recipient** puts a `[test]` copy in `/admin/outbox`.
+3. Submit an application. The Outbox thank-you uses the saved template. Approve a free role and the approved letter is used. Approve a paying role and the payment-due letter is used. Needs-more-info includes the note you wrote. Decline does not include a reason. A recorded payment sends the welcome letter. A failed test payment sends the dues reminder. A renewal reminder sends the renewal letter.
+4. `/admin/crm` is the pipeline: Invited, Applied, In review, Approved, Active, Declined. Search by name, email, company, or tag. **Follow-ups due** filters the board. **Export CSV** downloads the rows.
+5. Open a person. The timeline shows the invite, application, emails, verification run, decision, and payment when those exist. Add a note. Set a follow-up date, tags, and an owner. Check **Do not contact**, write a reason, and save. The next letter to that email is stored in the Outbox as **Not sent** with the reason, and the timeline says the same.
+6. **Add a prospect** mints an invite code and, with the box checked, puts the information email in the Outbox. Issuing a code for an invite request does the same. **Send information email** on a person sends it again. The applicant is not emailed.
+
 ## What the offline samples are for
 
 The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or web search. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is unavailable and is listed under “What I could not check for free.” A source that answers with no match is “No data found.” Neither one approves anyone.

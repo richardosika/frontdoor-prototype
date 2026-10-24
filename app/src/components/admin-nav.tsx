@@ -3,6 +3,8 @@ import Link from "next/link";
 const LINKS = [
   ["/admin", "Dashboard"],
   ["/admin/applications", "Applications"],
+  ["/admin/crm", "People"],
+  ["/admin/templates", "Templates"],
   ["/admin/outbox", "Outbox"],
   ["/admin/audit", "Audit log"],
   ["/admin/test", "Test console"],
