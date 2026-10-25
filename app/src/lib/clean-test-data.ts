@@ -661,7 +661,8 @@ async function rebuildPeopleFromKeptUsers(db: PrismaClient = prisma): Promise<vo
     select: { id: true, email: true, name: true, role: true, org: true, location: true, status: true, paymentStatus: true },
   });
   for (const user of users) {
-    const paymentDue = user.paymentStatus === "DUE" || user.paymentStatus === "PAST_DUE" || user.paymentStatus === "FAILED";
+    const payment = user.paymentStatus as string;
+    const paymentDue = payment === "DUE" || payment === "FAILED" || payment === "REFUNDED";
     const stage = user.status === "ACTIVE" ? (paymentDue ? "APPROVED" : "ACTIVE") : "DECLINED";
     const data = {
       name: user.name,
