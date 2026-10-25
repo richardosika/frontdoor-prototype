@@ -1,24 +1,12 @@
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
+import { INVITE_STATUS_COPY } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const COPY = {
-  PENDING: {
-    title: "Invite request pending",
-    body: "A Private Floor administrator has not issued a code yet.",
-  },
-  ISSUED: {
-    title: "Invite code issued",
-    body: "A Private Floor administrator will pass the invite code along. This page does not include the code.",
-  },
-  DECLINED: {
-    title: "Invite request declined",
-    body: "A Private Floor administrator did not issue a code.",
-  },
-} as const;
+const COPY = INVITE_STATUS_COPY;
 
 export default async function InviteStatusPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

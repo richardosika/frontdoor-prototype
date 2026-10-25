@@ -3,38 +3,57 @@
 import { useState } from "react";
 import { CopyCode } from "@/components/copy-code";
 import { btn, field } from "@/components/ui";
+import { INVITE_REQUEST_THANKS_BODY, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
+import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
 export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: string }[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [statusUrl, setStatusUrl] = useState("");
+  const [done, setDone] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const firstName = String(form.get("firstName") ?? "");
+    const lastName = String(form.get("lastName") ?? "");
+    const nameError = validatePersonName(firstName, lastName)[0];
+    const addressError = validateAddress({
+      street: String(form.get("street") ?? ""),
+      city: String(form.get("city") ?? ""),
+      state: String(form.get("state") ?? ""),
+      zip: String(form.get("zip") ?? ""),
+    })[0];
+    if (nameError || addressError) {
+      setError(nameError || addressError || "Check the form and try again.");
+      return;
+    }
+    setPending(true);
     const response = await fetch("/api/request-invite", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: form.get("name"),
+        firstName,
+        lastName,
         email: form.get("email"),
         role: form.get("role"),
         company: form.get("company"),
+        street: form.get("street"),
         city: form.get("city"),
+        state: form.get("state"),
+        zip: form.get("zip"),
         note: form.get("note"),
         website: form.get("website"),
       }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string; statusUrl?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     setPending(false);
     if (!response.ok) {
       setError(payload?.error || "Could not send that request.");
       return;
     }
-    setStatusUrl(payload?.statusUrl || "");
+    setDone(true);
   }
 
   return (
@@ -48,24 +67,25 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
           ))}
         </div>
       ) : null}
-      {statusUrl ? (
-        <div className="mt-2 text-xs leading-relaxed text-ink">
-          <p>Request sent. Share this private status link. It shows pending, issued, or declined, and it does not include an invite code.</p>
-          <a className="mt-2 block break-all text-forest underline" href={statusUrl}>
-            {statusUrl}
-          </a>
+      {done ? (
+        <div className="mt-3 rounded border border-brass bg-brass-soft px-3 py-3">
+          <p className="font-serif text-lg">{INVITE_REQUEST_THANKS_TITLE}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink">{INVITE_REQUEST_THANKS_BODY}</p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
           <p className="text-xs text-ink">
-            Request a code. You get a private status link that never includes the code. A Private Floor administrator issues it on Admin, copies it there, and passes it along.
+            Request a code for a colleague. A Private Floor administrator reviews every application. They will hear from us by email.
           </p>
           <label className="absolute -left-[9999px]" aria-hidden="true">
             Website
             <input name="website" tabIndex={-1} autoComplete="off" />
           </label>
           {error ? <p className="text-xs text-brass">{error}</p> : null}
-          <input name="name" className={field} placeholder="Colleague name" required />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input name="firstName" className={field} placeholder="First name" autoComplete="given-name" required />
+            <input name="lastName" className={field} placeholder="Last name" autoComplete="family-name" required />
+          </div>
           <input name="email" type="email" className={field} placeholder="Email" required />
           <select name="role" className={field} defaultValue="DEVELOPER" aria-label="Role">
             {ROLES.map((role) => (
@@ -75,7 +95,12 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
             ))}
           </select>
           <input name="company" className={field} placeholder="Company" required />
-          <input name="city" className={field} placeholder="City" required />
+          <input name="street" className={field} placeholder="Street" autoComplete="address-line1" required />
+          <div className="grid gap-2 sm:grid-cols-3">
+            <input name="city" className={field} placeholder="City" autoComplete="address-level2" required />
+            <input name="state" className={field} placeholder="ST" autoComplete="address-level1" maxLength={2} aria-label="State" required />
+            <input name="zip" className={field} placeholder="ZIP" autoComplete="postal-code" inputMode="numeric" aria-label="ZIP" required />
+          </div>
           <textarea name="note" className={field} rows={2} placeholder="Short note (optional)" aria-label="Note" />
           <button className={btn} type="submit" disabled={pending}>
             {pending ? "Sending…" : "Request a code"}

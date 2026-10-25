@@ -1,11 +1,25 @@
 "use server";
 
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { isRoleId, roleLabel } from "@/lib/roles";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { isInviteUsable, normalizeInviteCode, validateApplication, type ApplicationInput } from "@/lib/domain";
+import {
+  applicationLocation,
+  applicationName,
+  isInviteUsable,
+  normalizeInviteCode,
+  validateApplication,
+  type ApplicationInput,
+} from "@/lib/domain";
+import {
+  APPLICATION_CODE_LENGTH,
+  emailProviderConfigured,
+  newApplicationCode,
+  normalizeApplicationCode,
+  verificationCodeForScreen,
+} from "@/lib/application-code";
 import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE, safeCardFileName, validateBusinessCard } from "@/lib/business-card";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
@@ -45,7 +59,9 @@ async function clientIpHash(): Promise<string> {
   return hashClientIp(ip);
 }
 
-export async function sendApplicationCode(emailRaw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendApplicationCode(
+  emailRaw: string,
+): Promise<{ ok: true; testCode: string | null } | { ok: false; error: string }> {
   const email = emailRaw.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email before requesting a code." };
   const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -53,20 +69,25 @@ export async function sendApplicationCode(emailRaw: string): Promise<{ ok: true 
   const since = new Date(Date.now() - 60 * 60 * 1000);
   const recent = await prisma.emailChallenge.count({ where: { email, createdAt: { gte: since } } });
   if (recent >= 5) return { ok: false, error: "Too many codes for that email this hour. Try again later." };
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await prisma.emailChallenge.create({
+  const code = newApplicationCode();
+  const challenge = await prisma.emailChallenge.create({
     data: {
       email,
       codeHash: hashCode(code),
       expiresAt: new Date(Date.now() + CODE_MINUTES * 60 * 1000),
     },
   });
-  await sendNotice({
-    intendedTo: email,
-    subject: `${BRAND.name} application code`,
-    text: `Your Private Floor application code is ${code}. It expires in ${CODE_MINUTES} minutes. During this test the code is delivered only to the test recipient, not to the applicant.`,
-  });
-  return { ok: true };
+  try {
+    await sendTemplate({
+      key: "application_code",
+      to: email,
+      vars: buildMailVars({ name: "", code }),
+    });
+  } catch {
+    await prisma.emailChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+    return { ok: false, error: "Could not record the code. Try again." };
+  }
+  return { ok: true, testCode: verificationCodeForScreen({ providerConfigured: emailProviderConfigured(), code }) };
 }
 
 export async function confirmApplicationCode(
@@ -74,8 +95,8 @@ export async function confirmApplicationCode(
   codeRaw: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const email = emailRaw.trim().toLowerCase();
-  const code = codeRaw.replace(/\D/g, "");
-  if (code.length !== 6) return { ok: false, error: "Enter the 6-digit code." };
+  const code = normalizeApplicationCode(codeRaw);
+  if (code.length !== APPLICATION_CODE_LENGTH) return { ok: false, error: "Enter the 4-digit code." };
   const challenge = await prisma.emailChallenge.findFirst({
     where: { email, verifiedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
@@ -93,11 +114,15 @@ export async function submitApplication(
   const input: ApplicationInput = {
     code: textField(formData, "code"),
     role: textField(formData, "role"),
-    name: textField(formData, "name"),
+    firstName: textField(formData, "firstName"),
+    lastName: textField(formData, "lastName"),
     email: textField(formData, "email"),
     password: textField(formData, "password"),
     org: textField(formData, "org"),
-    location: textField(formData, "location"),
+    street: textField(formData, "street"),
+    city: textField(formData, "city"),
+    state: textField(formData, "state"),
+    zip: textField(formData, "zip"),
     referenceEmails: [textField(formData, "referenceEmail"), textField(formData, "referenceEmail2")],
     phone: textField(formData, "phone"),
     linkedinUrl: textField(formData, "linkedinUrl"),
@@ -146,6 +171,8 @@ export async function submitApplication(
   }
 
   const references = (input.referenceEmails ?? []).map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const name = applicationName(input);
+  const location = applicationLocation(input);
   const passwordHash = await bcrypt.hash(input.password, 10);
   const statusToken = randomBytes(24).toString("hex");
   const ipHash = await clientIpHash();
@@ -159,11 +186,11 @@ export async function submitApplication(
         inviteCodeId: invite.id,
         email,
         statusToken,
-        name: input.name.trim(),
+        name,
         passwordHash,
         role,
         org: input.org.trim(),
-        location: input.location.trim(),
+        location,
         credentialValue: card ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
         referenceEmails: references,
         phone: (input.phone ?? "").trim().slice(0, 40),
@@ -211,16 +238,16 @@ export async function submitApplication(
     to: email,
     applicationId: application.id,
     vars: buildMailVars({
-      name: input.name.trim(),
+      name,
       role: roleLabel(role),
       org: input.org.trim(),
       statusLink: `${base}/apply/status/${statusToken}`,
     }),
     person: {
-      name: input.name.trim(),
+      name,
       role,
       org: input.org.trim(),
-      location: input.location.trim(),
+      location,
     },
   });
   await queueApplicationVerification(application.id, input.org.trim(), { network: true });

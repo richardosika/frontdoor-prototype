@@ -2,6 +2,8 @@ export const SIGN_OFF = "Richard Osika, Founder";
 
 export const TEMPLATE_KEYS = [
   "info",
+  "invite_received",
+  "application_code",
   "application_thanks",
   "welcome",
   "needs_info",
@@ -37,6 +39,29 @@ A Private Floor administrator reviews every application. The check uses public r
 Invite code: {invite_code}
 
 Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles have flat annual dues, and those are asked for only after approval. Nothing is charged on the application, and no fee is tied to a deal.${SIGN}`,
+  },
+  {
+    key: "invite_received",
+    name: "Invite request received",
+    subject: "Thank you for applying to Private Floor",
+    body: `Hello {first_name},
+
+Thank you for applying to Private Floor.
+
+A Private Floor administrator reviews every application. You will hear from us by email.
+
+Check your status
+{status_link}
+
+Richard Osika, Founder, Private Floor Club`,
+  },
+  {
+    key: "application_code",
+    name: "Email code",
+    subject: "Your Private Floor code",
+    body: `Your Private Floor code is {code}.
+
+It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
   },
   {
     key: "application_thanks",
@@ -146,6 +171,7 @@ export const TEMPLATE_VARIABLES = [
   "renewal_date",
   "note",
   "invite_code",
+  "code",
 ] as const;
 
 export function isTemplateKey(value: string): value is TemplateKey {
@@ -196,6 +222,7 @@ export function sampleTemplateVars(): Record<string, string> {
     renewal_date: "2027-10-24",
     note: "A short note from the administrator.",
     invite_code: "PF-PREVIEW",
+    code: "1234",
   };
 }
 

@@ -5,7 +5,10 @@ import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+import { testModeCodeMessage } from "@/lib/application-code";
+import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
+import { validateAddress, validatePersonName, validatePhone } from "@/lib/person-fields";
 import { duesForRole } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
@@ -48,14 +51,19 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [statusToken, setStatusToken] = useState("");
   const [code, setCode] = useState("");
   const [role, setRole] = useState<RoleId>("DEVELOPER");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [org, setOrg] = useState("");
-  const [location, setLocation] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [stateName, setStateName] = useState("");
+  const [zip, setZip] = useState("");
   const [website, setWebsite] = useState("");
   const [socialLinks, setSocialLinks] = useState("");
   const [cardFile, setCardFile] = useState<File | null>(null);
@@ -107,6 +115,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
       return;
     }
     setCodeSent(true);
+    setTestCode(result.testCode);
     setVerifiedEmail("");
   }
 
@@ -123,8 +132,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   }
 
   function continueFromDetails() {
-    if (name.trim().length < 2 || !email.trim() || password.length < 8 || org.trim().length < 2 || location.trim().length < 2) {
-      setError("Enter your name, email, a password of at least 8 characters, company, and city.");
+    const nameError = validatePersonName(firstName, lastName)[0];
+    const addressError = validateAddress({ street, city, state: stateName, zip })[0];
+    const phoneError = validatePhone(phone);
+    if (nameError || addressError || phoneError || !email.trim() || password.length < 8 || org.trim().length < 2) {
+      setError(nameError || addressError || phoneError || "Enter your email, a password of at least 8 characters, and your company.");
       return;
     }
     if (verifiedEmail !== email.trim().toLowerCase()) {
@@ -151,11 +163,15 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
     const data = new FormData();
     data.set("code", code);
     data.set("role", role);
-    data.set("name", name);
+    data.set("firstName", firstName);
+    data.set("lastName", lastName);
     data.set("email", email);
     data.set("password", password);
     data.set("org", org);
-    data.set("location", location);
+    data.set("street", street);
+    data.set("city", city);
+    data.set("state", stateName);
+    data.set("zip", zip);
     data.set("website", website);
     data.set("socialLinks", socialLinks);
     data.set("referenceEmail", referenceEmail);
@@ -178,9 +194,12 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
 
   return (
     <div className="safe-bottom mx-auto min-h-dvh w-full max-w-[560px] overflow-hidden bg-paper md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-      <div className="safe-top flex items-center justify-between bg-forest px-5 pb-4 text-paper md:py-4">
-        <span className="font-serif text-lg tracking-[0.18em] uppercase">Apply</span>
-        <span className="text-xs text-sand">{done ? "Submitted" : `Step ${step} of ${STEPS.length}`}</span>
+      <div className="safe-top bg-forest px-5 pb-4 text-paper md:py-4">
+        <div className="flex items-center justify-between">
+          <span className="font-serif text-lg tracking-[0.18em] uppercase">Apply</span>
+          <span className="text-xs text-sand">{done ? "Submitted" : `Step ${step} of ${STEPS.length}`}</span>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-sand">{APPLY_ENCOURAGEMENT}</p>
       </div>
       <ol className="grid grid-cols-3 gap-2 px-5 pt-4 sm:grid-cols-5">
         {STEPS.map((item) => (
@@ -275,11 +294,17 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           <div className="space-y-3">
             <h1 className="font-serif text-xl">Your details</h1>
             <p className="text-sm text-ink">
-              Name, email, password, company, and city. A business card is optional and encouraged. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
+              First and last name, email, password, company, contact phone, and full address. A business card is optional. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
             </p>
-            <div>
-              <label className={labelCls}>Name</label>
-              <input className={field} value={name} onChange={(event) => setName(event.target.value)} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>First name</label>
+                <input className={field} value={firstName} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>Last name</label>
+                <input className={field} value={lastName} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
+              </div>
             </div>
             <div>
               <label className={labelCls}>Email</label>
@@ -290,6 +315,9 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                 onChange={(event) => {
                   setEmail(event.target.value);
                   setVerifiedEmail("");
+                  setCodeSent(false);
+                  setTestCode(null);
+                  setEmailCode("");
                 }}
               />
             </div>
@@ -302,12 +330,26 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               <input className={field} value={org} onChange={(event) => setOrg(event.target.value)} />
             </div>
             <div>
-              <label className={labelCls}>City and state</label>
-              <input className={field} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Newark, NJ" />
+              <label className={labelCls}>Street</label>
+              <input className={field} value={street} autoComplete="address-line1" onChange={(event) => setStreet(event.target.value)} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className={labelCls}>City</label>
+                <input className={field} value={city} autoComplete="address-level2" onChange={(event) => setCity(event.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>State</label>
+                <input className={field} value={stateName} autoComplete="address-level1" maxLength={2} placeholder="NJ" onChange={(event) => setStateName(event.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>ZIP</label>
+                <input className={field} value={zip} autoComplete="postal-code" inputMode="numeric" placeholder="07663" onChange={(event) => setZip(event.target.value)} />
+              </div>
             </div>
             <div>
-              <label className={labelCls}>Phone</label>
-              <input className={field} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Optional" />
+              <label className={labelCls}>Contact phone</label>
+              <input className={field} value={phone} autoComplete="tel" onChange={(event) => setPhone(event.target.value)} />
             </div>
             <div>
               <label className={labelCls}>LinkedIn URL</label>
@@ -363,7 +405,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <div className="rounded border border-line bg-cream p-3">
               <p className="text-sm font-semibold">Confirm your email</p>
               <p className="mt-1 text-sm text-ink">
-                A 6-digit code proves this inbox is yours. During this test the code is delivered only to the test recipient and is listed in the admin Outbox. It is not sent to the address you typed.
+                A 4-digit code proves this inbox is yours. It is recorded in the admin Outbox. When no email provider is configured, the code also appears here and is labelled test mode.
               </p>
               {verifiedEmail && verifiedEmail === email.trim().toLowerCase() ? (
                 <p className="mt-2 text-sm text-forest">Email confirmed.</p>
@@ -374,8 +416,13 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                   </button>
                   {codeSent ? (
                     <>
-                      <label className={`${labelCls} mt-3`}>6-digit code</label>
-                      <input className={field} inputMode="numeric" value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="000000" />
+                      {testCode ? (
+                        <p className="mt-3 rounded border border-brass bg-brass-soft p-3 text-sm text-ink" role="status">
+                          {testModeCodeMessage(testCode)}
+                        </p>
+                      ) : null}
+                      <label className={`${labelCls} mt-3`}>4-digit code</label>
+                      <input className={field} inputMode="numeric" maxLength={4} value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="0000" />
                       <button className={`${btn} mt-3 w-full`} type="button" disabled={pending} onClick={confirmCode}>
                         Confirm code
                       </button>

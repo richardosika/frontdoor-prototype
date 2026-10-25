@@ -2,69 +2,79 @@
 
 import { useState } from "react";
 import { btn, field, labelCls } from "@/components/ui";
+import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
-export function RequestInviteForm() {
+export function RequestInviteForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [statusUrl, setStatusUrl] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const firstName = String(form.get("firstName") ?? "");
+    const lastName = String(form.get("lastName") ?? "");
+    const nameError = validatePersonName(firstName, lastName)[0];
+    const addressError = validateAddress({
+      street: String(form.get("street") ?? ""),
+      city: String(form.get("city") ?? ""),
+      state: String(form.get("state") ?? ""),
+      zip: String(form.get("zip") ?? ""),
+    })[0];
+    if (nameError || addressError) {
+      setError(nameError || addressError || "Check the form and try again.");
+      return;
+    }
+    setPending(true);
     const response = await fetch("/api/request-invite", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: form.get("name"),
+        firstName,
+        lastName,
         email: form.get("email"),
         role: form.get("role"),
         company: form.get("company"),
+        street: form.get("street"),
         city: form.get("city"),
+        state: form.get("state"),
+        zip: form.get("zip"),
         note: form.get("note"),
         website: form.get("website"),
       }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string; statusUrl?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     setPending(false);
     if (!response.ok) {
       setError(payload?.error || "Could not send that request.");
       return;
     }
-    setStatusUrl(payload?.statusUrl || "received");
-  }
-
-  if (statusUrl) {
-    return (
-      <div className="mt-4 text-sm text-ink">
-        <p>Request received. Keep this private status link. It shows pending, issued, or declined, and it does not include an invite code. Private Floor does not email codes.</p>
-        {statusUrl.startsWith("http") ? (
-          <a className="mt-2 block break-all text-forest underline" href={statusUrl}>
-            {statusUrl}
-          </a>
-        ) : null}
-      </div>
-    );
+    onSubmitted();
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 grid gap-2 border-t border-line pt-6">
-      <h2 className="font-serif text-xl font-normal">Request an invite</h2>
-      <p className="text-sm text-ink">No code yet. A Private Floor administrator can issue one and pass it along. This form does not email you.</p>
+    <form id="request-invite" onSubmit={onSubmit} className="mt-6 scroll-mt-6 grid gap-2 rounded border border-brass bg-cream p-4">
+      <h2 className="font-serif text-2xl font-normal">Request an invite</h2>
+      <p className="text-sm text-ink">No code yet. A Private Floor administrator reviews every application. You will hear from us by email.</p>
       <label className="absolute -left-[9999px]" aria-hidden="true">
         Website
         <input name="website" tabIndex={-1} autoComplete="off" />
       </label>
       {error ? <p className="text-sm text-brass">{error}</p> : null}
-      <div>
-        <label className={labelCls}>Name</label>
-        <input name="name" className={field} required />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className={labelCls}>First name</label>
+          <input name="firstName" className={field} autoComplete="given-name" required />
+        </div>
+        <div>
+          <label className={labelCls}>Last name</label>
+          <input name="lastName" className={field} autoComplete="family-name" required />
+        </div>
       </div>
       <div>
         <label className={labelCls}>Email</label>
-        <input name="email" type="email" className={field} required />
+        <input name="email" type="email" className={field} autoComplete="email" required />
       </div>
       <div>
         <label className={labelCls}>Role</label>
@@ -78,18 +88,32 @@ export function RequestInviteForm() {
       </div>
       <div>
         <label className={labelCls}>Company</label>
-        <input name="company" className={field} required />
+        <input name="company" className={field} autoComplete="organization" required />
       </div>
       <div>
-        <label className={labelCls}>City</label>
-        <input name="city" className={field} placeholder="Newark, NJ" required />
+        <label className={labelCls}>Street</label>
+        <input name="street" className={field} autoComplete="address-line1" required />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="sm:col-span-1">
+          <label className={labelCls}>City</label>
+          <input name="city" className={field} autoComplete="address-level2" required />
+        </div>
+        <div>
+          <label className={labelCls}>State</label>
+          <input name="state" className={field} autoComplete="address-level1" maxLength={2} placeholder="NJ" required />
+        </div>
+        <div>
+          <label className={labelCls}>ZIP</label>
+          <input name="zip" className={field} autoComplete="postal-code" inputMode="numeric" placeholder="07663" required />
+        </div>
       </div>
       <div>
         <label className={labelCls}>Short note (optional)</label>
         <textarea name="note" className={field} rows={2} />
       </div>
       <button className={btn} type="submit" disabled={pending}>
-        Request invite
+        {pending ? "Sending…" : "Request an invite"}
       </button>
     </form>
   );

@@ -33,9 +33,11 @@ describe("email templates", () => {
     expect(declined?.body).toContain(SIGN_OFF);
   });
 
-  it("ships the nine letters in a warm administrator voice", () => {
+  it("ships the letters in a warm administrator voice", () => {
     expect(TEMPLATE_DEFS.map((item) => item.key)).toEqual([
       "info",
+      "invite_received",
+      "application_code",
       "application_thanks",
       "welcome",
       "needs_info",
@@ -50,6 +52,16 @@ describe("email templates", () => {
     expect(joined.toLowerCase()).not.toContain("sent from my");
     expect(joined).not.toContain("299 Market Street");
     expect(TEMPLATE_DEFS.every((item) => item.body.includes(SIGN_OFF))).toBe(true);
+    const received = templateDef("invite_received");
+    const rendered = renderTemplate(received?.body || "", {
+      first_name: "Ada",
+      status_link: "https://cornicio-mvp.onrender.com/invite-status/preview",
+    });
+    expect(rendered).toContain("Check your status");
+    expect(rendered).toContain("https://cornicio-mvp.onrender.com/invite-status/preview");
+    expect(rendered).toContain("Richard Osika, Founder, Private Floor Club");
+    expect(rendered.match(/Richard Osika, Founder/g)).toHaveLength(1);
+    expect(templateDef("application_code")?.body).toContain("{code}");
   });
 
   it("keeps live mode on the test outbox", () => {

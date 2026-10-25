@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
+import { inviteRequestAddress, INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { withinRateLimit } from "@/lib/messaging";
+import { joinName } from "@/lib/person-fields";
 import { prisma } from "@/lib/prisma";
-import { isRoleId } from "@/lib/roles";
+import { isRoleId, roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +24,15 @@ export async function POST(request: Request) {
   if (shouldDiscardInviteRequest(website)) return Response.json({ ok: true });
 
   const input = {
-    name: String(body.name ?? ""),
+    firstName: String(body.firstName ?? ""),
+    lastName: String(body.lastName ?? ""),
     email: String(body.email ?? ""),
     role: String(body.role ?? ""),
     company: String(body.company ?? ""),
+    street: String(body.street ?? ""),
     city: String(body.city ?? ""),
+    state: String(body.state ?? ""),
+    zip: String(body.zip ?? ""),
     note: String(body.note ?? ""),
   };
   const errors = validateInviteRequest(input);
@@ -42,18 +48,41 @@ export async function POST(request: Request) {
     return Response.json({ error: "Too many requests for that email. Try again tomorrow." }, { status: 429 });
   }
 
+  const name = joinName(input.firstName, input.lastName);
+  const location = inviteRequestAddress(input);
   const statusToken = randomBytes(24).toString("hex");
-  await prisma.inviteRequest.create({
+  const created = await prisma.inviteRequest.create({
     data: {
-      name: input.name.trim(),
+      name,
       email,
       role: input.role,
       org: input.company.trim(),
-      location: input.city.trim(),
+      location,
       note: input.note.trim().slice(0, 500),
       statusToken,
     },
   });
   const statusUrl = `${await appBaseUrl()}/invite-status/${statusToken}`;
-  return Response.json({ ok: true, statusUrl });
+  try {
+    await sendTemplate({
+      key: "invite_received",
+      to: email,
+      vars: buildMailVars({
+        name,
+        role: roleLabel(input.role),
+        org: input.company.trim(),
+        statusLink: statusUrl,
+      }),
+      person: {
+        name,
+        role: input.role,
+        org: input.company.trim(),
+        location,
+        inviteRequestId: created.id,
+      },
+    });
+  } catch {
+    return Response.json({ error: "We saved the request, but the note could not be recorded. Try again in a moment." }, { status: 500 });
+  }
+  return Response.json({ ok: true });
 }

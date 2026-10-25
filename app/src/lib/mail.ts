@@ -52,6 +52,7 @@ export function buildMailVars(input: {
   renewalDate?: string;
   note?: string;
   inviteCode?: string;
+  code?: string;
 }): Record<string, string> {
   return {
     first_name: firstName(input.name),
@@ -67,6 +68,7 @@ export function buildMailVars(input: {
     renewal_date: input.renewalDate || "",
     note: input.note || "",
     invite_code: input.inviteCode || "",
+    code: input.code || "",
   };
 }
 
@@ -75,7 +77,14 @@ export async function sendTemplate(input: {
   to: string;
   applicationId?: string | null;
   vars: Record<string, string>;
-  person?: { name: string; role?: string; org?: string; location?: string; inviteCode?: string };
+  person?: {
+    name: string;
+    role?: string;
+    org?: string;
+    location?: string;
+    inviteCode?: string;
+    inviteRequestId?: string | null;
+  };
 }) {
   if (!isTemplateKey(input.key)) throw new Error("Unknown template.");
   await ensureTemplates();
@@ -87,6 +96,7 @@ export async function sendTemplate(input: {
       org: input.person.org,
       location: input.person.location,
       inviteCode: input.person.inviteCode,
+      inviteRequestId: input.person.inviteRequestId,
     });
   }
   const template = await prisma.emailTemplate.findUnique({ where: { key: input.key } });

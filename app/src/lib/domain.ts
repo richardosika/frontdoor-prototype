@@ -1,4 +1,5 @@
 import { BRAND } from "@/lib/brand";
+import { formatAddress, joinName, validateAddress, validatePersonName, validatePhone } from "@/lib/person-fields";
 import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
 
 /** Database enum still contains VERIFIED so existing rows can be migrated without dropping a value. */
@@ -172,11 +173,15 @@ export function canConnect(fromId: string, toId: string): { ok: true } | { ok: f
 export type ApplicationInput = {
   code: string;
   role: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   org: string;
-  location: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
   referenceEmails?: string[];
   statement?: string;
   phone?: string;
@@ -185,25 +190,33 @@ export type ApplicationInput = {
   socialLinks?: string;
 };
 
+export function applicationName(input: Pick<ApplicationInput, "firstName" | "lastName">): string {
+  return joinName(input.firstName, input.lastName);
+}
+
+export function applicationLocation(input: Pick<ApplicationInput, "street" | "city" | "state" | "zip">): string {
+  return formatAddress(input);
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateApplication(input: ApplicationInput): string[] {
   const errors: string[] = [];
   if (normalizeInviteCode(input.code).length < 4) errors.push("Enter the invite code a member shared with you.");
   if (!isRoleId(input.role)) errors.push("Pick the role that best describes you.");
-  if (input.name.trim().length < 2) errors.push("Enter your name.");
+  errors.push(...validatePersonName(input.firstName, input.lastName));
   if (!EMAIL.test(input.email.trim())) errors.push("Enter a valid email.");
   if (input.password.length < 8) errors.push("Password must be at least 8 characters.");
   if (input.password.length > 72) errors.push("Password must be 72 characters or fewer.");
   if (input.org.trim().length < 2) errors.push("Enter your company or firm.");
-  if (input.location.trim().length < 2) errors.push("Enter your city and state.");
+  errors.push(...validateAddress(input));
   const refs = (input.referenceEmails ?? []).map((email) => email.trim()).filter(Boolean);
   if (refs.some((email) => !EMAIL.test(email))) {
     errors.push("Leave reference emails blank, or enter a valid email.");
   }
   if ((input.statement ?? "").length > 1000) errors.push("Keep the statement under 1000 characters.");
-  const phone = (input.phone ?? "").trim();
-  if (phone && phone.replace(/\D/g, "").length < 7) errors.push("Enter a phone number with at least 7 digits, or leave it blank.");
+  const phoneError = validatePhone(input.phone ?? "");
+  if (phoneError) errors.push(phoneError);
   const linkedin = (input.linkedinUrl ?? "").trim();
   if (linkedin && !/^https?:\/\//i.test(linkedin)) errors.push("LinkedIn URL must start with http.");
   const website = (input.website ?? "").trim();
