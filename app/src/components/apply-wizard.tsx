@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
+import { AdminEntryLink } from "@/components/admin-mark";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { duesForRole } from "@/lib/dues";
@@ -466,6 +467,9 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           </div>
         ) : null}
       </div>
+      <p className="px-5 pb-5">
+        <AdminEntryLink />
+      </p>
     </div>
   );
 }

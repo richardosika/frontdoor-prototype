@@ -40,7 +40,7 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 
 ### Demo login
 
-Every seeded member uses the password `cornicio-demo`.
+Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login`. When `ADMIN_PASSWORD` is set to at least 12 characters, startup replaces every administrator password with that value and `cornicio-demo` no longer signs in an administrator. Member passwords stay `cornicio-demo`. The member sign-in page does not accept an administrator.
 
 | Email | Role |
 | --- | --- |

@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { moderationDenial } from "@/lib/messaging";
-import { loggedInPublicRedirect } from "@/lib/session-gate";
+import { adminEntryRedirect, loggedInPublicRedirect } from "@/lib/session-gate";
 import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
@@ -20,6 +20,12 @@ export default auth((req) => {
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
+  const adminEntry = adminEntryRedirect(path, loggedIn ? { isAdmin: Boolean(req.auth?.user?.isAdmin) } : null);
+  if (path === "/admin/login") {
+    if (adminEntry) return NextResponse.redirect(new URL(adminEntry, req.nextUrl));
+    return NextResponse.next();
+  }
+
   const isPublic = path === "/" || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (!loggedIn && !isPublic) {

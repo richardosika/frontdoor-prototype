@@ -1,4 +1,9 @@
 export const GENERIC_SIGN_IN_ERROR = "Those credentials were not recognized.";
+
+/** Member sign-in accepts members. Administrator sign-in accepts administrators. Anything else is the generic error. */
+export function credentialsPortalAllowed(isAdmin: boolean, portal: unknown): boolean {
+  return (portal === "admin") === isAdmin;
+}
 export const PENDING_APPROVAL_ERROR = "Your application is under review. You can sign in after Richard Osika approves it.";
 export const DECLINED_APPLICATION_ERROR = "This application was not approved.";
 export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact connect@privatefloorclub.com if you need help.";

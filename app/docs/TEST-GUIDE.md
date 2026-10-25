@@ -1,6 +1,10 @@
 # Test guide
 
-Use this on the deployed site or on a local server. The demo password for seeded members, including the admin, is `cornicio-demo`. Sign in as Marcus Hale (`marcus.hale@halerow.example`) for the admin screens. Open a private window when you want a member session and an admin session at the same time.
+Use this on the deployed site or on a local server. Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` (also linked as **Admin**, with a brass shield, from the home page, the member sign-in page, apply, and the legal pages). Marcus Hale is `marcus.hale@halerow.example`.
+
+When `ADMIN_PASSWORD` is set to at least 12 characters, the server replaces every administrator password with that value at startup. `cornicio-demo` then stops working for administrators and still works for members. A shorter value is ignored. If `ADMIN_PASSWORD` is unset, Marcus’s password remains `cornicio-demo`, but only on `/admin/login`.
+
+The member sign-in page does not accept an administrator, and it uses the same generic error it uses for a wrong password. `/admin/login` does not accept a member, including a member password that is correct, and it uses that same generic error. After an administrator signs in, the next page is `/admin`. Open a private window when you want a member session and an administrator session at the same time.
 
 Nothing on this test charges a card. Every email notice is stored in the Outbox and addressed only to `rich@privatefloorclub.com` (or `NOTICE_TEST_RECIPIENT` if that env var is set).
 
@@ -22,7 +26,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 
 ## Admin side
 
-1. `/admin` shows open applications, the Outbox count, and test applications.
+1. Open `/admin/login` from the **Admin** link, or go there directly. The title is **Private Floor administrator**. Sign in as Marcus Hale. `/admin` shows open applications, the Outbox count, and test applications. The signed-in nav keeps **Admin**, with the same brass shield. Signing in as Marcus on `/login`, or as a member on `/admin/login`, stays on that page and shows **Those credentials were not recognized.**
 2. `/admin/test`. Choose **Create sample applicants**. Six labelled TEST people appear:
    - Strong legit (offline fixtures, recommendation LEGIT)
    - Ambiguous (phone area code does not match the state)

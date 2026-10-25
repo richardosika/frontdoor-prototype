@@ -10,3 +10,10 @@ export function loggedInPublicRedirect(path: string): "/feed" | null {
   if (path === "/" || path === "/login") return "/feed";
   return null;
 }
+
+/** The administrator sign-in is public. A signed-in administrator continues to the admin home. A signed-in member returns to the floor. */
+export function adminEntryRedirect(path: string, session: { isAdmin: boolean } | null): "/admin" | "/feed" | null {
+  if (path !== "/admin/login") return null;
+  if (!session) return null;
+  return session.isAdmin ? "/admin" : "/feed";
+}

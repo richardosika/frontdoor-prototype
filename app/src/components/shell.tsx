@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
+import { AdminMark } from "@/components/admin-mark";
 import { Avatar } from "@/components/avatar";
 import { Logo } from "@/components/logo";
 import { tierLabel } from "@/lib/format";
@@ -93,7 +94,9 @@ export function Shell({
               }`}
             >
               {pathname.startsWith("/admin") && !pathname.startsWith("/admin/verification") && !pathname.startsWith("/admin/messages") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
-              <span className="grid h-6 w-6 place-items-center text-lg">▣</span>
+              <span className="grid h-6 w-6 place-items-center text-brass">
+                <AdminMark className="h-5 w-5" />
+              </span>
               <span className="hidden lg:inline">Admin</span>
             </Link>
           ) : null}
@@ -206,7 +209,8 @@ export function Shell({
               {alerts > 0 ? <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{alerts}</span> : null}
             </Link>
             {user.isAdmin ? (
-              <Link href="/admin" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+              <Link href="/admin" className="flex min-h-11 items-center gap-2 border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+                <AdminMark className="h-4 w-4 text-brass" />
                 Admin
               </Link>
             ) : null}

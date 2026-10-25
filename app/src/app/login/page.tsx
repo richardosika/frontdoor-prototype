@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEntryLink } from "@/components/admin-mark";
 import { LoginForm } from "@/components/login-form";
 import { Logo } from "@/components/logo";
 import { BRAND } from "@/lib/brand";
@@ -21,6 +22,9 @@ export default async function LoginPage({
         <LoginForm next={params.next} />
         <p className="mt-4 text-center text-sm text-mut">
           Have an invite? <Link className="inline-flex min-h-11 items-center font-semibold text-brass" href="/apply">Apply</Link>
+        </p>
+        <p className="mt-2 text-center">
+          <AdminEntryLink />
         </p>
         </div>
       </div>

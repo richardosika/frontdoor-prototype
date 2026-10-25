@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { loginAction } from "@/actions/auth";
+import { adminLoginAction, loginAction } from "@/actions/auth";
 import { btn, field, labelCls } from "@/components/ui";
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({ next, portal = "member" }: { next?: string; portal?: "member" | "admin" }) {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
     setError("");
-    const result = await loginAction(formData);
+    const result = portal === "admin" ? await adminLoginAction(formData) : await loginAction(formData);
     if (result?.error) {
       setError(result.error);
       setPending(false);
@@ -20,7 +20,7 @@ export function LoginForm({ next }: { next?: string }) {
 
   return (
     <form action={onSubmit} className="space-y-3">
-      <input type="hidden" name="next" value={next || "/feed"} />
+      {portal === "member" ? <input type="hidden" name="next" value={next || "/feed"} /> : null}
       {error ? <p className="text-sm text-brass">{error}</p> : null}
       <div>
         <label className={labelCls}>Email</label>

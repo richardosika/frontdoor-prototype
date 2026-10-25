@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEntryLink } from "@/components/admin-mark";
 import { Logo } from "@/components/logo";
 import { RequestInviteForm } from "@/components/request-invite-form";
 import { btn, btnOutline } from "@/components/ui";
@@ -28,6 +29,9 @@ export default function HomePage() {
           <p className="mt-10 text-xs leading-relaxed text-mut">
             {BRAND.name} does not offer securities, take subscriptions, or process payments. Raising posts are member-only notes, not an offer to sell.
           </p>
+          <div className="mt-4">
+            <AdminEntryLink />
+          </div>
         </div>
       </div>
     </main>

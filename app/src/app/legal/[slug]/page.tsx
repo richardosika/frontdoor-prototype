@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminEntryLink } from "@/components/admin-mark";
 import { Logo } from "@/components/logo";
 import { BRAND } from "@/lib/brand";
 import { documentVersion, LEGAL_DOCS, legalDoc, memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
@@ -25,10 +26,11 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
           Draft - pending attorney review. Version {version}. {BRAND.legalName}, {BRAND.formation}. {BRAND.address}. {BRAND.contactEmail}.
         </p>
         <div className="mt-4" dangerouslySetInnerHTML={{ __html: html }} />
-        <p className="mt-8 text-sm">
+        <p className="mt-8 flex flex-wrap items-center gap-4 text-sm">
           <Link href="/apply" className="underline decoration-brass">
             Back to apply
           </Link>
+          <AdminEntryLink />
         </p>
       </article>
     </main>

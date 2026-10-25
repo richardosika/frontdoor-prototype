@@ -18,6 +18,10 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   const next = safeNext(String(formData.get("next") || "/feed"));
 
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  if (user?.isAdmin) {
+    if (password) await bcrypt.compare(password, user.passwordHash);
+    return { error: GENERIC_SIGN_IN_ERROR };
+  }
   const memberPasswordMatches = user ? await bcrypt.compare(password, user.passwordHash) : false;
   let pendingApplicationPasswordMatches = false;
   let declinedApplicationPasswordMatches = false;
@@ -43,7 +47,24 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   if (failure) return { error: failure };
 
   try {
-    await signIn("credentials", { email, password, redirectTo: next });
+    await signIn("credentials", { email, password, portal: "member", redirectTo: next });
+  } catch (error) {
+    if (error instanceof CredentialsSignin || (error instanceof AuthError && error.type === "CredentialsSignin")) {
+      return { error: GENERIC_SIGN_IN_ERROR };
+    }
+    throw error;
+  }
+}
+
+export async function adminLoginAction(formData: FormData): Promise<{ error: string } | void> {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  const matches = Boolean(user && password && (await bcrypt.compare(password, user.passwordHash)));
+  const ok = Boolean(user?.isAdmin && user.status === "ACTIVE" && matches);
+  if (!ok) return { error: GENERIC_SIGN_IN_ERROR };
+  try {
+    await signIn("credentials", { email, password, portal: "admin", redirectTo: "/admin" });
   } catch (error) {
     if (error instanceof CredentialsSignin || (error instanceof AuthError && error.type === "CredentialsSignin")) {
       return { error: GENERIC_SIGN_IN_ERROR };
