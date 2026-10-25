@@ -3,19 +3,21 @@ import { notFound } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { DecisionForm } from "@/components/decision-form";
+import { GuidedReview } from "@/components/guided-review";
 import { PaymentPanel } from "@/components/payment-admin";
 import { CheckTable, ExecutiveSummary, GradeMark, recommendationNeedsConfirm } from "@/components/grade-summary";
 import { RunAndReload } from "@/components/run-and-reload";
 import { btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
-import { adminDuesLine } from "@/lib/dues";
+import { adminDuesLine, annualDuesCents } from "@/lib/dues";
+import { ADMIN_INTROS } from "@/lib/membership-copy";
+import { buildReviewSteps, isReviewStepId, parseReviewProgress, skippedFrom } from "@/lib/review-steps";
 import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
-import { gradeFactsFromApplication, gradeForRun } from "@/lib/verify/grade";
+import { applyReviewSkips, gradeFactsFromApplication, gradeForRun } from "@/lib/verify/grade";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +27,7 @@ export default async function ApplicationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; step?: string }>;
 }) {
   await requireAdmin();
   await settleStuckRuns();
@@ -52,6 +54,27 @@ export default async function ApplicationDetailPage({
   const companyGrade = gradeForRun(company, { ...facts, name: application.org, applicantName: application.name });
   const card = application.businessCard;
   const cardOnFile = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
+  const progress = parseReviewProgress(application.reviewProgress);
+  const currentStep = query.step && isReviewStepId(query.step) ? query.step : progress.current;
+  const reviewSteps = buildReviewSteps({
+    evidence: (report?.evidence ?? []).map((item) => ({
+      checkKey: item.checkKey,
+      status: item.status,
+      finding: item.finding,
+      source: item.source,
+      url: item.url,
+    })),
+    saved: progress,
+    references: application.referenceEmails,
+    cardOnFile,
+  });
+  const shownGrade = grade
+    ? applyReviewSkips(
+        grade,
+        skippedFrom(reviewSteps).map((step) => ({ title: step.title, reason: step.saved?.skipReason || "" })),
+      )
+    : null;
+  const paying = annualDuesCents(application.role) > 0 && !application.duesWaived;
   const open = ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"].includes(application.status);
   const verification = application.userId
     ? await prisma.verificationCase.findFirst({ where: { userId: application.userId }, select: { id: true } })
@@ -65,13 +88,23 @@ export default async function ApplicationDetailPage({
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>
-        <p className="mt-3 text-sm text-ink">Applications are the people waiting to be checked. This grade is a recommendation. Richard Osika approves every member.</p>
+        <p className="mt-3 text-sm text-ink">{ADMIN_INTROS.applications} This grade is a recommendation. Richard Osika approves every member.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <GradeMark letter={grade?.letter} score={grade?.score} recommendation={grade?.recommendation} confidence={grade?.confidence} />
+          <GradeMark letter={shownGrade?.letter} score={shownGrade?.score} recommendation={shownGrade?.recommendation} confidence={shownGrade?.confidence} />
           <span className="text-xs uppercase tracking-wide text-mut">{applicationStatusLabel(application.status)}</span>
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
-        {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
+        {shownGrade ? <ExecutiveSummary report={shownGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
+        <GuidedReview
+          applicationId={application.id}
+          steps={reviewSteps}
+          currentId={currentStep}
+          grade={shownGrade}
+          paying={paying}
+          notLegit={recommendationNeedsConfirm(shownGrade?.recommendation, report?.verdict)}
+          confirmLabel={shownGrade?.recommendation === "DECLINE" ? "The recommendation is DECLINE." : "The recommendation is NOT LEGIT."}
+          decided={!open}
+        />
         <section className={`${card} mt-4 space-y-2 p-4 text-sm`}>
           <p>
             <b>Email:</b> {application.email}
@@ -157,9 +190,12 @@ export default async function ApplicationDetailPage({
             <p className="mt-2 text-sm text-mut">No business card uploaded.</p>
           )}
         </section>
-        <CheckSection title="Application checks" run={report} />
-        {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" /> : null}
-        <CheckSection title="Company checks" run={company} />
+        <details className={`${card} mt-4 p-4`}>
+          <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
+          <CheckSection title="Application checks" run={report} />
+          {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" /> : null}
+          <CheckSection title="Company checks" run={company} />
+        </details>
         <div className="mt-4">
           <RunAndReload
             className={btnOutline}
@@ -203,22 +239,6 @@ export default async function ApplicationDetailPage({
             refundNote={application.user.refundNote}
             back={`/admin/applications/${application.id}`}
           />
-        ) : null}
-        {open ? (
-          <section className={`${card} mt-4 p-4`}>
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your decision</h2>
-            <p className="mt-1 text-sm text-ink">Automation does not approve or decline. A decline does not show the reason to the applicant.</p>
-            {grade ? (
-              <p className="mt-3 text-sm leading-relaxed text-ink">
-                Grade {grade.letter} ({grade.score}). {grade.recommendation}. Confidence {grade.confidence}. {grade.summary.reasoning}
-              </p>
-            ) : null}
-            <DecisionForm
-              applicationId={application.id}
-              notLegit={recommendationNeedsConfirm(grade?.recommendation, report?.verdict)}
-              confirmLabel={grade?.recommendation === "DECLINE" ? "The recommendation is DECLINE." : "The recommendation is NOT LEGIT."}
-            />
-          </section>
         ) : null}
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Decision log</h2>

@@ -71,7 +71,7 @@ export async function syncCrm() {
   const [invites, applications, users, runs, decisions, payments, notices] = await Promise.all([
     prisma.inviteRequest.findMany({ include: { inviteCode: true }, orderBy: { createdAt: "asc" } }),
     prisma.application.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.user.findMany({ where: { isAdmin: false }, orderBy: { createdAt: "asc" } }),
+    prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.verificationRun.findMany({
       where: { applicationId: { not: null }, status: "DONE" },
       include: { application: { select: { email: true } } },

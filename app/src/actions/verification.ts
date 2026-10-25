@@ -103,7 +103,39 @@ export async function updateVerificationCheck(formData: FormData) {
 
   revalidatePath(back);
   revalidatePath("/admin/verification");
-  redirect(`${back}?notice=Checklist+saved`);
+  const nextStep = String(formData.get("nextStep") || "");
+  const stepQuery = /^\d+$/.test(nextStep) ? `&step=${nextStep}` : "";
+  redirect(`${back}?notice=Checklist+saved${stepQuery}`);
+}
+
+export async function skipVerificationCheck(formData: FormData) {
+  const admin = await requireVerificationAdmin();
+  const checkId = String(formData.get("checkId") || "");
+  const reason = String(formData.get("skipReason") || "").trim().slice(0, 500);
+  const check = await prisma.verificationCheck.findUnique({ where: { id: checkId } });
+  if (!check) notFound();
+  const back = `/admin/verification/${check.caseId}`;
+  if (reason.length < 8) redirect(`${back}?error=${encodeURIComponent("A skip needs a short reason (at least 8 characters).")}`);
+  const record = await prisma.verificationCase.findUnique({ where: { id: check.caseId } });
+  if (!record) notFound();
+  const note = `Skipped: ${reason}`.slice(0, 2000);
+  await prisma.verificationCheck.update({
+    where: { id: check.id },
+    data: { result: "NOT_PROVIDED", note, reviewerId: admin.id, reviewedAt: new Date() },
+  });
+  await prisma.verificationEvent.create({
+    data: {
+      caseId: check.caseId,
+      actorId: admin.id,
+      fromStatus: record.status,
+      toStatus: record.status,
+      summary: `${admin.name} skipped “${check.label}” (not a pass). Reason: ${reason}`,
+    },
+  });
+  revalidatePath(back);
+  const nextStep = String(formData.get("nextStep") || "");
+  const stepQuery = /^\d+$/.test(nextStep) ? `&step=${nextStep}` : "";
+  redirect(`${back}?notice=${encodeURIComponent("Skip recorded. It is not a pass.")}${stepQuery}`);
 }
 
 export async function deleteBusinessCard(formData: FormData) {

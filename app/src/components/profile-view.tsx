@@ -8,8 +8,8 @@ import { blockMember, introduceMember, openConversation, respondIntroduction, un
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
-import { membershipTier } from "@/lib/domain";
 import { tierLabel } from "@/lib/format";
+import { VERIFIED_EXPLANATION } from "@/lib/membership-copy";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
 
 type Project = {
@@ -77,11 +77,6 @@ export function ProfileView({
   blockedByThem: boolean;
 }) {
   const messagingClosed = blockedByViewer || blockedByThem;
-  const shownTier = membershipTier(member.tier);
-  const tiers = [
-    ["INVITED", "A Private Floor administrator accepted the application."],
-    ["CONFIRMED", "An admin accepted a vouch. This is separate from the brass Verified badge."],
-  ] as const;
 
   return (
     <article className="border-x border-b border-line bg-paper md:overflow-hidden md:rounded md:border">
@@ -242,33 +237,20 @@ export function ProfileView({
           <Stat value={String(vouchCount)} label="Vouches" />
           <Stat value={tierLabel(member.tier)} label="Membership" />
         </div>
-        {verification.showBadge && shownTier === "INVITED" ? (
-          <p className="mt-3 text-xs leading-relaxed text-ink">
-            This verification file is verified. Membership stays Invited until a Private Floor administrator accepts a vouch.
-          </p>
-        ) : null}
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership</h2>
         <p className="mb-2 text-xs leading-relaxed text-ink">
-          Membership is Invited or Confirmed. The verification-file mark is separate. Marking a file Verified does not change membership. Confirmed follows an accepted vouch.
+          Status is Approved. {VERIFIED_EXPLANATION} The brass badge is separate from membership.
         </p>
-        <div className="overflow-hidden rounded border border-line">
-          {tiers.map(([id, copy]) => (
-            <div key={id} className={`flex gap-3 border-b border-line px-3 py-2 last:border-0 ${shownTier === id ? "border-l-[3px] border-l-brass bg-brass-soft" : ""}`}>
-              <TierBadge tier={id} />
-              <small className="text-[11px] leading-snug text-mut">
-                {shownTier === id ? <b className="text-forest">Current membership. </b> : null}
-                {copy}
-              </small>
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <TierBadge tier={member.tier} />
         </div>
         <div className="mt-3 rounded border border-line bg-cream px-3 py-2 text-[12px] leading-relaxed text-ink">
           <b>How verification works</b>
           <ol className="mt-1 list-decimal pl-4">
-            <li>Invite code from an existing member.</li>
+            <li>Request to join, or use an invite code from an existing member.</li>
             <li>A business card is optional. A Private Floor administrator matches it to public records.</li>
             <li>A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.</li>
-            <li>A project can request a vouch only after that project file is Verified. Confirmed follows an accepted vouch.</li>
+            <li>A project can request a confirmation only after that project file is Verified. Accepting it does not change membership.</li>
           </ol>
         </div>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>

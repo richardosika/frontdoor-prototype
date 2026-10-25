@@ -135,8 +135,8 @@ export default async function AdminPage({
     <div className="mx-auto max-w-5xl px-4 pb-8 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Command center" />
       <p className="font-serif text-2xl text-forest md:hidden">Command center</p>
-      <p className="mt-1 text-sm text-ink">
-        What is waiting on a Private Floor administrator, then the floor behind it. Members never see this page.
+        <p className="mt-1 text-sm text-ink">
+        What is waiting on a Private Floor administrator, then the floor behind it. Members never see this page. Applications are waiting to be checked. Members are approved. People is everyone.
       </p>
       <div className="mt-4">
         <Banner error={params.error} notice={params.notice} />
@@ -212,7 +212,7 @@ export default async function AdminPage({
 
       <section className={`${card} mt-6 p-4`}>
         <h2 className={sectionLabel}>Vouches waiting for review</h2>
-        <p className="mt-1 text-sm text-ink">A counterparty yes does not change a member&apos;s tier until you accept it.</p>
+        <p className="mt-1 text-sm text-ink">A counterparty confirmation does not change membership. Membership stays Approved.</p>
         {vouches.length === 0 ? <p className="mt-3 text-sm text-mut">None waiting.</p> : null}
         <ul className="mt-3 divide-y divide-line">
           {vouches.map((vouch) => (

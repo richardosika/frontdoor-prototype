@@ -9,6 +9,7 @@ import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDetailsIssue } from "@/lib/apply-details";
 import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
+import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 import { DUES_ANNUAL_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, DUES_WAIVED, duesForRole } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
@@ -285,7 +286,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         {!done && step === 1 ? (
           <div>
             <StepIntro title="Invite code">
-              <p>{BRAND.club} is nationwide and invite-only. Enter the code a member shared with you, or request one.</p>
+              <p>{MEMBERSHIP_PHRASE}. Enter the invite code a member shared with you, or request to join.</p>
             </StepIntro>
             <label className={labelCls}>Invite code</label>
             <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="PF-XXXX-XXXX" />
@@ -293,7 +294,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               Continue
             </button>
             <Link href="/" className={`${btnOutline} mt-2 w-full`}>
-              Request an invite
+              Request to join
             </Link>
           </div>
         ) : null}

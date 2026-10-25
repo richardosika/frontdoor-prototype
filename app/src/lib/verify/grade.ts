@@ -794,6 +794,28 @@ export function gradePlainText(report: Pick<GradeReport, "letter" | "score" | "c
     .trim();
 }
 
+function lowerConfidence(confidence: Confidence): Confidence {
+  if (confidence === "High") return "Medium";
+  if (confidence === "Medium") return "Low";
+  return "Low";
+}
+
+/** A skipped review step is not a pass. The letter and score stay put. Confidence drops one step. */
+export function applyReviewSkips(report: GradeReport, skips: { title: string; reason: string }[]): GradeReport {
+  if (!skips.length) return report;
+  const extra: AttentionItem[] = skips.map((skip) => ({
+    severity: "Medium",
+    title: `Skipped: ${skip.title}`,
+    detail: `Skipped, not a pass. Reason: ${skip.reason || "No reason recorded."} This does not confirm the step.`,
+  }));
+  const next: GradeReport = {
+    ...report,
+    confidence: lowerConfidence(report.confidence),
+    attention: [...extra, ...report.attention],
+  };
+  return { ...next, plainText: gradePlainText(next) };
+}
+
 export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeReport, "letter" | "score" | "recommendation" | "confidence" | "attention" | "banner">): string {
   if (!previous) return "First graded run. Nothing earlier to compare.";
   const changes: string[] = [];
@@ -837,7 +859,7 @@ export function rubricSections(): { title: string; body: string }[] {
     },
     {
       title: "Confidence",
-      body: `Confidence is separate from the letter. High means at least ${Math.round(CONFIDENCE_RULES.highMinRatio * 100)} percent of weighted checks returned a pass or a fail, and at least ${CONFIDENCE_RULES.highMinCorroboration} sources corroborated the person and the company. Medium means at least ${Math.round(CONFIDENCE_RULES.mediumMinRatio * 100)} percent returned a pass or a fail, or at least ${CONFIDENCE_RULES.mediumMinCorroboration} source corroborated them. Low means fewer than that, or no corroboration at all. A blocked or empty source lowers confidence. It never raises the grade.`,
+      body: `Confidence is separate from the letter. High means at least ${Math.round(CONFIDENCE_RULES.highMinRatio * 100)} percent of weighted checks returned a pass or a fail, and at least ${CONFIDENCE_RULES.highMinCorroboration} sources corroborated the person and the company. Medium means at least ${Math.round(CONFIDENCE_RULES.mediumMinRatio * 100)} percent returned a pass or a fail, or at least ${CONFIDENCE_RULES.mediumMinCorroboration} source corroborated them. Low means fewer than that, or no corroboration at all. A blocked or empty source lowers confidence. It never raises the grade. A step Richard skips is not a pass and lowers confidence by one step. It never raises the letter or the score.`,
     },
     {
       title: "What free sources cannot show",

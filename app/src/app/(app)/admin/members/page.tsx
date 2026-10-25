@@ -1,70 +1,86 @@
 import Link from "next/link";
-import { setMemberTier } from "@/actions/admin";
 import { Banner } from "@/components/banner";
-import { TierBadge } from "@/components/badge";
+import { VerifiedMark } from "@/components/badge";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { btn, card, field } from "@/components/ui";
+import { DemoChip, StatusChip } from "@/components/status-chip";
+import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
-import { MEMBERSHIP_TIERS, membershipTier } from "@/lib/domain";
-import { formatEtDate, tierLabel } from "@/lib/format";
+import { ADMIN_INTROS, VERIFIED_EXPLANATION } from "@/lib/membership-copy";
+import { isApprovedMember, isDemoRecord, personStageLabel, personStanding } from "@/lib/person-standing";
 import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { toPublicVerification } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
 
 export default async function MembersAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; demo?: string }>;
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const members = await prisma.user.findMany({ orderBy: { name: "asc" } });
+  const hideDemo = params.demo === "hide";
+  const members = await prisma.user.findMany({
+    orderBy: { name: "asc" },
+    include: {
+      ownedApplication: { select: { status: true, isTest: true } },
+      memberVerification: { include: { checks: { select: { result: true } } } },
+    },
+  });
+  const rows = members
+    .map((member) => {
+      const standing = personStanding({
+        applicationStatus: member.ownedApplication?.status,
+        accountStatus: member.status,
+        paymentStatus: member.paymentStatus,
+        hasMember: true,
+      });
+      const demo = isDemoRecord({ isTest: member.isTest || member.ownedApplication?.isTest, email: member.email });
+      return { member, standing, demo };
+    })
+    .filter((row) => isApprovedMember(row.standing))
+    .filter((row) => (hideDemo ? !row.demo : true));
 
   return (
     <div>
       <MobileTitle href="/admin" label="Admin" title="Members" />
       <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
-      <PageHeader title="Members" />
-      <p className="mt-1 text-sm text-ink">Membership tier is Invited or Confirmed. Confirmed requires an accepted vouch. The brass Verified badge is a separate verification file.</p>
-      <div className="mt-3">
-        <Banner error={params.error} notice={params.notice} />
-      </div>
-      <ul className={`mt-4 divide-y divide-line ${card}`}>
-        {members.map((member) => (
-          <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold">
+        <PageHeader title="Members" />
+        <p className="mt-1 text-sm text-ink">{ADMIN_INTROS.members}</p>
+        <p className="mt-1 text-sm text-ink">
+          One status: Approved. The brass Verified badge is separate. {VERIFIED_EXPLANATION}
+        </p>
+        <div className="mt-3">
+          <Banner error={params.error} notice={params.notice} />
+        </div>
+        <p className="mt-3 text-sm">
+          <Link href={hideDemo ? "/admin/members" : "/admin/members?demo=hide"} className="underline decoration-brass">
+            {hideDemo ? "Show demo members" : "Hide demo members"}
+          </Link>
+        </p>
+        {rows.length === 0 ? <p className="mt-6 text-sm text-mut">No approved members{hideDemo ? " outside the demo set" : ""}.</p> : null}
+        <ul className={`mt-4 divide-y divide-line ${card}`}>
+          {rows.map(({ member, standing, demo }) => (
+            <li key={member.id} className="px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                 <Link href={`/admin/members/${member.id}`} className="underline decoration-brass/40">
                   {member.name}
-                </Link>{" "}
-                <TierBadge tier={member.tier} />
+                </Link>
+                <StatusChip status={standing.status} />
+                {demo ? <DemoChip /> : null}
                 {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
               </div>
-              <p className="text-xs text-mut">
-                {roleShort(roleLabel(member.role))} · {member.org} · {paymentStatusLabel(member.paymentStatus)}
-                {member.renewalAt ? ` · renews ${formatEtDate(member.renewalAt)}` : ""}
-                {member.phone ? ` · ${member.phone}` : ""}
-                {member.linkedinUrl ? ` · ${member.linkedinUrl}` : ""}
+              <p className="mt-1 text-xs text-mut">
+                {roleShort(roleLabel(member.role))} · {member.org} · {paymentStatusLabel(member.paymentStatus)} · {personStageLabel(standing.stage)}
               </p>
-            </div>
-            <form action={setMemberTier} className="flex items-center gap-2">
-              <input type="hidden" name="userId" value={member.id} />
-              <select name="tier" defaultValue={membershipTier(member.tier)} className={field}>
-                {MEMBERSHIP_TIERS.map((tier) => (
-                  <option key={tier} value={tier}>
-                    {tierLabel(tier)}
-                  </option>
-                ))}
-              </select>
-              <button className={btn} type="submit">
-                Save
-              </button>
-            </form>
-          </li>
-        ))}
-      </ul>
+              <div className="mt-2">
+                <VerifiedMark view={toPublicVerification(member.memberVerification)} />
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
 export const TIERS = ["INVITED", "VERIFIED", "CONFIRMED"] as const;
 export type Tier = (typeof TIERS)[number];
 
-/** Membership shown in the product is Invited or Confirmed. The brass badge is a separate verification file. */
+/** Stored tier values stay in the database. The product shows one status: Approved. The brass badge is a separate verification file. */
 export const MEMBERSHIP_TIERS = ["INVITED", "CONFIRMED"] as const;
 export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
 

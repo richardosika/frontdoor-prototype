@@ -8,7 +8,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 **Effective date:** [DATE]
 
 **The key points (plain-English summary, not a substitute for the full Terms)**
-- Private Floor is an invite-only networking platform for real estate professionals. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
+- Private Floor is a private network where every member is personally reviewed. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
 - Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Dues are a flat annual fee, billed once a year, and due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
@@ -28,7 +28,7 @@ By applying for membership, creating an account, clicking "I agree," or using th
 
 ## 1. What the Platform is — and what it is not
 
-1.1 **What it is.** Private Floor is an invite-only online networking platform for professionals who work on real estate projects across the United States, including developers, general contractors, investors and limited partners, family offices, lenders, brokers, attorneys, appraisers, property managers, accountants, and qualified intermediaries. The Platform lets approved members create profiles, post project information and "seeking" notes, message other members inside the Platform, and, when the member who runs a deal room approves access, view materials in that deal room. In these Terms, a deal room's "sponsor" means the developer or other member who created that deal room and approves who may enter it.
+1.1 **What it is.** Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. It is for professionals who work on real estate projects across the United States, including developers, general contractors, investors and limited partners, family offices, lenders, brokers, attorneys, appraisers, property managers, accountants, and qualified intermediaries. The Platform lets approved members create profiles, post project information and "seeking" notes, message other members inside the Platform, and, when the member who runs a deal room approves access, view materials in that deal room. In these Terms, a deal room's "sponsor" means the developer or other member who created that deal room and approves who may enter it.
 
 1.2 **What it is not.** Private Floor:
 

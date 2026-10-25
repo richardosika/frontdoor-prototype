@@ -104,6 +104,8 @@ export async function reviewApplication(formData: FormData) {
     });
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
+    revalidatePath("/admin/members");
+    revalidatePath("/admin/crm");
     redirect(`/admin/applications/${application.id}?notice=Declined`);
   }
 
@@ -126,6 +128,8 @@ export async function reviewApplication(formData: FormData) {
       person: { name: application.name, role: application.role, org: application.org, location: application.location },
     });
     revalidatePath("/admin/applications");
+    revalidatePath("/admin/members");
+    revalidatePath("/admin/crm");
     redirect(`/admin/applications/${application.id}?notice=Asked+for+more+info`);
   }
 
@@ -225,6 +229,8 @@ export async function reviewApplication(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/crm");
   revalidatePath("/network");
   redirect(
     `/admin/applications/${application.id}?notice=${encodeURIComponent(paying ? `Approved, payment due — ${application.name}` : `Approved ${application.name}`)}`,
@@ -313,7 +319,7 @@ export async function reviewVouch(formData: FormData) {
     ]);
     await notify(member.id, {
       title: "Vouch accepted",
-      body: `${admin.name} accepted the vouch on ${confirmation.project.name}. Your tier is now ${tierLabel(nextTier)}.`,
+      body: `${admin.name} accepted the confirmation on ${confirmation.project.name}. Membership stays Approved. The Verified badge is a separate file.`,
       href: "/profile",
     });
     await reviewVouchOnChecklist({
@@ -331,7 +337,7 @@ export async function reviewVouch(formData: FormData) {
     });
     await notify(member.id, {
       title: "Vouch not accepted",
-      body: `A Private Floor administrator did not accept the vouch on ${confirmation.project.name}. Your tier is unchanged.`,
+      body: `A Private Floor administrator did not accept the confirmation on ${confirmation.project.name}. Membership is unchanged.`,
       href: "/profile",
     });
     await reviewVouchOnChecklist({

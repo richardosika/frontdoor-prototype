@@ -55,7 +55,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: () => void }) 
 
   return (
     <form id="request-invite" onSubmit={onSubmit} className="mt-6 scroll-mt-6 grid gap-2 rounded border border-brass bg-cream p-4">
-      <h2 className="font-serif text-2xl font-normal">Request an invite</h2>
+      <h2 className="font-serif text-2xl font-normal">Request to join</h2>
       <p className="text-sm text-ink">No code yet. A Private Floor administrator reviews every application. You will hear from us by email.</p>
       <label className="absolute -left-[9999px]" aria-hidden="true">
         Website
@@ -113,7 +113,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: () => void }) 
         <textarea name="note" className={field} rows={2} />
       </div>
       <button className={btn} type="submit" disabled={pending}>
-        {pending ? "Sending…" : "Request an invite"}
+        {pending ? "Sending…" : "Request to join"}
       </button>
     </form>
   );

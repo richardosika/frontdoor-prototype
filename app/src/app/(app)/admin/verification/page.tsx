@@ -84,7 +84,7 @@ export default async function VerificationQueuePage({
       <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Verification" />
       <p className="mt-1 text-sm text-ink">
-        Verification files are the member and project checklists. The grade comes from the application file when one is linked. Members never see this queue, the grade, or the notes. {awaiting} awaiting review.
+        Verification files are the checklists for members and projects. The grade comes from the application file when one is linked. Members never see this queue, the grade, or the notes. {awaiting} awaiting review.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         {["", "A", "B", "C", "D", "F"].map((letter) => (

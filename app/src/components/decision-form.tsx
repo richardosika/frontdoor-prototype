@@ -7,10 +7,12 @@ export function DecisionForm({
   applicationId,
   notLegit,
   confirmLabel = "The recommendation is NOT LEGIT.",
+  paying = false,
 }: {
   applicationId: string;
   notLegit: boolean;
   confirmLabel?: string;
+  paying?: boolean;
 }) {
   return (
     <form
@@ -19,14 +21,24 @@ export function DecisionForm({
       onSubmit={(event) => {
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
-        if (notLegit && decision === "APPROVED") {
-          const confirmed = window.confirm(`${confirmLabel} Approve this applicant anyway?`);
+        if (decision === "APPROVED") {
+          const dues = paying
+            ? "Approve this person? The annual-dues link goes out only after you approve."
+            : "Approve this person? This role can sign in right away.";
+          const warning = notLegit ? ` ${confirmLabel}` : "";
+          const confirmed = window.confirm(`${dues}${warning}`);
           if (!confirmed) {
             event.preventDefault();
             return;
           }
-          const input = event.currentTarget.querySelector('input[name="confirmNotLegit"]');
-          if (input instanceof HTMLInputElement) input.value = "yes";
+          if (notLegit) {
+            const input = event.currentTarget.querySelector('input[name="confirmNotLegit"]');
+            if (input instanceof HTMLInputElement) input.value = "yes";
+          }
+        }
+        if (decision === "DECLINED") {
+          const confirmed = window.confirm("Decline this application? A short notice goes out. The applicant does not see your reason.");
+          if (!confirmed) event.preventDefault();
         }
       }}
     >
@@ -37,14 +49,14 @@ export function DecisionForm({
       {notLegit ? (
         <p className="text-sm text-brass">{confirmLabel} Approving asks for confirmation and is written to the audit log.</p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <button className={btn} name="decision" value="APPROVED" type="submit">
-          Approve as Invited member
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button className={`${btn} min-h-12 w-full sm:w-auto`} name="decision" value="APPROVED" type="submit">
+          Approve
         </button>
-        <button className={btnOutline} name="decision" value="NEEDS_INFO" type="submit">
-          Needs more info
+        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="NEEDS_INFO" type="submit">
+          Request more info
         </button>
-        <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="DECLINED" type="submit">
           Decline
         </button>
       </div>

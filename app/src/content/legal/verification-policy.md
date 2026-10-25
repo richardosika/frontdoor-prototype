@@ -10,7 +10,7 @@ This policy explains, in plain English, how Private Floor checks applicants and 
 
 ## 1. Why we verify
 
-Private Floor is invite-only so members can spend their time with real people at real firms. Verification is meant to screen out fake accounts, impersonation, and obvious misrepresentation. It does not replace your own due diligence.
+Private Floor is a private network where every member is personally reviewed, so members can spend their time with real people at real firms. Anyone can request to join, and every request is personally reviewed. Verification is meant to screen out fake accounts, impersonation, and obvious misrepresentation. It does not replace your own due diligence.
 
 ## 2. How it works, in two steps
 

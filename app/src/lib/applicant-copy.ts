@@ -1,6 +1,6 @@
-import { BRAND } from "@/lib/brand";
+import { JOIN_COMPANION, MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 
-export const LANDING_INTRO = `The ${BRAND.club} is nationwide and invite-only. A Private Floor administrator reviews every application.`;
+export const LANDING_INTRO = `${MEMBERSHIP_PHRASE}. ${JOIN_COMPANION}`;
 
 export const APPLY_ENCOURAGEMENT =
   "The more detail you share, the better we can match you with the right members and deals.";

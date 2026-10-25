@@ -41,7 +41,7 @@ Private Floor is not a consumer reporting agency. Verification is used only for 
 
 Members who are raising capital are solely responsible for complying with securities laws. In particular:
 
-- Many private real estate offerings rely on Rule 506(b) of Regulation D (to be confirmed by counsel), which **prohibits general solicitation or general advertising**. Posting offering terms, return targets, or calls for investors to a broad audience, even an invite-only one, may be treated as general solicitation and could cause the offering to lose that exemption.
+- Many private real estate offerings rely on Rule 506(b) of Regulation D (to be confirmed by counsel), which **prohibits general solicitation or general advertising**. Posting offering terms, return targets, or calls for investors to a broad audience, even inside a private network, may be treated as general solicitation and could cause the offering to lose that exemption.
 - Offerings under Rule 506(c) may use general solicitation, but every purchaser must be an accredited investor and the issuer must take reasonable steps to verify that status.
 - State securities ("blue sky") laws in each state where an offering is made or where investors live may impose their own requirements, such as notice filings and anti-fraud rules. Because members are located across the United States, more than one state's laws may apply to a single raise.
 

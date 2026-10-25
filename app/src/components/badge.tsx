@@ -1,19 +1,11 @@
 import { membershipChipLabel } from "@/lib/format";
+import { VERIFIED_EXPLANATION } from "@/lib/membership-copy";
 import { committeeFileLabel, type PublicVerification } from "@/lib/verification";
 
 export function TierBadge({ tier }: { tier: string }) {
   const label = membershipChipLabel(tier);
-  if (tier === "CONFIRMED") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-sm border border-brass bg-brass px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-paper">
-        <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-paper text-[6px] text-brass">✓✓</span>
-        {label}
-      </span>
-    );
-  }
   return (
-    <span className="inline-flex items-center gap-1 rounded-sm border border-mut px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-mut">
-      <span className="grid h-[11px] w-[11px] place-items-center rounded-full bg-mut text-[8px] text-paper">○</span>
+    <span className="inline-flex items-center gap-1 rounded-sm border border-forest bg-forest px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-paper">
       {label}
     </span>
   );
@@ -32,7 +24,7 @@ export function VerifiedMark({ view }: { view: PublicVerification }) {
           {committeeFileLabel(true)}
         </span>
         <span className="text-[11px] text-mut">
-          File verified {verifiedOn}
+          {VERIFIED_EXPLANATION} File verified {verifiedOn}
           {expiresOn ? ` · Re-verify by ${expiresOn}` : ""}
         </span>
       </span>

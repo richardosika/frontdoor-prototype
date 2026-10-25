@@ -103,7 +103,7 @@ Reply on this page: {status_link}${SIGN}`,
     subject: "You're approved for Private Floor",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. You are an Invited member. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
 
 Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
 
@@ -177,7 +177,7 @@ export const TEMPLATE_VARIABLES = [
 ] as const;
 
 /** Unedited letters from before the annual-dues wording. An admin edit is left alone. */
-export const TEMPLATE_PREVIOUS_BODIES: Partial<Record<TemplateKey, string>> = {
+export const TEMPLATE_PREVIOUS_BODIES: Partial<Record<TemplateKey, string | string[]>> = {
   info: `Hello {first_name},
 
 You're invited to Private Floor, the vetted circle for real estate deal teams. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
@@ -194,13 +194,22 @@ Thank you. We have your Private Floor application for {role} at {org}.
 A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat amount and they come only after approval.${SIGN}`,
-  approved: `Hello {first_name},
+  approved: [
+    `Hello {first_name},
 
 A Private Floor administrator approved your application. You are an Invited member, and this role has no annual dues.
 
 Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. You are an Invited member. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+
+Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
+
+{note}${SIGN}`,
+  ],
   payment_due: `Hello {first_name},
 
 A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. That amount is a flat membership fee. It is never based on a deal, and Private Floor does not store a card number.
@@ -229,7 +238,8 @@ export function replacementTemplateBody(key: string, current: string): string | 
   if (!isTemplateKey(key)) return null;
   const previous = TEMPLATE_PREVIOUS_BODIES[key];
   const next = templateDef(key);
-  if (!previous || !next || current !== previous || current === next.body) return null;
+  const known = previous == null ? [] : Array.isArray(previous) ? previous : [previous];
+  if (!next || !known.includes(current) || current === next.body) return null;
   return next.body;
 }
 

@@ -280,11 +280,11 @@ describe("network and verification", () => {
   it("keeps membership tier separate from the verified badge", () => {
     expect(membershipTier("VERIFIED")).toBe("INVITED");
     expect(membershipTier("CONFIRMED")).toBe("CONFIRMED");
-    expect(tierLabel("VERIFIED")).toBe("Invited");
-    expect(tierLabel("INVITED")).toBe("Invited");
-    expect(tierLabel("CONFIRMED")).toBe("Confirmed");
-    expect(membershipChipLabel("INVITED")).toBe("Membership · Invited");
-    expect(membershipChipLabel("VERIFIED")).toBe("Membership · Invited");
+    expect(tierLabel("VERIFIED")).toBe("Approved");
+    expect(tierLabel("INVITED")).toBe("Approved");
+    expect(tierLabel("CONFIRMED")).toBe("Approved");
+    expect(membershipChipLabel("INVITED")).toBe("Approved");
+    expect(membershipChipLabel("VERIFIED")).toBe("Approved");
     expect(matchAudience("GENERAL_CONTRACTOR").role).toBe("DEVELOPER");
     expect(matchAudience("DEVELOPER").role).toBe("INVESTOR_PE");
     expect(marketToken("Hoboken, NJ")).toBe("NJ");

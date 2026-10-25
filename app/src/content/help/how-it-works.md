@@ -4,7 +4,7 @@ These notes describe the product. They are not legal, tax, or investment advice.
 
 ## Signup
 
-Private Floor is invite-only. An applicant needs an invite code, then completes the application at Apply. The form asks for a real name, role, company, and location. A business card image is optional. Private Floor does not ask for a government ID, a Social Security number, or a date of birth. Two consent boxes start unchecked. Both must be checked before the application can be submitted. After submit, the applicant keeps a status link. The status page is where a reply goes if a Private Floor administrator asks for something more.
+Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. An applicant can use an invite code, then completes the application at Apply. The form asks for a real name, role, company, and location. A business card image is optional. Private Floor does not ask for a government ID, a Social Security number, or a date of birth. Two consent boxes start unchecked. Both must be checked before the application can be submitted. After submit, the applicant keeps a status link. The status page is where a reply goes if a Private Floor administrator asks for something more.
 
 ## Verification
 
@@ -20,7 +20,7 @@ Members introduce themselves inside the portal before a thread opens. The person
 
 ## Deal rooms
 
-A deal room is invite-only. The member who created it decides who may enter. Before entering, a member acknowledges the Deal Room NDA. The acknowledgement stores the document version and the time. Documents in a deal room are described by their file name and type. Private Floor does not keep the file bytes. The owner can remove someone. Materials in a deal room are confidential.
+The member who created a deal room decides who may enter. Before entering, a member acknowledges the Deal Room NDA. The acknowledgement stores the document version and the time. Documents in a deal room are described by their file name and type. Private Floor does not keep the file bytes. The owner can remove someone. Materials in a deal room are confidential.
 
 ## Dues
 

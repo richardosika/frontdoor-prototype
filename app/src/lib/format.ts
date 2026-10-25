@@ -10,12 +10,12 @@ export function timeAgo(date: Date, now = new Date()): string {
 export const AUDIT_TIME_ZONE = "America/New_York";
 
 export function tierLabel(tier: string): string {
-  if (tier === "CONFIRMED") return "Confirmed";
-  return "Invited";
+  if (tier === "INVITED" || tier === "VERIFIED" || tier === "CONFIRMED") return "Approved";
+  return "Approved";
 }
 
-export function membershipChipLabel(tier: string): string {
-  return `Membership · ${tierLabel(tier)}`;
+export function membershipChipLabel(_tier: string): string {
+  return "Approved";
 }
 
 export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {

@@ -20,8 +20,8 @@ export function memberStatusCopy(status: string): { title: string; body: string 
   }
   if (status === "APPROVED") {
     return {
-      title: "You're an Invited member",
-      body: "Richard Osika approved this application. Sign in with the email and password you chose. Your membership starts as Invited.",
+      title: "You're approved",
+      body: "Richard Osika approved this application. Sign in with the email and password you chose. Reviewed membership means every member is personally reviewed.",
     };
   }
   if (status === "PAYMENT_DUE") {

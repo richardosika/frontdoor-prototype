@@ -22,7 +22,7 @@ export function LandingStart() {
     <>
       <div className="mt-8 flex flex-wrap gap-3">
         <a href="#request-invite" className={btn}>
-          Request an invite
+          Request to join
         </a>
         <Link href="/apply" className={btnOutline}>
           Apply with an invite

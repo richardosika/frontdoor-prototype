@@ -167,7 +167,7 @@ export default async function FeedPage({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</p>
           <h2 className="mt-1 font-serif text-2xl font-normal">{tierLabel(user.tier)} member</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink">
-            Your account is active. {BRAND.owner} approved membership. Invited and Confirmed are the membership tiers. You only see “Verified” or “Verification in progress.”
+            Your account is active. {BRAND.owner} approved membership. Reviewed membership means every member is personally reviewed. You see “Verified” or “Verification in progress.” Verified means the verification file was completed by Private Floor.
           </p>
           <div className="mt-2">
             <TierBadge tier={user.tier} />
@@ -368,7 +368,7 @@ export default async function FeedPage({
             <TierBadge tier={user.tier} />
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink">
-            {tierLabel(user.tier)} member. Account active. {BRAND.owner} approves membership. Confirmed follows an accepted vouch. Members see Verified or Verification in progress.
+            Approved member. Account active. {BRAND.owner} approves every member. Members see Verified or Verification in progress. Verified means the verification file was completed by Private Floor.
           </p>
         </div>
         <ColleagueInvite codes={unusedCodes} />

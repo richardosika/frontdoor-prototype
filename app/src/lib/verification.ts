@@ -176,7 +176,7 @@ export function canPromoteTierFromVouch(input: { adminReviewed: boolean }): bool
 
 export function vouchEvidenceNote(input: { counterpartyName: string; projectName: string; note: string }): string {
   const extra = input.note.trim();
-  return `${input.counterpartyName} confirmed work on ${input.projectName}.${extra ? ` ${extra}` : ""} Awaiting admin review before any tier change.`;
+  return `${input.counterpartyName} confirmed work on ${input.projectName}.${extra ? ` ${extra}` : ""} Awaiting admin review. Accepting this does not change membership.`;
 }
 
 export const PUBLIC_VERIFICATION_KEYS = ["showBadge", "verifiedOn", "expiresOn", "statusLine"] as const;

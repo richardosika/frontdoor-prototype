@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteBusinessCard, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { deleteBusinessCard, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { ADMIN_INTROS } from "@/lib/membership-copy";
+import { displayCheckStatus } from "@/lib/review-steps";
 import { CHECK_RESULTS, VERIFICATION_STATUSES, checkResultLabel, verificationCaseHeading, verificationStatusLabel } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +18,7 @@ export default async function VerificationCasePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; step?: string }>;
 }) {
   await requireVerificationAdmin();
   const { id } = await params;
@@ -31,6 +33,9 @@ export default async function VerificationCasePage({
     },
   });
   if (!record) notFound();
+  const requestedStep = Number(query.step || "1");
+  const stepIndex = Number.isFinite(requestedStep) ? Math.min(record.checks.length, Math.max(1, requestedStep)) : 1;
+  const currentCheck = record.checks[stepIndex - 1];
   const heading = verificationCaseHeading(record);
   const expiresValue = record.expiresAt ? record.expiresAt.toISOString().slice(0, 10) : "";
   const businessCard = record.userId
@@ -64,7 +69,7 @@ export default async function VerificationCasePage({
         <Banner error={query.error} notice={query.notice} />
       </div>
       <p className="mt-3 text-sm text-ink">
-        The badge is shown to members only after you mark this file Verified and every item below is Pass. Members otherwise see “Verification in progress.”
+        {ADMIN_INTROS.verification} The badge is shown to members only after you mark this file Verified and every item is Pass. A skip is not a pass. Members otherwise see “Verification in progress.”
       </p>
 
       <form action={updateVerificationCase} className={`${card} mt-4 space-y-3 p-4`}>
@@ -122,34 +127,101 @@ export default async function VerificationCasePage({
         </section>
       ) : null}
 
-      <h2 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Checklist</h2>
-      <ul className="space-y-3">
-        {record.checks.map((check) => (
-          <li key={check.id} className={`${card} p-4`}>
-            <p className="font-semibold">{check.label}</p>
-            <p className="mt-1 text-xs text-mut">
-              {checkResultLabel(check.result)}
-              {check.reviewer ? ` · ${check.reviewer.name}` : ""}
-              {check.reviewedAt ? ` · ${formatAuditTime(check.reviewedAt)}` : ""}
+      <section className={`${card} mt-4 p-4`}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
+        {currentCheck ? (
+          <>
+            <h2 className="mt-1 font-serif text-2xl font-normal">
+              Step {stepIndex} of {record.checks.length}
+            </h2>
+            <p className="mt-1 font-semibold">{currentCheck.label}</p>
+            <p className="mt-1 text-sm text-ink">
+              {displayCheckStatus(currentCheck.result, currentCheck.note)}
+              {currentCheck.reviewer ? ` · ${currentCheck.reviewer.name}` : ""}
+              {currentCheck.reviewedAt ? ` · ${formatAuditTime(currentCheck.reviewedAt)}` : ""}
             </p>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {record.checks.map((check, index) => (
+                <a
+                  key={check.id}
+                  href={`/admin/verification/${record.id}?step=${index + 1}`}
+                  className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-sm border px-3 text-xs ${
+                    index + 1 === stepIndex ? "border-brass bg-forest text-paper" : "border-line bg-cream"
+                  }`}
+                >
+                  {index + 1}. {check.label}
+                </a>
+              ))}
+            </div>
             <form action={updateVerificationCheck} className="mt-3 space-y-2">
-              <input type="hidden" name="checkId" value={check.id} />
-              <select name="result" className={field} defaultValue={check.result}>
+              <input type="hidden" name="checkId" value={currentCheck.id} />
+              <input type="hidden" name="nextStep" value={String(Math.min(record.checks.length, stepIndex + 1))} />
+              <label className={labelCls}>Your mark</label>
+              <select name="result" className={field} defaultValue={currentCheck.result}>
                 {CHECK_RESULTS.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
                   </option>
                 ))}
               </select>
-              <input name="evidenceUrl" className={field} defaultValue={check.evidenceUrl} placeholder="https:// evidence link" />
-              <textarea name="note" className={field} rows={3} defaultValue={check.note} placeholder="What you checked and what the evidence shows" />
-              <button className={btnOutline} type="submit">
-                Save item
+              <input name="evidenceUrl" className={field} defaultValue={currentCheck.evidenceUrl} placeholder="https:// evidence link" />
+              <textarea name="note" className={field} rows={3} defaultValue={currentCheck.note} placeholder="What you checked and what the evidence shows" />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button className={`${btn} min-h-11`} type="submit">
+                  Save & next
+                </button>
+                {stepIndex > 1 ? (
+                  <a className={`${btnOutline} inline-flex min-h-11 items-center justify-center`} href={`/admin/verification/${record.id}?step=${stepIndex - 1}`}>
+                    Back
+                  </a>
+                ) : null}
+              </div>
+            </form>
+            <form action={skipVerificationCheck} className="mt-3 space-y-2 rounded border border-[#7A2E2E] bg-cream p-3">
+              <input type="hidden" name="checkId" value={currentCheck.id} />
+              <input type="hidden" name="nextStep" value={String(Math.min(record.checks.length, stepIndex + 1))} />
+              <p className="font-serif text-xl text-forest">Skip (override)</p>
+              <p className="text-sm text-ink">A skip is not a pass. It is written on this file’s audit log.</p>
+              <textarea name="skipReason" className={field} rows={2} required minLength={8} placeholder="Why you are skipping this" />
+              <button className={`${btnOutline} min-h-11`} type="submit">
+                Record skip
               </button>
             </form>
-          </li>
-        ))}
-      </ul>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-mut">This file has no checklist items.</p>
+        )}
+      </section>
+      <details className={`${card} mt-4 p-4`}>
+        <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
+        <ul className="mt-3 space-y-3">
+          {record.checks.map((check) => (
+            <li key={check.id} className="border-t border-line pt-3">
+              <p className="font-semibold">{check.label}</p>
+              <p className="mt-1 text-xs text-mut">
+                {displayCheckStatus(check.result, check.note)} · {checkResultLabel(check.result)}
+                {check.reviewer ? ` · ${check.reviewer.name}` : ""}
+                {check.reviewedAt ? ` · ${formatAuditTime(check.reviewedAt)}` : ""}
+              </p>
+              <form action={updateVerificationCheck} className="mt-3 space-y-2">
+                <input type="hidden" name="checkId" value={check.id} />
+                <select name="result" className={field} defaultValue={check.result}>
+                  {CHECK_RESULTS.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <input name="evidenceUrl" className={field} defaultValue={check.evidenceUrl} placeholder="https:// evidence link" />
+                <textarea name="note" className={field} rows={3} defaultValue={check.note} placeholder="What you checked and what the evidence shows" />
+                <button className={btnOutline} type="submit">
+                  Save item
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </details>
 
       <h2 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Audit log</h2>
       <ul className={`${card} divide-y divide-line px-4`}>

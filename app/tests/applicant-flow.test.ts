@@ -22,7 +22,9 @@ const ADDRESS = {
 
 describe("applicant details", () => {
   it("keeps the landing line short and leaves the business card out", () => {
-    expect(LANDING_INTRO).toContain("A Private Floor administrator reviews every application.");
+    expect(LANDING_INTRO).toContain("A private network where every member is personally reviewed");
+    expect(LANDING_INTRO).toContain("Anyone can request to join");
+    expect(LANDING_INTRO.toLowerCase()).not.toContain("invite-only");
     expect(LANDING_INTRO.toLowerCase()).not.toContain("business card");
     expect(APPLY_ENCOURAGEMENT).toBe(
       "The more detail you share, the better we can match you with the right members and deals.",

@@ -4,6 +4,7 @@ import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton, RunAndReload } from "@/components/run-and-reload";
 import { GradeMark } from "@/components/grade-summary";
+import { DemoChip, StatusChip } from "@/components/status-chip";
 import { btnOutline, card } from "@/components/ui";
 import {
   APPLICATION_FILTERS,
@@ -12,6 +13,8 @@ import {
   matchesApplicationFilter,
 } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
+import { ADMIN_INTROS } from "@/lib/membership-copy";
+import { isDemoRecord, personStageLabel, personStanding } from "@/lib/person-standing";
 import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { settleStuckRuns } from "@/lib/verify/queue";
@@ -23,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function ApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string; filter?: string; sort?: string; grade?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; filter?: string; sort?: string; grade?: string; demo?: string }>;
 }) {
   await requireAdmin();
   await settleStuckRuns();
@@ -31,6 +34,8 @@ export default async function ApplicationsPage({
   const filter = APPLICATION_FILTERS.some((item) => item.id === params.filter) ? (params.filter as ApplicationFilter) : "action";
   const sort = params.sort === "score" || params.sort === "grade" ? params.sort : "submitted";
   const gradeFilter = ["A", "B", "C", "D", "F"].includes(params.grade || "") ? params.grade : "";
+  const hideDemo = params.demo === "hide";
+  const demoQuery = hideDemo ? "&demo=hide" : "";
   const applications = await prisma.application.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
@@ -43,6 +48,7 @@ export default async function ApplicationsPage({
   const rows = applications
     .filter((application) => matchesApplicationFilter(filter, application.status, application.runs[0]?.verdict))
     .filter((application) => !gradeFilter || application.runs[0]?.gradeLetter === gradeFilter)
+    .filter((application) => (hideDemo ? !isDemoRecord({ isTest: application.isTest, email: application.email }) : true))
     .sort((a, b) => {
       if (sort === "grade") return gradeRank(b.runs[0]?.gradeLetter) - gradeRank(a.runs[0]?.gradeLetter) || (b.runs[0]?.gradeScore ?? -1) - (a.runs[0]?.gradeScore ?? -1);
       if (sort === "score") return (b.runs[0]?.gradeScore ?? b.runs[0]?.score ?? -1) - (a.runs[0]?.gradeScore ?? a.runs[0]?.score ?? -1);
@@ -54,7 +60,7 @@ export default async function ApplicationsPage({
       <MobileTitle href="/admin" label="Admin" title="Applications" />
       <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Applications" />
-        <p className="mt-3 text-sm text-ink">Applications are the people waiting to be checked. The grade is a recommendation. Richard Osika approves every member.</p>
+        <p className="mt-3 text-sm text-ink">{ADMIN_INTROS.applications} The grade is a recommendation. Richard Osika approves every member.</p>
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>
@@ -62,7 +68,7 @@ export default async function ApplicationsPage({
           {APPLICATION_FILTERS.map((item) => (
             <Link
               key={item.id}
-              href={`/admin/applications?filter=${item.id}&sort=${sort}${gradeFilter ? `&grade=${gradeFilter}` : ""}`}
+              href={`/admin/applications?filter=${item.id}&sort=${sort}${gradeFilter ? `&grade=${gradeFilter}` : ""}${demoQuery}`}
               className={`inline-flex min-h-11 items-center rounded-sm border px-3 text-xs ${
                 filter === item.id ? "border-brass bg-forest text-paper" : "border-line bg-paper"
               }`}
@@ -75,7 +81,7 @@ export default async function ApplicationsPage({
           {["", "A", "B", "C", "D", "F"].map((letter) => (
             <Link
               key={letter || "all"}
-              href={`/admin/applications?filter=${filter}&sort=${sort}${letter ? `&grade=${letter}` : ""}`}
+              href={`/admin/applications?filter=${filter}&sort=${sort}${letter ? `&grade=${letter}` : ""}${demoQuery}`}
               className={`inline-flex min-h-11 items-center rounded-sm border px-3 text-xs ${
                 gradeFilter === letter ? "border-brass bg-forest text-paper" : "border-line bg-paper"
               }`}
@@ -85,14 +91,17 @@ export default async function ApplicationsPage({
           ))}
         </div>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          <Link href={`/admin/applications?filter=${filter}&sort=submitted${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "submitted" ? "font-semibold text-brass" : ""}>
+          <Link href={`/admin/applications?filter=${filter}&sort=submitted${gradeFilter ? `&grade=${gradeFilter}` : ""}${demoQuery}`} className={sort === "submitted" ? "font-semibold text-brass" : ""}>
             Sort by submitted
           </Link>
-          <Link href={`/admin/applications?filter=${filter}&sort=grade${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "grade" ? "font-semibold text-brass" : ""}>
+          <Link href={`/admin/applications?filter=${filter}&sort=grade${gradeFilter ? `&grade=${gradeFilter}` : ""}${demoQuery}`} className={sort === "grade" ? "font-semibold text-brass" : ""}>
             Sort by grade
           </Link>
-          <Link href={`/admin/applications?filter=${filter}&sort=score${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "score" ? "font-semibold text-brass" : ""}>
+          <Link href={`/admin/applications?filter=${filter}&sort=score${gradeFilter ? `&grade=${gradeFilter}` : ""}${demoQuery}`} className={sort === "score" ? "font-semibold text-brass" : ""}>
             Sort by score
+          </Link>
+          <Link href={hideDemo ? `/admin/applications?filter=${filter}&sort=${sort}${gradeFilter ? `&grade=${gradeFilter}` : ""}` : `/admin/applications?filter=${filter}&sort=${sort}${gradeFilter ? `&grade=${gradeFilter}` : ""}&demo=hide`} className="underline decoration-brass">
+            {hideDemo ? "Show demo" : "Hide demo"}
           </Link>
         </div>
         <form id="bulk-delete" action={deleteSelectedApplications} />
@@ -115,14 +124,25 @@ export default async function ApplicationsPage({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <h2 className="font-serif text-xl font-normal">{application.name}</h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <StatusChip
+                        status={
+                          personStanding({
+                            applicationStatus: application.status,
+                            paymentStatus: application.user?.paymentStatus,
+                            hasMember: Boolean(application.user),
+                          }).status
+                        }
+                      />
+                      {isDemoRecord({ isTest: application.isTest, email: application.email }) ? <DemoChip /> : null}
+                    </div>
                     <p className="text-sm text-ink">
                       {application.org} · {roleLabel(application.role)} · {application.location}
                     </p>
                     <p className="text-xs text-mut">
-                      {formatAuditTime(application.createdAt)} · {applicationStatusLabel(application.status)}
+                      {formatAuditTime(application.createdAt)} · {personStageLabel(personStanding({ applicationStatus: application.status, paymentStatus: application.user?.paymentStatus, hasMember: Boolean(application.user) }).stage)} · {applicationStatusLabel(application.status)}
                       {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
                       {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
-                      {application.isTest ? " · TEST" : ""}
                     </p>
                   </div>
                   <GradeMark

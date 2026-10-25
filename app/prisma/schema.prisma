@@ -318,6 +318,7 @@ model Application {
   duesWaived      Boolean           @default(true)
   isTest          Boolean           @default(false)
   testProfile     String            @default("")
+  reviewProgress  Json?
   businessCard    BusinessCard?
   runs            VerificationRun[]
   decisions       ApplicationDecision[]
