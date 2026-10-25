@@ -36,6 +36,8 @@ export default async function ApplicationsPage({
   const gradeFilter = ["A", "B", "C", "D", "F"].includes(params.grade || "") ? params.grade : "";
   const hideDemo = params.demo === "hide";
   const demoQuery = hideDemo ? "&demo=hide" : "";
+  const members = await prisma.user.findMany({ select: { email: true, status: true, paymentStatus: true } });
+  const memberByEmail = new Map(members.map((member) => [member.email.toLowerCase(), member]));
   const applications = await prisma.application.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
@@ -117,11 +119,12 @@ export default async function ApplicationsPage({
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">Nothing in this filter.</p> : null}
         <ul className="mt-4 space-y-3">
           {rows.map((application) => {
+            const member = application.user || memberByEmail.get(application.email.toLowerCase());
             const standing = personStanding({
               applicationStatus: application.status,
-              accountStatus: application.user?.status,
-              paymentStatus: application.user?.paymentStatus,
-              hasMember: Boolean(application.user),
+              accountStatus: member?.status,
+              paymentStatus: member?.paymentStatus,
+              hasMember: Boolean(member),
             });
             return (
             <li key={application.id} className="flex items-start gap-2">

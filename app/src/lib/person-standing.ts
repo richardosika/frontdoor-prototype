@@ -46,10 +46,8 @@ export function personStanding(input: {
   const paymentDue = PAYMENT_DUE.has(input.paymentStatus || "") || app === "PAYMENT_DUE";
   const approvedApplication = app === "APPROVED" || app === "PAYMENT_DUE";
   const activeMember = Boolean(input.hasMember) && (account === "ACTIVE" || account === "");
-  if (approvedApplication || (activeMember && !app)) {
-    return { status: "APPROVED", stage: paymentDue ? "PAYMENT_DUE" : "ACTIVE" };
-  }
-  if (activeMember && (app === "APPROVED" || app === "PAYMENT_DUE")) {
+  // An active member stays Approved. A later open application does not demote them.
+  if (approvedApplication || activeMember) {
     return { status: "APPROVED", stage: paymentDue ? "PAYMENT_DUE" : "ACTIVE" };
   }
   if (invite === "DECLINED" && !app) return { status: "DECLINED", stage: "DECLINED" };

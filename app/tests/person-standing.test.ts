@@ -29,6 +29,10 @@ describe("one status for applications, members, and people", () => {
       status: "DECLINED",
       stage: "DECLINED",
     });
+    expect(personStanding({ applicationStatus: "IN_REVIEW", hasMember: true, accountStatus: "ACTIVE" })).toEqual({
+      status: "APPROVED",
+      stage: "ACTIVE",
+    });
   });
 
   it("marks demo and sample rows without marking a real address", () => {
