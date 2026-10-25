@@ -295,7 +295,7 @@ function Report({
                         <>
                           {" "}
                           <a className="underline decoration-brass" href={row.url} target="_blank" rel="noreferrer">
-                            Link
+                            {row.checkKey === "news-story" ? "Open article" : "Link"}
                           </a>
                         </>
                       ) : null}

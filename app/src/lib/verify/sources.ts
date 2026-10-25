@@ -8,6 +8,7 @@ export const VERIFICATION_SOURCES = [
   { name: "SEC EDGAR full-text search", kind: "efts.sec.gov" },
   { name: "CourtListener public search", kind: "courtlistener.com" },
   { name: "Web search (DuckDuckGo, Wikipedia, Wikidata, GDELT, Bing)", kind: "Free HTML or API, no key" },
+  { name: "News (Google News RSS, Bing News RSS, GDELT)", kind: "Free RSS or API, no key. Last five years. GDELT is rate-limited and cached." },
   { name: "LinkedIn public page title", kind: "Public HTTP, no login" },
   { name: "State registry deep links", kind: "Manual. No free API." },
   { name: "Business card text compare", kind: "Local. OCR is not installed; an uploaded image is marked could not be checked." },

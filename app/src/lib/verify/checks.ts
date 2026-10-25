@@ -3,6 +3,7 @@ import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
+import { newsChecks } from "@/lib/verify/news";
 import { webFootprintCheck } from "@/lib/verify/web-search";
 
 const DISPOSABLE = new Set([
@@ -597,7 +598,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
         key: "website",
         status: "NOT_RUN",
         weight: 14,
-        finding: "Website, RDAP, EDGAR, courts, and web search were not run in this pass.",
+        finding: "Website, RDAP, EDGAR, courts, web search, and news were not run in this pass.",
         source: "Network",
         url: "",
       }),
@@ -735,6 +736,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const court = await fetchText(courtUrl);
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
   out.push(await webFootprintCheck(ctx.facts, fetchText));
+  out.push(...(await newsChecks(ctx.facts, fetchText)));
   if (ctx.facts.linkedinUrl) {
     const linked = await fetchText(ctx.facts.linkedinUrl);
     const linkedText = stripHtml(linked.text);

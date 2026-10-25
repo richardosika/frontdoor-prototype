@@ -18,7 +18,9 @@ export function retryDelayMs(url: string): number {
 
 function cacheable(url: string): boolean {
   try {
-    return new URL(url).host === "api.gdeltproject.org";
+    const parsed = new URL(url);
+    if (parsed.host === "api.gdeltproject.org" || parsed.host === "news.google.com") return true;
+    return parsed.host === "www.bing.com" && parsed.pathname.startsWith("/news/");
   } catch {
     return false;
   }
@@ -77,13 +79,18 @@ async function fetchOnce(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const wiki = host.endsWith("wikipedia.org") || host.endsWith("wikimedia.org") || host.endsWith("wikidata.org");
+  const news = host === "news.google.com" || (host.endsWith("bing.com") && url.includes("/news"));
   try {
     const response = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: {
         "user-agent": USER_AGENT,
-        accept: wiki ? "application/json" : "text/html,application/json,text/csv,*/*",
+        accept: wiki
+          ? "application/json"
+          : news
+            ? "application/rss+xml, application/xml, text/xml, */*"
+            : "text/html,application/json,text/csv,*/*",
         ...(wiki ? { "api-user-agent": USER_AGENT } : {}),
       },
     });
