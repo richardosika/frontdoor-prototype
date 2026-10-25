@@ -35,14 +35,42 @@ Absence of a sanctions hit is not corroboration. A private email (Gmail and the 
 
 A possible sanctions match without location corroboration is a review flag, not a hard flag. Common names such as John Smith against a list entry in another country stay on `NEEDS_OWNER_DECISION`.
 
+## Grade
+
+The letter grade is separate from the older 0–100 engine score. It is a recommendation to Richard Osika. Rubric version `2026-10-25`.
+
+Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and still sits in the possible total, so missing data cannot raise the grade. Email domain and MX earn 0. RDAP earns at most 2.
+
+| Category | Possible | What earns the points |
+| --- | --- | --- |
+| Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4 |
+| Company legitimacy | 22 | Website names the person or company 8, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (always 0; it is not searched for free) |
+| Public footprint and reputation | 18 | Web result names person and company 8, headline names both 8, social links are full URLs 2 |
+| Risk and sanctions | 20 | Sanctions list clear 8, not a duplicate 6, no fraud-pattern text 4, no application burst 2 |
+| Role fit and plausibility | 12 | Name, company, and role readable 8, invite code on file 4 |
+| Completeness of application | 10 | Phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, reference 1 |
+
+Letters before caps: A 90–100, B 80–89, C 70–79, D 60–69, F 0–59. Caps only lower the letter.
+
+- No person-and-company corroboration: cannot exceed B.
+- Negative headline that is only a name match: cannot exceed C. The file says “possible match, verify” and does not state the headline as fact.
+- Disposable email that still has a public page, sanctions name without country or date of birth, or a negative headline or court result that also names the company: cannot exceed D, with a red banner.
+- Corroborated sanctions, fraud-pattern text, disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed F, with a red banner.
+- Two or more conflicting checks: cannot exceed C.
+
+Confidence is separate. High: at least 70% of weighted checks returned pass or fail, and at least 2 sources corroborated the person and the company. Medium: at least 45%, or at least 1 corroborating source. Low: otherwise, and always when nothing corroborated them.
+
+The recommendation is one of APPROVE, APPROVE WITH CONDITIONS, NEEDS MORE INFO, or DECLINE. A hard red flag recommends DECLINE. A doubtful hit, low confidence, or a thin file recommends NEEDS MORE INFO. A paying role is not a clean APPROVE, because annual dues go out only after approval. The grade is stored as JSON on the verification run with the time it was graded. Re-run writes a note of what changed. Richard’s decision log and the admin notice include the grade. Members never see it.
+
+There is no language model on this path. The summary is built from the checks. If a model key is set elsewhere on the site, this file is still not sent to a model.
+
 ## Summary
 
-The summary is a template. It is not a language model. It always includes:
+The stored summary text is the executive summary plus a short legacy line. It is not a language model. It always includes:
 
+- The applicant, the company, what checked out, what did not, and what could not be checked
+- The letter grade, the recommendation to Richard Osika, and the next step
 - `Recommendation: LEGIT`, `Recommendation: NOT LEGIT`, or `Recommendation: NEEDS YOUR DECISION`
-- The strongest support
-- The strongest concern
-- `No data found` for sources that responded without a match
 - `What I could not check for free`, including any source marked unavailable (blocked, timed out, or errored)
 
 ## Jobs

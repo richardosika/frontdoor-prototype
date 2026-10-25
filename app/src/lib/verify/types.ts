@@ -38,6 +38,7 @@ export type ApplicantFacts = {
   duplicateOfMember: boolean;
   duplicateOfDeclined: boolean;
   recentApplications: number;
+  referenceCount?: number;
 };
 
 export type ScoredReport = {

@@ -3,7 +3,15 @@
 import { reviewApplication } from "@/actions/admin";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 
-export function DecisionForm({ applicationId, notLegit }: { applicationId: string; notLegit: boolean }) {
+export function DecisionForm({
+  applicationId,
+  notLegit,
+  confirmLabel = "The recommendation is NOT LEGIT.",
+}: {
+  applicationId: string;
+  notLegit: boolean;
+  confirmLabel?: string;
+}) {
   return (
     <form
       action={reviewApplication}
@@ -12,7 +20,7 @@ export function DecisionForm({ applicationId, notLegit }: { applicationId: strin
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
         if (notLegit && decision === "APPROVED") {
-          const confirmed = window.confirm("The recommendation is NOT LEGIT. Approve this applicant anyway?");
+          const confirmed = window.confirm(`${confirmLabel} Approve this applicant anyway?`);
           if (!confirmed) {
             event.preventDefault();
             return;
@@ -27,7 +35,7 @@ export function DecisionForm({ applicationId, notLegit }: { applicationId: strin
       <label className={labelCls}>Note</label>
       <textarea name="note" className={field} rows={3} placeholder="Shown if you approve or ask for more info. Hidden if you decline." />
       {notLegit ? (
-        <p className="text-sm text-brass">Recommendation: NOT LEGIT. Approving asks for confirmation and is written to the audit log.</p>
+        <p className="text-sm text-brass">{confirmLabel} Approving asks for confirmation and is written to the audit log.</p>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <button className={btn} name="decision" value="APPROVED" type="submit">

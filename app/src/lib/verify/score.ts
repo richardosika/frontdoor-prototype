@@ -1,3 +1,4 @@
+import { gradeChecks, gradePlainText } from "@/lib/verify/grade";
 import type { CheckOutput, ScoredReport, Verdict } from "@/lib/verify/types";
 
 /**
@@ -43,29 +44,19 @@ export function unavailableLabels(checks: CheckOutput[]): string[] {
   return names;
 }
 
-export function buildSummary(checks: CheckOutput[], score: number, verdict: Verdict): string {
+/** Legacy phrases the admin notice and older tests still look for. The page renders the structured grade instead. */
+export function summaryTail(checks: CheckOutput[], verdict: Verdict): string {
   const label = verdict === "LEGIT" ? "LEGIT" : verdict === "NOT_LEGIT" ? "NOT LEGIT" : "NEEDS YOUR DECISION";
-  const opinion =
-    verdict === "LEGIT"
-      ? `Recommendation: ${label}. Several independent checks line up on this person and company. The score is ${score} out of 100. This is a recommendation only. Richard Osika still approves every member.`
-      : verdict === "NOT_LEGIT"
-        ? `Recommendation: ${label}. A hard red flag is in the evidence. The score is ${score} out of 100. Do not treat this as an automatic decline. Richard Osika still decides.`
-        : `Recommendation: ${label}. The file is thin or the checks conflict. The score is ${score} out of 100. Richard Osika should look at the items below before deciding.`;
-  const support = checks.filter((check) => check.status === "PASS").slice(0, 2).map((check) => check.finding);
-  const against = checks.filter((check) => check.hardFlag || check.reviewFlag || check.status === "FAIL").slice(0, 2).map((check) => check.finding);
-  const noData = checks.filter((check) => check.status === "INCONCLUSIVE").map((check) => check.key);
   const unavailable = unavailableLabels(checks);
-  const blockedFindings = checks.filter((check) => check.status === "UNAVAILABLE").map((check) => check.finding);
-  const forLine = support.length ? `Strongest support: ${support.join(" ")}` : "Strongest support: no corroborating pass yet.";
-  const againstLine = against.length ? `Strongest concern: ${against.join(" ")}` : "Strongest concern: no hard conflict in the checks that ran.";
-  const noDataLine = noData.length
-    ? `No data found: ${noData.slice(0, 8).join(", ")}.`
-    : "No data found: the sources that responded had a result or a pass.";
   const unavailableText = unavailable.length
-    ? `Unavailable sources: ${unavailable.join(", ")}. ${blockedFindings.join(" ")}`.trim()
+    ? `Unavailable sources: ${unavailable.join(", ")}.`
     : "none of the free sources were blocked on this run";
-  const free = `What I could not check for free: paid people-search, credit, full court dockets, logged-in LinkedIn, state registries that have no stable free API, and any source marked unavailable. ${unavailableText}`;
-  return [opinion, forLine, againstLine, noDataLine, free].join(" ");
+  return `Recommendation: ${label}. What I could not check for free: paid people-search, credit, full court dockets, logged-in LinkedIn, state registries that have no stable free API, and any source marked unavailable. ${unavailableText}`;
+}
+
+export function buildSummary(checks: CheckOutput[], _score: number, verdict: Verdict): string {
+  const graded = gradeChecks(checks);
+  return `${gradePlainText(graded)} ${summaryTail(checks, verdict)}`.replace(/\s+/g, " ").trim();
 }
 
 export function scoreReport(checks: CheckOutput[]): ScoredReport {

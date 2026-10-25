@@ -1,7 +1,8 @@
-import type { EvidenceStatus, RunSubject, Verdict } from "@prisma/client";
+import type { EvidenceStatus, Prisma, RunSubject, Verdict } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
-import { scoreReport } from "@/lib/verify/score";
+import { failedGrade, gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot } from "@/lib/verify/grade";
+import { scoreReport, summaryTail } from "@/lib/verify/score";
 import type { ApplicantFacts } from "@/lib/verify/types";
 import { politeFetch } from "@/lib/verify/fetch";
 import { readCardImage } from "@/lib/verify/ocr";
@@ -47,6 +48,17 @@ export async function executeVerificationRun(runId: string, options?: { network?
       fetchText: politeFetch,
     };
     const report = scoreReport(await collectChecks(ctx));
+    const finishedAt = new Date();
+    const previous = run.applicationId
+      ? await prisma.verificationRun.findFirst({
+          where: { applicationId: run.applicationId, subject: run.subject, status: "DONE", id: { not: run.id } },
+          orderBy: { finishedAt: "desc" },
+          select: { gradeSnapshot: true },
+        })
+      : null;
+    const graded = gradeChecks(report.checks, facts, { gradedAt: finishedAt.toISOString(), subject: run.subject });
+    graded.changeNote = gradeChangeNote(parseGradeSnapshot(previous?.gradeSnapshot), graded);
+    graded.plainText = gradePlainText(graded);
     await prisma.verificationEvidence.deleteMany({ where: { runId: run.id } });
     await prisma.verificationEvidence.createMany({
       data: report.checks.map((check) => ({
@@ -58,6 +70,9 @@ export async function executeVerificationRun(runId: string, options?: { network?
         source: check.source,
         url: check.url,
         ranAt: Number.isNaN(new Date(check.ranAt).getTime()) ? new Date() : new Date(check.ranAt),
+        hardFlag: Boolean(check.hardFlag),
+        reviewFlag: Boolean(check.reviewFlag),
+        corroborates: Boolean(check.corroborates),
       })),
     });
     await prisma.verificationRun.update({
@@ -66,9 +81,14 @@ export async function executeVerificationRun(runId: string, options?: { network?
         status: "DONE",
         score: report.score,
         verdict: report.verdict as Verdict,
-        summary: report.summary,
+        summary: `${graded.plainText} ${summaryTail(report.checks, report.verdict)}`.replace(/\s+/g, " ").trim(),
+        gradeLetter: graded.letter,
+        gradeScore: graded.score,
+        gradeConfidence: graded.confidence,
+        recommendation: graded.recommendation,
+        gradeSnapshot: graded as unknown as Prisma.InputJsonValue,
         error: "",
-        finishedAt: new Date(),
+        finishedAt,
       },
     });
     if (run.application && (run.application.status === "SUBMITTED" || run.application.status === "PENDING")) {
@@ -78,15 +98,22 @@ export async function executeVerificationRun(runId: string, options?: { network?
       });
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Verification failed.";
+    const graded = failedGrade(message);
     await prisma.verificationRun.update({
       where: { id: run.id },
       data: {
         status: "FAILED",
-        error: error instanceof Error ? error.message : "Verification failed.",
+        error: message,
         finishedAt: new Date(),
-        summary: "Recommendation: NEEDS YOUR DECISION. The verification job failed before it could finish. Richard Osika should read the application directly. What I could not check for free: the sources this job did not reach.",
+        summary: `${graded.plainText} Recommendation: NEEDS YOUR DECISION. What I could not check for free: the sources this job did not reach.`,
         verdict: "NEEDS_OWNER_DECISION",
         score: 0,
+        gradeLetter: graded.letter,
+        gradeScore: 0,
+        gradeConfidence: graded.confidence,
+        recommendation: graded.recommendation,
+        gradeSnapshot: graded as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -110,6 +137,7 @@ async function factsForRun(run: {
     testProfile: string;
     inviteCode: { note: string; code: string } | null;
     businessCard?: { deletedAt: Date | null; sizeBytes: number; contentType?: string; bytes?: Uint8Array | null } | null;
+    referenceEmails?: string[];
   } | null;
 }): Promise<ApplicantFacts> {
   const application = run.application;
@@ -159,5 +187,6 @@ async function factsForRun(run: {
     duplicateOfMember: run.subject === "APPLICATION" ? duplicateOfMember : false,
     duplicateOfDeclined,
     recentApplications,
+    referenceCount: application?.referenceEmails?.length ?? 0,
   };
 }

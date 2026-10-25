@@ -5,11 +5,9 @@ import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DecisionForm } from "@/components/decision-form";
 import { PaymentPanel } from "@/components/payment-admin";
-import { EvidenceChip } from "@/components/evidence-chip";
-import { newsStoryChipLabel } from "@/lib/verify/news";
+import { CheckTable, ExecutiveSummary, GradeMark, recommendationNeedsConfirm } from "@/components/grade-summary";
 import { RunAndReload } from "@/components/run-and-reload";
-import { VerdictChip } from "@/components/verdict-chip";
-import { btnOutline, card, field, labelCls } from "@/components/ui";
+import { btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { adminDuesLine } from "@/lib/dues";
@@ -17,6 +15,7 @@ import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
+import { gradeFactsFromApplication, gradeForRun } from "@/lib/verify/grade";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +47,9 @@ export default async function ApplicationDetailPage({
   const statementParts = splitMemberReply(application.statement);
   const report = application.runs.find((run) => run.subject === "APPLICATION");
   const company = application.runs.find((run) => run.subject === "COMPANY");
+  const facts = gradeFactsFromApplication(application);
+  const grade = gradeForRun(report, facts);
+  const companyGrade = gradeForRun(company, { ...facts, name: application.org, applicantName: application.name });
   const card = application.businessCard;
   const cardOnFile = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
   const open = ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"].includes(application.status);
@@ -63,11 +65,13 @@ export default async function ApplicationDetailPage({
         <div className="mt-3">
           <Banner error={query.error} notice={query.notice} />
         </div>
+        <p className="mt-3 text-sm text-ink">Applications are the people waiting to be checked. This grade is a recommendation. Richard Osika approves every member.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <VerdictChip verdict={report?.verdict} score={report?.score} />
+          <GradeMark letter={grade?.letter} score={grade?.score} recommendation={grade?.recommendation} confidence={grade?.confidence} />
           <span className="text-xs uppercase tracking-wide text-mut">{applicationStatusLabel(application.status)}</span>
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
+        {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
         <section className={`${card} mt-4 space-y-2 p-4 text-sm`}>
           <p>
             <b>Email:</b> {application.email}
@@ -153,11 +157,9 @@ export default async function ApplicationDetailPage({
             <p className="mt-2 text-sm text-mut">No business card uploaded.</p>
           )}
         </section>
-        {!report ? (
-          <p className="mt-4 text-sm text-ink">No verification report yet. Run it to replace the “verification in progress” placeholder.</p>
-        ) : null}
-        <Report title="Automated verification report" run={report} applicationId={application.id} />
-        <Report title="Company report" run={company} applicationId={application.id} />
+        <CheckSection title="Application checks" run={report} />
+        {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" /> : null}
+        <CheckSection title="Company checks" run={company} />
         <div className="mt-4">
           <RunAndReload
             className={btnOutline}
@@ -206,7 +208,16 @@ export default async function ApplicationDetailPage({
           <section className={`${card} mt-4 p-4`}>
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your decision</h2>
             <p className="mt-1 text-sm text-ink">Automation does not approve or decline. A decline does not show the reason to the applicant.</p>
-            <DecisionForm applicationId={application.id} notLegit={report?.verdict === "NOT_LEGIT"} />
+            {grade ? (
+              <p className="mt-3 text-sm leading-relaxed text-ink">
+                Grade {grade.letter} ({grade.score}). {grade.recommendation}. Confidence {grade.confidence}. {grade.summary.reasoning}
+              </p>
+            ) : null}
+            <DecisionForm
+              applicationId={application.id}
+              notLegit={recommendationNeedsConfirm(grade?.recommendation, report?.verdict)}
+              confirmLabel={grade?.recommendation === "DECLINE" ? "The recommendation is DECLINE." : "The recommendation is NOT LEGIT."}
+            />
           </section>
         ) : null}
         <section className={`${card} mt-4 p-4`}>
@@ -215,7 +226,9 @@ export default async function ApplicationDetailPage({
           <ul className="mt-2 divide-y divide-line text-sm">
             {application.decisions.map((row) => (
               <li key={row.id} className="py-2">
-                <b>{row.decision}</b> · {row.actor?.name || "Private Floor"} · {formatAuditTime(row.createdAt)}
+                <b>{row.decision}</b>
+                {row.gradeLetter ? ` · grade ${row.gradeLetter}${typeof row.gradeScore === "number" ? ` (${row.gradeScore})` : ""}` : ""}
+                {row.recommendation ? ` · ${row.recommendation}` : ""} · {row.actor?.name || "Private Floor"} · {formatAuditTime(row.createdAt)}
                 {row.reason ? <p className="text-ink">{row.reason}</p> : null}
               </li>
             ))}
@@ -241,98 +254,28 @@ export default async function ApplicationDetailPage({
   );
 }
 
-function EvidenceLabel({ row }: { row: { checkKey: string; status: string; finding: string } }) {
-  const label = newsStoryChipLabel(row.checkKey, row.status, row.finding);
-  if (!label) return <EvidenceChip status={row.status} />;
-  return (
-    <span className="inline-flex rounded-sm border border-line bg-cream px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-forest">
-      {label}
-    </span>
-  );
-}
-
-function Report({
+function CheckSection({
   title,
   run,
-  applicationId,
 }: {
   title: string;
-  applicationId: string;
   run?: {
     status: string;
-    summary: string;
-    verdict: string | null;
-    score: number | null;
     finishedAt: Date | null;
     evidence: { id: string; checkKey: string; status: string; finding: string; source: string; url: string; ranAt: Date }[];
   };
 }) {
   return (
     <section className={`${card} mt-4 p-4`}>
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{title}</h2>
-      {!run ? <p className="mt-2 text-sm text-mut">No report yet.</p> : null}
+      <h2 className={sectionLabel}>{title}</h2>
+      {!run ? <p className="mt-2 text-sm text-mut">No checks yet.</p> : null}
       {run ? (
         <>
-          <div className="mt-2">
-            <VerdictChip verdict={run.verdict} score={run.score} />
-            <span className="ml-2 text-xs text-mut">{run.status}{run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}</span>
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-ink">{run.summary || "The report is still running."}</p>
-          {run.status !== "DONE" ? (
-            <div className="mt-3">
-              <RunAndReload
-                className={btnOutline}
-                label="Re-run verification"
-                pendingLabel="Running verification…"
-                run={rerunVerification.bind(null, applicationId)}
-              />
-              <p className="mt-2 text-xs text-mut">A run that is still going after a few minutes is stopped. Re-run starts it again.</p>
-            </div>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {run.evidence.map((row) => (
-              <span key={`${row.id}-chip`} className="inline-flex items-center gap-1 text-[11px] text-ink">
-                <EvidenceLabel row={row} />
-                {row.checkKey}
-              </span>
-            ))}
-          </div>
-          <div className="mt-3 max-w-full overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-left text-xs">
-              <thead>
-                <tr className="border-b border-line text-mut">
-                  <th className="py-2 pr-2">Check</th>
-                  <th className="py-2 pr-2">Status</th>
-                  <th className="py-2 pr-2">Finding</th>
-                  <th className="py-2 pr-2">Source</th>
-                  <th className="py-2">When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {run.evidence.map((row) => (
-                  <tr key={row.id} className="border-b border-line align-top">
-                    <td className="py-2 pr-2">{row.checkKey}</td>
-                    <td className="py-2 pr-2">
-                      <EvidenceLabel row={row} />
-                    </td>
-                    <td className="max-w-xs py-2 pr-2 break-words">
-                      {row.finding}
-                      {row.url ? (
-                        <>
-                          {" "}
-                          <a className="underline decoration-brass" href={row.url} target="_blank" rel="noreferrer">
-                            {row.checkKey === "news-story" ? "Open article" : "Link"}
-                          </a>
-                        </>
-                      ) : null}
-                    </td>
-                    <td className="py-2 pr-2">{row.source}</td>
-                    <td className="py-2">{formatAuditTime(row.ranAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="mt-2 text-xs text-mut">
+            {run.status}
+            {run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}
+          </p>
+          <CheckTable evidence={run.evidence} />
         </>
       ) : null}
     </section>

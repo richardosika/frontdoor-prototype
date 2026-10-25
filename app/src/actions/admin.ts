@@ -15,6 +15,10 @@ import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verific
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
+import { noticeTestRecipient } from "@/lib/brand";
+import { sendNotice } from "@/lib/notices";
+import { notifyAdmins } from "@/lib/notify";
+import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
@@ -62,14 +66,23 @@ export async function reviewApplication(formData: FormData) {
   }
 
   const base = await appBaseUrl();
+  const latestGradeRun = await prisma.verificationRun.findFirst({
+    where: { applicationId: application.id, subject: "APPLICATION", status: "DONE" },
+    orderBy: { finishedAt: "desc" },
+  });
+  const grade = parseGradeSnapshot(latestGradeRun?.gradeSnapshot);
   await prisma.applicationDecision.create({
     data: {
       applicationId: application.id,
       actorId: admin.id,
       decision: normalized,
       reason: note,
+      gradeLetter: grade?.letter || latestGradeRun?.gradeLetter || "",
+      gradeScore: grade?.score ?? latestGradeRun?.gradeScore ?? null,
+      recommendation: grade?.recommendation || latestGradeRun?.recommendation || "",
     },
   });
+  await tellRichard(application, normalized, grade);
 
   if (normalized === "DECLINED") {
     await prisma.application.update({
@@ -216,6 +229,26 @@ export async function reviewApplication(formData: FormData) {
   redirect(
     `/admin/applications/${application.id}?notice=${encodeURIComponent(paying ? `Approved, payment due — ${application.name}` : `Approved ${application.name}`)}`,
   );
+}
+
+async function tellRichard(
+  application: { id: string; name: string },
+  decision: string,
+  grade: GradeReport | null,
+) {
+  const text = decisionNoticeText({ name: application.name, decision, grade });
+  await notifyAdmins({
+    title: `${application.name}: ${decision} · grade ${grade?.letter || "ungraded"}`,
+    body: text.slice(0, 600),
+    href: `/admin/applications/${application.id}`,
+  });
+  await sendNotice({
+    intendedTo: noticeTestRecipient(),
+    applicationId: application.id,
+    subject: `${application.name}: ${decision} · grade ${grade?.letter || "ungraded"}`,
+    text,
+    templateKey: "admin_decision",
+  });
 }
 
 export async function setMemberTier(formData: FormData) {

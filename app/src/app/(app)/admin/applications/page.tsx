@@ -3,7 +3,7 @@ import { deleteSelectedApplications, rerunVerification } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton, RunAndReload } from "@/components/run-and-reload";
-import { VerdictChip } from "@/components/verdict-chip";
+import { GradeMark } from "@/components/grade-summary";
 import { btnOutline, card } from "@/components/ui";
 import {
   APPLICATION_FILTERS,
@@ -23,13 +23,14 @@ export const dynamic = "force-dynamic";
 export default async function ApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string; filter?: string; sort?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; filter?: string; sort?: string; grade?: string }>;
 }) {
   await requireAdmin();
   await settleStuckRuns();
   const params = await searchParams;
   const filter = APPLICATION_FILTERS.some((item) => item.id === params.filter) ? (params.filter as ApplicationFilter) : "action";
-  const sort = params.sort === "score" ? "score" : "submitted";
+  const sort = params.sort === "score" || params.sort === "grade" ? params.sort : "submitted";
+  const gradeFilter = ["A", "B", "C", "D", "F"].includes(params.grade || "") ? params.grade : "";
   const applications = await prisma.application.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
@@ -38,10 +39,13 @@ export default async function ApplicationsPage({
       user: { select: { paymentStatus: true, renewalAt: true } },
     },
   });
+  const gradeRank = (letter?: string | null) => ({ A: 5, B: 4, C: 3, D: 2, F: 1 })[letter || ""] || 0;
   const rows = applications
     .filter((application) => matchesApplicationFilter(filter, application.status, application.runs[0]?.verdict))
+    .filter((application) => !gradeFilter || application.runs[0]?.gradeLetter === gradeFilter)
     .sort((a, b) => {
-      if (sort === "score") return (b.runs[0]?.score ?? -1) - (a.runs[0]?.score ?? -1);
+      if (sort === "grade") return gradeRank(b.runs[0]?.gradeLetter) - gradeRank(a.runs[0]?.gradeLetter) || (b.runs[0]?.gradeScore ?? -1) - (a.runs[0]?.gradeScore ?? -1);
+      if (sort === "score") return (b.runs[0]?.gradeScore ?? b.runs[0]?.score ?? -1) - (a.runs[0]?.gradeScore ?? a.runs[0]?.score ?? -1);
       return b.createdAt.getTime() - a.createdAt.getTime();
     });
 
@@ -50,7 +54,7 @@ export default async function ApplicationsPage({
       <MobileTitle href="/admin" label="Admin" title="Applications" />
       <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Applications" />
-        <p className="mt-3 text-sm text-ink">Recommendations only. Richard Osika approves every member.</p>
+        <p className="mt-3 text-sm text-ink">Applications are the people waiting to be checked. The grade is a recommendation. Richard Osika approves every member.</p>
         <div className="mt-3">
           <Banner error={params.error} notice={params.notice} />
         </div>
@@ -58,7 +62,7 @@ export default async function ApplicationsPage({
           {APPLICATION_FILTERS.map((item) => (
             <Link
               key={item.id}
-              href={`/admin/applications?filter=${item.id}&sort=${sort}`}
+              href={`/admin/applications?filter=${item.id}&sort=${sort}${gradeFilter ? `&grade=${gradeFilter}` : ""}`}
               className={`inline-flex min-h-11 items-center rounded-sm border px-3 text-xs ${
                 filter === item.id ? "border-brass bg-forest text-paper" : "border-line bg-paper"
               }`}
@@ -67,11 +71,27 @@ export default async function ApplicationsPage({
             </Link>
           ))}
         </div>
-        <div className="mt-3 flex gap-3 text-sm">
-          <Link href={`/admin/applications?filter=${filter}&sort=submitted`} className={sort === "submitted" ? "font-semibold text-brass" : ""}>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {["", "A", "B", "C", "D", "F"].map((letter) => (
+            <Link
+              key={letter || "all"}
+              href={`/admin/applications?filter=${filter}&sort=${sort}${letter ? `&grade=${letter}` : ""}`}
+              className={`inline-flex min-h-11 items-center rounded-sm border px-3 text-xs ${
+                gradeFilter === letter ? "border-brass bg-forest text-paper" : "border-line bg-paper"
+              }`}
+            >
+              {letter ? `Grade ${letter}` : "All grades"}
+            </Link>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <Link href={`/admin/applications?filter=${filter}&sort=submitted${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "submitted" ? "font-semibold text-brass" : ""}>
             Sort by submitted
           </Link>
-          <Link href={`/admin/applications?filter=${filter}&sort=score`} className={sort === "score" ? "font-semibold text-brass" : ""}>
+          <Link href={`/admin/applications?filter=${filter}&sort=grade${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "grade" ? "font-semibold text-brass" : ""}>
+            Sort by grade
+          </Link>
+          <Link href={`/admin/applications?filter=${filter}&sort=score${gradeFilter ? `&grade=${gradeFilter}` : ""}`} className={sort === "score" ? "font-semibold text-brass" : ""}>
             Sort by score
           </Link>
         </div>
@@ -105,7 +125,12 @@ export default async function ApplicationsPage({
                       {application.isTest ? " · TEST" : ""}
                     </p>
                   </div>
-                  <VerdictChip verdict={application.runs[0]?.verdict} score={application.runs[0]?.score} />
+                  <GradeMark
+                    letter={application.runs[0]?.gradeLetter}
+                    score={application.runs[0]?.gradeScore}
+                    recommendation={application.runs[0]?.recommendation}
+                    confidence={application.runs[0]?.gradeConfidence}
+                  />
                 </div>
               </Link>
               {!application.runs[0] || application.runs[0].status !== "DONE" ? (

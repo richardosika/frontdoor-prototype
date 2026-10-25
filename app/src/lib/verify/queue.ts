@@ -1,4 +1,6 @@
+import type { Prisma } from "@prisma/client";
 import { createVerificationRun, executeVerificationRun } from "@/lib/verify/engine";
+import { failedGrade } from "@/lib/verify/grade";
 import { prisma } from "@/lib/prisma";
 import { stuckRunDecision } from "@/lib/verify/watchdog";
 
@@ -84,6 +86,7 @@ export async function settleStuckRuns(now = new Date()): Promise<void> {
 }
 
 async function markRunTimedOut(runId: string, now: Date): Promise<void> {
+  const graded = failedGrade("This run was still going after several minutes, so it was stopped.", now.toISOString());
   await prisma.verificationRun.updateMany({
     where: { id: runId, status: { in: ["PENDING", "RUNNING"] } },
     data: {
@@ -92,7 +95,12 @@ async function markRunTimedOut(runId: string, now: Date): Promise<void> {
       error: "The verification run timed out.",
       verdict: "NEEDS_OWNER_DECISION",
       score: 0,
-      summary: FAILED_SUMMARY,
+      summary: `${graded.plainText} ${FAILED_SUMMARY}`,
+      gradeLetter: graded.letter,
+      gradeScore: 0,
+      gradeConfidence: graded.confidence,
+      recommendation: graded.recommendation,
+      gradeSnapshot: graded as unknown as Prisma.InputJsonValue,
     },
   });
 }

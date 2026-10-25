@@ -816,9 +816,12 @@ model ApplicationDecision {
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   actorId       String?
   actor         User?       @relation("DecisionActor", fields: [actorId], references: [id])
-  decision      String
-  reason        String      @default("")
-  createdAt     DateTime    @default(now())
+  decision       String
+  reason         String   @default("")
+  gradeLetter    String   @default("")
+  gradeScore     Int?
+  recommendation String   @default("")
+  createdAt      DateTime @default(now())
 
   @@index([applicationId, createdAt])
 }
@@ -831,10 +834,15 @@ model VerificationRun {
   application   Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   projectId     String?
   companyName   String        @default("")
-  score         Int?
-  verdict       Verdict?
-  summary       String        @default("")
-  error         String        @default("")
+  score            Int?
+  verdict          Verdict?
+  summary          String        @default("")
+  gradeLetter      String        @default("")
+  gradeScore       Int?
+  gradeConfidence  String        @default("")
+  recommendation   String        @default("")
+  gradeSnapshot    Json?
+  error            String        @default("")
   startedAt     DateTime?
   finishedAt    DateTime?
   createdAt     DateTime      @default(now())
@@ -851,10 +859,13 @@ model VerificationEvidence {
   checkKey String
   status   EvidenceStatus
   weight   Int            @default(0)
-  finding  String
-  source   String
-  url      String         @default("")
-  ranAt    DateTime       @default(now())
+  finding      String
+  source       String
+  url          String         @default("")
+  ranAt        DateTime       @default(now())
+  hardFlag     Boolean        @default(false)
+  reviewFlag   Boolean        @default(false)
+  corroborates Boolean        @default(false)
 
   @@index([runId])
 }
