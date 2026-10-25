@@ -5,9 +5,9 @@ import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDetailsIssue } from "@/lib/apply-details";
 import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
-import { validateAddress, validatePersonName, validatePhone } from "@/lib/person-fields";
 import { duesForRole } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
@@ -72,11 +72,37 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [phone, setPhone] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [statement, setStatement] = useState("");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [showAllIssues, setShowAllIssues] = useState(false);
+  const [continueNote, setContinueNote] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptVerification, setAcceptVerification] = useState(false);
 
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[0];
   const dues = duesForRole(role);
+  const detailValues = {
+    firstName,
+    lastName,
+    email,
+    password,
+    org,
+    street,
+    city,
+    state: stateName,
+    zip,
+    phone,
+    linkedinUrl,
+    website,
+    socialLinks,
+    referenceEmail,
+    referenceEmail2,
+    statement,
+  };
+  const detailIssues = applyDetailsIssues(detailValues);
+  const issueById = new Map(detailIssues.map((issue) => [issue.id, issue]));
+  const emailMatches = verifiedEmail !== "" && verifiedEmail === email.trim().toLowerCase();
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const holdConfirmation = verifiedEmail !== "" && (emailMatches || !emailLooksValid);
 
   useEffect(() => {
     if (!error) return;
@@ -104,7 +130,37 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
     setStep(2);
   }
 
+  function reveal(id: string) {
+    setTouched((current) => (current[id] ? current : { ...current, [id]: true }));
+  }
+
+  function visibleError(id: string): string {
+    if (!showAllIssues && !touched[id]) return "";
+    return issueById.get(id)?.message ?? "";
+  }
+
+  function editField(id: string, apply: () => void) {
+    if (!issueById.has(id)) reveal(id);
+    apply();
+  }
+
+  function focusDetail(id: string) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ block: "center" });
+      if (el instanceof HTMLElement) el.focus();
+    });
+  }
+
   async function sendCode() {
+    if (detailIssues.length) {
+      setShowAllIssues(true);
+      setContinueNote(DETAILS_CONTINUE_MESSAGE);
+      const first = detailIssues[0];
+      if (first) focusDetail(first.id);
+      return;
+    }
     setPending(true);
     setError("");
     const result = await sendApplicationCode(email);
@@ -131,17 +187,19 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   }
 
   function continueFromDetails() {
-    const nameError = validatePersonName(firstName, lastName)[0];
-    const addressError = validateAddress({ street, city, state: stateName, zip })[0];
-    const phoneError = validatePhone(phone);
-    if (nameError || addressError || phoneError || !email.trim() || password.length < 8 || org.trim().length < 2) {
-      setError(nameError || addressError || phoneError || "Enter your email, a password of at least 8 characters, and your company.");
+    if (detailIssues.length) {
+      setShowAllIssues(true);
+      setContinueNote(DETAILS_CONTINUE_MESSAGE);
+      const first = detailIssues[0];
+      if (first) focusDetail(first.id);
       return;
     }
-    if (verifiedEmail !== email.trim().toLowerCase()) {
-      setError("Confirm the email code before you continue.");
+    if (!emailMatches) {
+      setContinueNote("Confirm the email code before you continue.");
+      focusDetail("confirm-email");
       return;
     }
+    setContinueNote("");
     setError("");
     setStep(4);
   }
@@ -296,72 +354,41 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               First and last name, email, password, company, contact phone, and full address. A business card is optional. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className={labelCls}>First name</label>
-                <input className={field} value={firstName} autoComplete="given-name" onChange={(event) => setFirstName(event.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>Last name</label>
-                <input className={field} value={lastName} autoComplete="family-name" onChange={(event) => setLastName(event.target.value)} />
-              </div>
+              <DetailControl id="apply-first-name" label="First name" value={firstName} error={visibleError("apply-first-name")} autoComplete="given-name" onBlur={() => reveal("apply-first-name")} onChange={(value) => editField("apply-first-name", () => setFirstName(value))} />
+              <DetailControl id="apply-last-name" label="Last name" value={lastName} error={visibleError("apply-last-name")} autoComplete="family-name" onBlur={() => reveal("apply-last-name")} onChange={(value) => editField("apply-last-name", () => setLastName(value))} />
             </div>
-            <div>
-              <label className={labelCls}>Email</label>
-              <input
-                className={field}
-                type="email"
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  setVerifiedEmail("");
-                  setCodeSent(false);
-                  setTestHint(null);
-                  setEmailCode("");
-                }}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Password</label>
-              <input className={field} type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Company</label>
-              <input className={field} value={org} onChange={(event) => setOrg(event.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Street</label>
-              <input className={field} value={street} autoComplete="address-line1" onChange={(event) => setStreet(event.target.value)} />
-            </div>
+            <DetailControl
+              id="apply-email"
+              label="Email"
+              type="email"
+              value={email}
+              error={visibleError("apply-email")}
+              autoComplete="email"
+              onBlur={() => reveal("apply-email")}
+              onChange={(value) =>
+                editField("apply-email", () => {
+                  setEmail(value);
+                  const next = value.trim().toLowerCase();
+                  if (verifiedEmail && next !== verifiedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
+                    setCodeSent(false);
+                    setEmailCode("");
+                    setTestHint(null);
+                  }
+                })
+              }
+            />
+            <DetailControl id="apply-password" label="Password" type="password" value={password} error={visibleError("apply-password")} autoComplete="new-password" onBlur={() => reveal("apply-password")} onChange={(value) => editField("apply-password", () => setPassword(value))} />
+            <DetailControl id="apply-company" label="Company" value={org} error={visibleError("apply-company")} autoComplete="organization" onBlur={() => reveal("apply-company")} onChange={(value) => editField("apply-company", () => setOrg(value))} />
+            <DetailControl id="apply-street" label="Street" value={street} error={visibleError("apply-street")} autoComplete="address-line1" onBlur={() => reveal("apply-street")} onChange={(value) => editField("apply-street", () => setStreet(value))} />
             <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className={labelCls}>City</label>
-                <input className={field} value={city} autoComplete="address-level2" onChange={(event) => setCity(event.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>State</label>
-                <input className={field} value={stateName} autoComplete="address-level1" maxLength={2} placeholder="NJ" onChange={(event) => setStateName(event.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>ZIP</label>
-                <input className={field} value={zip} autoComplete="postal-code" inputMode="numeric" placeholder="07663" onChange={(event) => setZip(event.target.value)} />
-              </div>
+              <DetailControl id="apply-city" label="City" value={city} error={visibleError("apply-city")} autoComplete="address-level2" onBlur={() => reveal("apply-city")} onChange={(value) => editField("apply-city", () => setCity(value))} />
+              <DetailControl id="apply-state" label="State" value={stateName} error={visibleError("apply-state")} autoComplete="address-level1" maxLength={2} placeholder="NJ" onBlur={() => reveal("apply-state")} onChange={(value) => editField("apply-state", () => setStateName(value))} />
+              <DetailControl id="apply-zip" label="ZIP" value={zip} error={visibleError("apply-zip")} autoComplete="postal-code" inputMode="numeric" placeholder="07663" onBlur={() => reveal("apply-zip")} onChange={(value) => editField("apply-zip", () => setZip(value))} />
             </div>
-            <div>
-              <label className={labelCls}>Contact phone</label>
-              <input className={field} value={phone} autoComplete="tel" onChange={(event) => setPhone(event.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>LinkedIn URL</label>
-              <input className={field} value={linkedinUrl} onChange={(event) => setLinkedinUrl(event.target.value)} placeholder="https://" />
-            </div>
-            <div>
-              <label className={labelCls}>Website</label>
-              <input className={field} value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://" />
-            </div>
-            <div>
-              <label className={labelCls}>Other social links (optional)</label>
-              <textarea className={field} rows={2} value={socialLinks} onChange={(event) => setSocialLinks(event.target.value)} placeholder="One https link per line" />
-            </div>
+            <DetailControl id="apply-phone" label="Contact phone" value={phone} error={visibleError("apply-phone")} autoComplete="tel" onBlur={() => reveal("apply-phone")} onChange={(value) => editField("apply-phone", () => setPhone(value))} />
+            <DetailControl id="apply-linkedin" label="LinkedIn URL" value={linkedinUrl} error={visibleError("apply-linkedin")} placeholder="https://" onBlur={() => reveal("apply-linkedin")} onChange={(value) => editField("apply-linkedin", () => setLinkedinUrl(value))} />
+            <DetailControl id="apply-website" label="Website" value={website} error={visibleError("apply-website")} placeholder="https://" onBlur={() => reveal("apply-website")} onChange={(value) => editField("apply-website", () => setWebsite(value))} />
+            <DetailControl id="apply-social" label="Other social links (optional)" value={socialLinks} error={visibleError("apply-social")} rows={2} placeholder="One https link per line" onBlur={() => reveal("apply-social")} onChange={(value) => editField("apply-social", () => setSocialLinks(value))} />
             <div>
               <label className={labelCls}>Business card (optional, encouraged)</label>
               <input
@@ -389,39 +416,42 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                 <p className="mt-1 text-[11px] text-mut">JPG, PNG, or PDF, up to 5 MB. Other members never see the file.</p>
               )}
             </div>
-            <div>
-              <label className={labelCls}>Reference email (optional)</label>
-              <input className={field} type="email" value={referenceEmail} onChange={(event) => setReferenceEmail(event.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Second reference email (optional)</label>
-              <input className={field} type="email" value={referenceEmail2} onChange={(event) => setReferenceEmail2(event.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Tell us about you / your track record</label>
-              <textarea className={field} rows={4} value={statement} onChange={(event) => setStatement(event.target.value)} />
-            </div>
-            <div className="rounded border border-line bg-cream p-3">
+            <DetailControl id="apply-reference-1" label="Reference email (optional)" type="email" value={referenceEmail} error={visibleError("apply-reference-1")} onBlur={() => reveal("apply-reference-1")} onChange={(value) => editField("apply-reference-1", () => setReferenceEmail(value))} />
+            <DetailControl id="apply-reference-2" label="Second reference email (optional)" type="email" value={referenceEmail2} error={visibleError("apply-reference-2")} onBlur={() => reveal("apply-reference-2")} onChange={(value) => editField("apply-reference-2", () => setReferenceEmail2(value))} />
+            <DetailControl id="apply-statement" label="Tell us about you / your track record" value={statement} error={visibleError("apply-statement")} rows={4} onBlur={() => reveal("apply-statement")} onChange={(value) => editField("apply-statement", () => setStatement(value))} />
+            <div id="confirm-email" tabIndex={-1} className="rounded border border-line bg-cream p-3 outline-none">
               <p className="text-sm font-semibold">Confirm your email</p>
               <p className="mt-1 text-sm text-ink">
                 A 4-digit code proves this inbox is yours. It is recorded in the admin Outbox. When no email provider is configured, the code also appears here and is labelled test mode.
               </p>
-              {verifiedEmail && verifiedEmail === email.trim().toLowerCase() ? (
-                <p className="mt-2 text-sm text-forest">Email confirmed.</p>
+              {holdConfirmation ? (
+                <>
+                  <p className="mt-2 text-sm text-forest">Email confirmed.</p>
+                  <StillNeeded issues={detailIssues} />
+                </>
               ) : (
                 <>
-                  <button className={`${btnOutline} mt-3 w-full`} type="button" disabled={pending || !email.trim()} onClick={sendCode}>
+                  <StillNeeded issues={detailIssues} />
+                  <button
+                    className={`${btnOutline} mt-3 w-full`}
+                    type="button"
+                    disabled={pending || detailIssues.length > 0}
+                    aria-describedby={detailIssues.length ? "apply-still-needed" : undefined}
+                    onClick={sendCode}
+                  >
                     {codeSent ? "Send a new code" : "Send code"}
                   </button>
-                  {codeSent ? (
+                  {detailIssues.length === 0 && codeSent ? (
                     <>
                       {testHint ? (
                         <p className="mt-3 rounded border border-brass bg-brass-soft p-3 text-sm text-ink" role="status">
                           {testHint}
                         </p>
                       ) : null}
-                      <label className={`${labelCls} mt-3`}>4-digit code</label>
-                      <input className={field} inputMode="numeric" maxLength={4} value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="0000" />
+                      <label className={`${labelCls} mt-3`} htmlFor="apply-email-code">
+                        4-digit code
+                      </label>
+                      <input id="apply-email-code" className={field} inputMode="numeric" maxLength={4} value={emailCode} onChange={(event) => setEmailCode(event.target.value)} placeholder="0000" />
                       <button className={`${btn} mt-3 w-full`} type="button" disabled={pending} onClick={confirmCode}>
                         Confirm code
                       </button>
@@ -430,6 +460,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                 </>
               )}
             </div>
+            {continueNote ? (
+              <p id="apply-continue-note" role="alert" className="text-sm font-semibold text-brass">
+                {continueNote}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(2)}>
                 Back
@@ -516,6 +551,86 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
       <p className="px-5 pb-5">
         <AdminEntryLink />
       </p>
+    </div>
+  );
+}
+
+function StillNeeded({ issues }: { issues: ApplyDetailsIssue[] }) {
+  if (!issues.length) return null;
+  return (
+    <p id="apply-still-needed" className="mt-2 text-sm text-brass" role="status">
+      {stillNeeded(issues)}
+    </p>
+  );
+}
+
+function DetailControl({
+  id,
+  label,
+  value,
+  error,
+  onChange,
+  onBlur,
+  type = "text",
+  autoComplete,
+  inputMode,
+  placeholder,
+  maxLength,
+  rows,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  error: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  type?: string;
+  autoComplete?: string;
+  inputMode?: "numeric" | "email" | "text" | "tel";
+  placeholder?: string;
+  maxLength?: number;
+  rows?: number;
+}) {
+  const className = `${field} ${error ? "border-brass ring-1 ring-brass" : ""}`;
+  const describedBy = error ? `${id}-error` : undefined;
+  return (
+    <div>
+      <label className={labelCls} htmlFor={id}>
+        {label}
+      </label>
+      {rows ? (
+        <textarea
+          id={id}
+          className={className}
+          rows={rows}
+          value={value}
+          placeholder={placeholder}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          onBlur={onBlur}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <input
+          id={id}
+          className={className}
+          type={type}
+          value={value}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          onBlur={onBlur}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+      {error ? (
+        <p id={`${id}-error`} className="mt-1 text-sm text-brass">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
