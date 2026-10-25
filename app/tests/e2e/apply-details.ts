@@ -23,7 +23,7 @@ async function fillRequired(page: Page, email: string, phone = "2015550148") {
     ["First name", "Ada"],
     ["Last name", "Okoye"],
     ["Email", email],
-    ["Password", "correct-horse"],
+    ["Create password", "correct-horse"],
     ["Company", "Northline Builders"],
     ["Street", "299 Market Street"],
     ["City", "Saddle Brook"],
@@ -65,6 +65,10 @@ async function run(width: number, height: number) {
     page.on("pageerror", (error) => failures.push(error.message));
 
     await openDetails(page);
+    await page.getByText("Minimum 8 characters").waitFor();
+    await field(page, "Create password").then((input) => input.fill("short"));
+    await page.locator("#apply-password").blur();
+    await page.getByText("Password must be at least 8 characters.").waitFor();
     await page.getByRole("button", { name: "Continue" }).click();
     assert.equal(await stepLabel(page), "Step 3 of 5");
     await page.getByText("Please complete the highlighted fields.").waitFor();

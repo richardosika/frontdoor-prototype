@@ -4,6 +4,7 @@ import { noticeTestRecipient } from "@/lib/brand";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { noticeHtml } from "@/lib/resend-mail";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,12 @@ export default async function OutboxPage() {
                 {notice.sendStatus === "sent" ? " · Emailed to the test recipient" : ""}
                 {notice.sendStatus === "failed" ? ` · Email failed: ${notice.sendError}` : ""}
               </p>
+              <iframe
+                title={`Email preview: ${notice.subject}`}
+                sandbox=""
+                srcDoc={noticeHtml(notice.body, { headline: notice.subject })}
+                className="mt-3 h-[520px] w-full rounded border border-line bg-cream"
+              />
               <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{notice.body}</pre>
             </li>
           ))}

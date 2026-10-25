@@ -25,9 +25,13 @@ describe("site gate", () => {
     expect(siteGateConfigured(PASSWORD)).toBe(true);
   });
 
-  it("exempts only the health check and the Stripe webhook", () => {
+  it("exempts the health check, the Stripe webhook, and email images", () => {
     expect(siteGateExempt("/api/health")).toBe(true);
     expect(siteGateExempt("/api/stripe/webhook")).toBe(true);
+    expect(siteGateExempt("/email-assets/lockup.png")).toBe(true);
+    expect(siteGateExempt("/email-assets/")).toBe(true);
+    expect(siteGateExempt("/email-assets")).toBe(false);
+    expect(siteGateExempt("/email-assets-extra")).toBe(false);
     expect(siteGateExempt("/api/health/extra")).toBe(false);
     expect(siteGateExempt("/api/stripe")).toBe(false);
     expect(siteGateExempt("/api/stripe/webhook/replay")).toBe(false);

@@ -20,9 +20,9 @@ export function siteGateConfigured(password: string | undefined | null): passwor
   return typeof password === "string" && password.length > 0;
 }
 
-/** Render's health check and the Stripe webhook. Everything else is behind the gate. */
+/** Health, Stripe, and the public email wordmark. Everything else is behind the gate. */
 export function siteGateExempt(pathname: string): boolean {
-  return pathname === "/api/health" || pathname === "/api/stripe/webhook";
+  return pathname === "/api/health" || pathname === "/api/stripe/webhook" || pathname.startsWith("/email-assets/");
 }
 
 /** Paths the member session gate used to ignore. The site gate still applies to them. */

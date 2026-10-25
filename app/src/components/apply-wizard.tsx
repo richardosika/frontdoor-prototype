@@ -351,7 +351,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           <div className="space-y-3">
             <h1 className="font-serif text-xl">Your details</h1>
             <p className="text-sm text-ink">
-              First and last name, email, password, company, contact phone, and full address. A business card is optional. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
+              First and last name, email, a password of at least 8 characters, company, contact phone, and full address. A business card is optional. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailControl id="apply-first-name" label="First name" value={firstName} error={visibleError("apply-first-name")} autoComplete="given-name" onBlur={() => reveal("apply-first-name")} onChange={(value) => editField("apply-first-name", () => setFirstName(value))} />
@@ -377,7 +377,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                 })
               }
             />
-            <DetailControl id="apply-password" label="Password" type="password" value={password} error={visibleError("apply-password")} autoComplete="new-password" onBlur={() => reveal("apply-password")} onChange={(value) => editField("apply-password", () => setPassword(value))} />
+            <DetailControl id="apply-password" label="Create password" hint="Minimum 8 characters" type="password" value={password} error={visibleError("apply-password")} autoComplete="new-password" onBlur={() => reveal("apply-password")} onChange={(value) => editField("apply-password", () => setPassword(value))} />
             <DetailControl id="apply-company" label="Company" value={org} error={visibleError("apply-company")} autoComplete="organization" onBlur={() => reveal("apply-company")} onChange={(value) => editField("apply-company", () => setOrg(value))} />
             <DetailControl id="apply-street" label="Street" value={street} error={visibleError("apply-street")} autoComplete="address-line1" onBlur={() => reveal("apply-street")} onChange={(value) => editField("apply-street", () => setStreet(value))} />
             <div className="grid gap-3 sm:grid-cols-3">
@@ -574,6 +574,7 @@ function DetailControl({
   type = "text",
   autoComplete,
   inputMode,
+  hint,
   placeholder,
   maxLength,
   rows,
@@ -587,17 +588,23 @@ function DetailControl({
   type?: string;
   autoComplete?: string;
   inputMode?: "numeric" | "email" | "text" | "tel";
+  hint?: string;
   placeholder?: string;
   maxLength?: number;
   rows?: number;
 }) {
   const className = `${field} ${error ? "border-brass ring-1 ring-brass" : ""}`;
-  const describedBy = error ? `${id}-error` : undefined;
+  const describedBy = [hint ? `${id}-hint` : "", error ? `${id}-error` : ""].filter(Boolean).join(" ") || undefined;
   return (
     <div>
       <label className={labelCls} htmlFor={id}>
         {label}
       </label>
+      {hint ? (
+        <p id={`${id}-hint`} className="mb-1.5 text-xs text-mut">
+          {hint}
+        </p>
+      ) : null}
       {rows ? (
         <textarea
           id={id}

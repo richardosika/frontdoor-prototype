@@ -46,10 +46,13 @@ describe("Resend test mail", () => {
     expect(message.subject).toBe(testMailSubject(APPLICANT, "Your Private Floor code"));
     expect(message.text.startsWith(`Intended recipient: ${APPLICANT}`)).toBe(true);
     expect(message.text).toContain("1234");
-    expect(message.html).toBeUndefined();
+    expect(message.html).toContain("letter-spacing:0.4em");
+    expect(message.html).toContain(">1234<");
+    expect(message.html).toContain("Private Floor Club LLC, 299 Market Street, Saddle Brook, NJ 07663");
+    expect(message.html).toContain("does not offer securities or process payments through the platform");
     const payload = resendPayload(message);
     expect(payload.to).toEqual([TEST_INBOX]);
-    expect(payload.html).toBeUndefined();
+    expect(payload.html).toContain(">1234<");
     expect(resendKeyConfigured({})).toBe(false);
     expect(resendKeyConfigured({ RESEND_API_KEY: " " })).toBe(false);
     expect(resendKeyConfigured({ RESEND_API_KEY: "re_test" })).toBe(true);
@@ -65,11 +68,22 @@ describe("Resend test mail", () => {
     });
     expect(message.text).toContain(STATUS);
     expect(message.html).toContain(`href="${STATUS}"`);
-    expect(message.html).toContain(">Check your status</a>");
+    expect(message.html).toContain(">CHECK YOUR STATUS</a>");
+    expect(message.html).toContain("background:#1F3A2E");
+    expect(message.html).toContain("background:#A8843F");
+    expect(message.html).toContain("/email-assets/lockup.png");
+    expect(message.html).toContain("800-399-3745");
+    expect(message.html?.match(/Richard Osika, Founder, Private Floor Club/g)).toEqual([
+      "Richard Osika, Founder, Private Floor Club",
+    ]);
     expect(message.html).not.toContain("<script>");
-    const hostile = noticeHtml(`Hello <script>alert(1)</script>\n\nCheck your status\n${STATUS}`);
+    const hostile = noticeHtml(`Hello <script>alert(1)</script>\n\nCheck your status\n${STATUS}`, {
+      headline: "Thank you",
+    });
     expect(hostile).toContain("&lt;script&gt;");
     expect(hostile).not.toContain("<script>");
+    const pay = noticeHtml("Pay here: https://cornicio-mvp.onrender.com/pay/preview", { headline: "Dues" });
+    expect(pay).toContain(">PAY DUES</a>");
   });
 
   it("posts only the test recipient through a mocked fetch", async () => {

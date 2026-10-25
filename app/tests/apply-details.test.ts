@@ -35,6 +35,12 @@ describe("apply details gate", () => {
     expect(issues.map((issue) => issue.id)).toEqual(["apply-zip", "apply-phone"]);
   });
 
+  it("rejects a password shorter than 8 characters", () => {
+    const issues = applyDetailsIssues({ ...READY, password: "short" });
+    expect(issues.find((issue) => issue.id === "apply-password")?.message).toBe("Password must be at least 8 characters.");
+    expect(applyDetailsIssues(READY).some((issue) => issue.id === "apply-password")).toBe(false);
+  });
+
   it("treats a filled optional field as required until it is valid", () => {
     const issues = applyDetailsIssues({ ...READY, linkedinUrl: "linkedin.com/in/ada", website: "northline.example" });
     expect(stillNeeded(issues)).toBe("Still needed: LinkedIn URL, website");

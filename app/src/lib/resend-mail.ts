@@ -1,7 +1,8 @@
-export const DEFAULT_EMAIL_FROM = "Private Floor Club <onboarding@resend.dev>";
-export const RESEND_EMAILS_URL = "https://api.resend.com/emails";
+import { brandedNoticeHtml, emailLogoUrl } from "@/lib/email-layout";
 
-const STATUS_URL = /https?:\/\/[^\s<>"']+\/(?:invite-status|apply\/status)\/[^\s<>"']+/gi;
+export const DEFAULT_EMAIL_FROM = "Private Floor Club <onboarding@resend.dev>";
+export { emailLogoUrl };
+export const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 
 export type TestMail = {
   from: string;
@@ -40,49 +41,22 @@ export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function statusButton(url: string): string {
-  return `<p style="margin:16px 0;"><a href="${escapeHtml(url)}" style="display:inline-block;background:#1F3A2E;color:#FFFDF8;padding:12px 18px;text-decoration:none;">Check your status</a></p>`;
-}
-
-/** HTML part only when the letter contains an invite or application status link. */
-export function noticeHtml(text: string): string | null {
-  const urls = [...text.matchAll(STATUS_URL)].map((match) => match[0]);
-  if (!urls.length) return null;
-  const urlSet = new Set(urls);
-  const lines = text.split("\n");
-  const parts: string[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    const trimmed = line.trim();
-    const next = (lines[index + 1] ?? "").trim();
-    if (trimmed === "Check your status" && urlSet.has(next)) continue;
-    if (urlSet.has(trimmed)) {
-      parts.push(statusButton(trimmed));
-      continue;
-    }
-    if (!trimmed) continue;
-    const found = [...urlSet].filter((url) => line.includes(url));
-    if (!found.length) {
-      parts.push(`<p style="margin:0 0 12px;">${escapeHtml(line)}</p>`);
-      continue;
-    }
-    let remaining = line;
-    for (const url of found) remaining = remaining.replace(url, "");
-    const prose = remaining.replace(/\s+/g, " ").trim();
-    if (prose) parts.push(`<p style="margin:0 0 12px;">${escapeHtml(prose)}</p>`);
-    for (const url of found) parts.push(statusButton(url));
-  }
-  return `<div style="font-family:Georgia,serif;color:#1F3A2E;">${parts.join("")}</div>`;
+/** Branded HTML for every template. The plain-text letter is unchanged. */
+export function noticeHtml(text: string, options?: { headline?: string; logoUrl?: string }): string {
+  return brandedNoticeHtml({
+    text,
+    headline: options?.headline ?? "",
+    logoUrl: options?.logoUrl ?? emailLogoUrl(),
+  });
 }
 
 export function buildTestMail(input: { intendedTo: string; subject: string; text: string; to: string; from: string }): TestMail {
-  const html = noticeHtml(input.text);
   return {
     from: headerValue(input.from),
     to: headerValue(input.to),
     subject: testMailSubject(input.intendedTo, input.subject),
     text: input.text,
-    ...(html ? { html } : {}),
+    html: noticeHtml(input.text, { headline: input.subject }),
   };
 }
 
