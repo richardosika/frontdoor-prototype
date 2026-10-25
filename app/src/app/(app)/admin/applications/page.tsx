@@ -41,7 +41,7 @@ export default async function ApplicationsPage({
     take: 200,
     include: {
       runs: { where: { subject: "APPLICATION" }, orderBy: { createdAt: "desc" }, take: 1 },
-      user: { select: { paymentStatus: true, renewalAt: true } },
+      user: { select: { status: true, paymentStatus: true, renewalAt: true } },
     },
   });
   const gradeRank = (letter?: string | null) => ({ A: 5, B: 4, C: 3, D: 2, F: 1 })[letter || ""] || 0;
@@ -116,7 +116,14 @@ export default async function ApplicationsPage({
         </div>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">Nothing in this filter.</p> : null}
         <ul className="mt-4 space-y-3">
-          {rows.map((application) => (
+          {rows.map((application) => {
+            const standing = personStanding({
+              applicationStatus: application.status,
+              accountStatus: application.user?.status,
+              paymentStatus: application.user?.paymentStatus,
+              hasMember: Boolean(application.user),
+            });
+            return (
             <li key={application.id} className="flex items-start gap-2">
               <input form="bulk-delete" className="mt-5 h-4 w-4 shrink-0" type="checkbox" name="applicationId" value={application.id} aria-label={`Select ${application.name}`} />
               <div className="min-w-0 flex-1">
@@ -125,22 +132,14 @@ export default async function ApplicationsPage({
                   <div>
                     <h2 className="font-serif text-xl font-normal">{application.name}</h2>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <StatusChip
-                        status={
-                          personStanding({
-                            applicationStatus: application.status,
-                            paymentStatus: application.user?.paymentStatus,
-                            hasMember: Boolean(application.user),
-                          }).status
-                        }
-                      />
+                      <StatusChip status={standing.status} />
                       {isDemoRecord({ isTest: application.isTest, email: application.email }) ? <DemoChip /> : null}
                     </div>
                     <p className="text-sm text-ink">
                       {application.org} · {roleLabel(application.role)} · {application.location}
                     </p>
                     <p className="text-xs text-mut">
-                      {formatAuditTime(application.createdAt)} · {personStageLabel(personStanding({ applicationStatus: application.status, paymentStatus: application.user?.paymentStatus, hasMember: Boolean(application.user) }).stage)} · {applicationStatusLabel(application.status)}
+                      {formatAuditTime(application.createdAt)} · {personStageLabel(standing.stage)} · {applicationStatusLabel(application.status)}
                       {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
                       {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
                     </p>
@@ -165,7 +164,8 @@ export default async function ApplicationsPage({
               ) : null}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </div>

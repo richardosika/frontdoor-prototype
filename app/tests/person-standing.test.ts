@@ -25,6 +25,10 @@ describe("one status for applications, members, and people", () => {
     expect(isApprovedMember(dues)).toBe(true);
     expect(isApprovedMember(waiting)).toBe(false);
     expect(isApprovedMember(declined)).toBe(false);
+    expect(personStanding({ applicationStatus: "SUBMITTED", accountStatus: "SUSPENDED", hasMember: true })).toEqual({
+      status: "DECLINED",
+      stage: "DECLINED",
+    });
   });
 
   it("marks demo and sample rows without marking a real address", () => {
