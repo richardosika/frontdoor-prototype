@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
+import { AgreementBoxes, BeforeSubmit, StepIntro } from "@/components/apply-before-submit";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDetailsIssue } from "@/lib/apply-details";
 import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
-import { duesForRole } from "@/lib/dues";
+import { DUES_ANNUAL_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, DUES_WAIVED, duesForRole } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
 
@@ -18,15 +19,6 @@ const STEPS = [
   { id: 3, label: "Your details" },
   { id: 4, label: "Terms" },
   { id: 5, label: "Membership dues" },
-] as const;
-
-const LEGAL_LINKS = [
-  ["/legal/terms", "Terms of Use"],
-  ["/legal/privacy", "Privacy Policy"],
-  ["/legal/disclosures", "Important Disclosures"],
-  ["/legal/verification-policy", "Verification Policy"],
-  ["/legal/applicant-consent", "Applicant consent"],
-  ["/legal/guidelines", "Community guidelines"],
 ] as const;
 
 export type ApplyConsentCopy = {
@@ -292,11 +284,10 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ) : null}
         {!done && step === 1 ? (
           <div>
-            <h1 className="font-serif text-xl">Invite code</h1>
-            <p className="mt-1 text-sm text-ink">
-              {BRAND.club} is nationwide and invite-only. Enter the code a member shared with you, or request one.
-            </p>
-            <label className={`${labelCls} mt-4`}>Invite code</label>
+            <StepIntro title="Invite code">
+              <p>{BRAND.club} is nationwide and invite-only. Enter the code a member shared with you, or request one.</p>
+            </StepIntro>
+            <label className={labelCls}>Invite code</label>
             <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="PF-XXXX-XXXX" />
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>
               Continue
@@ -308,8 +299,13 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ) : null}
         {!done && step === 2 ? (
           <div>
-            <h1 className="font-serif text-xl">Choose role</h1>
-            <p className="mt-1 text-sm text-ink">Pick the role that best describes you. Dues, if any, are shown on the last step and are paid after approval.</p>
+            <StepIntro title="Choose role">
+              <p>Pick the role that best describes you. Each card shows the annual dues for that role.</p>
+            </StepIntro>
+            <div className="mb-4 rounded border border-line bg-cream px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Annual dues</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink">{DUES_SCHEDULE_SENTENCE}</p>
+            </div>
             <div className="mt-3 max-h-[420px] overflow-y-auto pr-1">
               {GROUPS.map((group) => (
                 <div key={group}>
@@ -331,6 +327,9 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                       <span>
                         {item.label}
                         <small className="block text-[11px] text-mut">{item.blurb}</small>
+                        <small className="mt-0.5 block text-[11px] font-semibold tracking-wide text-brass">
+                          {duesForRole(item.id).label}
+                        </small>
                       </span>
                     </button>
                   ))}
@@ -348,11 +347,12 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           </div>
         ) : null}
         {!done && step === 3 ? (
-          <div className="space-y-3">
-            <h1 className="font-serif text-xl">Your details</h1>
-            <p className="text-sm text-ink">
+          <div className="space-y-4">
+            <StepIntro title="Your details">
+              <p className="text-sm text-ink">
               First and last name, email, a password of at least 8 characters, company, contact phone, and full address. A business card is optional. References are optional. Other members never see the card, your email, your phone, or your LinkedIn URL.
-            </p>
+              </p>
+            </StepIntro>
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailControl id="apply-first-name" label="First name" value={firstName} error={visibleError("apply-first-name")} autoComplete="given-name" onBlur={() => reveal("apply-first-name")} onChange={(value) => editField("apply-first-name", () => setFirstName(value))} />
               <DetailControl id="apply-last-name" label="Last name" value={lastName} error={visibleError("apply-last-name")} autoComplete="family-name" onBlur={() => reveal("apply-last-name")} onChange={(value) => editField("apply-last-name", () => setLastName(value))} />
@@ -476,66 +476,47 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           </div>
         ) : null}
         {!done && step === 4 ? (
-          <div>
-            <div className="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: consent.beforeHtml }} />
-            <ul className="mt-4 space-y-2 text-sm">
-              {LEGAL_LINKS.map(([href, label]) => (
-                <li key={href}>
-                  <Link className="underline decoration-brass" href={href} target="_blank">
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <ConsentBoxes
-              consent={consent}
-              acceptTerms={acceptTerms}
-              acceptVerification={acceptVerification}
-              onTerms={setAcceptTerms}
-              onVerification={setAcceptVerification}
-            />
-            <div className="mt-4 flex gap-2">
-              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(3)}>
-                Back
-              </button>
-              <button className={`${btn} flex-1`} type="button" disabled={!acceptTerms || !acceptVerification} onClick={() => setStep(5)}>
-                Continue
-              </button>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-ink">{consent.helper}</p>
-          </div>
+          <BeforeSubmit
+            consent={consent}
+            acceptTerms={acceptTerms}
+            acceptVerification={acceptVerification}
+            onTerms={setAcceptTerms}
+            onVerification={setAcceptVerification}
+            onBack={() => setStep(3)}
+            onContinue={() => setStep(5)}
+          />
         ) : null}
         {!done && step === 5 ? (
           <div>
-            <h1 className="font-serif text-xl">Membership dues</h1>
-            <p className="mt-1 text-sm text-ink">{selected.label}</p>
-            <div className="mt-4 rounded border border-brass bg-brass-soft p-4">
+            <StepIntro title="Annual dues">
+              <p>{selected.label}</p>
+            </StepIntro>
+            <div className="rounded border border-brass bg-brass-soft p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Annual dues</p>
               <p className="mt-1 font-serif text-3xl">{dues.label}</p>
-            </div>
-            <p className="mt-3 text-sm text-ink">
-              {dues.cents > 0
-                ? "No card is collected on this form. After approval, this flat annual amount is due. It is never based on a deal."
-                : "This role has no annual dues. Approval opens the floor. Nothing is charged."}
-            </p>
-            <ConsentBoxes
-              consent={consent}
-              acceptTerms={acceptTerms}
-              acceptVerification={acceptVerification}
-              onTerms={setAcceptTerms}
-              onVerification={setAcceptVerification}
-            />
-            {pending ? (
-              <p role="status" className="mt-3 text-sm font-semibold text-forest">
-                Submitting your application…
+              <p className="mt-2 text-sm leading-relaxed text-ink">
+                {dues.cents > 0
+                  ? `${DUES_ANNUAL_NOTE} No card is collected on this form. The renewal date is one year after these annual dues are recorded.`
+                  : `${DUES_FREE_LINE} Approval opens the floor. Nothing is charged.`}
               </p>
-            ) : null}
-            <div className="mt-4 flex gap-2">
-              <button className={`${btnOutline} flex-1`} type="button" onClick={() => setStep(4)} disabled={pending}>
-                Back
-              </button>
+              {dues.cents > 0 ? <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p> : null}
+            </div>
+            <section className="mt-5 rounded border border-brass bg-paper px-4 py-5">
+              <h2 className="font-serif text-xl font-normal">Your agreement</h2>
+              <AgreementBoxes
+                consent={consent}
+                acceptTerms={acceptTerms}
+                acceptVerification={acceptVerification}
+                onTerms={setAcceptTerms}
+                onVerification={setAcceptVerification}
+              />
+              {pending ? (
+                <p role="status" className="mt-3 text-sm font-semibold text-forest">
+                  Submitting your application…
+                </p>
+              ) : null}
               <button
-                className={`${btn} flex-1`}
+                className={`${btn} mt-5 w-full`}
                 type="button"
                 disabled={pending || !acceptTerms || !acceptVerification}
                 aria-busy={pending}
@@ -543,8 +524,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               >
                 {pending ? "Submitting…" : "Submit application"}
               </button>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-ink">{consent.helper}</p>
+              <button className={`${btnOutline} mt-2 w-full`} type="button" onClick={() => setStep(4)} disabled={pending}>
+                Back
+              </button>
+              <p className="mt-3 text-xs leading-relaxed text-ink">{consent.helper}</p>
+            </section>
           </div>
         ) : null}
       </div>
@@ -638,38 +622,6 @@ function DetailControl({
           {error}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function ConsentBoxes({
-  consent,
-  acceptTerms,
-  acceptVerification,
-  onTerms,
-  onVerification,
-}: {
-  consent: ApplyConsentCopy;
-  acceptTerms: boolean;
-  acceptVerification: boolean;
-  onTerms: (value: boolean) => void;
-  onVerification: (value: boolean) => void;
-}) {
-  return (
-    <div className="mt-4 space-y-3">
-      <label className="flex items-start gap-2 text-sm leading-relaxed">
-        <input className="mt-1 shrink-0" type="checkbox" checked={acceptTerms} onChange={(event) => onTerms(event.target.checked)} />
-        <span>{consent.termsLabel}</span>
-      </label>
-      <label className="flex items-start gap-2 text-sm leading-relaxed">
-        <input
-          className="mt-1 shrink-0"
-          type="checkbox"
-          checked={acceptVerification}
-          onChange={(event) => onVerification(event.target.checked)}
-        />
-        <span>{consent.verificationLabel}</span>
-      </label>
     </div>
   );
 }

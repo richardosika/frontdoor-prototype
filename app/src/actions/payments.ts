@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { currentUser, requireAccount, requireAdmin } from "@/lib/current-user";
 import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
-import { blocksMembership, checkoutModeForRole, paymentRequired, renewalInOneYear, stripePriceForRole } from "@/lib/payments";
+import { blocksMembership, checkoutModeForRole, paymentRenewalLabel, paymentRequired, renewalInOneYear, stripePriceForRole } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { createBillingPortal, createDuesCheckout, retrieveCheckoutSession, sessionPaid, sessionUserId } from "@/lib/stripe-checkout";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
@@ -126,6 +126,7 @@ export async function resendPaymentLink(formData: FormData) {
       role: roleLabel(member.role),
       org: member.org,
       duesAmount: duesLabel(member.duesCents || annualDuesCents(member.role)),
+      renewalDate: paymentRenewalLabel(member.renewalAt),
       paymentLink: `${base}/pay/${token}`,
       loginLink: `${base}/login`,
     }),

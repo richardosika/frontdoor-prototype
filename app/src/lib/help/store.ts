@@ -19,16 +19,17 @@ export async function ensureHelpArticles() {
   for (const article of DEFAULT_FAQ) {
     const existing = await prisma.helpArticle.findUnique({ where: { slug: article.slug } });
     if (existing) {
-      if (existing.body.includes("Richard Osika reviews every application")) {
-        await prisma.helpArticle.update({
-          where: { id: existing.id },
-          data: {
-            body: existing.body.replaceAll(
-              "Richard Osika reviews every application",
-              "A Private Floor administrator reviews every application",
-            ),
-          },
-        });
+      let next = clarifyAnnualDues(
+        existing.body.replaceAll("Richard Osika reviews every application", "A Private Floor administrator reviews every application"),
+      );
+      if (
+        (article.slug === "dues" || article.slug === "gc-dues") &&
+        existing.body.includes("$2,400 a year")
+      ) {
+        next = article.body;
+      }
+      if (next !== existing.body) {
+        await prisma.helpArticle.update({ where: { id: existing.id }, data: { body: next } });
       }
       continue;
     }
@@ -36,6 +37,18 @@ export async function ensureHelpArticles() {
       data: { slug: article.slug, title: article.title, body: article.body, published: true },
     });
   }
+}
+
+/** Replaces the older “a year” dues phrase when an article has not already been rewritten. */
+export function clarifyAnnualDues(body: string): string {
+  if (!body.includes("a year") || body.includes("per year")) return body;
+  let next = body
+    .replaceAll("$2,400 a year", "$2,400 per year")
+    .replaceAll("$1,800 a year", "$1,800 per year")
+    .replaceAll("$1,200 a year", "$1,200 per year");
+  if (next === body) return body;
+  if (!next.includes("once a year")) next = `${next} Annual dues are billed once a year.`;
+  return next;
 }
 
 export async function publishedFaq(): Promise<FaqArticle[]> {

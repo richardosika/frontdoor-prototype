@@ -88,7 +88,7 @@ describe("admin command center", () => {
     expect(schedule.find((row) => row.role === "BROKER")?.cents).toBe(180000);
     expect(schedule.find((row) => row.role === "MORTGAGE_BROKER")?.cents).toBe(180000);
     expect(schedule.find((row) => row.role === "RE_ATTORNEY")?.cents).toBe(120000);
-    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toBe("$2,400 a year");
+    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toBe("$2,400 per year");
   });
 
   it("rolls the funnel and the seven-day window without a database", () => {

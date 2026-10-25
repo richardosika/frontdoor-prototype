@@ -9,7 +9,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 
 **The key points (plain-English summary, not a substitute for the full Terms)**
 - Private Floor is an invite-only networking platform for real estate professionals. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
-- Membership is free for developers, investors and LPs, family offices, and lenders. General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year. Dues are paid after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
+- Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Dues are a flat annual fee, billed once a year, and due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
 - A Verified badge is a limited, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
@@ -142,11 +142,11 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 8.1 **Free memberships.** Membership is free for members approved in these categories: developers, investors and limited partners, family offices, and lenders.
 
-8.2 **Annual dues.** Members approved in these categories pay flat annual dues [subject to change]:
+8.2 **Annual dues.** Members approved in these categories pay a flat annual fee, billed once a year and due only after approval [subject to change]:
 
-- General contractors: [$2,400] per year
-- Brokers: [$1,800] per year
-- Attorneys and advisors: [$1,200] per year
+- General contractors: $2,400 per year
+- Brokers: $1,800 per year
+- Attorneys and advisors: $1,200 per year
 
 We decide which category applies based on the professional role you are approved under.
 

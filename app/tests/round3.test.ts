@@ -31,7 +31,8 @@ describe("round 3 copy", () => {
   it("calls a free role free instead of waived", () => {
     expect(adminDuesLine(0, true)).toBe("Free role - no dues");
     expect(adminDuesLine(240_000, true)).toContain("Founding member: dues waived during testing");
-    expect(adminDuesLine(240_000, false)).toContain("$2,400 a year");
+    expect(adminDuesLine(240_000, false)).toContain("$2,400 per year");
+    expect(adminDuesLine(240_000, false)).toContain("Billed once a year");
     expect(adminDuesLine(240_000, false)).not.toContain("waived");
   });
 

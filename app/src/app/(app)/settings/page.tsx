@@ -5,7 +5,7 @@ import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { duesLabel } from "@/lib/dues";
+import { DUES_ANNUAL_NOTE, duesLabel } from "@/lib/dues";
 import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 
@@ -27,11 +27,11 @@ export default async function SettingsPage({
       <section className={`${card} mt-4 p-4 text-sm`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Billing</h2>
         {user.paymentStatus === "NOT_REQUIRED" ? (
-          <p className="mt-2 text-ink">No annual dues are due on this membership. Private Floor does not charge a fee on a deal.</p>
+          <p className="mt-2 text-ink">No annual dues are due on this membership. {DUES_ANNUAL_NOTE}</p>
         ) : (
           <div className="mt-2 space-y-1 text-ink">
             <p>
-              <b>Receipt.</b> {paymentStatusLabel(user.paymentStatus)} · {duesLabel(user.duesCents)}
+              <b>Annual dues.</b> {paymentStatusLabel(user.paymentStatus)} · {duesLabel(user.duesCents)}. {DUES_ANNUAL_NOTE}
             </p>
             <p>{receiptLine(user.paymentMode)}</p>
             <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>

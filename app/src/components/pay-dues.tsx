@@ -4,9 +4,9 @@ import { simulateFailedPayment, simulatePayment, startStripeCheckout } from "@/a
 import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { DUES_WAIVED, duesLabel } from "@/lib/dues";
+import { DUES_ANNUAL_NOTE, DUES_WAIVED, duesLabel } from "@/lib/dues";
 import { formatEtDate } from "@/lib/format";
-import { DUES_COVERS } from "@/lib/payments";
+import { DUES_COVERS, paymentRenewalLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 
 export function PayDues({
@@ -38,7 +38,7 @@ export function PayDues({
       <article className="mx-auto w-full max-w-lg bg-paper px-6 py-8 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.28)]">
         <Logo />
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Annual dues</p>
-        <h1 className="mt-1 font-serif text-3xl font-normal">Pay dues</h1>
+        <h1 className="mt-1 font-serif text-3xl font-normal">Pay annual dues</h1>
         <p className="mt-2 text-sm text-ink">
           {name} · {roleLabel(role)}
         </p>
@@ -46,8 +46,12 @@ export function PayDues({
         {notice ? <p className="mt-3 text-sm text-forest">{notice}</p> : null}
         <div className="mt-4 rounded border border-brass bg-brass-soft p-4">
           <p className="font-serif text-4xl font-normal">{duesLabel(cents)}</p>
+          <p className="mt-2 text-sm text-ink">{DUES_ANNUAL_NOTE}</p>
           <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
           {status === "WAIVED" ? <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p> : null}
+          {status === "WAIVED" ? null : (
+            <p className="mt-2 text-sm text-forest">Renewal date {paymentRenewalLabel(renewalAt)}.</p>
+          )}
           <p className="mt-2 text-sm text-ink">Until this is recorded, the rest of the floor stays closed.</p>
         </div>
         <p className="mt-3 text-sm">
@@ -83,7 +87,7 @@ export function PayDues({
             <form action={simulatePayment}>
               <input type="hidden" name="token" value={token} />
               <button className={btn} type="submit">
-                Pay dues (test)
+                Pay annual dues (test)
               </button>
             </form>
             <form action={simulateFailedPayment}>

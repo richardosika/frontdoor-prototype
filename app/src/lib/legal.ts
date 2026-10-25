@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { DUES_SCHEDULE_SENTENCE } from "@/lib/dues";
 import { renderMarkdown } from "@/lib/markdown";
 
 export const LEGAL_DOCS = [
@@ -47,9 +48,6 @@ export function stripVersionLine(markdown: string): string {
   return markdown.replace(/^\uFEFF?Version:[^\n]*\n+/, "");
 }
 
-export const DUES_AMOUNTS_SENTENCE =
-  "General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year";
-
 /** Long date from a version id such as 2026-10-24-draft-1. */
 export function versionDateLabel(version: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(version);
@@ -67,7 +65,7 @@ function stripBracketPlaceholders(text: string): string {
       continue;
     }
     if (text.startsWith("[amounts to be confirmed]", i) || text.startsWith("[amounts are placeholders]", i)) {
-      out += DUES_AMOUNTS_SENTENCE;
+      out += DUES_SCHEDULE_SENTENCE;
       i += (text.startsWith("[amounts to be confirmed]", i) ? "[amounts to be confirmed]" : "[amounts are placeholders]").length - 1;
       continue;
     }

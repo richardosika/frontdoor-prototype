@@ -38,7 +38,7 @@ A Private Floor administrator reviews every application. The check uses public r
 
 Invite code: {invite_code}
 
-Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles have flat annual dues, and those are asked for only after approval. Nothing is charged on the application, and no fee is tied to a deal.${SIGN}`,
+Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
   },
   {
     key: "invite_received",
@@ -73,7 +73,7 @@ Thank you. We have your Private Floor application for {role} at {org}.
 
 A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
 
-Nothing is charged at this step. If your role has annual dues, they are a flat amount and they come only after approval.${SIGN}`,
+Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
   },
   {
     key: "welcome",
@@ -103,7 +103,7 @@ Reply on this page: {status_link}${SIGN}`,
     subject: "You're approved for Private Floor",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. You are an Invited member, and this role has no annual dues.
+A Private Floor administrator approved your application. You are an Invited member. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
 
 Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
 
@@ -125,11 +125,13 @@ You can see the status here: {status_link}${SIGN}`,
     subject: "You're approved — annual dues are next",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. That amount is a flat membership fee. It is never based on a deal, and Private Floor does not store a card number.
+A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. They are a flat fee, billed once a year, and due only after approval. They are never based on a deal, and Private Floor does not store a card number.
+
+Renewal date: {renewal_date}.
 
 Pay here: {payment_link}
 
-You can also sign in at {login_link}. Until the dues are recorded, the floor stays on the payment page.
+You can also sign in at {login_link}. Until the annual dues are recorded, the floor stays on the payment page.
 
 The decision is here: {status_link}
 
@@ -141,9 +143,9 @@ The decision is here: {status_link}
     subject: "Your Private Floor dues still need attention",
     body: `Hello {first_name},
 
-Your Private Floor dues of {dues_amount} still need attention. No card number is stored. You can try again here: {payment_link}
+Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored. You can try again here: {payment_link}
 
-The fee stays flat and is not tied to a deal.${SIGN}`,
+The fee stays flat and is never based on a deal.${SIGN}`,
   },
   {
     key: "renewal",
@@ -151,7 +153,7 @@ The fee stays flat and is not tied to a deal.${SIGN}`,
     subject: "Your Private Floor dues renew soon",
     body: `Hello {first_name},
 
-Your flat annual dues of {dues_amount} renew on {renewal_date}. This is not a deal fee. Write to connect@privatefloorclub.com if you want to cancel before that date.
+Your flat annual dues of {dues_amount} renew on {renewal_date}. They are billed once a year and are never based on a deal. Write to connect@privatefloorclub.com if you want to cancel before that date.
 
 Billing: {billing_link}${SIGN}`,
   },
@@ -173,6 +175,63 @@ export const TEMPLATE_VARIABLES = [
   "invite_code",
   "code",
 ] as const;
+
+/** Unedited letters from before the annual-dues wording. An admin edit is left alone. */
+export const TEMPLATE_PREVIOUS_BODIES: Partial<Record<TemplateKey, string>> = {
+  info: `Hello {first_name},
+
+You're invited to Private Floor, the vetted circle for real estate deal teams. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Invite code: {invite_code}
+
+Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles have flat annual dues, and those are asked for only after approval. Nothing is charged on the application, and no fee is tied to a deal.${SIGN}`,
+  application_thanks: `Hello {first_name},
+
+Thank you. We have your Private Floor application for {role} at {org}.
+
+A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
+
+Nothing is charged at this step. If your role has annual dues, they are a flat amount and they come only after approval.${SIGN}`,
+  approved: `Hello {first_name},
+
+A Private Floor administrator approved your application. You are an Invited member, and this role has no annual dues.
+
+Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
+
+{note}${SIGN}`,
+  payment_due: `Hello {first_name},
+
+A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. That amount is a flat membership fee. It is never based on a deal, and Private Floor does not store a card number.
+
+Pay here: {payment_link}
+
+You can also sign in at {login_link}. Until the dues are recorded, the floor stays on the payment page.
+
+The decision is here: {status_link}
+
+{note}${SIGN}`,
+  dues_reminder: `Hello {first_name},
+
+Your Private Floor dues of {dues_amount} still need attention. No card number is stored. You can try again here: {payment_link}
+
+The fee stays flat and is not tied to a deal.${SIGN}`,
+  renewal: `Hello {first_name},
+
+Your flat annual dues of {dues_amount} renew on {renewal_date}. This is not a deal fee. Write to connect@privatefloorclub.com if you want to cancel before that date.
+
+Billing: {billing_link}${SIGN}`,
+};
+
+/** The new default body when the stored letter is still the previous default. */
+export function replacementTemplateBody(key: string, current: string): string | null {
+  if (!isTemplateKey(key)) return null;
+  const previous = TEMPLATE_PREVIOUS_BODIES[key];
+  const next = templateDef(key);
+  if (!previous || !next || current !== previous || current === next.body) return null;
+  return next.body;
+}
 
 export function isTemplateKey(value: string): value is TemplateKey {
   return (TEMPLATE_KEYS as readonly string[]).includes(value);
@@ -218,7 +277,7 @@ export function sampleTemplateVars(): Record<string, string> {
     login_link: "https://cornicio-mvp.onrender.com/login",
     billing_link: "https://cornicio-mvp.onrender.com/settings",
     apply_link: "https://cornicio-mvp.onrender.com/apply",
-    dues_amount: "$2,400 a year",
+    dues_amount: "$2,400 per year",
     renewal_date: "2027-10-24",
     note: "A short note from the administrator.",
     invite_code: "PF-PREVIEW",

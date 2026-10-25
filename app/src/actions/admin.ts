@@ -15,7 +15,7 @@ import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verific
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
-import { paymentRequired } from "@/lib/payments";
+import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
@@ -188,6 +188,7 @@ export async function reviewApplication(formData: FormData) {
         paymentLink: `${base}/pay/${paymentToken}`,
         loginLink: `${base}/login`,
         duesAmount: duesLabel(duesCents),
+        renewalDate: paymentRenewalLabel(null),
         note,
       }),
       person,

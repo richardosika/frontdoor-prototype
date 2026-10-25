@@ -12,13 +12,13 @@ Membership is free for members approved as developers, investors and limited par
 
 ## Annual dues
 
-Members approved in these categories pay flat annual dues:
+Members approved in these categories pay a flat annual fee, billed once a year:
 
 - General contractors: $2,400 per year
 - Brokers: $1,800 per year
 - Attorneys and advisors: $1,200 per year
 
-Private Floor decides the category from the professional role on the approved application. Dues are billed only after a Private Floor administrator approves the application.
+Private Floor decides the category from the professional role on the approved application. Annual dues are due only after a Private Floor administrator approves the application. They are never based on a deal. The renewal date is one year after the annual dues are recorded.
 
 ## Founding members
 

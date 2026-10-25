@@ -24,7 +24,7 @@ A deal room is invite-only. The member who created it decides who may enter. Bef
 
 ## Dues
 
-Developers, investors and limited partners, family offices, and lenders pay no annual dues and become active when a Private Floor administrator approves them. General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year. Dues are a flat membership fee, asked for only after approval. They are never a deal fee. During this test, payment can be a labelled simulated payment. No card number is stored. A founding-member waiver is a note an administrator applies. It is not automatic.
+Developers, investors and limited partners, family offices, and lenders pay no annual dues and become active when a Private Floor administrator approves them. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Annual dues are a flat fee, billed once a year, and due only after approval. They are never based on a deal. During this test, payment can be a labelled simulated payment. No card number is stored. A founding-member waiver is a note an administrator applies. It is not automatic.
 
 ## Getting a person
 

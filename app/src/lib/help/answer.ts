@@ -79,8 +79,8 @@ export function cleanHelpText(text: string): string {
   return text
     .replace(/\*\*/g, "")
     .replace(/\[DATE\]/g, "October 24, 2026")
-    .replace(/\[amounts to be confirmed\]/gi, "general contractors $2,400 a year, brokers $1,800 a year, and attorneys and advisors $1,200 a year")
-    .replace(/\[amounts are placeholders\]/gi, "general contractors $2,400 a year, brokers $1,800 a year, and attorneys and advisors $1,200 a year")
+    .replace(/\[amounts to be confirmed\]/gi, "General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year")
+    .replace(/\[amounts are placeholders\]/gi, "General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year")
     .split("\n")
     .filter((line) => !/bracketed items are placeholders/i.test(line) && !/^\s*DRAFT\b/i.test(line))
     .join(" ")

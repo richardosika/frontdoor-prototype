@@ -2,7 +2,7 @@ import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { formatEtDate } from "@/lib/format";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { notify } from "@/lib/notify";
-import { renewalInOneYear } from "@/lib/payments";
+import { paymentRenewalLabel, renewalInOneYear } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
@@ -79,6 +79,7 @@ export async function markPaymentFailed(userId: string) {
       name: user.name,
       role: roleLabel(user.role),
       duesAmount: duesLabel(user.duesCents || annualDuesCents(user.role)),
+      renewalDate: paymentRenewalLabel(user.renewalAt),
       paymentLink: link,
     }),
     person: { name: user.name, role: user.role, org: user.org, location: user.location },

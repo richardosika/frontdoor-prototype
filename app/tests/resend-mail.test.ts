@@ -83,7 +83,7 @@ describe("Resend test mail", () => {
     expect(hostile).toContain("&lt;script&gt;");
     expect(hostile).not.toContain("<script>");
     const pay = noticeHtml("Pay here: https://cornicio-mvp.onrender.com/pay/preview", { headline: "Dues" });
-    expect(pay).toContain(">PAY DUES</a>");
+    expect(pay).toContain(">PAY ANNUAL DUES</a>");
   });
 
   it("posts only the test recipient through a mocked fetch", async () => {

@@ -107,4 +107,10 @@ export function verifyStripeSignature(payload: string, header: string | null, se
 }
 
 export const DUES_COVERS =
-  "One year of access to the Private Floor Club. The amount is a flat annual fee. It does not change because a deal happens, and Private Floor does not charge a success fee or hold member funds.";
+  "One year of access to the Private Floor Club. Annual dues are a flat fee, billed once a year, and due only after approval. The amount does not change because a deal happens, and Private Floor does not charge a success fee or hold member funds.";
+
+/** Date shown on the payment page and in the payment-link email. */
+export function paymentRenewalLabel(renewalAt: Date | null, now = new Date()): string {
+  const date = formatEtDate(renewalAt ?? renewalInOneYear(now));
+  return renewalAt ? date : `${date} if recorded today`;
+}

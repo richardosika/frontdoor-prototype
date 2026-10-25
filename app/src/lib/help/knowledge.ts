@@ -39,7 +39,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "dues",
     title: "Annual dues and refunds",
-    body: "Developers, investors and limited partners, family offices, and lenders pay no annual dues and become active when approved. General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year. Dues are a flat membership fee after approval, never a deal fee. During testing, Pay dues can be a labelled simulated payment. No card number is stored. A founding-member waiver is applied by an administrator and is not automatic. Refund wording lives on the Membership Dues and Refund Terms page, which is still a draft.",
+    body: "Developers, investors and limited partners, family offices, and lenders pay no annual dues and become active when approved. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Annual dues are a flat fee, billed once a year, and due only after approval. They are never based on a deal. During testing, Pay dues can be a labelled simulated payment. No card number is stored. A founding-member waiver is applied by an administrator and is not automatic. Refund wording lives on the Membership Dues and Refund Terms page, which is still a draft.",
   },
   {
     slug: "posts",
@@ -69,7 +69,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "gc-dues",
     title: "What a general contractor pays for membership",
-    body: "General contractors pay $2,400 a year. Brokers pay $1,800 a year. Attorneys and advisors pay $1,200 a year. Developers, investors and limited partners, family offices, and lenders pay nothing. Dues are a flat membership fee, paid after a Private Floor administrator approves the application. They are never based on a deal.",
+    body: "General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and limited partners, family offices, and lenders are free. Annual dues are a flat fee, billed once a year, and due only after a Private Floor administrator approves the application. They are never based on a deal.",
   },
   {
     slug: "post-held",

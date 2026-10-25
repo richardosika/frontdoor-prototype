@@ -5,6 +5,7 @@ import {
   firstName,
   isTemplateKey,
   renderTemplate,
+  replacementTemplateBody,
   TEMPLATE_DEFS,
   type TemplateKey,
 } from "@/lib/email-templates";
@@ -32,11 +33,40 @@ export async function ensureTemplates() {
       },
     });
   }
+  for (const def of TEMPLATE_DEFS) {
+    const existing = await prisma.emailTemplate.findUnique({ where: { key: def.key } });
+    const nextBody = existing ? replacementTemplateBody(def.key, existing.body) : null;
+    if (!existing || !nextBody) continue;
+    const latest = await prisma.emailTemplateVersion.findFirst({
+      where: { templateId: existing.id },
+      orderBy: { version: "desc" },
+    });
+    await prisma.emailTemplate.update({
+      where: { id: existing.id },
+      data: {
+        subject: def.subject,
+        body: nextBody,
+        versions: {
+          create: { version: (latest?.version ?? 1) + 1, subject: def.subject, body: nextBody, savedById: "" },
+        },
+      },
+    });
+  }
   await prisma.mailSettings.upsert({
     where: { id: "default" },
     update: {},
     create: { id: "default", delivery: process.env.NOTICE_DELIVERY === "live" ? "live" : "outbox" },
   });
+}
+
+const SIGN_OFF_LINE = "\n\nRichard Osika, Founder";
+
+/** Payment letters always name the renewal date, even when an older template omitted it. */
+export function withRenewalLine(text: string, key: string, renewal: string | undefined): string {
+  if ((key !== "payment_due" && key !== "dues_reminder") || !renewal || text.includes(renewal)) return text;
+  const line = `Annual dues are billed once a year. Renewal date: ${renewal}.`;
+  if (text.endsWith(SIGN_OFF_LINE)) return `${text.slice(0, -SIGN_OFF_LINE.length)}\n\n${line}${SIGN_OFF_LINE}`;
+  return `${text}\n\n${line}`;
 }
 
 export function buildMailVars(input: {
@@ -102,7 +132,7 @@ export async function sendTemplate(input: {
   const template = await prisma.emailTemplate.findUnique({ where: { key: input.key } });
   if (!template) throw new Error("Template missing.");
   const subject = renderTemplate(template.subject, input.vars, { signOff: false });
-  const text = renderTemplate(template.body, input.vars);
+  const text = withRenewalLine(renderTemplate(template.body, input.vars), input.key, input.vars.renewal_date);
   return sendNotice({
     intendedTo: input.to,
     applicationId: input.applicationId,
