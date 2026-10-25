@@ -10,6 +10,8 @@ Nothing on this test charges a card. Every email notice is stored in the Outbox 
 
 When `SITE_GATE_PASSWORD` is set, the browser asks for HTTP Basic username `privatefloor` and that password before any page, script, or API call. `/api/health` and `/api/stripe/webhook` do not ask. After the browser accepts the password, it sends that header again on same-origin requests, so `/login`, `/admin/login`, and the Auth.js calls from those pages keep working. When `SITE_GATE_PASSWORD` is unset, nothing asks for that password. Responses send `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows every path.
 
+`CLEAN_TEST_DATA=dry` makes the next server start log a count for each table of testing rows and change nothing. `CLEAN_TEST_DATA=1` deletes those rows on startup, then logs the same counts. The log line never includes names, emails, or message text. Seeded members, seeded projects, templates, legal pages, settings, and the administrator password hash stay. Every invite code other than `PF-7K2M-91QX` is removed, and that demo code is set back to 0 of 40 uses. Unset the variable after that log line. Any other value is ignored.
+
 The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The approved files in `richardosika/private-floor-site` `tools/brand-src` were not readable from the build environment.
 
 ## Member side

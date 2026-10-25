@@ -39,6 +39,7 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 | `AUTH_TRUST_HOST` | Set to `true` behind Render's proxy |
 | `SITE_GATE_PASSWORD` | Optional. When set, the whole site asks for HTTP Basic username `privatefloor` and this password. Unset leaves the site open. `/api/health` and `/api/stripe/webhook` stay open. |
 | `ADMIN_PASSWORD` | Optional. At least 12 characters. Startup replaces every administrator password. Member passwords stay the seeded demo password. |
+| `CLEAN_TEST_DATA` | Optional. `dry` logs how many testing rows would be removed. `1` removes them at startup and logs the same counts. Unset does nothing. Seeded members, projects, templates, legal pages, settings, and administrator password hashes stay. The demo invite `PF-7K2M-91QX` stays at 0 of 40 uses. |
 
 ### Demo login
 
