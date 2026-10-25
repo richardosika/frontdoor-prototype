@@ -6,6 +6,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DecisionForm } from "@/components/decision-form";
 import { PaymentPanel } from "@/components/payment-admin";
 import { EvidenceChip } from "@/components/evidence-chip";
+import { newsStoryChipLabel } from "@/lib/verify/news";
 import { RunAndReload } from "@/components/run-and-reload";
 import { VerdictChip } from "@/components/verdict-chip";
 import { btnOutline, card, field, labelCls } from "@/components/ui";
@@ -238,6 +239,16 @@ export default async function ApplicationDetailPage({
   );
 }
 
+function EvidenceLabel({ row }: { row: { checkKey: string; status: string; finding: string } }) {
+  const label = newsStoryChipLabel(row.checkKey, row.status, row.finding);
+  if (!label) return <EvidenceChip status={row.status} />;
+  return (
+    <span className="inline-flex rounded-sm border border-line bg-cream px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-forest">
+      {label}
+    </span>
+  );
+}
+
 function Report({
   title,
   run,
@@ -266,7 +277,7 @@ function Report({
           <div className="mt-3 flex flex-wrap gap-2">
             {run.evidence.map((row) => (
               <span key={`${row.id}-chip`} className="inline-flex items-center gap-1 text-[11px] text-ink">
-                <EvidenceChip status={row.status} />
+                <EvidenceLabel row={row} />
                 {row.checkKey}
               </span>
             ))}
@@ -287,7 +298,7 @@ function Report({
                   <tr key={row.id} className="border-b border-line align-top">
                     <td className="py-2 pr-2">{row.checkKey}</td>
                     <td className="py-2 pr-2">
-                      <EvidenceChip status={row.status} />
+                      <EvidenceLabel row={row} />
                     </td>
                     <td className="max-w-xs py-2 pr-2 break-words">
                       {row.finding}

@@ -5,6 +5,7 @@ import {
   bingNewsUrl,
   classifyNews,
   feedBodyState,
+  newsStoryChipLabel,
   gdeltNewsUrl,
   gdeltQuery,
   googleNewsUrl,
@@ -368,6 +369,13 @@ describe("news feeds", () => {
     const stories = checks.filter((check) => check.key === "news-story");
     expect(stories.filter((check) => check.source.includes("Bing News"))).toHaveLength(2);
     expect(stories.length).toBeLessThanOrEqual(8);
+  });
+
+  it("labels a matched headline instead of no data", () => {
+    expect(newsStoryChipLabel("news-story", "INCONCLUSIVE", "Neutral · 2026-07-18 · Stephen Ross speaks")).toBe("Headline");
+    expect(newsStoryChipLabel("news-story", "INCONCLUSIVE", "Possible match, review · 2026-06-02 · John Smith sued")).toBe("Review");
+    expect(newsStoryChipLabel("news", "INCONCLUSIVE", "No data found.")).toBeNull();
+    expect(newsStoryChipLabel("news-story", "FAIL", "Negative · 2026-03-04 · SEC charges")).toBeNull();
   });
 
   it("parses GDELT articles and treats an empty feed as no data", () => {

@@ -186,6 +186,12 @@ export function classifyNews(
   return [summary, ...shown.map((item) => newsStory(item, ranAt))];
 }
 
+/** Story rows keep INCONCLUSIVE so they do not count as a pass. The table says Headline or Review instead of No data. */
+export function newsStoryChipLabel(checkKey: string, status: string, finding: string): string | null {
+  if (checkKey !== "news-story" || status !== "INCONCLUSIVE") return null;
+  return finding.startsWith("Possible match") ? "Review" : "Headline";
+}
+
 export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, now = new Date()): Promise<CheckOutput[]> {
   const queries = newsSearchQueries(facts);
   if (!queries.length) {
