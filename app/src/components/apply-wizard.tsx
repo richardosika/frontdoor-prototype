@@ -232,7 +232,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         {!done && step === 2 ? (
           <div>
             <h1 className="font-serif text-xl">Choose role</h1>
-            <p className="mt-1 text-sm text-ink">Pick the role that best describes you. Dues, if any, are shown later and are waived during this test.</p>
+            <p className="mt-1 text-sm text-ink">Pick the role that best describes you. Dues, if any, are shown on the last step and are paid after approval.</p>
             <div className="mt-3 max-h-[420px] overflow-y-auto pr-1">
               {GROUPS.map((group) => (
                 <div key={group}>
