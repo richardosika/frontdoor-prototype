@@ -37,6 +37,8 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 | `APP_URL` | Public origin used in email links, no trailing slash. Placeholder until you host the app. No domain is registered for Private Floor. |
 | `AUTH_URL` | Auth.js origin. Use the same value as `APP_URL`. |
 | `AUTH_TRUST_HOST` | Set to `true` behind Render's proxy |
+| `SITE_GATE_PASSWORD` | Optional. When set, the whole site asks for HTTP Basic username `privatefloor` and this password. Unset leaves the site open. `/api/health` and `/api/stripe/webhook` stay open. |
+| `ADMIN_PASSWORD` | Optional. At least 12 characters. Startup replaces every administrator password. Member passwords stay the seeded demo password. |
 
 ### Demo login
 

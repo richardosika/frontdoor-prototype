@@ -8,6 +8,8 @@ The member sign-in page does not accept an administrator, and it uses the same g
 
 Nothing on this test charges a card. Every email notice is stored in the Outbox and addressed only to `rich@privatefloorclub.com` (or `NOTICE_TEST_RECIPIENT` if that env var is set).
 
+When `SITE_GATE_PASSWORD` is set, the browser asks for HTTP Basic username `privatefloor` and that password before any page, script, or API call. `/api/health` and `/api/stripe/webhook` do not ask. After the browser accepts the password, it sends that header again on same-origin requests, so `/login`, `/admin/login`, and the Auth.js calls from those pages keep working. When `SITE_GATE_PASSWORD` is unset, nothing asks for that password. Responses send `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` disallows every path.
+
 The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The approved files in `richardosika/private-floor-site` `tools/brand-src` were not readable from the build environment.
 
 ## Member side

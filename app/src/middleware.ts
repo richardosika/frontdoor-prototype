@@ -1,29 +1,49 @@
 import NextAuth from "next-auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextMiddleware, type NextRequest } from "next/server";
 import { authConfig } from "@/auth.config";
 import { moderationDenial } from "@/lib/messaging";
 import { adminEntryRedirect, loggedInPublicRedirect } from "@/lib/session-gate";
+import {
+  ROBOTS_TAG,
+  basicAuthorizationMatches,
+  siteGateChallengeHeaders,
+  siteGateConfigured,
+  siteGateExempt,
+  skipsMemberSession,
+} from "@/lib/site-gate";
 import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/pay", "/api/health", "/api/auth", "/api/request-invite", "/api/stripe", "/api/help"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/pay", "/robots.txt", "/api/health", "/api/auth", "/api/request-invite", "/api/stripe", "/api/help"];
 
-export default auth((req) => {
+function withRobots(response: NextResponse) {
+  response.headers.set("X-Robots-Tag", ROBOTS_TAG);
+  return response;
+}
+
+function siteGateDenied() {
+  const headers = siteGateChallengeHeaders();
+  return new NextResponse("Authentication required.", { status: 401, headers });
+}
+
+const withSession = auth(async (req) => {
   const path = req.nextUrl.pathname;
   const loggedIn = Boolean(req.auth?.user);
   const actor = loggedIn ? { isAdmin: Boolean(req.auth?.user?.isAdmin) } : null;
   const hiddenStatus = moderationDenial({ path, actor }) ?? verificationDenial({ path, actor });
   if (hiddenStatus) {
-    return new NextResponse(hiddenStatus === 404 ? "Not found" : "Forbidden", {
-      status: hiddenStatus,
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    });
+    return withRobots(
+      new NextResponse(hiddenStatus === 404 ? "Not found" : "Forbidden", {
+        status: hiddenStatus,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+    );
   }
   const adminEntry = adminEntryRedirect(path, loggedIn ? { isAdmin: Boolean(req.auth?.user?.isAdmin) } : null);
   if (path === "/admin/login") {
-    if (adminEntry) return NextResponse.redirect(new URL(adminEntry, req.nextUrl));
-    return NextResponse.next();
+    if (adminEntry) return withRobots(NextResponse.redirect(new URL(adminEntry, req.nextUrl)));
+    return withRobots(NextResponse.next());
   }
 
   const isPublic = path === "/" || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
@@ -31,21 +51,34 @@ export default auth((req) => {
   if (!loggedIn && !isPublic) {
     const url = new URL("/login", req.nextUrl);
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    return withRobots(NextResponse.redirect(url));
   }
 
   const entry = loggedIn ? loggedInPublicRedirect(path) : null;
   if (entry) {
-    return NextResponse.redirect(new URL(entry, req.nextUrl));
+    return withRobots(NextResponse.redirect(new URL(entry, req.nextUrl)));
   }
 
   if (path.startsWith("/admin") && !req.auth?.user?.isAdmin) {
-    return NextResponse.redirect(new URL("/feed", req.nextUrl));
+    return withRobots(NextResponse.redirect(new URL("/feed", req.nextUrl)));
   }
 
-  return NextResponse.next();
-});
+  return withRobots(NextResponse.next());
+}) as unknown as NextMiddleware;
+
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+  const path = req.nextUrl.pathname;
+  const gatePassword = process.env.SITE_GATE_PASSWORD;
+  if (siteGateConfigured(gatePassword) && !siteGateExempt(path)) {
+    const allowed = await basicAuthorizationMatches(req.headers.get("authorization"), gatePassword);
+    if (!allowed) return siteGateDenied();
+  }
+  if (skipsMemberSession(path)) return withRobots(NextResponse.next());
+  const response = await withSession(req, event);
+  if (response) response.headers.set("X-Robots-Tag", ROBOTS_TAG);
+  return response;
+}
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: ["/((?!_next/webpack-hmr).*)"],
 };
