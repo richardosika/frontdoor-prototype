@@ -14,7 +14,7 @@ export default function HomePage() {
         <div className="flex flex-1 flex-col justify-center px-6 py-10">
           <h1 className="font-serif text-4xl font-normal leading-tight">{BRAND.tagline}</h1>
           <p className="mt-4 text-base leading-relaxed text-ink">
-            The {BRAND.club} is nationwide and invite-only. {BRAND.owner} reviews every application. A business card is optional. Deal rooms open only after the sponsor approves an NDA acknowledgement. Nothing is charged during this test.
+            The {BRAND.club} is nationwide and invite-only. A Private Floor administrator reviews every application. A business card is optional. Deal rooms open only after the sponsor approves an NDA acknowledgement. Nothing is charged during this test.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/login" className={btn}>

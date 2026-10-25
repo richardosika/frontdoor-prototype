@@ -14,6 +14,7 @@ import {
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { settleStuckRuns } from "@/lib/verify/queue";
 import { paymentStatusLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 
@@ -25,6 +26,7 @@ export default async function ApplicationsPage({
   searchParams: Promise<{ error?: string; notice?: string; filter?: string; sort?: string }>;
 }) {
   await requireAdmin();
+  await settleStuckRuns();
   const params = await searchParams;
   const filter = APPLICATION_FILTERS.some((item) => item.id === params.filter) ? (params.filter as ApplicationFilter) : "action";
   const sort = params.sort === "score" ? "score" : "submitted";
@@ -106,11 +108,11 @@ export default async function ApplicationsPage({
                   <VerdictChip verdict={application.runs[0]?.verdict} score={application.runs[0]?.score} />
                 </div>
               </Link>
-              {!application.runs[0] ? (
+              {!application.runs[0] || application.runs[0].status !== "DONE" ? (
                 <div className="mt-2">
                   <RunAndReload
                     className={btnOutline}
-                    label="Run verification"
+                    label={application.runs[0] ? "Re-run verification" : "Run verification"}
                     pendingLabel="Running verification…"
                     run={rerunVerification.bind(null, application.id)}
                   />

@@ -201,7 +201,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           <div className="py-4">
             <h1 className="font-serif text-2xl">Application under review</h1>
             <p className="mt-2 text-sm text-ink">
-              Richard Osika reviews every application. Verification is in progress. Nothing was charged. Keep the status link. Messages about this application stay on that page.
+              A Private Floor administrator reviews every application. Verification is in progress. Nothing was charged. Keep the status link. Messages about this application stay on that page.
             </p>
             {statusToken ? (
               <Link href={`/apply/status/${statusToken}`} className={`${btn} mt-4 w-full`}>

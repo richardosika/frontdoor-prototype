@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { BRAND } from "@/lib/brand";
 import { memberFacingLegal } from "@/lib/legal";
 
 export type HelpChunk = {
@@ -30,7 +29,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "signup",
     title: "How signup works",
-    body: `Private Floor is invite-only. Use the invite code on Apply, with your real name, role, company, and location. A business card is optional. Private Floor does not ask for a government ID. Two consent boxes start unchecked, and both are required. After you submit, keep the status link. That page is where you reply if a Private Floor administrator asks for more information. ${BRAND.owner} reviews every application.`,
+    body: "Private Floor is invite-only. Use the invite code on Apply, with your real name, role, company, and location. A business card is optional. Private Floor does not ask for a government ID. Two consent boxes start unchecked, and both are required. After you submit, keep the status link. That page is where you reply if a Private Floor administrator asks for more information. A Private Floor administrator reviews every application.",
   },
   {
     slug: "verification",

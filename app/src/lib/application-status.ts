@@ -38,7 +38,7 @@ export function memberStatusCopy(status: string): { title: string; body: string 
   }
   return {
     title: "Application under review",
-    body: "Verification in progress. Richard Osika reviews every application personally. This page updates when he decides.",
+    body: "Verification in progress. A Private Floor administrator reviews every application. This page updates when there is a decision.",
   };
 }
 

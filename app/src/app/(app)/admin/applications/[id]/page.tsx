@@ -12,7 +12,8 @@ import { VerdictChip } from "@/components/verdict-chip";
 import { btnOutline, card, field, labelCls } from "@/components/ui";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
-import { DUES_WAIVED, duesLabel } from "@/lib/dues";
+import { adminDuesLine } from "@/lib/dues";
+import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +29,7 @@ export default async function ApplicationDetailPage({
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   await requireAdmin();
+  await settleStuckRuns();
   const { id } = await params;
   const query = await searchParams;
   const application = await prisma.application.findUnique({
@@ -75,7 +77,7 @@ export default async function ApplicationDetailPage({
             <b>Role:</b> {roleLabel(application.role)} · {application.org} · {application.location}
           </p>
           <p>
-            <b>Dues:</b> {duesLabel(application.duesCents)}. {application.duesWaived ? DUES_WAIVED : "Billed after approval. Never a deal fee."}
+            <b>Dues:</b> {adminDuesLine(application.duesCents, application.duesWaived)}
           </p>
           {application.phone ? (
             <p>
@@ -154,8 +156,8 @@ export default async function ApplicationDetailPage({
         {!report ? (
           <p className="mt-4 text-sm text-ink">No verification report yet. Run it to replace the “verification in progress” placeholder.</p>
         ) : null}
-        <Report title="Automated verification report" run={report} />
-        <Report title="Company report" run={company} />
+        <Report title="Automated verification report" run={report} applicationId={application.id} />
+        <Report title="Company report" run={company} applicationId={application.id} />
         <div className="mt-4">
           <RunAndReload
             className={btnOutline}
@@ -252,8 +254,10 @@ function EvidenceLabel({ row }: { row: { checkKey: string; status: string; findi
 function Report({
   title,
   run,
+  applicationId,
 }: {
   title: string;
+  applicationId: string;
   run?: {
     status: string;
     summary: string;
@@ -274,6 +278,17 @@ function Report({
             <span className="ml-2 text-xs text-mut">{run.status}{run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-ink">{run.summary || "The report is still running."}</p>
+          {run.status !== "DONE" ? (
+            <div className="mt-3">
+              <RunAndReload
+                className={btnOutline}
+                label="Re-run verification"
+                pendingLabel="Running verification…"
+                run={rerunVerification.bind(null, applicationId)}
+              />
+              <p className="mt-2 text-xs text-mut">A run that is still going after a few minutes is stopped. Re-run starts it again.</p>
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {run.evidence.map((row) => (
               <span key={`${row.id}-chip`} className="inline-flex items-center gap-1 text-[11px] text-ink">

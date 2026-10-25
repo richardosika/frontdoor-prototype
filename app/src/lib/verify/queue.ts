@@ -1,5 +1,6 @@
 import { createVerificationRun, executeVerificationRun } from "@/lib/verify/engine";
 import { prisma } from "@/lib/prisma";
+import { stuckRunDecision } from "@/lib/verify/watchdog";
 
 const inflight = new Set<string>();
 
@@ -46,9 +47,62 @@ export async function queueProjectVerification(projectId: string, name: string) 
   enqueueVerification(runId, { network: true });
 }
 
+const FAILED_SUMMARY =
+  "Recommendation: NEEDS YOUR DECISION. This run was still going after several minutes, so it was stopped. Use Re-run verification. What I could not check for free: the sources this run did not finish.";
+
+/** Stop or retry a run that is still pending or running after the watchdog window. */
+export async function settleStuckRuns(now = new Date()): Promise<void> {
+  const runs = await prisma.verificationRun.findMany({
+    where: { status: { in: ["PENDING", "RUNNING"] } },
+    select: {
+      id: true,
+      status: true,
+      startedAt: true,
+      createdAt: true,
+      error: true,
+      application: { select: { testProfile: true } },
+    },
+    take: 40,
+  });
+  for (const run of runs) {
+    const decision = stuckRunDecision(run, now);
+    if (decision === "wait") continue;
+    if (inflight.has(run.id)) {
+      await markRunTimedOut(run.id, now);
+      continue;
+    }
+    if (decision === "retry") {
+      const claimed = await prisma.verificationRun.updateMany({
+        where: { id: run.id, status: { in: ["PENDING", "RUNNING"] } },
+        data: { status: "PENDING", startedAt: new Date(), error: "watchdog-retry:1" },
+      });
+      if (claimed.count) enqueueVerification(run.id, { network: !run.application?.testProfile });
+      continue;
+    }
+    await markRunTimedOut(run.id, now);
+  }
+}
+
+async function markRunTimedOut(runId: string, now: Date): Promise<void> {
+  await prisma.verificationRun.updateMany({
+    where: { id: runId, status: { in: ["PENDING", "RUNNING"] } },
+    data: {
+      status: "FAILED",
+      finishedAt: now,
+      error: "The verification run timed out.",
+      verdict: "NEEDS_OWNER_DECISION",
+      score: 0,
+      summary: FAILED_SUMMARY,
+    },
+  });
+}
+
 export async function resumeVerificationJobs() {
   if (resumed) return;
   resumed = true;
+  await settleStuckRuns().catch((error) => {
+    console.error("verification watchdog failed", error);
+  });
   const runs = await prisma.verificationRun.findMany({
     where: { status: { in: ["PENDING", "RUNNING"] } },
     select: { id: true, application: { select: { testProfile: true } } },

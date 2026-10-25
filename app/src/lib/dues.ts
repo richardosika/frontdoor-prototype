@@ -15,6 +15,13 @@ export function duesLabel(cents: number): string {
 
 export const DUES_WAIVED = "Founding member: dues waived during testing";
 
+/** Admin application header. A free role is not a waived paid membership. */
+export function adminDuesLine(cents: number, waived: boolean): string {
+  if (cents <= 0) return "Free role - no dues";
+  if (waived) return `${duesLabel(cents)}. ${DUES_WAIVED}`;
+  return `${duesLabel(cents)}. Billed after approval. Never a deal fee.`;
+}
+
 export function duesForRole(role: RoleId | string): { cents: number; label: string; waived: string } {
   const cents = annualDuesCents(role);
   return { cents, label: duesLabel(cents), waived: DUES_WAIVED };

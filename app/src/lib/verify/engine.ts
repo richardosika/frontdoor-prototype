@@ -31,9 +31,10 @@ export async function executeVerificationRun(runId: string, options?: { network?
     include: { application: { include: { inviteCode: true, businessCard: true } } },
   });
   if (!run) return;
+  const preservedError = run.error.startsWith("watchdog-retry:") ? run.error : "";
   await prisma.verificationRun.update({
     where: { id: run.id },
-    data: { status: "RUNNING", startedAt: run.startedAt ?? new Date(), error: "" },
+    data: { status: "RUNNING", startedAt: new Date(), error: preservedError },
   });
   try {
     const facts = await factsForRun(run);
@@ -66,6 +67,7 @@ export async function executeVerificationRun(runId: string, options?: { network?
         score: report.score,
         verdict: report.verdict as Verdict,
         summary: report.summary,
+        error: "",
         finishedAt: new Date(),
       },
     });

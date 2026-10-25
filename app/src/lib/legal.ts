@@ -71,7 +71,7 @@ function stripBracketPlaceholders(text: string): string {
       i += (text.startsWith("[amounts to be confirmed]", i) ? "[amounts to be confirmed]" : "[amounts are placeholders]").length - 1;
       continue;
     }
-    if (text.startsWith("[PLACEHOLDER:", i)) {
+    if (text.startsWith("[PLACEHOLDER", i)) {
       let depth = 0;
       let j = i;
       for (; j < text.length; j++) {
@@ -92,19 +92,27 @@ function stripBracketPlaceholders(text: string): string {
   return out;
 }
 
-/** Member-facing legal text. The draft banner stays on /legal. Bodies drop draft lines, placeholder notes, and [DATE]. */
+/** Member-facing legal text. The draft banner stays on /legal. Bodies drop authoring notes. Real brackets such as [to be formed] stay for the page to mark as draft. */
 export function memberFacingLegal(markdown: string): string {
-  const stripped = stripBracketPlaceholders(stripVersionLine(markdown));
+  const stripped = stripBracketPlaceholders(stripVersionLine(markdown)).replace(
+    /\*\*Short helper text under the button:\*\*\s*/g,
+    "",
+  );
   return stripped
     .split("\n")
     .filter((line) => {
       const trimmed = line.trim();
+      if (!trimmed) return true;
       if (/^DRAFT\b/i.test(trimmed)) return false;
       if (/bracketed items are placeholders/i.test(trimmed)) return false;
+      if (/^\[\s*submit application\s*\]$/i.test(trimmed)) return false;
+      if (/^[-*]\s+\*\*[^*]+\*\*:?\s*$/.test(trimmed)) return false;
       return true;
     })
     .join("\n")
     .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+;/g, ";")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

@@ -18,7 +18,20 @@ export function sessionFromHeader(header: string | null): string {
 export async function ensureHelpArticles() {
   for (const article of DEFAULT_FAQ) {
     const existing = await prisma.helpArticle.findUnique({ where: { slug: article.slug } });
-    if (existing) continue;
+    if (existing) {
+      if (existing.body.includes("Richard Osika reviews every application")) {
+        await prisma.helpArticle.update({
+          where: { id: existing.id },
+          data: {
+            body: existing.body.replaceAll(
+              "Richard Osika reviews every application",
+              "A Private Floor administrator reviews every application",
+            ),
+          },
+        });
+      }
+      continue;
+    }
     await prisma.helpArticle.create({
       data: { slug: article.slug, title: article.title, body: article.body, published: true },
     });

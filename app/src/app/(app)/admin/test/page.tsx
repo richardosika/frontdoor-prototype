@@ -1,4 +1,5 @@
-import { createCustomTestApplicant, createSampleApplicants, deleteRecentRecords, deleteTestData, seedMemberNetwork, seedPaymentDueMember } from "@/actions/owner";
+import { createSampleApplicants, deleteRecentRecords, deleteTestData, seedMemberNetwork, seedPaymentDueMember } from "@/actions/owner";
+import { CreateTestApplicantForm } from "@/components/create-test-applicant";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
@@ -87,31 +88,7 @@ export default async function TestConsolePage({
           <p className="mt-2">
             Runs live verification on a name you choose, without /apply. The row is marked is_test. Notices still go only to the test recipient.
           </p>
-          <form action={createCustomTestApplicant} className="mt-4 grid gap-3">
-            <label className="block">
-              <span className={labelCls}>Name</span>
-              <input className={field} name="name" required placeholder="Stephen Ross" />
-            </label>
-            <label className="block">
-              <span className={labelCls}>Company</span>
-              <input className={field} name="org" required placeholder="Related Companies" />
-            </label>
-            <label className="block">
-              <span className={labelCls}>Email</span>
-              <input className={field} name="email" type="email" required placeholder="stephen.ross.probe@example.com" />
-            </label>
-            <label className="block">
-              <span className={labelCls}>Website</span>
-              <input className={field} name="website" placeholder="https://www.related.com" />
-            </label>
-            <label className="block">
-              <span className={labelCls}>Location</span>
-              <input className={field} name="location" placeholder="New York, NY" />
-            </label>
-            <button className={btn} type="submit">
-              Create and run verification
-            </button>
-          </form>
+          <CreateTestApplicantForm />
         </section>
       </div>
     </div>

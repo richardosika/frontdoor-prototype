@@ -29,7 +29,42 @@ export function renderMarkdown(source: string): string {
 }
 
 function inline(value: string): string {
-  return escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const formatted = escapeHtml(value).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return wrapDraftMarkers(formatted);
+}
+
+/** Real bracketed draft text, such as [to be formed], stays visible and is marked as a draft. */
+function wrapDraftMarkers(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    if (value[index] !== "[") {
+      out += value[index];
+      index += 1;
+      continue;
+    }
+    let depth = 0;
+    let end = index;
+    for (; end < value.length; end += 1) {
+      if (value[end] === "[") depth += 1;
+      else if (value[end] === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          end += 1;
+          break;
+        }
+      }
+    }
+    if (depth !== 0) {
+      out += value[index];
+      index += 1;
+      continue;
+    }
+    const marker = value.slice(index, end);
+    out += `<span class="mx-0.5 inline rounded-sm border border-brass bg-brass-soft px-1 text-forest">${marker}</span>`;
+    index = end;
+  }
+  return out;
 }
 
 function escapeHtml(value: string): string {

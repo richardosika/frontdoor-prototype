@@ -691,7 +691,9 @@ export async function deleteOneApplication(applicationId: string): Promise<{ hre
   return { href: `/admin/applications?notice=${encodeURIComponent(notice)}` };
 }
 
-export async function createCustomTestApplicant(formData: FormData) {
+export async function createCustomTestApplicant(
+  formData: FormData,
+): Promise<{ href: string; message: string } | { error: string }> {
   const admin = await requireAdmin();
   const name = String(formData.get("name") || "").trim();
   const org = String(formData.get("org") || "").trim();
@@ -699,10 +701,10 @@ export async function createCustomTestApplicant(formData: FormData) {
   const website = String(formData.get("website") || "").trim();
   const location = String(formData.get("location") || "").trim() || "Newark, NJ";
   if (name.length < 2 || org.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    redirect("/admin/test?error=Name%2C+company%2C+and+a+valid+email+are+required");
+    return { error: "Name, company, and a valid email are required." };
   }
   const invite = await prisma.inviteCode.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!invite) redirect("/admin/test?error=Create+an+invite+code+first");
+  if (!invite) return { error: "Create an invite code first." };
   if (invite.uses >= invite.maxUses) {
     await prisma.inviteCode.update({ where: { id: invite.id }, data: { maxUses: invite.uses + 1 } });
   }
@@ -748,5 +750,8 @@ export async function createCustomTestApplicant(formData: FormData) {
   await queueApplicationVerification(application.id, org, { network: true, wait: false });
   revalidatePath("/admin/applications");
   revalidatePath("/admin/test");
-  redirect(`/admin/applications/${application.id}?notice=${encodeURIComponent("Test applicant created. Verification is running on live sources.")}`);
+  return {
+    href: `/admin/applications/${application.id}`,
+    message: `Created ${name}. Verification is running on live sources.`,
+  };
 }

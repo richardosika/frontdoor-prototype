@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { deleteHelpQuestion } from "@/actions/help-admin";
+import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { card } from "@/components/ui";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
+import { btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { ensureHelpArticles } from "@/lib/help/store";
@@ -18,7 +21,7 @@ const FILTERS = [
 export default async function AdminHelpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; notice?: string; error?: string }>;
 }) {
   await requireAdmin();
   await ensureHelpArticles();
@@ -42,6 +45,9 @@ export default async function AdminHelpPage({
       <MobileTitle href="/admin" label="Admin" title="Help" />
       <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Help questions" />
+        <div className="mt-3">
+          <Banner error={params.error} notice={params.notice} />
+        </div>
         <p className="mt-1 text-sm text-ink">
           {unanswered} unanswered. Questions are stored as typed. Help does not keep a name, email, or address with them.{" "}
           <Link href="/admin/help/faq" className="underline decoration-brass">
@@ -70,6 +76,16 @@ export default async function AdminHelpPage({
               </p>
               <p className="mt-2 font-semibold">{turn.question}</p>
               <p className="mt-2 whitespace-pre-wrap text-ink">{turn.answer}</p>
+              <form id={`delete-help-${turn.id}`} action={deleteHelpQuestion}>
+                <input type="hidden" name="id" value={turn.id} />
+              </form>
+              <ConfirmSubmitButton
+                form={`delete-help-${turn.id}`}
+                className={`${btnOutline} mt-3`}
+                message="Delete this help question? This cannot be undone."
+              >
+                Delete question
+              </ConfirmSubmitButton>
             </li>
           ))}
         </ul>

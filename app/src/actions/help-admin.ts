@@ -43,3 +43,11 @@ export async function createHelpArticle(formData: FormData) {
   revalidatePath("/admin/help/faq");
   redirect("/admin/help/faq?notice=Added");
 }
+
+export async function deleteHelpQuestion(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  if (id) await prisma.helpTurn.deleteMany({ where: { id } });
+  revalidatePath("/admin/help");
+  redirect("/admin/help?notice=Question+deleted");
+}
