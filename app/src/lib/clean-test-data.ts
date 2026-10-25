@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isDemoRecord } from "@/lib/person-standing";
 import { SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES } from "@/lib/seed-coherence";
 
 /** Seeded member ids. Administrator password hashes are never written by this cleanup. */
@@ -32,6 +33,8 @@ export const DEMO_INVITE_CODE = "PF-7K2M-91QX";
 export const DEMO_INVITE_MAX_USES = 40;
 export const KEEP_APPLICATION_STATUS_TOKEN = "demo-jordan-ellis-status";
 export const KEEP_INVITE_REQUEST_STATUS_TOKEN = "demo-chris-invite-status";
+/** Production administrator. Seed ids stay too. This address is kept even if the admin flag was missed. */
+export const KEEP_ADMIN_EMAIL = "rich@privatefloorclub.com";
 
 export const CLEAN_TEST_DATA_IGNORED = "CLEAN_TEST_DATA is not 1 or dry. Cleanup skipped.";
 
@@ -85,8 +88,17 @@ export const CLEAN_TABLES = [
 export type CleanTable = (typeof CLEAN_TABLES)[number];
 export type IdTable = Exclude<CleanTable, "like">;
 
+export type CleanUser = { id: string; email?: string; isAdmin?: boolean; isTest?: boolean };
+
+/** Seeded demo members, every administrator, and the production owner address stay. Testing accounts do not. */
+export function keptUser(user: CleanUser): boolean {
+  if (SEED_USERS.has(user.id)) return true;
+  if (user.isAdmin) return true;
+  return (user.email || "").trim().toLowerCase() === KEEP_ADMIN_EMAIL;
+}
+
 export type CleanSnapshot = {
-  users: { id: string }[];
+  users: CleanUser[];
   applications: { id: string; statusToken: string; inviteCodeId: string }[];
   applicationDecisions: { id: string; applicationId: string }[];
   inviteRequests: { id: string; statusToken: string }[];
@@ -150,17 +162,11 @@ function keptCase(row: { userId: string | null; projectId: string | null }): boo
   return false;
 }
 
-/** Decides which rows are testing data. Seeded members, projects, deals, the demo application, and the demo invite stay. */
+/** Decides which rows are testing data. Seeded members, administrators, projects, deals, and the demo invite stay. Applications and invite requests are cleared so those lists start empty. */
 export function planCleanTestData(snapshot: CleanSnapshot): CleanPlan {
-  const applicationIds = rowIds(
-    snapshot.applications.filter((row) => row.statusToken !== KEEP_APPLICATION_STATUS_TOKEN),
-  );
+  const applicationIds = rowIds(snapshot.applications);
   const deletedApplications = new Set(applicationIds);
-  const keptApplicationInviteIds = new Set(
-    snapshot.applications
-      .filter((row) => row.statusToken === KEEP_APPLICATION_STATUS_TOKEN)
-      .map((row) => row.inviteCodeId),
-  );
+  const keptApplicationInviteIds = new Set<string>();
 
   const inviteCodeIds = rowIds(
     snapshot.inviteCodes.filter((row) => row.code !== DEMO_INVITE_CODE && !keptApplicationInviteIds.has(row.id)),
@@ -170,7 +176,7 @@ export function planCleanTestData(snapshot: CleanSnapshot): CleanPlan {
     demoInvite && (demoInvite.uses !== 0 || demoInvite.maxUses !== DEMO_INVITE_MAX_USES),
   );
 
-  const userIds = rowIds(snapshot.users.filter((row) => !SEED_USERS.has(row.id)));
+  const userIds = rowIds(snapshot.users.filter((row) => !keptUser(row)));
   const projectIds = rowIds(snapshot.trackProjects.filter((row) => !SEED_PROJECTS.has(row.id)));
   const dealIds = rowIds(
     snapshot.deals.filter((row) => !SEED_DEALS.has(row.id) || !SEED_USERS.has(row.sponsorId)),
@@ -259,9 +265,7 @@ export function planCleanTestData(snapshot: CleanSnapshot): CleanPlan {
       snapshot.applicationDecisions.filter((row) => deletedApplications.has(row.applicationId)),
     ),
     application: applicationIds,
-    invite_request: rowIds(
-      snapshot.inviteRequests.filter((row) => row.statusToken !== KEEP_INVITE_REQUEST_STATUS_TOKEN),
-    ),
+    invite_request: rowIds(snapshot.inviteRequests),
     invite_code: inviteCodeIds,
     verification_check: rowIds(snapshot.verificationChecks.filter((row) => deletedCases.has(row.caseId))),
     verification_event: rowIds(snapshot.verificationEvents.filter((row) => deletedCases.has(row.caseId))),
@@ -282,8 +286,7 @@ export function planCleanTestData(snapshot: CleanSnapshot): CleanPlan {
   return { counts, ids, likes, inviteDemoReset };
 }
 
-/** One log line of table names and counts. Keys that are not plain table names are rejected so row text cannot leak. */
-export function formatCleanCounts(mode: "dry" | "delete", counts: Record<string, number>): string {
+function formatCountLine(prefix: string, counts: Record<string, number>): string {
   const parts: string[] = [];
   for (const key of Object.keys(counts).sort()) {
     if (!/^[a-z0-9_]+$/.test(key)) throw new Error("Cleanup log key was rejected");
@@ -291,7 +294,46 @@ export function formatCleanCounts(mode: "dry" | "delete", counts: Record<string,
     if (!Number.isInteger(value) || value < 0) throw new Error("Cleanup log count was rejected");
     parts.push(`${key}=${value}`);
   }
-  return `CLEAN_TEST_DATA mode=${mode} ${parts.join(" ")}`;
+  return `${prefix} ${parts.join(" ")}`;
+}
+
+/** One log line of table names and counts. Keys that are not plain table names are rejected so row text cannot leak. */
+export function formatCleanCounts(mode: "dry" | "delete", counts: Record<string, number>): string {
+  return formatCountLine(`CLEAN_TEST_DATA mode=${mode}`, counts);
+}
+
+/** Totals only. Names and email addresses are not included. */
+export function censusClean(snapshot: CleanSnapshot): Record<string, number> {
+  let admin = 0;
+  let demo = 0;
+  let other = 0;
+  for (const user of snapshot.users) {
+    const email = (user.email || "").trim().toLowerCase();
+    const adminAccount = Boolean(user.isAdmin) || email === KEEP_ADMIN_EMAIL;
+    const demoAccount = SEED_USERS.has(user.id) || isDemoRecord({ isTest: user.isTest, email: user.email });
+    if (adminAccount) admin += 1;
+    if (demoAccount) demo += 1;
+    if (!keptUser(user)) other += 1;
+  }
+  return {
+    application: snapshot.applications.length,
+    invite_request: snapshot.inviteRequests.length,
+    outbox_notice: snapshot.outboxNotices.length,
+    crm_person: snapshot.crmPeople.length,
+    user: snapshot.users.length,
+    admin,
+    demo,
+    other,
+  };
+}
+
+export function formatCleanCensus(label: "before" | "after", counts: Record<string, number>): string {
+  return formatCountLine(`CLEAN_TEST_DATA ${label}`, counts);
+}
+
+function sessionResetFlag(): 0 | 1 {
+  const cutoff = Number(process.env.SESSION_ISSUED_AFTER);
+  return Number.isFinite(cutoff) && cutoff > 0 ? 1 : 0;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -474,7 +516,7 @@ export async function loadCleanSnapshot(db: PrismaClient = prisma): Promise<Clea
     blocks,
     moderationEvents,
   ] = await Promise.all([
-    db.user.findMany({ select: { id: true } }),
+    db.user.findMany({ select: { id: true, email: true, isAdmin: true, isTest: true } }),
     db.application.findMany({ select: { id: true, statusToken: true, inviteCodeId: true } }),
     db.applicationDecision.findMany({ select: { id: true, applicationId: true } }),
     db.inviteRequest.findMany({ select: { id: true, statusToken: true } }),
@@ -593,9 +635,48 @@ export async function cleanTestDataFromEnv(options?: {
     (options?.warn ?? console.warn)(CLEAN_TEST_DATA_IGNORED);
     return "invalid";
   }
-  const snapshot = await (options?.load ?? (() => loadCleanSnapshot()))();
+  const load = options?.load ?? (() => loadCleanSnapshot());
+  const snapshot = await load();
   const plan = planCleanTestData(snapshot);
-  (options?.log ?? console.log)(formatCleanCounts(mode, plan.counts));
-  if (mode === "delete") await (options?.apply ?? ((next: CleanPlan) => applyCleanPlan(next)))(plan);
+  const log = options?.log ?? console.log;
+  log(formatCleanCensus("before", censusClean(snapshot)));
+  log(formatCleanCounts(mode, { ...plan.counts, session_reset: sessionResetFlag() }));
+  if (mode === "delete") {
+    await (options?.apply ?? ((next: CleanPlan) => applyCleanPlan(next)))(plan);
+    if (!options?.apply && !options?.load) {
+      try {
+        await rebuildPeopleFromKeptUsers();
+      } catch {
+        console.error("Could not rebuild people after cleanup");
+      }
+      log(formatCleanCensus("after", censusClean(await loadCleanSnapshot())));
+    }
+  }
   return mode;
+}
+
+/** People is wiped with the test rows. Put back one row per account that stayed, with no application attached. */
+async function rebuildPeopleFromKeptUsers(db: PrismaClient = prisma): Promise<void> {
+  const users = await db.user.findMany({
+    select: { id: true, email: true, name: true, role: true, org: true, location: true, status: true, paymentStatus: true },
+  });
+  for (const user of users) {
+    const paymentDue = user.paymentStatus === "DUE" || user.paymentStatus === "PAST_DUE" || user.paymentStatus === "FAILED";
+    const stage = user.status === "ACTIVE" ? (paymentDue ? "APPROVED" : "ACTIVE") : "DECLINED";
+    const data = {
+      name: user.name,
+      role: user.role,
+      org: user.org,
+      location: user.location,
+      stage,
+      userId: user.id,
+      applicationId: null,
+      inviteRequestId: null,
+    } as const;
+    await db.crmPerson.upsert({
+      where: { email: user.email },
+      create: { email: user.email, ...data },
+      update: data,
+    });
+  }
 }

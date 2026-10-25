@@ -6,15 +6,19 @@ import {
   CLEAN_TEST_DATA_IGNORED,
   DEMO_INVITE_CODE,
   DEMO_INVITE_MAX_USES,
+  KEEP_ADMIN_EMAIL,
   KEEP_APPLICATION_STATUS_TOKEN,
   KEEP_INVITE_REQUEST_STATUS_TOKEN,
   SEED_CONFIRMATION_TOKENS,
   SEED_DEAL_IDS,
   SEED_PROJECT_IDS,
   SEED_USER_IDS,
+  censusClean,
   cleanTestDataFromEnv,
   cleanTestDataMode,
+  formatCleanCensus,
   formatCleanCounts,
+  keptUser,
   planCleanTestData,
   type CleanPlan,
   type CleanSnapshot,
@@ -65,7 +69,13 @@ function emptySnapshot(): CleanSnapshot {
 
 function testingSnapshot(): CleanSnapshot {
   const snapshot = emptySnapshot();
-  snapshot.users.push({ id: "user_mh" }, { id: "user_pa" }, { id: "user_test" }, { id: "user_extra_admin" });
+  snapshot.users.push(
+    { id: "user_mh", email: "marcus.hale@halerow.example", isAdmin: true },
+    { id: "user_pa", email: "priya.anand@anandstorage.example" },
+    { id: "user_test", email: "rich@buildpro-cs.com" },
+    { id: "user_extra_admin" },
+    { id: "user_owner", email: "rich@privatefloorclub.com", isAdmin: true },
+  );
   snapshot.applications.push(
     { id: "app_jordan", statusToken: KEEP_APPLICATION_STATUS_TOKEN, inviteCodeId: "invite_founding" },
     { id: "app_tester", statusToken: "tester-token", inviteCodeId: "invite_other" },
@@ -225,9 +235,10 @@ describe("CLEAN_TEST_DATA", () => {
   it("keeps the seeded demo and counts every testing row", () => {
     const plan = planCleanTestData(testingSnapshot());
     expect(plan.ids.user).toEqual(["user_test", "user_extra_admin"]);
-    expect(plan.ids.application).toEqual(["app_tester"]);
-    expect(plan.ids.application_decision).toEqual(["decision_tester"]);
-    expect(plan.ids.invite_request).toEqual(["request_tester"]);
+    expect(plan.ids.user).not.toContain("user_owner");
+    expect(plan.ids.application).toEqual(["app_jordan", "app_tester"]);
+    expect(plan.ids.application_decision).toEqual(["decision_tester", "decision_jordan"]);
+    expect(plan.ids.invite_request).toEqual(["request_chris", "request_tester"]);
     expect(plan.ids.invite_code).toEqual(["invite_hale", "invite_other"]);
     expect(plan.inviteDemoReset).toBe(true);
     expect(plan.ids.verification_run).toEqual(["run_jordan", "run_company"]);
@@ -255,8 +266,8 @@ describe("CLEAN_TEST_DATA", () => {
     expect(plan.ids.notification).toEqual(["note_tester"]);
     expect(plan.ids.saved_filter).toEqual(["filter_tester"]);
     expect(plan.ids.payment_event).toEqual(["pay_tester", "pay_orphan"]);
-    expect(plan.ids.business_card).toEqual(["card_tester"]);
-    expect(plan.ids.legal_acceptance).toEqual(["legal_tester"]);
+    expect(plan.ids.business_card).toEqual(["card_jordan", "card_tester"]);
+    expect(plan.ids.legal_acceptance).toEqual(["legal_jordan", "legal_tester"]);
     expect(plan.ids.email_challenge).toEqual(["challenge_1"]);
     expect(plan.ids.crm_person).toEqual(["crm_1", "crm_2"]);
     expect(plan.ids.crm_note).toEqual(["crm_note_1"]);
@@ -266,23 +277,25 @@ describe("CLEAN_TEST_DATA", () => {
     expect(plan.ids.report).toEqual(["report_tester"]);
     expect(plan.ids.block).toEqual(["block_tester"]);
     expect(plan.ids.moderation_event).toEqual(["audit_1"]);
-    expect(plan.counts.application).toBe(1);
+    expect(plan.counts.application).toBe(2);
     expect(plan.counts.help_turn).toBe(2);
     expect(plan.counts.invite_demo_reset).toBe(1);
     expect(plan.counts.user).toBe(2);
-    for (const id of [...plan.ids.user, ...plan.ids.track_project, ...plan.ids.deal, ...plan.ids.application]) {
+    expect(plan.counts.invite_request).toBe(2);
+    for (const id of [...plan.ids.user, ...plan.ids.track_project, ...plan.ids.deal]) {
       expect(SEED_USER_IDS).not.toContain(id);
       expect(SEED_PROJECT_IDS).not.toContain(id);
       expect(SEED_DEAL_IDS).not.toContain(id);
-      expect(id).not.toBe("app_jordan");
     }
+    expect(plan.ids.application).toContain("app_jordan");
   });
 
-  it("leaves a code in place when the seeded application still points at it", () => {
+  it("removes every invite code except the demo code, including one an application used", () => {
     const snapshot = testingSnapshot();
     snapshot.applications[0].inviteCodeId = "invite_hale";
     const plan = planCleanTestData(snapshot);
-    expect(plan.ids.invite_code).toEqual(["invite_other"]);
+    expect(plan.ids.application).toContain("app_jordan");
+    expect(plan.ids.invite_code).toEqual(["invite_hale", "invite_other"]);
     expect(plan.ids.invite_code).not.toContain("invite_founding");
   });
 
@@ -308,7 +321,7 @@ describe("CLEAN_TEST_DATA", () => {
     const plan = planCleanTestData(testingSnapshot());
     const line = formatCleanCounts("dry", plan.counts);
     expect(line.startsWith("CLEAN_TEST_DATA mode=dry ")).toBe(true);
-    expect(line).toContain("application=1");
+    expect(line).toContain("application=2");
     expect(line).toContain("help_turn=2");
     expect(line).toContain("invite_demo_reset=1");
     expect(line).not.toMatch(/@|jordan|PF-|password|tester-token|Marcus|hale/i);
@@ -330,9 +343,11 @@ describe("CLEAN_TEST_DATA", () => {
     });
     expect(dry).toBe("dry");
     expect(applied).toEqual([]);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("mode=dry");
-    expect(lines[0]).not.toContain("user_test");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("CLEAN_TEST_DATA before");
+    expect(lines[0]).not.toMatch(/@/);
+    expect(lines[1]).toContain("mode=dry");
+    expect(lines[1]).not.toContain("user_test");
 
     const deleted = await cleanTestDataFromEnv({
       raw: "1",
@@ -345,8 +360,9 @@ describe("CLEAN_TEST_DATA", () => {
     expect(deleted).toBe("delete");
     expect(applied).toHaveLength(1);
     expect(applied[0].ids.user).not.toContain("user_mh");
-    expect(applied[0].ids.application).not.toContain("app_jordan");
-    expect(lines[1]).toContain("mode=delete");
+    expect(applied[0].ids.user).not.toContain("user_owner");
+    expect(applied[0].ids.application).toContain("app_jordan");
+    expect(lines[3]).toContain("mode=delete");
     expect(JSON.stringify(applied[0])).not.toMatch(/password|@/);
   });
 
@@ -401,5 +417,29 @@ describe("CLEAN_TEST_DATA", () => {
     const implementation = readFileSync(resolve(__dirname, "../src/lib/clean-test-data.ts"), "utf8");
     expect(implementation).not.toContain("passwordHash");
     expect(implementation).not.toContain("ADMIN_PASSWORD");
+  });
+
+  it("keeps the production administrator and drops the sample retest address", () => {
+    const owner = { id: "user_owner", email: KEEP_ADMIN_EMAIL, isAdmin: true };
+    const sample = { id: "user_sample", email: "rich@buildpro-cs.com", isTest: false };
+    expect(keptUser(owner)).toBe(true);
+    expect(keptUser({ id: "user_flag_only", isAdmin: true })).toBe(true);
+    expect(keptUser(sample)).toBe(false);
+    expect(keptUser({ id: "user_mh" })).toBe(true);
+    const snapshot = emptySnapshot();
+    snapshot.users.push(owner, sample, { id: "user_mh", email: "marcus.hale@halerow.example", isTest: false });
+    snapshot.applications.push({ id: "app_sample", statusToken: "sample", inviteCodeId: "invite_founding" });
+    snapshot.inviteRequests.push({ id: "request_sample", statusToken: "sample-request" });
+    snapshot.outboxNotices.push({ id: "outbox_sample" });
+    const census = censusClean(snapshot);
+    expect(census.application).toBe(1);
+    expect(census.other).toBe(1);
+    expect(census.admin).toBe(1);
+    expect(census.demo).toBe(1);
+    const line = formatCleanCensus("before", census);
+    expect(line.startsWith("CLEAN_TEST_DATA before ")).toBe(true);
+    expect(line).not.toMatch(/@|buildpro|privatefloor/i);
+    expect(planCleanTestData(snapshot).ids.user).toEqual(["user_sample"]);
+    expect(planCleanTestData(snapshot).ids.application).toEqual(["app_sample"]);
   });
 });

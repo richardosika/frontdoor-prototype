@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { addComment, closePost, markChecklist, toggleLike, updatePost } from "@/actions/feed";
 import { reportPost } from "@/actions/social";
+import { JoinEntryBanner } from "@/components/already-signed-in";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { KindTag, TierBadge } from "@/components/badge";
@@ -149,6 +150,7 @@ export default async function FeedPage({
   return (
     <div className="mx-auto grid max-w-[1180px] gap-6 px-4 pb-6 pt-3 md:pt-6 lg:grid-cols-[minmax(0,760px)_320px] lg:px-8">
       <section>
+        <JoinEntryBanner name={user.name} />
         <PageHeader title="The Ledger" ledger />
         <Banner error={error} notice={notice} />
         <div className="flex gap-5 overflow-x-auto border-b border-line font-serif text-[15px] text-mut">

@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { sessionIssuedAtAccepted } from "@/lib/session-gate";
 
 export const authConfig = {
   trustHost: true,
@@ -7,6 +8,7 @@ export const authConfig = {
   providers: [],
   callbacks: {
     jwt({ token, user }) {
+      if (!sessionIssuedAtAccepted(token.iat, process.env.SESSION_ISSUED_AFTER, Boolean(user))) return null;
       if (user) {
         token.id = user.id;
         token.isAdmin = Boolean((user as { isAdmin?: boolean }).isAdmin);
