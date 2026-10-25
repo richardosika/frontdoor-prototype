@@ -1,4 +1,5 @@
-export const DEFAULT_EMAIL_FROM = "Private Floor Club <rich@privatefloorclub.com>";
+export const DEFAULT_EMAIL_FROM = "Private Floor Club <onboarding@resend.dev>";
+export const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 
 const STATUS_URL = /https?:\/\/[^\s<>"']+\/(?:invite-status|apply\/status)\/[^\s<>"']+/gi;
 
@@ -10,8 +11,12 @@ export type TestMail = {
   html?: string;
 };
 
-export type MailTransport = {
-  sendMail: (message: TestMail) => Promise<unknown>;
+export type ResendPayload = {
+  from: string;
+  to: string[];
+  subject: string;
+  text: string;
+  html?: string;
 };
 
 export function emailFromAddress(env: { EMAIL_FROM?: string } = process.env as { EMAIL_FROM?: string }): string {
@@ -19,8 +24,8 @@ export function emailFromAddress(env: { EMAIL_FROM?: string } = process.env as {
   return value || DEFAULT_EMAIL_FROM;
 }
 
-export function smtpUrlConfigured(env: { SMTP_URL?: string } = process.env as { SMTP_URL?: string }): boolean {
-  return (env.SMTP_URL ?? "").trim().length > 0;
+export function resendKeyConfigured(env: { RESEND_API_KEY?: string } = process.env as { RESEND_API_KEY?: string }): boolean {
+  return (env.RESEND_API_KEY ?? "").trim().length > 0;
 }
 
 function headerValue(value: string): string {
@@ -81,33 +86,64 @@ export function buildTestMail(input: { intendedTo: string; subject: string; text
   };
 }
 
-export function safeMailError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : "SMTP send failed.";
-  const cleaned = raw
-    .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s/]*@/gi, "")
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}:[^\s]+/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return (cleaned || "SMTP send failed.").slice(0, 300);
+export function resendPayload(message: TestMail): ResendPayload {
+  return {
+    from: message.from,
+    to: [message.to],
+    subject: message.subject,
+    text: message.text,
+    ...(message.html ? { html: message.html } : {}),
+  };
 }
 
-export async function deliverTestMail(
-  message: TestMail,
-  transport: MailTransport,
-  allowedTo: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (message.to.trim().toLowerCase() !== allowedTo.trim().toLowerCase()) {
+export function safeMailError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "Resend send failed.";
+  const cleaned = raw
+    .replace(/bearer\s+\S+/gi, "Bearer")
+    .replace(/\bre_[A-Za-z0-9_]+/g, "re_")
+    .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s/]*@/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (cleaned || "Resend send failed.").slice(0, 300);
+}
+
+function resendFailureText(status: number, detail: string): string {
+  try {
+    const parsed = JSON.parse(detail) as { message?: unknown };
+    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message.trim();
+  } catch {
+    // A non-JSON body is summarized below.
+  }
+  const compact = detail.replace(/\s+/g, " ").trim();
+  return compact ? `Resend returned ${status}: ${compact}` : `Resend returned ${status}.`;
+}
+
+export async function deliverResendMail(input: {
+  message: TestMail;
+  apiKey: string;
+  allowedTo: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const allowed = input.allowedTo.trim().toLowerCase();
+  const payload = resendPayload(input.message);
+  if (payload.to.length !== 1 || payload.to[0]?.trim().toLowerCase() !== allowed) {
     return { ok: false, error: "Refusing to email anyone except the test recipient." };
   }
+  const fetchImpl = input.fetchImpl ?? fetch;
   try {
-    await transport.sendMail(message);
-    return { ok: true };
+    const response = await fetchImpl(RESEND_EMAILS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (response.ok) return { ok: true };
+    const detail = await response.text();
+    return { ok: false, error: safeMailError(new Error(resendFailureText(response.status, detail))) };
   } catch (error) {
     return { ok: false, error: safeMailError(error) };
   }
-}
-
-export async function createSmtpTransport(url: string): Promise<MailTransport> {
-  const nodemailer = await import("nodemailer");
-  return nodemailer.createTransport(url);
 }

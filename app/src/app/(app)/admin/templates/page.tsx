@@ -31,7 +31,7 @@ export default async function TemplatesPage({
           <Banner error={params.error} notice={params.notice} />
         </div>
         <p className="mt-3 text-sm text-ink">
-          Every send on this build is stored in the Outbox. When SMTP_URL is set, a copy is emailed only to {noticeTestRecipient()}. Applicants are not emailed.
+          Every send on this build is stored in the Outbox. When RESEND_API_KEY is set, a copy is emailed only to {noticeTestRecipient()}. Applicants are not emailed.
         </p>
         <form action={setDeliveryMode} className={`${card} mt-4 flex flex-wrap items-end gap-3 p-4`}>
           <label className="text-sm">

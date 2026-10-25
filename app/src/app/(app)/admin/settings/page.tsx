@@ -5,7 +5,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, card, sectionLabel } from "@/components/ui";
 import { duesSchedule } from "@/lib/admin-home";
 import { noticeTestRecipient } from "@/lib/brand";
-import { smtpUrlConfigured } from "@/lib/smtp-mail";
+import { resendKeyConfigured } from "@/lib/resend-mail";
 import { requireAdmin } from "@/lib/current-user";
 import { mailDeliveryMode } from "@/lib/mail";
 
@@ -21,7 +21,7 @@ export default async function AdminSettingsPage({
   const mode = await mailDeliveryMode();
   const recipient = noticeTestRecipient();
   const live = mode === "live";
-  const smtp = smtpUrlConfigured();
+  const resend = resendKeyConfigured();
   const dues = duesSchedule();
 
   return (
@@ -36,11 +36,11 @@ export default async function AdminSettingsPage({
           <h2 className={sectionLabel}>Notice delivery</h2>
           <p className="mt-3 font-serif text-3xl font-normal">{live ? "Live" : "Test"}</p>
           <p className="mt-2 text-sm text-ink">
-            {smtp
-              ? `SMTP is configured. Every notice is stored in the Outbox and also emailed only to ${recipient}. Applicants are not emailed.`
+            {resend
+              ? `Resend is configured. Every notice is stored in the Outbox and also emailed only to ${recipient}. Applicants are not emailed.`
               : live
-                ? `Live is saved on this page. SMTP_URL is not set, so nobody is emailed. Every notice stays in the Outbox for ${recipient}.`
-                : `Test mode. Every notice is stored in the Outbox for ${recipient}. Set SMTP_URL to also email that inbox. Applicants are not emailed.`}
+                ? `Live is saved on this page. RESEND_API_KEY is not set, so nobody is emailed. Every notice stays in the Outbox for ${recipient}.`
+                : `Test mode. Every notice is stored in the Outbox for ${recipient}. Set RESEND_API_KEY to also email that inbox. Applicants are not emailed.`}
           </p>
           <p className="mt-3 text-sm text-ink">
             Test recipient <b>{recipient}</b>. This is <span className="font-mono text-xs">NOTICE_TEST_RECIPIENT</span>. It is read here and changed in the service environment.
@@ -60,7 +60,7 @@ export default async function AdminSettingsPage({
                 <input type="radio" name="delivery" value="live" defaultChecked={live} className="mt-1" />
                 <span>
                   <b className="block">Live</b>
-                  <span className="text-sm text-ink">Saved preference. SMTP still sends only to the test recipient.</span>
+                  <span className="text-sm text-ink">Saved preference. Resend still sends only to the test recipient.</span>
                 </span>
               </label>
             </fieldset>

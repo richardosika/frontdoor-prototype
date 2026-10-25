@@ -718,8 +718,8 @@ model OutboxNotice {
   templateKey      String       @default("")
   suppressed       Boolean      @default(false)
   suppressedReason String       @default("")
-  smtpStatus       String       @default("")
-  smtpError        String       @default("")
+  sendStatus       String       @default("")
+  sendError        String       @default("")
   createdAt        DateTime     @default(now())
 
   @@index([createdAt])

@@ -30,7 +30,7 @@ export function normalizeApplicationCode(raw: string): string {
   return raw.replace(/\D/g, "");
 }
 
-/** Exactly `1` keeps the code on screen after an email provider, including SMTP, is configured. */
+/** Exactly `1` keeps the code on screen after an email provider, including Resend, is configured. */
 export function showTestCodeRequested(env: { SHOW_TEST_CODE?: string } = process.env as { SHOW_TEST_CODE?: string }): boolean {
   return env.SHOW_TEST_CODE === "1";
 }

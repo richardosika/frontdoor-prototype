@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["tesseract.js", "nodemailer"],
+  serverExternalPackages: ["tesseract.js"],
   poweredByHeader: false,
   devIndicators: false,
   experimental: {

@@ -8,7 +8,7 @@ The product does not offer securities, take subscriptions, or process payments. 
 
 ## Stack
 
-Next.js (App Router, TypeScript), Tailwind CSS, PostgreSQL, Prisma, Auth.js email/password (JWT sessions). On this test, every notice is stored in the admin Outbox. When `SMTP_URL` is set, the same notice is emailed only to `NOTICE_TEST_RECIPIENT` (default `rich@privatefloorclub.com`). Applicants are not emailed. Signup, the verification recommendation, and the admin walkthrough are in `docs/TEST-GUIDE.md`. Scoring rules are in `docs/VERIFICATION.md`.
+Next.js (App Router, TypeScript), Tailwind CSS, PostgreSQL, Prisma, Auth.js email/password (JWT sessions). On this test, every notice is stored in the admin Outbox. When `RESEND_API_KEY` is set, the same notice is emailed only to `NOTICE_TEST_RECIPIENT` (default `rich@privatefloorclub.com`). Applicants are not emailed. Signup, the verification recommendation, and the admin walkthrough are in `docs/TEST-GUIDE.md`. Scoring rules are in `docs/VERIFICATION.md`.
 
 ## Local setup
 

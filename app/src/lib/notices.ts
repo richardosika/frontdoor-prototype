@@ -2,7 +2,7 @@ import { BRAND, noticeTestRecipient } from "@/lib/brand";
 import { recordCrmEvent } from "@/lib/crm";
 import { deliveryTarget } from "@/lib/email-templates";
 import { prisma } from "@/lib/prisma";
-import { buildTestMail, createSmtpTransport, deliverTestMail, emailFromAddress, safeMailError } from "@/lib/smtp-mail";
+import { buildTestMail, deliverResendMail, emailFromAddress, safeMailError } from "@/lib/resend-mail";
 
 export type NoticeInput = {
   intendedTo: string;
@@ -14,8 +14,8 @@ export type NoticeInput = {
 
 /**
  * Test outbox. Notices are stored for Richard and addressed only to NOTICE_TEST_RECIPIENT.
- * When SMTP_URL is set, the same notice is also emailed to that test inbox, never to the applicant.
- * A do-not-contact flag suppresses the send and keeps the reason. An SMTP failure is recorded and does not throw.
+ * When RESEND_API_KEY is set, the same notice is also emailed to that test inbox, never to the applicant.
+ * A do-not-contact flag suppresses the send and keeps the reason. A Resend failure is recorded and does not throw.
  */
 export async function sendNotice(input: NoticeInput): Promise<{ id: string; deliveredTo: string; suppressed?: boolean; reason?: string }> {
   const settings = await prisma.mailSettings.findUnique({ where: { id: "default" } });
@@ -48,7 +48,7 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
 
   const liveNote =
     mode === "live"
-      ? "Delivery mode is set to live. This notice is stored in the Outbox. SMTP, when configured, emails only the test recipient.\n\n"
+      ? "Delivery mode is set to live. This notice is stored in the Outbox. Resend, when configured, emails only the test recipient.\n\n"
       : "";
   const body = `${liveNote}Intended recipient: ${input.intendedTo}\n\n${input.text}`;
   console.log(`\n----- ${BRAND.name} outbox -----`);
@@ -73,7 +73,7 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
     summary: `${input.templateKey || "notice"} · ${input.subject}`,
     sourceKey: `outbox:${row.id}`,
   });
-  await sendStoredNoticeBySmtp(row.id, {
+  await sendStoredNotice(row.id, {
     intendedTo: input.intendedTo,
     subject: input.subject,
     text: body,
@@ -82,12 +82,12 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
   return { id: row.id, deliveredTo: target.to };
 }
 
-async function sendStoredNoticeBySmtp(
+async function sendStoredNotice(
   id: string,
   input: { intendedTo: string; subject: string; text: string; to: string },
 ): Promise<void> {
-  const url = process.env.SMTP_URL?.trim() ?? "";
-  if (!url) return;
+  const apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
+  if (!apiKey) return;
   const message = buildTestMail({
     intendedTo: input.intendedTo,
     subject: input.subject,
@@ -96,23 +96,22 @@ async function sendStoredNoticeBySmtp(
     from: emailFromAddress(),
   });
   try {
-    const transport = await createSmtpTransport(url);
-    const result = await deliverTestMail(message, transport, input.to);
+    const result = await deliverResendMail({ message, apiKey, allowedTo: input.to });
     if (result.ok) {
-      await prisma.outboxNotice.update({ where: { id }, data: { smtpStatus: "sent", smtpError: "" } });
+      await prisma.outboxNotice.update({ where: { id }, data: { sendStatus: "sent", sendError: "" } });
       return;
     }
-    console.error("SMTP notice failed");
+    console.error("Resend notice failed");
     console.error(result.error);
     await prisma.outboxNotice
-      .update({ where: { id }, data: { smtpStatus: "failed", smtpError: result.error } })
-      .catch(() => console.error("Could not record the SMTP error on the Outbox row"));
+      .update({ where: { id }, data: { sendStatus: "failed", sendError: result.error } })
+      .catch(() => console.error("Could not record the Resend error on the Outbox row"));
   } catch (error) {
-    const smtpError = safeMailError(error);
-    console.error("SMTP notice failed");
-    console.error(smtpError);
+    const sendError = safeMailError(error);
+    console.error("Resend notice failed");
+    console.error(sendError);
     await prisma.outboxNotice
-      .update({ where: { id }, data: { smtpStatus: "failed", smtpError } })
-      .catch(() => console.error("Could not record the SMTP error on the Outbox row"));
+      .update({ where: { id }, data: { sendStatus: "failed", sendError } })
+      .catch(() => console.error("Could not record the Resend error on the Outbox row"));
   }
 }
