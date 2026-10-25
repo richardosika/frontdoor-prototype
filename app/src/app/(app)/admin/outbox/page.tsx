@@ -16,7 +16,7 @@ export default async function OutboxPage() {
       <div className="mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Outbox" />
         <p className="mt-3 text-sm text-ink">
-          Every notice on this test is stored here and addressed only to {noticeTestRecipient()}. Applicants are not emailed.
+          Every notice on this test is stored here. When SMTP is configured, a copy is emailed only to {noticeTestRecipient()}. Applicants are not emailed. A failed send is marked on the notice.
         </p>
         {notices.length === 0 ? <p className="mt-6 text-sm text-mut">No notices yet.</p> : null}
         <ul className="mt-4 space-y-3">
@@ -30,6 +30,8 @@ export default async function OutboxPage() {
                 Intended: {notice.intendedTo} · Delivered only to: {notice.deliveredTo}
                 {notice.templateKey ? ` · ${notice.templateKey}` : ""}
                 {notice.suppressed ? ` · Not sent: ${notice.suppressedReason}` : ""}
+                {notice.smtpStatus === "sent" ? " · SMTP sent to the test recipient" : ""}
+                {notice.smtpStatus === "failed" ? ` · SMTP failed: ${notice.smtpError}` : ""}
               </p>
               <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{notice.body}</pre>
             </li>

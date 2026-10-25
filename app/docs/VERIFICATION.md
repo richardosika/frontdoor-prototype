@@ -83,4 +83,4 @@ Refresh the OFAC cache from **Admin → Verification settings**.
 
 ## Notices
 
-`NOTICE_TEST_RECIPIENT` defaults to `rich@privatefloorclub.com`. Every outbound notice is stored in the admin Outbox and is not sent to the applicant.
+`NOTICE_TEST_RECIPIENT` defaults to `rich@privatefloorclub.com`. Every outbound notice is stored in the admin Outbox. When `SMTP_URL` is set, that same notice is emailed only to the test recipient, not to the applicant.

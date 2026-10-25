@@ -8,7 +8,7 @@ export type EmailMessage = {
 
 /**
  * Every notice on this test build is logged and stored in the admin Outbox.
- * Delivery is limited to NOTICE_TEST_RECIPIENT. Applicants are never emailed.
+ * SMTP, when configured, delivers only to NOTICE_TEST_RECIPIENT. Applicants are never emailed.
  */
 export async function sendEmail(message: EmailMessage): Promise<{ delivered: "outbox"; id: string }> {
   const result = await sendNotice({

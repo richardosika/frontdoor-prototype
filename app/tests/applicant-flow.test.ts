@@ -5,6 +5,7 @@ import {
   newApplicationCode,
   normalizeApplicationCode,
   testModeCodeMessage,
+  showTestCodeRequested,
   verificationCodeForScreen,
 } from "@/lib/application-code";
 import { APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO } from "@/lib/applicant-copy";
@@ -80,9 +81,16 @@ describe("application email code", () => {
     expect(normalizeApplicationCode("12-34")).toBe("1234");
     expect(verificationCodeForScreen({ providerConfigured: false, code: "1234" })).toBe("1234");
     expect(verificationCodeForScreen({ providerConfigured: true, code: "1234" })).toBeNull();
+    expect(verificationCodeForScreen({ providerConfigured: true, showTestCode: true, code: "1234" })).toBe("1234");
+    expect(verificationCodeForScreen({ providerConfigured: true, showTestCode: false, code: "1234" })).toBeNull();
+    expect(showTestCodeRequested({})).toBe(false);
+    expect(showTestCodeRequested({ SHOW_TEST_CODE: "1" })).toBe(true);
+    expect(showTestCodeRequested({ SHOW_TEST_CODE: "true" })).toBe(false);
     expect(testModeCodeMessage("1234")).toContain("TEST MODE");
+    expect(testModeCodeMessage("1234")).toContain("No email provider is configured");
     expect(testModeCodeMessage("1234")).toContain("1234");
     expect(testModeCodeMessage("1234")).toContain("admin Outbox");
+    expect(testModeCodeMessage("1234", { providerConfigured: true })).toContain("SHOW_TEST_CODE is on");
     expect(emailProviderConfigured({})).toBe(false);
     expect(emailProviderConfigured({ EMAIL_PROVIDER: "resend" })).toBe(true);
     expect(emailProviderConfigured({ RESEND_API_KEY: " " })).toBe(false);

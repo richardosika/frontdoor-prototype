@@ -5,7 +5,6 @@ import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { testModeCodeMessage } from "@/lib/application-code";
 import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
 import { validateAddress, validatePersonName, validatePhone } from "@/lib/person-fields";
@@ -57,7 +56,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
-  const [testCode, setTestCode] = useState<string | null>(null);
+  const [testHint, setTestHint] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [org, setOrg] = useState("");
   const [street, setStreet] = useState("");
@@ -115,7 +114,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
       return;
     }
     setCodeSent(true);
-    setTestCode(result.testCode);
+    setTestHint(result.testHint);
     setVerifiedEmail("");
   }
 
@@ -316,7 +315,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                   setEmail(event.target.value);
                   setVerifiedEmail("");
                   setCodeSent(false);
-                  setTestCode(null);
+                  setTestHint(null);
                   setEmailCode("");
                 }}
               />
@@ -416,9 +415,9 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                   </button>
                   {codeSent ? (
                     <>
-                      {testCode ? (
+                      {testHint ? (
                         <p className="mt-3 rounded border border-brass bg-brass-soft p-3 text-sm text-ink" role="status">
-                          {testModeCodeMessage(testCode)}
+                          {testHint}
                         </p>
                       ) : null}
                       <label className={`${labelCls} mt-3`}>4-digit code</label>

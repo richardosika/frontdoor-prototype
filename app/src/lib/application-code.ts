@@ -30,12 +30,20 @@ export function normalizeApplicationCode(raw: string): string {
   return raw.replace(/\D/g, "");
 }
 
-/** The digits are returned to the browser only while no email provider is configured. */
-export function verificationCodeForScreen(input: { providerConfigured: boolean; code: string }): string | null {
-  if (input.providerConfigured) return null;
+/** Exactly `1` keeps the code on screen after an email provider, including SMTP, is configured. */
+export function showTestCodeRequested(env: { SHOW_TEST_CODE?: string } = process.env as { SHOW_TEST_CODE?: string }): boolean {
+  return env.SHOW_TEST_CODE === "1";
+}
+
+/** The digits stay off screen once a provider is configured, unless SHOW_TEST_CODE=1. */
+export function verificationCodeForScreen(input: { providerConfigured: boolean; showTestCode?: boolean; code: string }): string | null {
+  if (input.providerConfigured && !input.showTestCode) return null;
   return input.code;
 }
 
-export function testModeCodeMessage(code: string): string {
+export function testModeCodeMessage(code: string, options?: { providerConfigured?: boolean }): string {
+  if (options?.providerConfigured) {
+    return `TEST MODE. Your code is ${code}. A copy is in the admin Outbox. SHOW_TEST_CODE is on, so the code is also shown here.`;
+  }
   return `TEST MODE. No email provider is configured. Your code is ${code}. The same code is in the admin Outbox.`;
 }

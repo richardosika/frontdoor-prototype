@@ -18,6 +18,8 @@ import {
   emailProviderConfigured,
   newApplicationCode,
   normalizeApplicationCode,
+  showTestCodeRequested,
+  testModeCodeMessage,
   verificationCodeForScreen,
 } from "@/lib/application-code";
 import { CARD_MISSING_NOTE, CARD_UPLOADED_NOTE, safeCardFileName, validateBusinessCard } from "@/lib/business-card";
@@ -61,7 +63,7 @@ async function clientIpHash(): Promise<string> {
 
 export async function sendApplicationCode(
   emailRaw: string,
-): Promise<{ ok: true; testCode: string | null } | { ok: false; error: string }> {
+): Promise<{ ok: true; testCode: string | null; testHint: string | null } | { ok: false; error: string }> {
   const email = emailRaw.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email before requesting a code." };
   const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -87,7 +89,13 @@ export async function sendApplicationCode(
     await prisma.emailChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
     return { ok: false, error: "Could not record the code. Try again." };
   }
-  return { ok: true, testCode: verificationCodeForScreen({ providerConfigured: emailProviderConfigured(), code }) };
+  const providerConfigured = emailProviderConfigured();
+  const testCode = verificationCodeForScreen({
+    providerConfigured,
+    showTestCode: showTestCodeRequested(),
+    code,
+  });
+  return { ok: true, testCode, testHint: testCode ? testModeCodeMessage(code, { providerConfigured }) : null };
 }
 
 export async function confirmApplicationCode(
