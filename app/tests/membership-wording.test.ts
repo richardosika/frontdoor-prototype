@@ -28,4 +28,23 @@ describe("membership wording", () => {
     }
     expect(hits).toEqual([]);
   });
+
+  it("does not tell a member that a vouch changes them to Confirmed", () => {
+    const watched = [
+      "actions/profile.ts",
+      "actions/admin.ts",
+      "app/confirm/[token]/page.tsx",
+      "lib/verification-db.ts",
+      "app/(app)/admin/members/page.tsx",
+    ];
+    const banned = [/promoting to Confirmed/, /tier stays/, /tier can change/, /before the tier change/, /Tier unchanged/, /Invited or Confirmed/];
+    const hits: string[] = [];
+    for (const relative of watched) {
+      const text = readFileSync(path.join(ROOT, relative), "utf8");
+      for (const pattern of banned) {
+        if (pattern.test(text)) hits.push(`${relative}: ${pattern}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
 });

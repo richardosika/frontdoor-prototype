@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { removeMember, setMemberStatus } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
+import { DemoChip } from "@/components/status-chip";
 import { PaymentPanel } from "@/components/payment-admin";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
+import { isDemoRecord } from "@/lib/person-standing";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
@@ -40,7 +42,7 @@ export default async function AdminMemberPage({
           <div className="flex items-center gap-2">
             <TierBadge tier={member.tier} />
             {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
-            {member.isTest ? <span className="text-[10px] uppercase tracking-wider text-brass">Test</span> : null}
+            {isDemoRecord({ isTest: member.isTest, email: member.email }) ? <DemoChip /> : null}
           </div>
           <p>
             {roleLabel(member.role)} · {member.org} · {member.location}

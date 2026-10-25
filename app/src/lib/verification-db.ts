@@ -153,8 +153,8 @@ export async function reviewVouchOnChecklist(input: {
       fromStatus: record.status,
       toStatus: record.status,
       summary: input.accepted
-        ? `${input.adminName} reviewed the vouch evidence and accepted it before the tier change.`
-        : `${input.adminName} reviewed the vouch evidence and did not accept it. Tier unchanged.`,
+        ? `${input.adminName} reviewed the vouch evidence and accepted it. Membership stays Approved.`
+        : `${input.adminName} reviewed the vouch evidence and did not accept it. Membership is unchanged.`,
     },
   });
 }

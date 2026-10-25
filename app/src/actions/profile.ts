@@ -222,7 +222,7 @@ export async function respondConfirmation(formData: FormData) {
   if (decision === "CONFIRMED") {
     await notify(confirmation.project.userId, {
       title: "Vouch received",
-      body: `${confirmation.counterpartyName} confirmed ${confirmation.project.name}. Your tier stays ${confirmation.project.user.tier === "CONFIRMED" ? "Confirmed" : "unchanged"} until a Private Floor administrator reviews the vouch.`,
+      body: `${confirmation.counterpartyName} confirmed ${confirmation.project.name}. Membership stays Approved. A Private Floor administrator still reviews the vouch. Accepting it does not change membership.`,
       href: "/profile",
     });
     await notifyAdmins({

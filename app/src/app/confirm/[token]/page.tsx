@@ -37,12 +37,12 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         {confirmation.status !== "PENDING" ? (
           <p className="mt-4 rounded border border-brass bg-brass-soft px-3 py-2 text-sm">
             {confirmation.status === "DECLINED"
-              ? "Recorded as declined. Their tier is unchanged."
+              ? "Recorded as declined. Membership is unchanged."
               : confirmation.reviewStatus === "APPROVED"
-                ? "A Private Floor administrator accepted this vouch."
+                ? "A Private Floor administrator accepted this vouch. Membership stays Approved."
                 : confirmation.reviewStatus === "REJECTED"
-                  ? "A Private Floor administrator did not accept this vouch. Their tier is unchanged."
-                  : "Recorded as confirmed. A Private Floor administrator still reviews the vouch before the tier can change."}
+                  ? "A Private Floor administrator did not accept this vouch. Membership is unchanged."
+                  : "Recorded as confirmed. A Private Floor administrator still reviews the vouch. Accepting it does not change membership."}
             {confirmation.note ? ` Note: ${confirmation.note}` : ""}
           </p>
         ) : (

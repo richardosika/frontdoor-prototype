@@ -269,7 +269,7 @@ export async function setMemberTier(formData: FormData) {
       where: { reviewStatus: "APPROVED", project: { userId } },
     });
     if (!canPromoteTierFromVouch({ adminReviewed: approved > 0 })) {
-      redirect("/admin/members?error=Accept+a+counterparty+vouch+before+promoting+to+Confirmed");
+      redirect("/admin/members?error=Accept+a+counterparty+vouch+before+this+change");
     }
   }
   if (member.tier !== tier) {
@@ -278,8 +278,8 @@ export async function setMemberTier(formData: FormData) {
       data: { tier: tier as VerificationTier },
     });
     await notify(userId, {
-      title: "Membership tier updated",
-      body: `Your membership tier is now ${tierLabel(tier)}. The Verified badge is a separate verification file.`,
+      title: "Membership updated",
+      body: `Your membership is ${tierLabel(tier)}. The Verified badge is a separate verification file.`,
       href: "/profile",
     });
   }
@@ -287,7 +287,7 @@ export async function setMemberTier(formData: FormData) {
   revalidatePath(`/members/${userId}`);
   revalidatePath("/profile");
   revalidatePath("/alerts");
-  redirect("/admin/members?notice=Tier+updated");
+  redirect("/admin/members?notice=Membership+updated");
 }
 
 export async function reviewVouch(formData: FormData) {
