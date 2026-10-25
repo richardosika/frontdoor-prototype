@@ -12,9 +12,10 @@ import { PageHeader } from "@/components/page-header";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
+import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { matchAudience, marketToken, matchScore } from "@/lib/domain";
 import { plural, tierLabel, timeAgo } from "@/lib/format";
-import { readLegalMarkdown, stripVersionLine } from "@/lib/legal";
+import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 import { checklistProgress, intentsForRole, postIsPublic } from "@/lib/member-network";
 import { filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, settleProjectQuery, sortProjects, stageLabel } from "@/lib/project-filter";
@@ -59,7 +60,7 @@ export default async function FeedPage({
       },
     }),
     prisma.user.findMany({
-      where: { id: { not: user.id }, status: "ACTIVE" },
+      where: { id: { not: user.id }, status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] } },
       orderBy: { name: "asc" },
       take: 5,
     }),
@@ -69,6 +70,7 @@ export default async function FeedPage({
       where: {
         id: { not: user.id },
         status: "ACTIVE",
+        paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] },
         role: audience.role,
         ...(market ? { location: { contains: market } } : {}),
       },
@@ -214,7 +216,7 @@ export default async function FeedPage({
         <div className="mt-4">
           <Composer
             intents={intentsForRole(user.role).map((item) => ({ id: item.id, label: item.label, kind: item.kind }))}
-            rulesHtml={renderMarkdown(stripVersionLine(readLegalMarkdown("seeking-raising.md")))}
+            rulesHtml={renderMarkdown(memberFacingLegal(readLegalMarkdown("seeking-raising.md")))}
           />
         </div>
         <div className="mt-4 space-y-4">

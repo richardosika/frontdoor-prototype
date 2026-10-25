@@ -334,6 +334,67 @@ export function sanctionsCorroborated(facts: ApplicantFacts, entry: WatchlistEnt
   return new RegExp(`\\b(?:dob|born)\\b[^\\n]{0,40}\\b${year}\\b`, "i").test(`${facts.statement} ${facts.location}`);
 }
 
+const GENERIC_SITE_TOKENS = new Set([
+  "example",
+  "domain",
+  "test",
+  "holding",
+  "holdings",
+  "company",
+  "companies",
+  "group",
+  "partner",
+  "partners",
+  "llc",
+  "inc",
+  "incorporated",
+  "the",
+  "and",
+  "for",
+  "capital",
+  "realty",
+  "properties",
+  "property",
+  "limited",
+  "corp",
+  "corporation",
+  "club",
+  "private",
+  "floor",
+  "real",
+  "estate",
+  "development",
+  "developers",
+  "investments",
+  "investment",
+  "management",
+  "associates",
+  "advisory",
+  "advisors",
+  "builders",
+  "construction",
+]);
+
+function siteTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Shared by the application report and the company report. A short or generic fragment is not a match. */
+export function websiteNamesMatch(blob: string, personName: string, org: string): boolean {
+  const text = blob.toLowerCase();
+  const person = siteTokens(personName).filter((token) => token.length >= 3 && !GENERIC_SITE_TOKENS.has(token));
+  const personHit =
+    person.length >= 2
+      ? person.every((token) => text.includes(token))
+      : person.length === 1 && person[0].length >= 4 && text.includes(person[0]);
+  const orgHit = siteTokens(org).some((token) => token.length >= 6 && !GENERIC_SITE_TOKENS.has(token) && text.includes(token));
+  return personHit || orgHit;
+}
+
 export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
   const card = facts.cardText.trim();
   if (!card) {
@@ -617,23 +678,21 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const blob = `${home.text} ${about.text} ${team.text}`;
     const unreachable = home.status === 0 || home.status >= 500;
     const reachable = !unreachable && (home.ok || home.status > 0);
-    const first = ctx.facts.name.split(" ")[0]?.toLowerCase() || "";
-    const nameHit = first.length > 2 && blob.includes(first);
-    const orgHit = ctx.facts.org.length > 3 && blob.includes(ctx.facts.org.slice(0, 8).toLowerCase());
+    const matched = websiteNamesMatch(blob, ctx.facts.applicantName || ctx.facts.name, ctx.facts.org);
     out.push(
       check({
         key: "website",
-        status: unreachable ? "UNAVAILABLE" : nameHit || orgHit ? "PASS" : reachable ? "FAIL" : "INCONCLUSIVE",
+        status: unreachable ? "UNAVAILABLE" : matched ? "PASS" : reachable ? "FAIL" : "INCONCLUSIVE",
         weight: 14,
-        reviewFlag: reachable && !(nameHit || orgHit),
+        reviewFlag: reachable && !matched,
         finding: unreachable
           ? "The website timed out or did not respond. This source could not be checked."
-          : nameHit || orgHit
+          : matched
             ? "The site responded. Homepage, /about, or /team text includes the person or company name."
             : "The site responded, but the person and company names were not on the homepage, /about, or /team. No data found on those pages.",
         source: "Public website fetch",
         url: base,
-        corroborates: Boolean(nameHit || orgHit),
+        corroborates: matched,
       }),
     );
   } else {

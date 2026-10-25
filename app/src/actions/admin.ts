@@ -450,6 +450,48 @@ export async function resolveReport(formData: FormData) {
   redirect("/admin/moderation?notice=Report+closed");
 }
 
+export async function deleteInviteRequest(formData: FormData) {
+  const admin = await requireAdmin();
+  const requestId = String(formData.get("requestId") || "");
+  const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
+  if (!request) redirect("/admin?error=That+invite+request+was+not+found");
+  await prisma.crmPerson.updateMany({ where: { inviteRequestId: request.id }, data: { inviteRequestId: null } });
+  await prisma.inviteRequest.delete({ where: { id: request.id } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "DELETE_INVITE_REQUEST",
+      summary: `${admin.name} deleted the invite request for ${request.name} <${request.email}>.`,
+    },
+  });
+  revalidatePath("/admin");
+  redirect("/admin?notice=Invite+request+deleted");
+}
+
+export async function deleteInviteCode(formData: FormData) {
+  const admin = await requireAdmin();
+  const inviteId = String(formData.get("inviteId") || "");
+  const invite = await prisma.inviteCode.findUnique({
+    where: { id: inviteId },
+    include: { applications: { select: { id: true } } },
+  });
+  if (!invite) redirect("/admin?error=That+invite+code+was+not+found");
+  if (invite.applications.length) {
+    redirect("/admin?error=This+code+has+applications.+Delete+those+applicants+first.");
+  }
+  await prisma.inviteRequest.updateMany({ where: { inviteCodeId: invite.id }, data: { inviteCodeId: null } });
+  await prisma.inviteCode.delete({ where: { id: invite.id } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "DELETE_INVITE_CODE",
+      summary: `${admin.name} deleted invite code ${invite.code}.`,
+    },
+  });
+  revalidatePath("/admin");
+  redirect("/admin?notice=Invite+code+deleted");
+}
+
 export async function declineInviteRequest(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") || "");

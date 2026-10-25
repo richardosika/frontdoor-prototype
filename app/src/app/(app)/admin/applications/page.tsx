@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { deleteSelectedApplications } from "@/actions/owner";
+import { deleteSelectedApplications, rerunVerification } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { ConfirmSubmitButton } from "@/components/run-and-reload";
+import { ConfirmSubmitButton, RunAndReload } from "@/components/run-and-reload";
 import { VerdictChip } from "@/components/verdict-chip";
 import { btnOutline, card } from "@/components/ui";
 import {
@@ -12,7 +12,7 @@ import {
   matchesApplicationFilter,
 } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
-import { formatAuditTime } from "@/lib/format";
+import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { paymentStatusLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
@@ -78,7 +78,7 @@ export default async function ApplicationsPage({
           <ConfirmSubmitButton
             form="bulk-delete"
             className={btnOutline}
-            message="Delete the selected applicants and all of their data? This cannot be undone."
+            message="Delete the selected applicants? This removes each application, its verification runs, outbox notices, and business card, plus the linked member account and CRM person when they exist. This cannot be undone."
           >
             Delete selected
           </ConfirmSubmitButton>
@@ -88,7 +88,8 @@ export default async function ApplicationsPage({
           {rows.map((application) => (
             <li key={application.id} className="flex items-start gap-2">
               <input form="bulk-delete" className="mt-5 h-4 w-4 shrink-0" type="checkbox" name="applicationId" value={application.id} aria-label={`Select ${application.name}`} />
-              <Link href={`/admin/applications/${application.id}`} className={`${card} block min-w-0 flex-1 p-4`}>
+              <div className="min-w-0 flex-1">
+              <Link href={`/admin/applications/${application.id}`} className={`${card} block p-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <h2 className="font-serif text-xl font-normal">{application.name}</h2>
@@ -98,13 +99,24 @@ export default async function ApplicationsPage({
                     <p className="text-xs text-mut">
                       {formatAuditTime(application.createdAt)} · {applicationStatusLabel(application.status)}
                       {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
-                      {application.user?.renewalAt ? ` · renews ${application.user.renewalAt.toISOString().slice(0, 10)}` : ""}
+                      {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
                       {application.isTest ? " · TEST" : ""}
                     </p>
                   </div>
                   <VerdictChip verdict={application.runs[0]?.verdict} score={application.runs[0]?.score} />
                 </div>
               </Link>
+              {!application.runs[0] ? (
+                <div className="mt-2">
+                  <RunAndReload
+                    className={btnOutline}
+                    label="Run verification"
+                    pendingLabel="Running verification…"
+                    run={rerunVerification.bind(null, application.id)}
+                  />
+                </div>
+              ) : null}
+              </div>
             </li>
           ))}
         </ul>

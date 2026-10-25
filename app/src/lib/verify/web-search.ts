@@ -16,6 +16,18 @@ export function bingResultTexts(html: string): string[] {
   return blocks.map((match) => stripTags(match[0])).map((text) => text.trim()).filter((text) => text.length > 2);
 }
 
+export function wikipediaRestResultTexts(payload: string): string[] {
+  try {
+    const parsed = JSON.parse(payload) as { pages?: { title?: string; excerpt?: string; description?: string }[] };
+    if (!Array.isArray(parsed.pages)) return [];
+    return parsed.pages
+      .map((row) => stripTags(`${row.title || ""} ${row.description || ""} ${row.excerpt || ""}`).trim())
+      .filter((text) => text.length > 2);
+  } catch {
+    return [];
+  }
+}
+
 export function wikipediaResultTexts(payload: string): string[] {
   try {
     const parsed = JSON.parse(payload) as { query?: { search?: { title?: string; snippet?: string }[] } };
@@ -83,6 +95,13 @@ function stripTags(value: string): string {
     .trim();
 }
 
+/** Blocked or rate-limited responses are unavailable. An HTTP success with nothing parsed is no data. */
+export function providerAttemptState(status: number, snippetCount: number): "unavailable" | "no-data" | "ready" {
+  if (status === 0 || status === 401 || status === 403 || status === 429 || status >= 500) return "unavailable";
+  if (snippetCount === 0) return "no-data";
+  return "ready";
+}
+
 type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
 
 type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative"; sample: string };
@@ -98,8 +117,8 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
     },
     {
       provider: "Wikipedia",
-      url: `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=1&format=json&srlimit=8`,
-      parse: wikipediaResultTexts,
+      url: `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=8`,
+      parse: wikipediaRestResultTexts,
     },
     {
       provider: "Wikidata",
@@ -125,13 +144,16 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
     } catch {
       response = { ok: false, status: 0, text: "" };
     }
-    const snippets = response.ok ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query)) : [];
-    if (!response.ok || response.status === 0 || snippets.length === 0 && (response.status === 202 || response.status === 403 || response.status >= 500)) {
+    const snippets = response.status >= 200 && response.status < 300
+      ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query))
+      : [];
+    const state = providerAttemptState(response.status, snippets.length);
+    if (state === "unavailable") {
       attempts.push({ provider: provider.provider, state: "unavailable", sample: "" });
       continue;
     }
-    if (snippets.length === 0) {
-      attempts.push({ provider: provider.provider, state: "unavailable", sample: "" });
+    if (state === "no-data") {
+      attempts.push({ provider: provider.provider, state: "no-data", sample: "" });
       continue;
     }
     const negative = snippets.find(

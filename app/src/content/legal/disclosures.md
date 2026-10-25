@@ -61,7 +61,7 @@ Real estate investments and loans involve significant risk, including the possib
 
 ## Flat dues only
 
-Membership is free for developers, investors and LPs, family offices, and lenders. General contractors, brokers, and attorneys and advisors pay flat annual dues [amounts to be confirmed]. No dues are charged during our testing period. Dues pay for access to the Platform only and never depend on any deal or introduction.
+Membership is free for developers, investors and LPs, family offices, and lenders. General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year. Dues are paid after approval. Dues pay for access to the Platform only and never depend on any deal or introduction.
 
 ## Your responsibility
 

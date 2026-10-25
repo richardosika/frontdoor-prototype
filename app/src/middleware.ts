@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { moderationDenial } from "@/lib/messaging";
+import { loggedInPublicRedirect } from "@/lib/session-gate";
 import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
@@ -27,8 +28,9 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  if (loggedIn && (path === "/" || path === "/login")) {
-    return NextResponse.redirect(new URL("/feed", req.nextUrl));
+  const entry = loggedIn ? loggedInPublicRedirect(path) : null;
+  if (entry) {
+    return NextResponse.redirect(new URL(entry, req.nextUrl));
   }
 
   if (path.startsWith("/admin") && !req.auth?.user?.isAdmin) {

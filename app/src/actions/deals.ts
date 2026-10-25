@@ -138,10 +138,10 @@ async function settleAccess(input: {
     kind: "ACCESS",
     body: decisionBody,
   });
-  if (!sent.ok) {
+  if (input.decision === "APPROVED" || !sent.ok) {
     await notify(access.requesterId, {
       title: input.decision === "APPROVED" ? "Access approved" : "Access declined",
-      body: "You have a new message on Private Floor.",
+      body: input.decision === "APPROVED" ? `${input.actor.name} approved your request for "${access.deal.title}".` : "You have a new message on Private Floor.",
       href: input.decision === "APPROVED" ? `/deals/${access.dealId}/room` : `/deals/${access.dealId}`,
     });
   }

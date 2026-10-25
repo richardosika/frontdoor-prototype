@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { BRAND } from "@/lib/brand";
+import { memberFacingLegal } from "@/lib/legal";
 
 export type HelpChunk = {
   id: string;
@@ -66,6 +67,21 @@ export const DEFAULT_FAQ: FaqArticle[] = [
     title: "What Help will not answer",
     body: "Help answers from Private Floor's pages only. It does not give legal, tax, or investment advice. It does not reveal verification scores, sources, or internal notes. It does not promise an outcome. If a question is outside those pages, email connect@privatefloorclub.com.",
   },
+  {
+    slug: "gc-dues",
+    title: "What a general contractor pays for membership",
+    body: "General contractors pay $2,400 a year. Brokers pay $1,800 a year. Attorneys and advisors pay $1,200 a year. Developers, investors and limited partners, family offices, and lenders pay nothing. Dues are a flat membership fee, paid after a Private Floor administrator approves the application. They are never based on a deal.",
+  },
+  {
+    slug: "post-held",
+    title: "Why a post was held for review",
+    body: "A seeking or raising post is held when it includes offering terms, a target return, a guarantee, past performance, or a subscription. A Private Floor administrator reviews that hold. The hold is not legal advice and is not approval of an offering. Nothing on Private Floor is an offer to sell a security.",
+  },
+  {
+    slug: "request-introduction",
+    title: "How to request an introduction",
+    body: "Request an introduction from the directory. Write a short note. The other member accepts or declines inside Private Floor. Messaging opens after they accept. Other members never see your email, phone, or LinkedIn.",
+  },
 ];
 
 export function isRestrictedChunk(heading: string, body: string): boolean {
@@ -78,11 +94,11 @@ export function chunkMarkdown(source: string, markdown: string): HelpChunk[] {
   return parts
     .map((part, index) => {
       const heading = part.match(/^#{1,3}\s+(.+)/)?.[1]?.replace(/\*\*/g, "").trim() || source;
-      const body = part.replace(/^#{1,3}\s+.+\n+/, "").trim();
+      const body = memberFacingLegal(part.replace(/^#{1,3}\s+.+\n+/, "").trim() || part.trim());
       return {
         id: `${source}:${index}`,
         title: heading,
-        body: body || part.trim(),
+        body,
         source,
         kind: "doc" as const,
         restricted: isRestrictedChunk(heading, part),

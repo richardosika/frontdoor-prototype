@@ -7,7 +7,9 @@ import { redirect } from "next/navigation";
 import type { MemberRole } from "@prisma/client";
 import { requireAdmin } from "@/lib/current-user";
 import { initialsFromName, orderedPair } from "@/lib/domain";
+import { applicantRemovalList, cleanupWindowHours } from "@/lib/demo-cleanup";
 import { annualDuesCents } from "@/lib/dues";
+import { deleteMemberAccount } from "@/lib/remove-member";
 import { prisma } from "@/lib/prisma";
 import { acceptanceVersions } from "@/lib/legal";
 import { queueApplicationVerification } from "@/lib/verify/queue";
@@ -198,35 +200,6 @@ export async function createSampleApplicants() {
   redirect("/admin/test?notice=Six+labelled+TEST+applicants+are+in+the+queue");
 }
 
-async function removeMemberAccount(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, isAdmin: true } });
-  if (!user || user.isAdmin) return;
-  await prisma.application.updateMany({ where: { userId }, data: { userId: null } });
-  await prisma.application.updateMany({ where: { reviewerId: userId }, data: { reviewerId: null } });
-  await prisma.inviteCode.updateMany({ where: { createdById: userId }, data: { createdById: null } });
-  await prisma.verificationCheck.updateMany({ where: { reviewerId: userId }, data: { reviewerId: null } });
-  await prisma.verificationEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-  await prisma.applicationDecision.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-  await prisma.dealEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-  await prisma.moderationEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-  await prisma.businessCard.updateMany({ where: { userId }, data: { userId: null } });
-  await prisma.message.deleteMany({ where: { senderId: userId } });
-  await prisma.conversation.deleteMany({ where: { OR: [{ userAId: userId }, { userBId: userId }] } });
-  await prisma.connection.deleteMany({ where: { OR: [{ fromId: userId }, { toId: userId }] } });
-  await prisma.dealAccess.deleteMany({ where: { requesterId: userId } });
-  const deals = await prisma.deal.findMany({ where: { sponsorId: userId }, select: { id: true } });
-  if (deals.length) {
-    const dealIds = deals.map((deal) => deal.id);
-    await prisma.post.updateMany({ where: { dealId: { in: dealIds } }, data: { dealId: null } });
-    await prisma.deal.deleteMany({ where: { id: { in: dealIds } } });
-  }
-  const projects = await prisma.trackProject.findMany({ where: { userId }, select: { id: true } });
-  if (projects.length) {
-    await prisma.verificationRun.deleteMany({ where: { projectId: { in: projects.map((project) => project.id) } } });
-  }
-  await prisma.user.delete({ where: { id: userId } });
-}
-
 export async function deleteApplicantRecords(ids: string[], actorId: string): Promise<string> {
   const applications = await prisma.application.findMany({
     where: { id: { in: ids } },
@@ -256,11 +229,17 @@ export async function deleteApplicantRecords(ids: string[], actorId: string): Pr
       data: { uses: Math.max(0, invite.uses - count) },
     });
   }
-  for (const row of applications) {
-    if (row.userId) await removeMemberAccount(row.userId);
-  }
+  const userIds = applications.map((row) => row.userId).filter((id): id is string => Boolean(id));
+  const crmCount = await prisma.crmPerson.count({
+    where: { OR: [{ email: { in: emails } }, { applicationId: { in: foundIds } }, { userId: { in: userIds } }] },
+  });
+  for (const userId of userIds) await deleteMemberAccount(userId);
+  await prisma.crmPerson.deleteMany({
+    where: { OR: [{ email: { in: emails } }, { applicationId: { in: foundIds } }, { userId: { in: userIds } }] },
+  });
   await prisma.application.deleteMany({ where: { id: { in: foundIds } } });
-  return `Removed ${applications.length} applicant(s) and their data.`;
+  const removed = applicantRemovalList({ member: userIds.length > 0, crm: crmCount > 0 });
+  return `Removed ${applications.length} applicant(s): ${removed.join(", ")}.`;
 }
 
 export async function setMemberStatus(formData: FormData) {
@@ -294,7 +273,7 @@ export async function removeMember(formData: FormData) {
       summary: `${admin.name} removed ${member.name}.`,
     },
   });
-  await removeMemberAccount(userId);
+  await deleteMemberAccount(userId);
   revalidatePath("/admin/members");
   redirect("/admin/members?notice=Member+removed");
 }
@@ -642,11 +621,54 @@ export async function deleteTestData() {
   const applications = await prisma.application.findMany({ where: { isTest: true }, select: { id: true } });
   const notice = await deleteApplicantRecords(applications.map((row) => row.id), admin.id);
   const leftovers = await prisma.user.findMany({ where: { isTest: true, isAdmin: false }, select: { id: true } });
-  for (const user of leftovers) await removeMemberAccount(user.id);
+  for (const user of leftovers) await deleteMemberAccount(user.id);
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit");
   redirect(`/admin/test?notice=${encodeURIComponent(applications.length ? notice : "No test applicants to remove.")}`);
+}
+
+export async function deleteRecentRecords(formData: FormData) {
+  const admin = await requireAdmin();
+  const hours = cleanupWindowHours(String(formData.get("hours") || ""));
+  if (!hours) redirect("/admin/test?error=Choose+a+whole+number+of+hours+from+1+to+168");
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const applications = await prisma.application.findMany({ where: { createdAt: { gte: since } }, select: { id: true } });
+  const notice = applications.length ? await deleteApplicantRecords(applications.map((row) => row.id), admin.id) : "";
+  const members = await prisma.user.findMany({
+    where: { isAdmin: false, createdAt: { gte: since } },
+    select: { id: true },
+  });
+  for (const member of members) await deleteMemberAccount(member.id);
+  const people = await prisma.crmPerson.deleteMany({ where: { createdAt: { gte: since } } });
+  const requests = await prisma.inviteRequest.findMany({ where: { createdAt: { gte: since } }, select: { id: true } });
+  if (requests.length) {
+    await prisma.crmPerson.updateMany({
+      where: { inviteRequestId: { in: requests.map((row) => row.id) } },
+      data: { inviteRequestId: null },
+    });
+    await prisma.inviteRequest.deleteMany({ where: { id: { in: requests.map((row) => row.id) } } });
+  }
+  const codes = await prisma.inviteCode.findMany({
+    where: { createdAt: { gte: since }, applications: { none: {} } },
+    select: { id: true },
+  });
+  if (codes.length) {
+    await prisma.inviteRequest.updateMany({
+      where: { inviteCodeId: { in: codes.map((row) => row.id) } },
+      data: { inviteCodeId: null },
+    });
+    await prisma.inviteCode.deleteMany({ where: { id: { in: codes.map((row) => row.id) } } });
+  }
+  revalidatePath("/admin");
+  revalidatePath("/admin/test");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/crm");
+  redirect(
+    `/admin/test?notice=${encodeURIComponent(
+      `Deleted records from the last ${hours} hours: ${applications.length} application(s), ${members.length} member account(s), ${people.count} CRM people, ${requests.length} invite request(s), ${codes.length} unused invite code(s). Administrators were kept. ${notice}`.trim(),
+    )}`,
+  );
 }
 
 export async function deleteSelectedApplications(formData: FormData) {

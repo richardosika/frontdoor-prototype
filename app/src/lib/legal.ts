@@ -47,6 +47,68 @@ export function stripVersionLine(markdown: string): string {
   return markdown.replace(/^\uFEFF?Version:[^\n]*\n+/, "");
 }
 
+export const DUES_AMOUNTS_SENTENCE =
+  "General contractors pay $2,400 a year, brokers pay $1,800 a year, and attorneys and advisors pay $1,200 a year";
+
+/** Long date from a version id such as 2026-10-24-draft-1. */
+export function versionDateLabel(version: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(version);
+  if (!match) return "October 24, 2026";
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" }).format(date);
+}
+
+function stripBracketPlaceholders(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text.startsWith("[DATE]", i)) {
+      out += versionDateLabel("2026-10-24");
+      i += "[DATE]".length - 1;
+      continue;
+    }
+    if (text.startsWith("[amounts to be confirmed]", i) || text.startsWith("[amounts are placeholders]", i)) {
+      out += DUES_AMOUNTS_SENTENCE;
+      i += (text.startsWith("[amounts to be confirmed]", i) ? "[amounts to be confirmed]" : "[amounts are placeholders]").length - 1;
+      continue;
+    }
+    if (text.startsWith("[PLACEHOLDER:", i)) {
+      let depth = 0;
+      let j = i;
+      for (; j < text.length; j++) {
+        if (text[j] === "[") depth += 1;
+        else if (text[j] === "]") {
+          depth -= 1;
+          if (depth === 0) {
+            j += 1;
+            break;
+          }
+        }
+      }
+      i = j - 1;
+      continue;
+    }
+    out += text[i];
+  }
+  return out;
+}
+
+/** Member-facing legal text. The draft banner stays on /legal. Bodies drop draft lines, placeholder notes, and [DATE]. */
+export function memberFacingLegal(markdown: string): string {
+  const stripped = stripBracketPlaceholders(stripVersionLine(markdown));
+  return stripped
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (/^DRAFT\b/i.test(trimmed)) return false;
+      if (/bracketed items are placeholders/i.test(trimmed)) return false;
+      return true;
+    })
+    .join("\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function legalVersion(slug: (typeof ACCEPTANCE_SLUGS)[number]): string {
   const doc = legalDoc(slug);
   if (!doc) throw new Error(`Unknown legal document: ${slug}`);
@@ -69,7 +131,7 @@ export function signupConsentCopy(): SignupConsentCopy {
   const helperMatch = source.match(/\*\*Short helper text under the button:\*\*\s*(.+)/);
   if (!helperMatch) throw new Error("Applicant consent is missing the helper sentence.");
   return {
-    beforeHtml: renderMarkdown(source.slice(beforeStart, beforeEnd).trim()),
+    beforeHtml: renderMarkdown(memberFacingLegal(source.slice(beforeStart, beforeEnd).trim())),
     termsLabel: labels[0],
     verificationLabel: labels[1],
     helper: helperMatch[1].trim(),

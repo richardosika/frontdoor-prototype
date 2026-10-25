@@ -3,6 +3,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { duesLabel } from "@/lib/dues";
+import { formatEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -50,7 +51,7 @@ export default async function AdminPaymentsPage() {
               </p>
               <p className="mt-1 text-ink">
                 {paymentStatusLabel(member.paymentStatus)} · {duesLabel(member.duesCents)}
-                {member.renewalAt ? ` · renews ${member.renewalAt.toISOString().slice(0, 10)}` : ""}
+                {member.renewalAt ? ` · renews ${formatEtDate(member.renewalAt)}` : ""}
               </p>
             </li>
           ))}

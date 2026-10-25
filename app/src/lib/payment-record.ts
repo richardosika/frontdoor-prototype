@@ -1,4 +1,5 @@
 import { annualDuesCents, duesLabel } from "@/lib/dues";
+import { formatEtDate } from "@/lib/format";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { notify } from "@/lib/notify";
 import { renewalInOneYear } from "@/lib/payments";
@@ -100,7 +101,7 @@ export async function sendRenewalReminder(userId: string) {
       name: user.name,
       role: roleLabel(user.role),
       duesAmount: duesLabel(user.duesCents || annualDuesCents(user.role)),
-      renewalDate: user.renewalAt.toISOString().slice(0, 10),
+      renewalDate: formatEtDate(user.renewalAt),
       billingLink: `${base}/settings`,
     }),
     person: { name: user.name, role: user.role, org: user.org, location: user.location },

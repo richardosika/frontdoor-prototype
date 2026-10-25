@@ -27,9 +27,11 @@ export async function GET() {
       select: { dealId: true, status: true, ndaVersion: true, ndaAcknowledgedAt: true },
     }),
   ]);
-  return NextResponse.json({
+  return new NextResponse(
+    JSON.stringify({
     exportedAt: new Date().toISOString(),
     profile: {
+      email: user.email,
       name: user.name,
       role: user.role,
       org: user.org,
@@ -48,5 +50,12 @@ export async function GET() {
     messagesSent: messages,
     introductions,
     dealAccess: access,
-  });
+  }),
+    {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": 'attachment; filename="private-floor-export.json"',
+      },
+    },
+  );
 }

@@ -5,6 +5,7 @@ import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { DUES_WAIVED, duesLabel } from "@/lib/dues";
+import { formatEtDate } from "@/lib/format";
 import { DUES_COVERS } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 
@@ -46,7 +47,7 @@ export function PayDues({
         <div className="mt-4 rounded border border-brass bg-brass-soft p-4">
           <p className="font-serif text-4xl font-normal">{duesLabel(cents)}</p>
           <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
-          <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p>
+          {status === "WAIVED" ? <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p> : null}
           <p className="mt-2 text-sm text-ink">Until this is recorded, the rest of the floor stays closed.</p>
         </div>
         <p className="mt-3 text-sm">
@@ -65,7 +66,7 @@ export function PayDues({
         )}
         {open ? (
           <div className="mt-4 text-sm">
-            <p>This membership is active{renewalAt ? `. Renewal date ${renewalAt.toISOString().slice(0, 10)}` : ""}.</p>
+            <p>This membership is active{renewalAt ? `. Renewal date ${formatEtDate(renewalAt)}` : ""}.</p>
             <Link href={signedIn ? "/feed" : "/login"} className={`${btn} mt-3`}>
               {signedIn ? "Open the floor" : "Sign in"}
             </Link>

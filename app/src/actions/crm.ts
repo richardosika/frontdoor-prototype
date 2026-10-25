@@ -227,3 +227,20 @@ export async function addProspect(formData: FormData) {
   revalidatePath("/admin/outbox");
   redirect(`/admin/crm/${person.id}?notice=${encodeURIComponent(send ? `Prospect added. Code ${code}. Information email is in the Outbox.` : `Prospect added. Code ${code}.`)}`);
 }
+
+export async function deleteCrmPerson(formData: FormData) {
+  const admin = await requireAdmin();
+  const personId = String(formData.get("personId") || "");
+  const person = await prisma.crmPerson.findUnique({ where: { id: personId } });
+  if (!person) redirect("/admin/crm?error=That+person+was+not+found");
+  await prisma.crmPerson.delete({ where: { id: person.id } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "DELETE_CRM_PERSON",
+      summary: `${admin.name} deleted the CRM person ${person.name} <${person.email}>. The member account and application were left in place.`,
+    },
+  });
+  revalidatePath("/admin/crm");
+  redirect("/admin/crm?notice=CRM+person+deleted.+The+member+account+and+application+were+left+in+place.");
+}

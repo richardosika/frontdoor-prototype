@@ -33,7 +33,8 @@ function withQuery(path: string, key: string, value: string) {
 export async function simulatePayment(formData: FormData) {
   const token = String(formData.get("token") || "");
   const account = token ? await payerByToken(token) : await requireAccount();
-  if (!account || account.status !== "ACTIVE") redirect("/login");
+  if (!account) redirect("/login");
+  if (account.status !== "ACTIVE") redirect("/suspended");
   if (checkoutModeForRole(account.role) === "stripe") redirect(`/pay/${account.paymentToken || ""}?error=Use+Stripe+test+checkout`);
   if (!blocksMembership(account.paymentStatus) && account.paymentStatus !== "NOT_REQUIRED") {
     redirect("/feed");

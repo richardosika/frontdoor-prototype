@@ -90,11 +90,13 @@ export function isDollarRaise(raiseLabel: string | null | undefined): boolean {
 
 export function isNonDollarSeeking(deal: FilterableDeal): boolean {
   if (deal.kind !== "SEEKING") return false;
+  if (deal.sizeBand === "under-1" || deal.sizeBand === "1-5" || deal.sizeBand === "5+") return false;
   if (deal.sizeBand === SCOPE_SIZE) return true;
   return Boolean(deal.raiseLabel) && !isDollarRaise(deal.raiseLabel);
 }
 
 export function storedSizeBand(kind: "DEAL" | "SEEKING", sizeBand: string, raiseLabel: string): string {
+  if (sizeBand === "under-1" || sizeBand === "1-5" || sizeBand === "5+") return sizeBand;
   if (kind === "SEEKING" && !isDollarRaise(raiseLabel)) return SCOPE_SIZE;
   return sizeBand;
 }

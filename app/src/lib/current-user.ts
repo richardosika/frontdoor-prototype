@@ -13,7 +13,8 @@ export async function currentUser() {
 
 export async function requireAccount() {
   const user = await currentUser();
-  if (!user || user.status !== "ACTIVE") redirect("/login");
+  if (!user) redirect("/login");
+  if (user.status !== "ACTIVE") redirect("/suspended");
   return user;
 }
 

@@ -91,7 +91,7 @@ export async function sendTemplate(input: {
   }
   const template = await prisma.emailTemplate.findUnique({ where: { key: input.key } });
   if (!template) throw new Error("Template missing.");
-  const subject = renderTemplate(template.subject, input.vars);
+  const subject = renderTemplate(template.subject, input.vars, { signOff: false });
   const text = renderTemplate(template.body, input.vars);
   return sendNotice({
     intendedTo: input.to,
@@ -110,7 +110,7 @@ export async function sendTemplateTest(key: TemplateKey, vars: Record<string, st
   const target = deliveryTarget(mode, noticeTestRecipient());
   return sendNotice({
     intendedTo: target.to,
-    subject: `[test] ${renderTemplate(template.subject, vars)}`,
+    subject: `[test] ${renderTemplate(template.subject, vars, { signOff: false })}`,
     text: renderTemplate(template.body, vars),
     templateKey: key,
   });

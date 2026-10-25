@@ -113,6 +113,17 @@ Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one
 3. On `/feed`, the same project filters apply to posts. The For you, Deals, Seeking, and My circle tabs keep the filters. A new raising or seeking post asks for stage and what is needed.
 4. On `/network`, filter by asset class (including condo and storage), state, deal type, what is needed, and role. Sort by name or newest. Stage, capital size, and posted date stay on deals and posts.
 
+## Round 2 checks
+
+1. A suspended member who is already signed in lands on **Account suspended**, with a sign-out button and connect@privatefloorclub.com. They are not sent back and forth between sign-in and the floor.
+2. The application report and the company report use the same website result. A made-up name on example.com is not a pass.
+3. Help answers what a general contractor pays ($2,400 a year; brokers $1,800; attorneys and advisors $1,200; developers, investors, family offices, and lenders free; paid after approval), why a post was held, and how to request an introduction. Those answers have no `[DATE]` and no raw markdown.
+4. Signup step 4 shows those dues. Draft wording stays on the legal pages as the banner. Member-facing text uses October 24, 2026 instead of `[DATE]`.
+5. A payment-due member is absent from the directory and cannot receive an introduction until the dues are recorded.
+6. A seeking post keeps the dollar band you picked. **$5M+** is not shown as Other scope.
+7. Delete applicant also removes the CRM person and the linked member account. CRM people, invite requests, and invite codes have their own delete controls. **Delete records from the last N hours** is on the test console, separate from Delete all test data.
+8. Accepting an introduction notifies the requester. Approving a deal room notifies the requester. Email subjects do not include the founder sign-off. That line stays at the end of the letter. Pay dues says dues are waived only when an administrator waived them. A simulated payment is labelled TEST. Renewal dates are America/New_York calendar dates. Data export downloads a file that includes the member's own email. A member reply is separate from the track record and shows a New York time. An application with no report has **Run verification** on the list.
+
 ## What the offline samples are for
 
 The strong LEGIT row is there so you can see that verdict without waiting on EDGAR, CourtListener, or web search. Re-run that row if you want to see which live sources answered from the server you are using. A blocked source is unavailable and is listed under “What I could not check for free.” A source that answers with no match is “No data found.” Neither one approves anyone.

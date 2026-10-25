@@ -1,3 +1,4 @@
+import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
@@ -9,6 +10,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
     },
   });
   if (!member || member.status !== "ACTIVE") return null;
+  if (viewerId !== memberId && blocksMembership(member.paymentStatus)) return null;
   const [connection, introduction] = await Promise.all([
     prisma.connection.findFirst({
       where: {

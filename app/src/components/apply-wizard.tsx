@@ -5,7 +5,7 @@ import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { DUES_WAIVED, duesForRole } from "@/lib/dues";
+import { duesForRole } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
 
@@ -396,7 +396,6 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         {!done && step === 4 ? (
           <div>
             <div className="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: consent.beforeHtml }} />
-            <p className="mt-3 text-xs leading-relaxed text-ink">Bracketed text such as [amounts to be confirmed] is still a draft placeholder.</p>
             <ul className="mt-4 space-y-2 text-sm">
               {LEGAL_LINKS.map(([href, label]) => (
                 <li key={href}>
@@ -431,7 +430,6 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <div className="mt-4 rounded border border-brass bg-brass-soft p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Annual dues</p>
               <p className="mt-1 font-serif text-3xl">{dues.label}</p>
-              <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p>
             </div>
             <p className="mt-3 text-sm text-ink">
               {dues.cents > 0

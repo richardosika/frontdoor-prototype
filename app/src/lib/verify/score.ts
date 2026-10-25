@@ -27,6 +27,22 @@ export function decideVerdict(checks: CheckOutput[], score: number): Verdict {
   return "NEEDS_OWNER_DECISION";
 }
 
+/** Names of sources that were blocked, including providers listed inside a web-footprint finding. */
+export function unavailableLabels(checks: CheckOutput[]): string[] {
+  const names: string[] = [];
+  const push = (name: string) => {
+    const trimmed = name.trim();
+    if (trimmed && !names.includes(trimmed)) names.push(trimmed);
+  };
+  for (const check of checks) {
+    if (check.status === "UNAVAILABLE") push(check.key);
+    const match = /Unavailable:\s*([^.]+)/i.exec(check.finding);
+    if (!match) continue;
+    for (const part of match[1].split(",")) push(part);
+  }
+  return names;
+}
+
 export function buildSummary(checks: CheckOutput[], score: number, verdict: Verdict): string {
   const label = verdict === "LEGIT" ? "LEGIT" : verdict === "NOT_LEGIT" ? "NOT LEGIT" : "NEEDS YOUR DECISION";
   const opinion =
@@ -38,17 +54,15 @@ export function buildSummary(checks: CheckOutput[], score: number, verdict: Verd
   const support = checks.filter((check) => check.status === "PASS").slice(0, 2).map((check) => check.finding);
   const against = checks.filter((check) => check.hardFlag || check.reviewFlag || check.status === "FAIL").slice(0, 2).map((check) => check.finding);
   const noData = checks.filter((check) => check.status === "INCONCLUSIVE").map((check) => check.key);
-  const unavailable = checks.filter((check) => check.status === "UNAVAILABLE");
+  const unavailable = unavailableLabels(checks);
+  const blockedFindings = checks.filter((check) => check.status === "UNAVAILABLE").map((check) => check.finding);
   const forLine = support.length ? `Strongest support: ${support.join(" ")}` : "Strongest support: no corroborating pass yet.";
   const againstLine = against.length ? `Strongest concern: ${against.join(" ")}` : "Strongest concern: no hard conflict in the checks that ran.";
   const noDataLine = noData.length
     ? `No data found: ${noData.slice(0, 8).join(", ")}.`
     : "No data found: the sources that responded had a result or a pass.";
   const unavailableText = unavailable.length
-    ? unavailable
-        .slice(0, 4)
-        .map((check) => `${check.key}: ${check.finding}`)
-        .join(" ")
+    ? `Unavailable sources: ${unavailable.join(", ")}. ${blockedFindings.join(" ")}`.trim()
     : "none of the free sources were blocked on this run";
   const free = `What I could not check for free: paid people-search, credit, full court dockets, logged-in LinkedIn, state registries that have no stable free API, and any source marked unavailable. ${unavailableText}`;
   return [opinion, forLine, againstLine, noDataLine, free].join(" ");

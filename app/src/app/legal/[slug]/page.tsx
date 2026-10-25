@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { BRAND } from "@/lib/brand";
-import { documentVersion, LEGAL_DOCS, legalDoc, readLegalMarkdown, stripVersionLine } from "@/lib/legal";
+import { documentVersion, LEGAL_DOCS, legalDoc, memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 
 export function generateStaticParams() {
@@ -15,7 +15,7 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
   if (!doc) notFound();
   const source = readLegalMarkdown(doc.file);
   const version = documentVersion(source);
-  const html = renderMarkdown(stripVersionLine(source));
+  const html = renderMarkdown(memberFacingLegal(source));
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:px-4 md:py-10">

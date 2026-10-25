@@ -8,7 +8,7 @@ import {
 } from "@/actions/payments";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { duesLabel } from "@/lib/dues";
-import { formatAuditTime } from "@/lib/format";
+import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { paymentRequired, paymentStatusLabel } from "@/lib/payments";
 
 export function PaymentPanel({
@@ -50,7 +50,7 @@ export function PaymentPanel({
         <b>Payment status:</b> {paymentStatusLabel(status)} · {duesLabel(duesCents)}
       </p>
       <p className="mt-1">
-        <b>Renewal date:</b> {renewalAt ? renewalAt.toISOString().slice(0, 10) : "Not set"}
+        <b>Renewal date:</b> {renewalAt ? formatEtDate(renewalAt) : "Not set"}
         {paidAt ? ` · paid ${formatAuditTime(paidAt)}` : ""}
         {paymentMode ? ` · ${paymentMode}` : ""}
       </p>

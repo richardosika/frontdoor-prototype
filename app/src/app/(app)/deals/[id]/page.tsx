@@ -10,7 +10,7 @@ import { btn, btnOutline, dealCard, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { sizeLabel } from "@/lib/domain";
 import { plural } from "@/lib/format";
-import { readLegalMarkdown, stripVersionLine } from "@/lib/legal";
+import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
@@ -37,7 +37,7 @@ export default async function DealPage({
   });
   if (!deal) notFound();
   const post = await prisma.post.findFirst({ where: { dealId: deal.id }, orderBy: { createdAt: "desc" } });
-  const ndaHtml = renderMarkdown(stripVersionLine(readLegalMarkdown("deal-room-nda.md")));
+  const ndaHtml = renderMarkdown(memberFacingLegal(readLegalMarkdown("deal-room-nda.md")));
   const mine = deal.access.find((item) => item.requesterId === user.id);
   const isSponsor = deal.sponsorId === user.id;
   const approved = mine?.status === "APPROVED" || isSponsor;

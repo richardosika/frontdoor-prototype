@@ -14,6 +14,7 @@ import { acceptanceVersions, hashClientIp } from "@/lib/legal";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { sendNotice } from "@/lib/notices";
 import { queueApplicationVerification } from "@/lib/verify/queue";
+import { appendMemberReply } from "@/lib/statement";
 import { appBaseUrl } from "@/lib/url";
 
 const CODE_MINUTES = 15;
@@ -243,12 +244,11 @@ export async function respondToApplication(formData: FormData): Promise<{ ok: tr
     if (!checked.ok) return checked;
     card = { fileName: safeCardFileName(upload.name), contentType: checked.contentType, bytes };
   }
-  const stamp = new Date().toISOString();
   await prisma.application.update({
     where: { id: application.id },
     data: {
       status: "IN_REVIEW",
-      statement: `${application.statement}\n\nMember reply (${stamp}):\n${note}`.slice(0, 4000),
+      statement: appendMemberReply(application.statement, note),
     },
   });
   if (card) {

@@ -117,7 +117,7 @@ describe("deals", () => {
     expect(filterDeals(deals, { role: "Any", market: "Any", size: "Any" })).toHaveLength(3);
   });
 
-  it("keeps non-dollar seeking posts out of dollar size bands", () => {
+  it("keeps a seeking dollar band when the label is square feet", () => {
     const seeking = {
       title: "Hoboken GC need",
       sponsorName: "Elena Voss",
@@ -133,12 +133,17 @@ describe("deals", () => {
     expect(isDollarRaise("40k sf")).toBe(false);
     expect(isDollarRaise("64 units")).toBe(false);
     expect(isDollarRaise("1 parcel")).toBe(false);
-    expect(isNonDollarSeeking(seeking)).toBe(true);
-    expect(storedSizeBand("SEEKING", "5+", "40k sf")).toBe("scope");
+    expect(isNonDollarSeeking(seeking)).toBe(false);
+    expect(storedSizeBand("SEEKING", "5+", "40k sf")).toBe("5+");
+    expect(storedSizeBand("SEEKING", "scope", "40k sf")).toBe("scope");
     expect(storedSizeBand("SEEKING", "1-5", "$3.2M")).toBe("1-5");
     expect(storedSizeBand("DEAL", "1-5", "$2.5M")).toBe("1-5");
-    expect(filterDeals([seeking], { size: "5+" })).toHaveLength(0);
-    expect(filterDeals([seeking], { size: "scope" })).toHaveLength(1);
+    expect(filterDeals([seeking], { size: "5+" })).toHaveLength(1);
+    expect(filterDeals([seeking], { size: "scope" })).toHaveLength(0);
+    const scopeSeeking = { ...seeking, sizeBand: "scope" };
+    expect(isNonDollarSeeking(scopeSeeking)).toBe(true);
+    expect(filterDeals([scopeSeeking], { size: "scope" })).toHaveLength(1);
+    expect(filterDeals([scopeSeeking], { size: "5+" })).toHaveLength(0);
     expect(filterDeals([seeking], {})).toHaveLength(1);
     const dollarSeeking = { ...seeking, raiseLabel: "$3.2M", sizeBand: "1-5" };
     expect(filterDeals([dollarSeeking], { size: "1-5" })).toHaveLength(1);

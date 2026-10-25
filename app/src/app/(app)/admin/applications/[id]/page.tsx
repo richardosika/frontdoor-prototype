@@ -13,6 +13,7 @@ import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { DUES_WAIVED, duesLabel } from "@/lib/dues";
 import { formatAuditTime } from "@/lib/format";
+import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 
@@ -41,6 +42,7 @@ export default async function ApplicationDetailPage({
     },
   });
   if (!application) notFound();
+  const statementParts = splitMemberReply(application.statement);
   const report = application.runs.find((run) => run.subject === "APPLICATION");
   const company = application.runs.find((run) => run.subject === "COMPANY");
   const card = application.businessCard;
@@ -105,8 +107,14 @@ export default async function ApplicationDetailPage({
             <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}
           </p>
           <p>
-            <b>Track record:</b> {application.statement.trim() || "Not provided"}
+            <b>Track record:</b> {statementParts.track || "Not provided"}
           </p>
+          {statementParts.replies.map((reply) => (
+            <p key={reply.at}>
+              <b>Member reply:</b> {reply.text}
+              <span className="block text-xs text-mut">{reply.label}</span>
+            </p>
+          ))}
           {application.reviewedAt ? (
             <p>
               <b>Last touch:</b> {formatAuditTime(application.reviewedAt)}
@@ -212,13 +220,15 @@ export default async function ApplicationDetailPage({
         </section>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete applicant</h2>
-          <p className="mt-2 text-sm text-ink">Removes this application, its card, notices, verification runs, and the member account created from it. An administrator account is left in place.</p>
+          <p className="mt-2 text-sm text-ink">
+            Removes this application, its business card, outbox notices, and verification runs. It also removes the linked member account and the CRM person when those exist. An administrator account is left in place.
+          </p>
           <div className="mt-3">
             <RunAndReload
               className={btnOutline}
               label="Delete this applicant and all their data"
               pendingLabel="Deleting…"
-              confirmMessage={`Delete ${application.name} and all of their data? This cannot be undone.`}
+              confirmMessage={`Delete ${application.name}? This removes the application, verification runs, outbox notices, business card, linked member account, and CRM person. This cannot be undone.`}
               run={deleteOneApplication.bind(null, application.id)}
             />
           </div>

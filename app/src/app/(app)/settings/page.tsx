@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { duesLabel } from "@/lib/dues";
-import { formatAuditTime } from "@/lib/format";
+import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export default async function SettingsPage({
             </p>
             <p>{receiptLine(user.paymentMode)}</p>
             <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>
-            <p>Renewal date {user.renewalAt ? user.renewalAt.toISOString().slice(0, 10) : "not set"}.</p>
+            <p>Renewal date {user.renewalAt ? formatEtDate(user.renewalAt) : "not set"}.</p>
             {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}
             {user.refundNote ? <p>Refund note: {user.refundNote}</p> : null}
             <p>No card on file. Private Floor does not store a card number.</p>

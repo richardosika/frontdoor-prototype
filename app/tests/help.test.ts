@@ -117,6 +117,33 @@ describe("help assistant", () => {
     expect(sameOrigin("https://evil.example", "cornicio-mvp.onrender.com")).toBe(false);
   });
 
+  it("answers membership price, a held post, and how to request an introduction", async () => {
+    const dues = await composeAnswer({ question: "What does a GC pay for membership?", chunks });
+    expect(dues.confidence).toBe("high");
+    expect(dues.answer).toContain("$2,400");
+    expect(dues.answer).toContain("$1,800");
+    expect(dues.answer).toContain("$1,200");
+    expect(dues.answer.toLowerCase()).toContain("after");
+    expect(dues.answer).not.toContain("Help cannot say whether an application will be approved");
+
+    const contractor = await composeAnswer({ question: "What does a general contractor pay for membership?", chunks });
+    expect(contractor.answer).toContain("$2,400");
+    expect(contractor.answer).not.toContain("[DATE]");
+    expect(contractor.answer).not.toContain("**");
+
+    const held = await composeAnswer({ question: "Why was my post held?", chunks });
+    expect(held.confidence).toBe("high");
+    expect(held.answer.toLowerCase()).toContain("held");
+    expect(held.answer).not.toContain("[DATE]");
+    expect(held.answer).not.toContain("**");
+    expect(held.answer.toLowerCase()).not.toContain("bracketed items are placeholders");
+
+    const intro = await composeAnswer({ question: "How do I request an introduction?", chunks });
+    expect(intro.confidence).toBe("high");
+    expect(intro.answer.toLowerCase()).toContain("request an introduction");
+    expect(intro.unanswered).toBe(false);
+  });
+
   it("uses a model only when its key is set", () => {
     expect(selectHelpProvider({})).toBe("keyword");
     expect(selectHelpProvider({ OPENAI_API_KEY: "sk-test" })).toBe("openai");

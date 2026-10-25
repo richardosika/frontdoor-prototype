@@ -59,6 +59,35 @@ export function tokens(text: string): string[] {
     .filter((token) => token.length >= 3 && !STOP.has(token));
 }
 
+function expandToken(token: string): string[] {
+  const forms = [token];
+  if (token.length >= 4 && token.endsWith("s") && !token.endsWith("ss")) forms.push(token.slice(0, -1));
+  else if (token.length >= 4) forms.push(`${token}s`);
+  return forms;
+}
+
+function tokenSet(text: string): Set<string> {
+  const set = new Set<string>();
+  for (const token of tokens(text)) {
+    for (const form of expandToken(token)) set.add(form);
+  }
+  return set;
+}
+
+/** Keyword answers are plain sentences. Draft markers and markdown markers stay off the reply. */
+export function cleanHelpText(text: string): string {
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/\[DATE\]/g, "October 24, 2026")
+    .replace(/\[amounts to be confirmed\]/gi, "general contractors $2,400 a year, brokers $1,800 a year, and attorneys and advisors $1,200 a year")
+    .replace(/\[amounts are placeholders\]/gi, "general contractors $2,400 a year, brokers $1,800 a year, and attorneys and advisors $1,200 a year")
+    .split("\n")
+    .filter((line) => !/bracketed items are placeholders/i.test(line) && !/^\s*DRAFT\b/i.test(line))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function classifyQuestion(question: string): "ok" | "injection" | "score" | "advice" | "approval" {
   if (INJECTION.test(question)) return "injection";
   if (SCORE_ASK.test(question)) return "score";
@@ -68,17 +97,20 @@ export function classifyQuestion(question: string): "ok" | "injection" | "score"
 }
 
 export function rankChunks(question: string, chunks: HelpChunk[]): { chunk: HelpChunk; score: number }[] {
-  const query = [...new Set(tokens(question))];
+  const queryTokens = tokens(question);
+  const priceAsk = queryTokens.some((token) => token === "pay" || token === "dues" || token === "fee" || token === "cost" || token === "pays");
   return chunks
     .filter((chunk) => !chunk.restricted)
     .map((chunk) => {
-      const title = new Set(tokens(chunk.title));
-      const body = new Set(tokens(chunk.body));
+      const title = tokenSet(chunk.title);
+      const body = tokenSet(chunk.body);
       let score = 0;
-      for (const token of query) {
-        if (title.has(token)) score += chunk.kind === "faq" ? 4 : 3;
-        else if (body.has(token)) score += 1;
+      for (const token of queryTokens) {
+        const forms = expandToken(token);
+        if (forms.some((form) => title.has(form))) score += chunk.kind === "faq" ? 4 : 3;
+        else if (forms.some((form) => body.has(form))) score += 1;
       }
+      if (priceAsk && (chunk.body.includes("$2,400") || chunk.body.includes("$1,800") || chunk.body.includes("$1,200"))) score += 6;
       return { chunk, score };
     })
     .filter((row) => row.score > 0)
@@ -156,7 +188,7 @@ function keywordFrom(ranked: { chunk: HelpChunk; score: number }[]): HelpResult 
   const best = ranked[0];
   const faq = ranked.find((row) => row.chunk.kind === "faq" && row.score >= best.score - 1);
   const chosen = faq ?? best;
-  const body = chosen.chunk.body.replace(/\s+/g, " ").trim().slice(0, 900);
+  const body = cleanHelpText(chosen.chunk.body).slice(0, 900);
   const answer = body.includes(HELP_EMAIL) ? `${body} ${NOT_ADVICE}` : `${body}\n\n${NOT_ADVICE}`;
   return { answer: guardAnswer(answer).text, confidence: "high", unanswered: false, provider: "keyword" };
 }

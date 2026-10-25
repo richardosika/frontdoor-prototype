@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
+import { eligibleForDirectory } from "@/lib/payments";
 import { canConnect, orderedPair } from "@/lib/domain";
 import { canMessageAfterIntro } from "@/lib/member-network";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
@@ -21,7 +22,7 @@ export async function requestConnection(formData: FormData) {
   if (!decision.ok) redirect(`/network?error=${encodeURIComponent(decision.reason)}`);
 
   const target = await prisma.user.findUnique({ where: { id: toId } });
-  if (!target || target.status !== "ACTIVE") redirect("/network");
+  if (!target || !eligibleForDirectory(target)) redirect("/network");
   if (await isBlocked(user.id, toId)) {
     redirect(`/members/${toId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
@@ -101,9 +102,9 @@ export async function introduceMember(formData: FormData) {
   if (note.length < 2) redirect(`${back}?error=${encodeURIComponent("Write a short note with the introduction.")}`);
   const other = await prisma.user.findUnique({
     where: { id: otherId },
-    select: { id: true, status: true, email: true, notifyIntros: true, name: true },
+    select: { id: true, status: true, paymentStatus: true, email: true, notifyIntros: true, name: true },
   });
-  if (!other || other.status !== "ACTIVE" || other.id === user.id) redirect("/network");
+  if (!other || !eligibleForDirectory(other) || other.id === user.id) redirect("/network");
   if (await isBlocked(user.id, otherId)) {
     redirect(`${back}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
@@ -169,8 +170,14 @@ export async function respondIntroduction(formData: FormData) {
     kind: "INTRO",
     body: `${intro.from.name} requested an introduction. ${intro.note}`,
   });
+  await notify(intro.fromId, {
+    title: "Introduction accepted",
+    body: `${user.name} accepted your introduction.`,
+    href: sent.ok ? `/messages/${sent.conversationId}` : "/network",
+  });
   revalidatePath("/network");
   revalidatePath("/messages");
+  revalidatePath("/alerts");
   if (!sent.ok) redirect(`/network?error=${encodeURIComponent(sent.reason)}`);
   redirect(`/messages/${sent.conversationId}`);
 }

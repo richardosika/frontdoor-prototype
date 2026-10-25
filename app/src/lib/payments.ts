@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { annualDuesCents } from "@/lib/dues";
+import { formatEtDate } from "@/lib/format";
 
 export type DuesGroup = "free" | "gc" | "broker" | "advisor";
 
@@ -16,6 +17,13 @@ export function paymentRequired(role: string): boolean {
 
 export function blocksMembership(status: string): boolean {
   return status === "DUE" || status === "FAILED" || status === "REFUNDED";
+}
+
+/** Payment states that may appear in the directory and receive introductions. */
+export const LISTED_PAYMENT_STATUSES = ["NOT_REQUIRED", "PAID", "WAIVED"] as const;
+
+export function eligibleForDirectory(member: { status: string; paymentStatus: string }): boolean {
+  return member.status === "ACTIVE" && (LISTED_PAYMENT_STATUSES as readonly string[]).includes(member.paymentStatus);
 }
 
 export function paymentStatusLabel(status: string): string {
@@ -56,10 +64,10 @@ export function checkoutModeForRole(role: string, env: NodeJS.ProcessEnv = proce
   });
 }
 
+/** One year after the America/New_York calendar date, stored so that same date still displays in New York. */
 export function renewalInOneYear(from = new Date()): Date {
-  const next = new Date(from.getTime());
-  next.setUTCFullYear(next.getUTCFullYear() + 1);
-  return next;
+  const [year, month, day] = formatEtDate(from).split("-").map(Number);
+  return new Date(Date.UTC(year + 1, month - 1, day, 16, 0, 0));
 }
 
 /** True in the 30 days before renewal, and not more often than weekly. */

@@ -38,7 +38,7 @@ export default async function TemplateEditPage({
           <Banner error={query.error} notice={query.notice} />
         </div>
         <p className="mt-3 text-sm text-ink">
-          Variables: {TEMPLATE_VARIABLES.map((name) => `{${name}}`).join(", ")}. The sign-off is Richard Osika, Founder. Declined mail does not include a reason.
+          Variables: {TEMPLATE_VARIABLES.map((name) => `{${name}}`).join(", ")}. The sign-off Richard Osika, Founder is added to the letter, not the subject. Declined mail does not include a reason.
         </p>
         <TemplateEditor
           templateKey={template.key}

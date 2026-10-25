@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { ProjectFilterBar } from "@/components/project-filters";
 import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
+import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { directoryMatch } from "@/lib/member-network";
 import { directoryNeedMatch, projectQuery, settleProjectQuery, sortDirectory } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
@@ -32,7 +33,7 @@ export default async function NetworkPage({
   const assetClass = filters.assetClass || "";
   const [rows, saved] = await Promise.all([
     prisma.user.findMany({
-      where: { status: "ACTIVE", id: { not: user.id } },
+      where: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, id: { not: user.id } },
       orderBy: { name: "asc" },
     }),
     prisma.savedFilter.findMany({
@@ -166,7 +167,9 @@ export default async function NetworkPage({
                     Open messages
                   </Link>
                 ) : intro === "PENDING" ? (
-                  <span className={`${btn} w-full bg-mut`}>Introduction requested</span>
+                  <p className="rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
+                    Introduction requested. It stays inside Private Floor until they accept.
+                  </p>
                 ) : intro === "INCOMING" ? (
                   <Link href={`/members/${member.id}`} className={`${btn} w-full`}>
                     Respond

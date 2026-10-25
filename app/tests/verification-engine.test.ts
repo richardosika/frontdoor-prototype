@@ -16,6 +16,7 @@ import { webFootprintCheck } from "@/lib/verify/web-search";
 function facts(overrides: Partial<ApplicantFacts> = {}): ApplicantFacts {
   return {
     name: "Priya Testlegit",
+    applicantName: "Priya Testlegit",
     email: "priya.testlegit@halerow-test.example",
     org: "Hale Row Test Partners",
     location: "Newark, NJ",
@@ -207,12 +208,14 @@ describe("web search", () => {
       facts({ name: "Zorblax Quimperton", org: "Nowhere Holdings" }),
       async (url) => (url.includes("duckduckgo") ? { ok: true, status: 200, text: html } : { ok: false, status: 403, text: "" }),
     );
-    expect(result.status).toBe("UNAVAILABLE");
+    expect(result.status).toBe("INCONCLUSIVE");
     expect(result.status).not.toBe("PASS");
     expect(result.status).not.toBe("FAIL");
+    expect(result.finding).toContain("Unavailable:");
     const summary = scoreReport([result]).summary;
     expect(summary).toContain("What I could not check for free");
-    expect(summary).toContain("could not be checked");
+    expect(summary).toContain("Wikipedia");
+    expect(summary).not.toContain("none of the free sources were blocked");
   });
 
   it("counts a real snippet that names the person and the company", async () => {

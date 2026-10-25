@@ -161,13 +161,22 @@ export function firstName(fullName: string): string {
   return token || "there";
 }
 
-/** Replaces {tokens}. Unknown tokens stay so a typo is visible. Adds the founder sign-off when the body does not already include it. */
-export function renderTemplate(source: string, vars: Record<string, string>): string {
+/** Drops a label whose token rendered empty, such as "The decision is here:" with no link. */
+export function dropEmptyLabelLines(source: string): string {
+  return source
+    .split("\n")
+    .filter((line) => !/^[^:\n]{0,80}:\s*$/.test(line.trim()))
+    .join("\n");
+}
+
+/** Replaces {tokens}. Unknown tokens stay so a typo is visible. The founder sign-off is for bodies, not subjects. */
+export function renderTemplate(source: string, vars: Record<string, string>, options?: { signOff?: boolean }): string {
   const rendered = source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
     const value = vars[key.toLowerCase()];
     return value === undefined ? match : value;
   });
-  const trimmed = rendered.trim();
+  const trimmed = dropEmptyLabelLines(rendered).trim();
+  if (options?.signOff === false) return trimmed;
   if (trimmed.includes(SIGN_OFF)) return trimmed;
   return `${trimmed}\n\n${SIGN_OFF}`;
 }

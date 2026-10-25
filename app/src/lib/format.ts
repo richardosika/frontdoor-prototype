@@ -22,6 +22,16 @@ export function plural(count: number, singular: string, pluralForm = `${singular
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
+/** Calendar date in America/New_York as YYYY-MM-DD. */
+export function formatEtDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: AUDIT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 export function formatAuditTime(date: Date): string {
   const formatted = new Intl.DateTimeFormat("en-US", {
     timeZone: AUDIT_TIME_ZONE,

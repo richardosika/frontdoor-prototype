@@ -4,6 +4,7 @@ import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { scoreReport } from "@/lib/verify/score";
 import type { ApplicantFacts } from "@/lib/verify/types";
 import { politeFetch } from "@/lib/verify/fetch";
+import { readCardImage } from "@/lib/verify/ocr";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
 export async function createVerificationRun(input: {
@@ -106,11 +107,12 @@ async function factsForRun(run: {
     statement: string;
     testProfile: string;
     inviteCode: { note: string; code: string } | null;
-    businessCard?: { deletedAt: Date | null; sizeBytes: number } | null;
+    businessCard?: { deletedAt: Date | null; sizeBytes: number; contentType?: string; bytes?: Uint8Array | null } | null;
   } | null;
 }): Promise<ApplicantFacts> {
   const application = run.application;
-  const name = run.subject === "COMPANY" ? run.companyName || application?.org || "" : application?.name || run.companyName;
+  const applicantName = application?.name || "";
+  const name = run.subject === "COMPANY" ? run.companyName || application?.org || applicantName : applicantName || run.companyName;
   const org = run.subject === "PROJECT" ? run.companyName || application?.org || "" : application?.org || run.companyName;
   const email = application?.email || "";
   const duplicateOfMember = email
@@ -130,8 +132,15 @@ async function factsForRun(run: {
         where: { email, createdAt: { gte: since }, ...(application ? { NOT: { email: "" } } : {}) },
       })
     : 0;
+  const card = application?.businessCard;
+  const cardUploaded = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
+  const cardText =
+    cardUploaded && card?.contentType?.startsWith("image/") && card.bytes
+      ? await readCardImage(card.contentType, card.bytes)
+      : "";
   return {
     name,
+    applicantName,
     email,
     org,
     location: application?.location || "",
@@ -143,8 +152,8 @@ async function factsForRun(run: {
     statement: application?.statement || "",
     inviteNote: application?.inviteCode ? `${application.inviteCode.code} · ${application.inviteCode.note}` : "",
     testProfile: application?.testProfile || "",
-    cardText: "",
-    cardUploaded: Boolean(application?.businessCard && !application.businessCard.deletedAt && application.businessCard.sizeBytes > 0),
+    cardText,
+    cardUploaded,
     duplicateOfMember: run.subject === "APPLICATION" ? duplicateOfMember : false,
     duplicateOfDeclined,
     recentApplications,

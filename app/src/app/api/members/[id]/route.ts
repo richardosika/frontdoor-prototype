@@ -1,4 +1,5 @@
 import { verificationActor } from "@/lib/current-user";
+import { blocksMembership } from "@/lib/payments";
 import { memberDirectoryResponse, type MemberRecord } from "@/lib/messaging";
 import { prisma } from "@/lib/prisma";
 
@@ -17,6 +18,7 @@ const select = {
   email: true,
   phone: true,
   linkedinUrl: true,
+  paymentStatus: true,
 } as const;
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -24,8 +26,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   if (!actor) return memberDirectoryResponse({ viewer: null, subject: null });
   const subject = await prisma.user.findUnique({ where: { id, status: "ACTIVE" }, select });
+  const hidden = subject && blocksMembership(subject.paymentStatus) && !actor.isAdmin;
   return memberDirectoryResponse({
     viewer: { isAdmin: actor.isAdmin },
-    subject: subject as MemberRecord | null,
+    subject: hidden || !subject ? null : (subject as MemberRecord),
   });
 }

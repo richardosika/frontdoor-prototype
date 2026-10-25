@@ -20,6 +20,8 @@ export type CheckOutput = {
 
 export type ApplicantFacts = {
   name: string;
+  /** The applicant's own name on every run, including the company report. */
+  applicantName: string;
   email: string;
   org: string;
   location: string;

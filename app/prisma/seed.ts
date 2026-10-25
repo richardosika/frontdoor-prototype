@@ -6,6 +6,8 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BRAND } from "../src/lib/brand";
+import { duplicateExampleIds } from "../src/lib/demo-cleanup";
+import { deleteMemberAccount } from "../src/lib/remove-member";
 import { SEEDED_EXTRA_PROJECTS, SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES } from "../src/lib/seed-coherence";
 import { MEMBER_CHECKS, PROJECT_CHECKS, type VerificationStatus } from "../src/lib/verification";
 
@@ -862,7 +864,19 @@ async function fillDemoProjectFields() {
   }
 }
 
+async function dedupeDanielReyes() {
+  const rows = await prisma.user.findMany({
+    where: { name: "Daniel Reyes", isAdmin: false },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, email: true, isTest: true, isAdmin: true, createdAt: true },
+  });
+  for (const id of duplicateExampleIds(rows)) {
+    await deleteMemberAccount(id);
+  }
+}
+
 async function alignSeededDemo() {
+  await dedupeDanielReyes();
   await fillDemoProjectFields();
   await ensureExtraProjects();
   await ensureMissingVerificationCases();

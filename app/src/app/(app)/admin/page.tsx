@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { createInvite, declineInviteRequest, issueInviteForRequest, reviewVouch } from "@/actions/admin";
+import { createInvite, declineInviteRequest, deleteInviteCode, deleteInviteRequest, issueInviteForRequest, reviewVouch } from "@/actions/admin";
 import { Banner } from "@/components/banner";
 import { CopyCode } from "@/components/copy-code";
 import { PageHeader } from "@/components/page-header";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { activitySince, attentionItems, funnelCounts, mergeActivity, type ActivityRow } from "@/lib/admin-home";
 import { requireAdmin } from "@/lib/current-user";
@@ -77,8 +78,8 @@ export default async function AdminPage({
       include: { project: { include: { user: true } } },
       orderBy: { respondedAt: "desc" },
     }),
-    prisma.inviteRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
-    prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+    prisma.inviteRequest.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
+    prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
   ]);
 
   const attention = attentionItems({
@@ -251,19 +252,34 @@ export default async function AdminPage({
                 {roleLabel(request.role)} · {request.org} · {request.location}
               </p>
               {request.note ? <p className="mt-1 text-xs text-ink">{request.note}</p> : null}
+              <p className="text-xs text-mut">{request.status}</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <form action={issueInviteForRequest}>
+                {request.status === "PENDING" ? (
+                  <>
+                    <form action={issueInviteForRequest}>
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <button className={btn} type="submit">
+                        Issue code
+                      </button>
+                    </form>
+                    <form action={declineInviteRequest}>
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <button className={btnOutline} type="submit">
+                        Decline
+                      </button>
+                    </form>
+                  </>
+                ) : null}
+                <form id={`delete-request-${request.id}`} action={deleteInviteRequest}>
                   <input type="hidden" name="requestId" value={request.id} />
-                  <button className={btn} type="submit">
-                    Issue code
-                  </button>
                 </form>
-                <form action={declineInviteRequest}>
-                  <input type="hidden" name="requestId" value={request.id} />
-                  <button className={btnOutline} type="submit">
-                    Decline
-                  </button>
-                </form>
+                <ConfirmSubmitButton
+                  form={`delete-request-${request.id}`}
+                  className={btnOutline}
+                  message={`Delete the invite request for ${request.name}? The CRM person stays.`}
+                >
+                  Delete request
+                </ConfirmSubmitButton>
               </div>
             </li>
           ))}
@@ -300,6 +316,16 @@ export default async function AdminPage({
                 <span className="block text-xs text-mut">
                   {invite.uses}/{invite.maxUses} used {invite.note ? `· ${invite.note}` : ""}
                 </span>
+                <form id={`delete-code-${invite.id}`} action={deleteInviteCode}>
+                  <input type="hidden" name="inviteId" value={invite.id} />
+                </form>
+                <ConfirmSubmitButton
+                  form={`delete-code-${invite.id}`}
+                  className={`${btnOutline} mt-2`}
+                  message={`Delete invite code ${invite.code}? Codes that already have applications are kept until those applicants are deleted.`}
+                >
+                  Delete code
+                </ConfirmSubmitButton>
               </li>
             ))}
           </ul>

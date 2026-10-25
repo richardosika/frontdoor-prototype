@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCrmNote, saveCrmPerson, sendPersonInfo } from "@/actions/crm";
+import { addCrmNote, deleteCrmPerson, saveCrmPerson, sendPersonInfo } from "@/actions/crm";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { CRM_STAGES, crmStageLabel, eventKindLabel, followUpDue } from "@/lib/crm-stage";
 import { requireAdmin } from "@/lib/current-user";
@@ -150,6 +151,20 @@ export default async function CrmPersonPage({
               </li>
             ))}
           </ul>
+        </section>
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete CRM person</h2>
+          <p className="mt-2 text-sm text-ink">Removes this CRM person, their notes, and their timeline. The member account and application stay.</p>
+          <form id="delete-crm" action={deleteCrmPerson} className="mt-3">
+            <input type="hidden" name="personId" value={person.id} />
+            <ConfirmSubmitButton
+              form="delete-crm"
+              className={btnOutline}
+              message={`Delete the CRM record for ${person.name}? Notes and timeline events go with it. The member account and application stay.`}
+            >
+              Delete CRM person
+            </ConfirmSubmitButton>
+          </form>
         </section>
       </div>
     </div>
