@@ -937,6 +937,89 @@ describe("QA follow-up scoring", () => {
     expect(companyOnly.recommendation.startsWith("APPROVE")).toBe(false);
   });
 
+  it("gives company-only credit for gtlaw.com, the Greenberg Traurig LinkedIn page, and kennedywilson.com", async () => {
+    expect(mentionsCompany("Kennedy-Wilson Holdings", "Kennedy-Wilson Holdings")).toBe(true);
+    expect(mentionsCompany("Kennedy Wilson", "Kennedy-Wilson Holdings")).toBe(true);
+    const samples = [
+      {
+        org: "Greenberg Traurig",
+        host: "https://www.gtlaw.com",
+        page: "<html><body><p>Greenberg Traurig</p></body></html>",
+        linkedin: "https://www.linkedin.com/company/greenberg-traurig-llp/",
+      },
+      {
+        org: "Kennedy-Wilson Holdings",
+        host: "https://www.kennedywilson.com",
+        page: "<html><body><p>Kennedy-Wilson Holdings</p></body></html>",
+        linkedin: "https://www.linkedin.com/company/kennedy-wilson/",
+      },
+    ];
+    for (const sample of samples) {
+      const applicant = facts({
+        name: "QA Tester",
+        applicantName: "QA Tester",
+        org: sample.org,
+        website: sample.host,
+        linkedinUrl: sample.linkedin,
+      });
+      const checks = await runPublicScreen(applicant, async (url) => {
+        if (url.includes(new URL(sample.host).hostname)) return { ok: true, status: 200, text: sample.page };
+        if (url.includes("linkedin.com/company")) return { ok: true, status: 200, text: sample.page };
+        return { ok: false, status: 403, text: "blocked" };
+      });
+      const website = checks.find((check) => check.key === "website");
+      const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+      expect(website?.status).toBe("PASS");
+      expect(website?.companyOnly).toBe(true);
+      expect(website?.corroborates).toBe(false);
+      expect(linkedin?.status).toBe("PASS");
+      expect(linkedin?.companyOnly).toBe(true);
+      expect(linkedin?.corroborates).toBe(false);
+      const graded = gradeChecks(checks, applicant);
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("(4 of 8)");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("(2 of 4)");
+      expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
+    }
+  });
+
+  it("keeps the fake control at least 15 points under a company-only real firm and off C", () => {
+    const shared = [
+      row({ key: "email-syntax", status: "PASS", weight: 2 }),
+      row({ key: "disposable-email", status: "PASS", weight: 4 }),
+      row({ key: "role-address", status: "PASS", weight: 2 }),
+      row({ key: "phone-state", status: "PASS", weight: 3 }),
+      row({ key: "linkedin-format", status: "PASS", weight: 3 }),
+      row({ key: "invite-source", status: "PASS", weight: 4 }),
+    ];
+    const real = gradeChecks(
+      [
+        ...shared,
+        row({ key: "plausibility", status: "PASS", weight: 8 }),
+        row({ key: "website", status: "PASS", weight: 8, companyOnly: true, corroborates: false, selfReported: true, finding: "company confirmed, person NOT confirmed" }),
+        row({ key: "edgar", status: "PASS", weight: 6, corroborates: false, finding: "EDGAR lists the company. It does not tie the person to the firm." }),
+        row({ key: "linkedin-fetch", status: "PASS", weight: 4, companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed" }),
+        row({ key: "rdap", status: "PASS", weight: 2, corroborates: false, finding: "RDAP responded." }),
+      ],
+      facts({ org: "CBRE Group", name: "Bob Sulentic", applicantName: "Bob Sulentic" }),
+    );
+    const fake = gradeChecks(
+      [
+        ...shared,
+        row({ key: "plausibility", status: "FAIL", weight: 8, finding: "The company name does not look like real words." }),
+        row({ key: "website", status: "FAIL", weight: 8, finding: "domain does not resolve" }),
+        row({ key: "edgar", status: "INCONCLUSIVE", weight: 6, finding: "No company on the SEC list uses this firm's name." }),
+        row({ key: "linkedin-fetch", status: "INCONCLUSIVE", weight: 4, finding: "no match found. Name: no. Company: no. City: no. Confidence: none." }),
+        row({ key: "rdap", status: "FAIL", weight: 2, finding: "domain does not resolve" }),
+      ],
+      facts({ org: "Blorptex Qwvzn Builders LLC", name: "Nix Qwvzn", applicantName: "Nix Qwvzn", location: "0 Nowhere Lane, NY 10001" }),
+    );
+    expect(real.score - fake.score).toBeGreaterThanOrEqual(15);
+    expect(fake.letter).toBe("F");
+    expect(["A", "B", "C"]).not.toContain(fake.letter);
+    expect(fake.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(real.recommendation.startsWith("APPROVE")).toBe(false);
+  });
+
   it("fails a domain that does not resolve and leaves a timeout or a 405 blocked", async () => {
     expect(classifyFetchError(Object.assign(new Error("getaddrinfo ENOTFOUND qa-test-nonexistent.example"), { code: "ENOTFOUND" }))).toBe("nxdomain");
     const cause = Object.assign(new Error("aborted"), { name: "AbortError" });
@@ -1869,6 +1952,8 @@ describe("batch 4 address and company-name plausibility", () => {
     expect(report.summary.didNotCheckOut.toLowerCase()).toContain("does not look like real words");
     expect(report.summary.didNotCheckOut.toLowerCase()).toContain("domain does not resolve");
     const role = report.categories.find((category) => category.id === "role");
+    expect(role?.reason).toContain("0 of 8");
     expect(role?.reason).not.toContain("8 of 8");
+    expect(report.summary.couldNotCheck.toLowerCase()).not.toContain("domain does not resolve");
   });
 });

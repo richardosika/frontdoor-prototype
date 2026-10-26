@@ -372,13 +372,14 @@ export function companyPhraseTokens(org: string): string[] {
 const PHRASE_GAP = `[\\s,.'’:"&/+-]+`;
 
 function tokenInPhrase(token: string): string {
-  const whole = `(?<![A-Za-z0-9-])${caseFold(token)}(?:'s)?(?![A-Za-z0-9-])`;
+  // A hyphen may separate the firm's own words ("Kennedy-Wilson"). A hyphen glued to a different word still fails the gap.
+  const whole = `(?<![A-Za-z0-9])${caseFold(token)}(?:'s)?(?![A-Za-z0-9])`;
   if (token.length < 8) return whole;
   const splits = [whole];
   for (let index = 4; index <= token.length - 3; index += 1) {
     const left = caseFold(token.slice(0, index));
     const right = caseFold(token.slice(index));
-    splits.push(`(?<![A-Za-z0-9-])${left}\\s+${right}(?:'s)?(?![A-Za-z0-9-])`);
+    splits.push(`(?<![A-Za-z0-9])${left}\\s+${right}(?:'s)?(?![A-Za-z0-9])`);
   }
   return `(?:${splits.join("|")})`;
 }

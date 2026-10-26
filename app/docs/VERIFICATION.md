@@ -64,6 +64,8 @@ Confidence is separate. High: at least 70% of weighted checks returned pass or f
 
 The recommendation is one of APPROVE, APPROVE WITH CONDITIONS, NEEDS MORE INFO, or DECLINE. A hard red flag recommends DECLINE. A doubtful hit, low confidence, or a thin file recommends NEEDS MORE INFO. A paying role is not a clean APPROVE, because monthly dues go out only after approval. The grade is stored as JSON on the verification run with the time it was graded. Re-run writes a note of what changed. Richard’s decision log and the admin notice include the grade. Members never see it.
 
+EDGAR also searches the free full-text index by the full company name when the firm is missing from `company_tickers.json`. The match is still the normalized exact name. Generic words never suffice, so CBRE Group matches CBRE GROUP, INC. and does not match Unum Group. A company-name hit does not corroborate the person. The approve step lists `person-to-company link` as Unverified unless a check actually corroborated the person, even when the company step auto-passed. News and social queries use the full distinctive company phrase. A result counts only when it names the person and the company or the city. A search that matches none of those says `no match found`, and each source is named once. Re-run checks writes that grade onto the application run, labels latest check against the grade at application when they differ, and always adds an audit entry.
+
 There is no language model on this path. The summary is built from the checks. If a model key is set elsewhere on the site, this file is still not sent to a model.
 
 ## Summary
