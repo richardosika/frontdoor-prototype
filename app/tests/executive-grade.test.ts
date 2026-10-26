@@ -104,6 +104,7 @@ describe("grade rubric", () => {
     expect(capLetter("F", "B")).toBe("F");
     expect(CAP_RULES).toEqual({
       noCorroboration: "D",
+      thinCorroboration: "C",
       ambiguousNews: "C",
       reviewRedFlag: "D",
       hardRedFlag: "F",

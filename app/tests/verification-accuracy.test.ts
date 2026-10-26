@@ -101,6 +101,7 @@ describe("corroboration is independent of the applicant's own page", () => {
       row({ key: "business-card", status: "PASS", selfReported: true, corroborates: false, finding: "The card names the person and the company." }),
       row({ key: "rdap", status: "PASS", corroborates: false, finding: "RDAP responded." }),
       row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists the exact company name." }),
+      row({ key: "edgar", status: "PASS", corroborates: false, finding: "EDGAR lists the company. It does not tie the person to the firm." }),
     ];
     const graded = gradeChecks(checks, {
       ...facts({
@@ -154,6 +155,40 @@ describe("corroboration is independent of the applicant's own page", () => {
     expect(strict.status).toBe("PASS");
     expect(strict.corroborates).toBe(false);
     expect(strict.selfReported).toBe(true);
+  });
+
+  it("caps a single independent source at C and does not approve it", () => {
+    const graded = gradeChecks(
+      [
+        row({ key: "email-syntax", status: "PASS" }),
+        row({ key: "disposable-email", status: "PASS" }),
+        row({ key: "role-address", status: "PASS" }),
+        row({ key: "phone-state", status: "PASS" }),
+        row({ key: "text-risk", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "linkedin-format", status: "PASS" }),
+        row({ key: "invite-source", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "velocity", status: "PASS" }),
+        row({ key: "website", status: "PASS", selfReported: true, corroborates: false }),
+        row({ key: "edgar", status: "PASS", corroborates: false }),
+        row({ key: "rdap", status: "PASS", corroborates: false }),
+        row({ key: "business-card", status: "PASS", selfReported: true, corroborates: false }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "One headline names the person and the company." }),
+      ],
+      facts({
+        phone: "201-555-0100",
+        website: "https://example.com",
+        linkedinUrl: "https://www.linkedin.com/in/jane-roe",
+        cardUploaded: true,
+        cardText: "Jane Roe, Zorblax Holdings",
+      }),
+    );
+    expect(graded.score).toBeGreaterThanOrEqual(80);
+    expect(graded.letter).toBe("C");
+    expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(graded.caps.some((line) => line.startsWith("Capped at C"))).toBe(true);
   });
 });
 
@@ -513,8 +548,9 @@ describe("self-reported site cannot reach C alone", () => {
     expect(website?.corroborates).toBe(false);
     expect(website?.finding).toContain("Name: yes");
     expect(website?.url).toMatch(/team|pellam/);
-    expect(footprint?.selfReported).toBe(true);
     expect(footprint?.corroborates).toBe(false);
+    expect(footprint?.selfReported).not.toBe(true);
+    expect(footprint?.url || "").not.toContain("bramblewick-group.example");
     const search = checks.find((check) => check.key === "screen-web");
     expect(search?.selfReported).toBe(true);
     expect(search?.corroborates).toBe(false);

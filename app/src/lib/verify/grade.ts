@@ -39,6 +39,8 @@ export const LETTER_FLOORS = { A: 90, B: 80, C: 70, D: 60 } as const;
  */
 export const CAP_RULES = {
   noCorroboration: "D",
+  /** One independent source can reach C. It cannot be an approval, and it cannot be an A or a B. */
+  thinCorroboration: "C",
   ambiguousNews: "C",
   reviewRedFlag: "D",
   hardRedFlag: "F",
@@ -525,7 +527,12 @@ export function gradeChecks(
   const weights = GRADE_WEIGHTS;
   const websitePass = passedKey(checks, "website", "fixture-website");
   const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
-  const webPass = passedKey(checks, "web-footprint", "fixture-web") || checks.some((item) => item.key.startsWith("screen-") && item.status === "PASS" && item.corroborates);
+  const footprintRow = findCheck(checks, "web-footprint");
+  const thirdPartyFootprint = passed(footprintRow) && !footprintRow?.selfReported;
+  const webPass =
+    thirdPartyFootprint ||
+    passed(findCheck(checks, "fixture-web")) ||
+    checks.some((item) => item.key.startsWith("screen-") && item.status === "PASS" && item.corroborates && !item.selfReported);
   const card = findCheck(checks, "business-card");
   const linkedin = findCheck(checks, "linkedin-fetch");
 
@@ -637,8 +644,11 @@ export function gradeChecks(
   if (conflicts.length >= 2) {
     applyCap(CAP_RULES.twoConflicts, "two or more checks disagree with the application");
   }
-  if (corroboratingPasses(checks).length === 0) {
+  const independentCount = corroboratingPasses(checks).length;
+  if (independentCount === 0) {
     applyCap(CAP_RULES.noCorroboration, "no free source corroborated the person and the company");
+  } else if (independentCount < 2) {
+    applyCap(CAP_RULES.thinCorroboration, "fewer than two independent sources tied this person to this company");
   }
 
   const checked = checks.map(passSentence).filter((line): line is string => Boolean(line));
@@ -686,7 +696,7 @@ export function gradeChecks(
   for (const check of conflicts) {
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
-  if (corroboratingPasses(checks).length === 0) {
+  if (independentCount === 0) {
     const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
     pushAttention({
       severity: "Medium",
@@ -694,6 +704,12 @@ export function gradeChecks(
       detail: selfReported
         ? "The applicant's own website or card is one self-reported source. No independent source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean."
         : "No free source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean.",
+    });
+  } else if (independentCount < 2) {
+    pushAttention({
+      severity: "Medium",
+      title: "Only one independent source",
+      detail: "Only one independent source tied this person to this company. The applicant's own site and a self-reported card do not count. The grade cannot go above a C, and this is not an approval.",
     });
   }
   for (const check of checks) {

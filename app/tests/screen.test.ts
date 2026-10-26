@@ -202,9 +202,13 @@ describe("public screening", () => {
     expect(linked?.finding.toLowerCase()).not.toContain("not found");
     expect(linked?.finding).toContain("blocked automated access");
     expect(linked?.url).toContain("company/buildprocs");
-    expect(web?.status).toBe("PASS");
-    expect(web?.url).toContain("/en/about");
-    expect(web?.finding).toContain("Confidence: high");
+    const site = checks.find((item) => item.key === "website");
+    expect(site?.status).toBe("PASS");
+    expect(site?.selfReported).toBe(true);
+    expect(site?.corroborates).toBe(false);
+    expect(site?.url).toContain("/en/about");
+    expect(web?.corroborates).toBe(false);
+    expect(web?.url || "").not.toContain("/en/about");
     expect(youtube?.finding).toContain("Confidence: low");
     expect(youtube?.finding).toContain("Rich Osika");
     expect(youtube?.finding.toLowerCase()).not.toContain("not found");
@@ -223,7 +227,7 @@ describe("public screening", () => {
       corroborates: item.corroborates,
     })));
     expect(suggestion.mark).toBe("PASS");
-    expect(suggestion.evidenceUrl).toContain("buildpro-cs.com");
+    expect(suggestion.evidenceUrls.join(" ")).toContain("buildpro-cs.com");
 
     const steps = buildReviewSteps({
       evidence: checks.map((item) => ({ checkKey: item.key, status: item.status, finding: item.finding, source: item.source, url: item.url })),
@@ -247,7 +251,8 @@ describe("public screening", () => {
     expect(grade.summary.couldNotCheck).toContain("YouTube returned a public result");
     expect(grade.summary.couldNotCheck).toContain("Confidence: low");
     expect(grade.summary.couldNotCheck).toContain("Couldn't check for free");
-    expect(grade.summary.checkedOut).toContain("names both the person and the company");
+    expect(grade.summary.checkedOut).toContain("A public web page included the person or the company name");
+    expect(grade.summary.checkedOut).not.toContain("names both the person and the company");
 
     const blockedSuggestion = suggestOne(
       "identity",

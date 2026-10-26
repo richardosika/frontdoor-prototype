@@ -418,21 +418,6 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           selfReported: true,
         });
       }
-      const named = pages
-        .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
-        .find((page) => page.score.name && page.score.company);
-      if (named) {
-        attempts.push({
-          key: "web-footprint",
-          platform: "Company website",
-          searched,
-          url: named.url,
-          outcome: "found",
-          score: named.score,
-          detail: "a public page names this person and this company",
-          selfReported: true,
-        });
-      }
     }
   }
 
@@ -708,8 +693,11 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
+  const ownHost = applicantHost(website);
   if (!attempts.some((item) => item.key === "web-footprint")) {
-    const best = attempts.find((item) => item.outcome === "found" && item.score.name && item.score.company);
+    const best = attempts.find(
+      (item) => item.outcome === "found" && item.score.name && item.score.company && !attemptOnOwnSite(item, ownHost),
+    );
     if (best) {
       attempts.push({ ...best, key: "web-footprint", platform: best.platform });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
@@ -721,7 +709,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         key: "web-footprint",
         platform: "Web search",
         searched,
-        url: website || ddgUrl,
+        url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
         detail: "no free page named both this person and this company",
@@ -729,8 +717,14 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
-  const ownHost = applicantHost(website);
   return attempts.map((attempt) => toCheck(attempt, ownHost));
+}
+
+/** The applicant's own site is one self-reported source. It cannot also be the public web footprint. */
+function attemptOnOwnSite(attempt: Attempt, ownHost: string): boolean {
+  if (attempt.selfReported || attempt.key === "website") return true;
+  const blob = `${attempt.url} ${attempt.detail} ${attempt.linkedUrl || ""}`.toLowerCase();
+  return Boolean(ownHost && blob.includes(ownHost));
 }
 
 function rank(score: MatchScore): number {
