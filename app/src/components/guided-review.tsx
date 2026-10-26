@@ -102,7 +102,7 @@ export function GuidedReview({
                 <option value="PASS">Pass</option>
                 <option value="CONCERN">Concern</option>
                 <option value="FAIL">Fail</option>
-                <option value="COULDNT_VERIFY">Couldn't verify</option>
+                <option value="COULDNT_VERIFY">{"Couldn't verify"}</option>
                 <option value="NOT_CHECKED">Not checked</option>
               </select>
             </label>
