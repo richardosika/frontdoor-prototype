@@ -1,5 +1,6 @@
 import type { EvidenceStatus, Prisma, RunSubject, Verdict } from "@prisma/client";
 import { applicationStatusAfterVerification } from "@/lib/application-status";
+import { isInviteUsable } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { failedGrade, gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot } from "@/lib/verify/grade";
@@ -157,7 +158,7 @@ async function factsForRun(run: {
     socialLinks: string;
     statement: string;
     testProfile: string;
-    inviteCode: { note: string; code: string } | null;
+    inviteCode: { note: string; code: string; uses?: number; maxUses?: number; expiresAt?: Date | null } | null;
     businessCard?: { deletedAt: Date | null; sizeBytes: number; contentType?: string; bytes?: Uint8Array | null } | null;
     referenceEmails?: string[];
   } | null;
@@ -203,6 +204,13 @@ async function factsForRun(run: {
     socialLinks: application?.socialLinks || "",
     statement: application?.statement || "",
     inviteNote: application?.inviteCode ? `${application.inviteCode.code} · ${application.inviteCode.note}` : "",
+    inviteValid: application?.inviteCode
+      ? isInviteUsable({
+          uses: application.inviteCode.uses ?? 0,
+          maxUses: application.inviteCode.maxUses ?? 1,
+          expiresAt: application.inviteCode.expiresAt ?? null,
+        })
+      : undefined,
     testProfile: application?.testProfile || "",
     cardText,
     cardUploaded,

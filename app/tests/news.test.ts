@@ -5,6 +5,7 @@ import {
   bingNewsUrl,
   allegedNegative,
   classifyNews,
+  dedupeNewsItems,
   feedBodyState,
   newsStoryChipLabel,
   gdeltNewsUrl,
@@ -500,5 +501,55 @@ describe("news feeds", () => {
     expect(fraud[0].status).toBe("FAIL");
     expect(fraud[0].reviewFlag).toBe(true);
     expect(fraud[0].finding).toContain("not an automatic decline");
+  });
+
+  it("does not match turner inside a hyphenated word, and keeps one copy of a repeated headline", () => {
+    const applicant = facts({
+      name: "QA Tester",
+      applicantName: "QA Tester",
+      org: "Turner Construction Company",
+    });
+    const headline = "A page-turner for every e-reader tester";
+    const checks = classifyNews(
+      applicant,
+      [
+        {
+          title: headline,
+          snippet: "The e-reader tester loved the page-turner.",
+          url: "https://example.com/turner-1",
+          source: "Desk",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Google News",
+        },
+        {
+          title: headline,
+          snippet: "The e-reader tester loved the page-turner.",
+          url: "https://example.com/turner-2",
+          source: "Wire",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Bing News",
+        },
+        {
+          title: "Turner Construction Company starts a New York tower",
+          snippet: "Turner Construction Company published the notice.",
+          url: "https://example.com/turner-real",
+          source: "Desk",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [
+        { name: "Google News", state: "responded" },
+        { name: "Bing News", state: "responded" },
+      ],
+      NOW,
+    );
+    const stories = checks.filter((check) => check.key === "news-story");
+    expect(stories.some((check) => /page-turner/i.test(check.finding))).toBe(false);
+    expect(stories.filter((check) => /Turner Construction Company starts/i.test(check.finding))).toHaveLength(1);
+    expect(dedupeNewsItems([
+      { title: headline, url: "https://example.com/a" },
+      { title: headline, url: "https://example.com/b" },
+    ])).toHaveLength(1);
   });
 });

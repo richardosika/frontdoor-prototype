@@ -206,6 +206,19 @@ export function isNewsEcho(title: string, snippet: string, queries: string[]): b
   return queries.some((query) => isQueryEcho(title, query) || isQueryEcho(blob, query) || normalizeName(title) === normalizeName(query));
 }
 
+/** Identical headlines are one story. This runs before a headline is scored or saved. */
+export function dedupeNewsItems<T extends { title: string; url: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const key = normalizeName(item.title).slice(0, 140) || item.url;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 export function classifyNews(
   facts: ApplicantFacts,
   items: NewsItem[],
@@ -217,7 +230,7 @@ export function classifyNews(
   const personName = facts.applicantName.trim();
   const companyName = (facts.org || facts.name).trim();
   const kept = dedupe(
-    items
+    dedupeNewsItems(items)
       .filter((item) => withinNewsWindow(item.publishedAt, now))
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
@@ -481,7 +494,7 @@ function textHasCompany(text: string, org: string, person = ""): boolean {
 function textHasLocation(text: string, location: string): boolean {
   const city = normalizeName(cityPhrase(location));
   if (city.length < 4) return false;
-  return new RegExp(`\\b${escapeRegExp(city)}\\b`).test(normalizeName(text));
+  return new RegExp(`(?<![A-Za-z0-9-])${escapeRegExp(city)}(?![A-Za-z0-9-])`).test(normalizeName(text));
 }
 
 function dedupe(items: Classified[]): Classified[] {

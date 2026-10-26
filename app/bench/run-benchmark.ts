@@ -23,9 +23,10 @@ import { parseWatchlists, splitCsv } from "@/lib/verify/watchlist";
 
 type Case = {
   id: string;
-  kind: "real" | "fake";
+  kind: "real" | "fake" | "qa";
   label: string;
   companyOnly?: boolean;
+  qaExpect?: "firm" | "fake";
   personAssumption?: string;
   name: string;
   email: string;
@@ -229,13 +230,24 @@ function evaluate(c: Case, grade: { letter: string; recommendation: string }, ch
         if (x.hardFlag || x.reviewFlag) reasons.push(`FLAG ${x.key}=${x.status}${x.hardFlag ? " hard" : " review"}: ${short(x.finding)}`);
       }
     }
-  } else {
+  } else if (c.kind === "fake") {
     expected = "F/D and NEEDS MORE INFO/DECLINE, never APPROVE*";
     ok = ["F", "D"].includes(grade.letter) && ["NEEDS MORE INFO", "DECLINE"].includes(grade.recommendation);
     falsePositive = grade.recommendation.startsWith("APPROVE") || ["A", "B", "C"].includes(grade.letter);
     if (!ok) reasons.push(`Expectation missed: grade ${grade.letter} / ${grade.recommendation}.`);
     const corr = checks.filter((x) => x.status === "PASS" && x.corroborates);
     if (!ok || corr.length) for (const x of corr) reasons.push(`Corroborating PASS on a fake: ${x.key}: ${short(x.finding)}`);
+  } else {
+    expected = c.qaExpect === "fake"
+      ? "QA fake control: F or D, never APPROVE*, domain does not resolve"
+      : "QA firm, person unmatched: company-only credit allowed, never APPROVE*";
+    ok = ["F", "D"].includes(grade.letter) && !grade.recommendation.startsWith("APPROVE");
+    falsePositive = grade.recommendation.startsWith("APPROVE") || ["A", "B", "C"].includes(grade.letter);
+    if (!ok) reasons.push(`QA expectation missed: grade ${grade.letter} / ${grade.recommendation}.`);
+    if (c.qaExpect === "fake" && !checks.some((x) => x.status === "FAIL" && /domain does not resolve/i.test(x.finding))) {
+      ok = false;
+      reasons.push("Fake control did not FAIL with domain does not resolve.");
+    }
   }
   if (c.mustSanctions) {
     const got = sanctions?.status ?? "missing";
@@ -337,6 +349,7 @@ async function main() {
         kind: c.kind,
         label: c.label,
         companyOnly: Boolean(c.companyOnly),
+        qaExpect: c.qaExpect || "",
         personAssumption: c.personAssumption ?? "",
         watchlist: c.watchlist ?? "full",
         watchlistEntries: watchlist.length,
@@ -403,7 +416,7 @@ function summarize(results: Record<string, unknown>[]) {
     passed: results.filter((r) => r.result === "PASS").length,
     failed: results.filter((r) => r.result === "FAIL").length,
     errored: results.filter((r) => r.result === "ERROR").length,
-    falsePositives: { count: ids(fake, (r) => Boolean(r.falsePositive)).length, ids: ids(fake, (r) => Boolean(r.falsePositive)), definition: "fake reaching APPROVE* or grade >= C" },
+    falsePositives: { count: ids(results, (r) => Boolean(r.falsePositive)).length, ids: ids(results, (r) => Boolean(r.falsePositive)), definition: "fake or QA control reaching APPROVE* or grade >= C" },
     falseNegatives: { count: ids(real, (r) => Boolean(r.falseNegative)).length, ids: ids(real, (r) => Boolean(r.falseNegative)), definition: "real entity graded D/F or DECLINE" },
     realHardFail: ids(real, (r) => r.result !== "PASS"),
   };

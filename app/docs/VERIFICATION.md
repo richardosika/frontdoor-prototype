@@ -43,8 +43,8 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 
 | Category | Possible | What earns the points |
 | --- | --- | --- |
-| Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4 |
-| Company legitimacy | 22 | Website names the person or company 8, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (NY Active Corporations exact name only; other states earn 0) |
+| Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4, or a LinkedIn company page names the company only 2 |
+| Company legitimacy | 22 | Website names the person and company 8, or the company only on the firm's own site 4, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (NY Active Corporations exact name only; other states earn 0) |
 | Public footprint and reputation | 18 | Web result names person and company 8, headline names both 8, social links are full URLs 2 |
 | Risk and sanctions | 20 | Sanctions list clear 8, not a duplicate 6, no fraud-pattern text 4, no application burst 2 |
 | Role fit and plausibility | 12 | Name, company, and role readable 8, invite code on file 4 |
@@ -52,9 +52,9 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 
 Letters before caps: A 90–100, B 80–89, C 70–79, D 60–69, F 0–59. Caps only lower the letter.
 
-Proposal R2 is off (`GRADE_WEIGHTS_MODE` is `standard`). Turning it on moves the 4 LinkedIn-fetch points and the 2 registry points onto the website (11) and the web footprint (11), then rescales earned points over the points that could actually be checked. A blocked or skipped check leaves that denominator. “No SEC registrant” stays in it. Letter floors do not move.
+Proposal R2 is off (`GRADE_WEIGHTS_MODE` is `standard`). Turning it on moves the 4 LinkedIn-fetch points and the 2 registry points onto the website (11) and the web footprint (11), then rescales earned points over the points that could actually be checked. A blocked or skipped check leaves that denominator. “No SEC registrant” stays in it. A file with no referral is `no referral supplied` and those 4 points leave the denominator; a code that was supplied but is not valid still scores 0 and is flagged. With R2 off, a missing referral still scores 0 of 4. Letter floors do not move.
 
-- No independent person-and-company corroboration: cannot exceed D, so the letter stays below C. Letter floors are unchanged (C still starts at 70). One independent source: cannot exceed C, and the recommendation is not an approval. The applicant's own website, team pages on that site, and a self-reported card are not independent sources. A public web footprint has to come from a third-party host. The same page is not counted again as a footprint. A company-name-only EDGAR or NY registry hit is company-exists evidence and does not corroborate the person. EDGAR matches a normalized exact name or a ticker that is the whole applicant name. Generic words such as group, capital, and realty do not match a different firm. A LinkedIn or social URL that was not fetched does not earn its points unless an independent source already corroborated the file.
+- No independent person-and-company corroboration: cannot exceed D, so the letter stays below C. Letter floors are unchanged (C still starts at 70). One independent source: cannot exceed C, and the recommendation is not an approval. The applicant's own website, team pages on that site, a LinkedIn company page, and a self-reported card are not independent sources. A company-only match on the firm's own site or LinkedIn company page is labelled “company confirmed, person NOT confirmed” and earns half the points of a person-and-company match. That partial credit cannot by itself reach APPROVE. A public web footprint has to come from a third-party host and still needs the person and the company. The same page is not counted again as a footprint. A company-name-only EDGAR or NY registry hit is company-exists evidence and does not corroborate the person. EDGAR matches a normalized exact name or a ticker that is the whole applicant name. Generic words such as group, capital, and realty do not match a different firm. “CBRE Group” does not match Unum Group. A LinkedIn or social URL that was not fetched does not earn its points unless an independent source already corroborated the file.
 - Negative headline that is only a name match: cannot exceed C. The file says “possible match, verify” and does not state the headline as fact. A headline is attributed to the person only on a full-name match, not a single surname token.
 - Disposable email that still has a public page, sanctions name without country or date of birth, or fraud, sanctions, or a criminal charge tied to the person together with the company or city: cannot exceed D, with a red banner. A company-level lawsuit or lien is an attention item for Richard. It is not that cap. Separate news headlines are not separate conflicts. An OpenSanctions hard flag, if that paid source ever answers, uses the same sanctions caps.
 - Corroborated sanctions, fraud-pattern text, disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed F, with a red banner.
@@ -77,7 +77,7 @@ The stored summary text is the executive summary plus a short legacy line. It is
 
 ## Jobs
 
-Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A source that answers with nothing relevant is `INCONCLUSIVE` (“No data found”). A source that is blocked, times out, or errors is `UNAVAILABLE`, stays in the score denominator, and earns 0. Neither one fails the job by itself. Each check shows a status chip. The recommendation is computed again after a skipped review step lowers confidence, so a skip can move APPROVE to NEEDS MORE INFO.
+Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A source that answers with nothing relevant is `INCONCLUSIVE` (“No data found”). A source that is blocked, times out, or errors is `UNAVAILABLE`, earns 0, and in the standard weighting stays in the score denominator. Proposal R2 drops a blocked or skipped check from the coverage denominator instead of treating it as a silent zero. A domain whose DNS is NXDOMAIN or ENOTFOUND, or that has no RDAP record, is `FAIL` and the summary says “domain does not resolve” under what did not check out. A timeout, HTTP 403, HTTP 405, or a captcha stays `UNAVAILABLE`. Neither a block nor an empty result fails the job by itself. Each check shows a status chip. The recommendation is computed again after a skipped review step lowers confidence, so a skip can move APPROVE to NEEDS MORE INFO.
 
 Test-console samples run with the network off. The strong sample adds three local fixture checks so a `LEGIT` recommendation is visible without outside sites. **Re-run verification** turns the network on and does not add those fixtures. The verdict can change. The test console can also create one `is_test` applicant with a name, company, email, and website you type, then queue a live run.
 
@@ -89,17 +89,17 @@ OCR is installed (`tesseract.js`). An uploaded card that comes back with no text
 | --- | --- | --- |
 | Email syntax, disposable list, free provider, role address | Bundled lists | Always local |
 | MX | DNS | Skipped on offline passes and disposable domains |
-| Website, /about, /team | Public HTTP | A blank website is missing, not blocked. A page that names the company is company-exists evidence. The applicant's own page is self-reported. |
+| Website, /about, /team | Public HTTP | A blank website is missing, not blocked. A page that names the company and not the person is “company confirmed, person NOT confirmed” and earns half the website points. The applicant's own page is self-reported. HTTP 403 or 405 is “blocked by site” and not checkable. NXDOMAIN or ENOTFOUND is “domain does not resolve”. |
 | RDAP | rdap.org | No company host |
 | Sanctions | Full OFAC SDN CSV plus the alternate-names file, cached in `SourceCache`. The cache refreshes on startup when it is missing or older than a day. | An empty cache is `NOT_RUN` and earns 0. The local name Alexei Sanctionhit can still flag that labelled sample. It is not a loaded list. A name match is a hard flag only when the country or a date of birth also lines up. |
 | OpenSanctions | api.opensanctions.org | Not checkable for free. HTTP 401 without a paid key is `UNAVAILABLE`. A hard flag, if a list is ever returned, uses the sanctions caps. |
 | OpenCorporates | api.opencorporates.com | Not checkable for free. HTTP 401 without a paid token is `UNAVAILABLE`. A company-name hit would be company-exists evidence only. |
 | EDGAR | SEC company list and efts.sec.gov full-text search | A 4-letter distinctive token such as “toll” can match. A block or timeout is `UNAVAILABLE`. A response with zero hits is `INCONCLUSIVE`. A company-name hit does not corroborate the person unless a filing also names them. Lookup uses the run's fetch function, so an offline test does not call the network. |
 | Courts | CourtListener public search, per result | 401, 403, or no response is `UNAVAILABLE`. A clean no-hit is “no record found in CourtListener federal data” and is not a clearance of all litigation. Its weight is 2. A severe word in a different result is ignored. A full-name hit without the company is “possible match, needs review” and is not a failure. |
-| Web | Public screening (DuckDuckGo and Bing), not a second fallback pass | An empty but reachable results page is `INCONCLUSIVE`. A challenge page is `UNAVAILABLE`. A footprint taken from the applicant's own site is the same self-reported source as that site. |
-| News | Google News RSS, Bing News RSS, and GDELT | Quoted person name, quoted company name, and company plus city. Items older than five years are dropped. The full name has to appear. A single surname token is not the person. A headline that only repeats the query does not count. Fraud, sanctions, or a criminal charge tied to the person with the company or city is a failure for review, not an automatic decline. A company-level lawsuit is an attention item, not a grade cap. A negative term on the person alone is “possible match, needs review” and is not a failure. A blocked feed is `UNAVAILABLE` and is listed under what could not be checked for free. GDELT waits five seconds between calls and caches a success. |
+| Web | DuckDuckGo HTML, then Bing, then Wikipedia REST, then keyless Wikidata `wbsearchentities` | An empty but reachable results page is `INCONCLUSIVE`. A challenge page is `UNAVAILABLE` and says “not checkable for free”. Under proposal R2 that row leaves the coverage denominator. A footprint taken from the applicant's own site is the same self-reported source as that site. |
+| News | Google News RSS, Bing News RSS, and GDELT | Quoted full person name, quoted full company phrase, and company plus city. A hyphen is part of the word, so “turner” does not match “page-turner”. Identical headlines are dropped before they are scored or saved. Items older than five years are dropped. The full name has to appear. A single surname token is not the person. A headline that only repeats the query does not count. Fraud, sanctions, or a criminal charge tied to the person with the company or city is a failure for review, not an automatic decline. A company-level lawsuit is an attention item, not a grade cap. A negative term on the person alone is “possible match, needs review” and is not a failure. A blocked feed is `UNAVAILABLE` and is listed under what could not be checked for free. GDELT waits five seconds between calls and caches a success. |
 | LinkedIn and other social pages | Public HTTP with an identifying user agent, not a browser spoof | A block is `UNAVAILABLE` and not checkable for free. A response without the name is `INCONCLUSIVE`. Logged-in pages are not scraped. A URL may include a query string or a sub-path. The shape of a URL does not earn points by itself. |
-| RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404 is “No data found”. |
+| RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404, or DNS NXDOMAIN, is `FAIL`: “domain does not resolve”. |
 | State registry | Deep link only | Always `NOT_RUN` with a manual link for NJ, NY, DE, FL, and TX |
 | Business card | Local text compare. OCR is installed (tesseract.js). | `NOT_RUN` when nothing was uploaded. `UNAVAILABLE` when an image was uploaded and OCR returned no text. A text match requires the full name and the company, and it is self-reported. |
 
@@ -112,6 +112,24 @@ State registry links:
 - TX: https://mycpa.cpa.state.tx.us/coa/
 
 Refresh the OFAC cache from **Admin → Verification settings**. The server also refreshes it on startup when the cache is missing or older than a day. Social fetches use `PrivateFloorClub/1.0` and do not pretend to be a browser. LinkedIn, X, Facebook, Instagram, YouTube, and TikTok often block that agent; a block is not checkable for free.
+
+Transient network failures, HTTP 429, and HTTP 5xx are retried twice with backoff (700ms, then 1400ms, or five seconds for GDELT). NXDOMAIN, HTTP 401, HTTP 403, HTTP 405, and a challenge page are not retried.
+
+## What Render cannot check for free
+
+Live QA on the Oregon Render service on 26 Oct 2026, plus the benchmark preflight, showed these sources do not return a usable free result from that host. The user agent stays `PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)`. A block is `UNAVAILABLE` and the summary says it is not checkable for free. It is not scored as a failed company match.
+
+| Source | What Render saw | How the grade treats it |
+| --- | --- | --- |
+| DuckDuckGo HTML | HTTP 202 or a challenge page | Not checkable for free. Wikipedia REST is tried next, then keyless Wikidata. |
+| Bing web search | Often blocked or unusable from the same run, even when a preflight returns 200 | Same fallback. If all four fail, the footprint says web search is not checkable for free. |
+| X, Facebook, Instagram | Blocked on the QA files | `UNAVAILABLE`. Not a pass. |
+| LinkedIn | Auth wall or no response. `cbre.com` also returns HTTP 403 to this agent | “blocked by site”. Not a failed name match. No browser user-agent is sent. |
+| CourtListener | Sometimes times out | `UNAVAILABLE`. A timeout is not “domain does not resolve”. |
+| OpenCorporates | HTTP 401 without a paid token | Not checkable for free. Weight 0. |
+| OpenSanctions | HTTP 401 without a paid key | Not checkable for free. Weight 0. |
+
+A `QA-TEST ` prefix is removed for search only when the email is `qa-test-*@privatefloorclub.com`. The removal is logged. Any other email keeps the prefix, including in production. The stored company name is not rewritten.
 
 ## Notices
 

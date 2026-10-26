@@ -17,6 +17,11 @@ export type CheckOutput = {
   /** True only when this pass corroborates the person and the company, not merely the absence of a red flag. */
   corroborates?: boolean;
   /**
+   * The company name matched on the applicant's own site or a LinkedIn company page.
+   * The person did not. This is partial credit and does not corroborate the person.
+   */
+  companyOnly?: boolean;
+  /**
    * Applicant-supplied material (their own site, a footprint from that same site, or their card).
    * Several of these together are one self-reported source. They do not corroborate the person.
    */
@@ -37,6 +42,8 @@ export type ApplicantFacts = {
   socialLinks: string;
   statement: string;
   inviteNote: string;
+  /** False when a stored invite code is expired or used up. Absent when no code was supplied. */
+  inviteValid?: boolean;
   testProfile: string;
   cardText: string;
   cardUploaded: boolean;

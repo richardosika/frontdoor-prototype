@@ -1,8 +1,8 @@
-import { decodeHtmlEntities } from "@/lib/verify/fetch";
+import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
-import { wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 
@@ -33,12 +33,14 @@ type Attempt = {
   platform: string;
   searched: string;
   url: string;
-  outcome: "found" | "not-found" | "blocked" | "missing";
+  outcome: "found" | "not-found" | "blocked" | "missing" | "dead";
   score: MatchScore;
   detail: string;
   selfReported?: boolean;
   linkedUrl?: string;
 };
+
+const COMPANY_ONLY = "company confirmed, person NOT confirmed";
 
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
   const hay = text.toLowerCase();
@@ -59,7 +61,7 @@ export function emptyScore(): MatchScore {
 
 /** A login wall or a bot challenge is a blocked source, not an empty result. */
 export function accessBlocked(status: number, text: string, url = ""): boolean {
-  if (status === 0 || status === 202 || status === 400 || status === 401 || status === 403 || status === 429 || status === 999 || status >= 500) {
+  if (status === 0 || status === 202 || status === 400 || status === 401 || status === 403 || status === 405 || status === 429 || status === 999 || status >= 500) {
     return true;
   }
   const blob = `${url} ${text.slice(0, 2500)}`.toLowerCase();
@@ -268,8 +270,15 @@ function strong(score: MatchScore): boolean {
   return score.confidence === "high" || (score.confidence === "medium" && score.name);
 }
 
-function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean } {
+function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean } {
   const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${attempt.score.company ? "yes" : "no"}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
+  if (attempt.outcome === "dead") {
+    return {
+      status: "FAIL",
+      corroborates: false,
+      finding: `Searched: ${attempt.searched}. domain does not resolve.`.replace(/\s+/g, " ").trim(),
+    };
+  }
   if (attempt.outcome === "missing") {
     return {
       status: "NOT_RUN",
@@ -293,12 +302,14 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   }
   // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.
   const tied = attempt.score.name && attempt.score.company && strong(attempt.score);
-  const companyOnOwnSite = attempt.key === "website" && attempt.score.company && !tied;
-  if (companyOnOwnSite) {
+  const linkedinCompanyPage = attempt.key === "linkedin-fetch" && /linkedin\.com\/company\//i.test(attempt.url);
+  const companyOnlyPage = (attempt.key === "website" || linkedinCompanyPage) && attempt.score.company && !attempt.score.name;
+  if (companyOnlyPage) {
     return {
       status: "PASS",
       corroborates: false,
-      finding: `Searched: ${attempt.searched}. Found: ${attempt.detail} The company name is on the applicant's site. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      companyOnly: true,
+      finding: `Searched: ${attempt.searched}. Found: ${attempt.detail} ${COMPANY_ONLY}. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   const selfReportedNote = attempt.selfReported
@@ -323,8 +334,9 @@ function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
     source: attempt.platform,
     url: attempt.url,
     ranAt: new Date().toISOString(),
-    corroborates: judged.corroborates && !ownSite,
+    corroborates: judged.corroborates && !ownSite && !judged.companyOnly,
     selfReported: ownSite ? true : undefined,
+    companyOnly: judged.companyOnly || undefined,
   };
 }
 
@@ -332,11 +344,14 @@ function blockedAttempt(key: string, platform: string, searched: string, url: st
   return { key, platform, searched, url, outcome: "blocked", score: emptyScore(), detail };
 }
 
-async function pull(fetchText: FetchText, url: string): Promise<{ ok: boolean; status: number; text: string }> {
+async function pull(
+  fetchText: FetchText,
+  url: string,
+): Promise<{ ok: boolean; status: number; text: string; failure?: "nxdomain" | "timeout" | "network" }> {
   try {
     return await fetchText(url);
-  } catch {
-    return { ok: false, status: 0, text: "" };
+  } catch (error) {
+    return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
   }
 }
 
@@ -390,15 +405,26 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   } else {
     let home = await pull(fetchText, website);
     let homeUrl = website;
-    if (home.status === 0) {
+    if (home.status === 0 && home.failure !== "nxdomain") {
       const alt = withWww(website);
       if (alt !== website) {
         home = await pull(fetchText, alt);
         homeUrl = alt;
       }
     }
-    if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
-      const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 999;
+    if (home.failure === "nxdomain") {
+      attempts.push({
+        key: "website",
+        platform: "Company website",
+        searched: website,
+        url: homeUrl,
+        outcome: "dead",
+        score: emptyScore(),
+        detail: "domain does not resolve",
+        selfReported: true,
+      });
+    } else if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
+      const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 405 || home.status === 999;
       attempts.push(
         blockedAttempt(
           "website",
@@ -478,7 +504,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       if (linkedinBlocked(linked.status, linked.text, queryFacts)) {
         if (!recorded && url === linkedinTargets[linkedinTargets.length - 1]) {
           attempts.push(
-            blockedAttempt("linkedin-fetch", "LinkedIn", url, url, "LinkedIn blocked automated access."),
+            blockedAttempt("linkedin-fetch", "LinkedIn", url, url, "LinkedIn blocked automated access. blocked by site."),
           );
           recorded = true;
         }
@@ -696,7 +722,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     wikiSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
     wikiBlocked = accessBlocked(wiki.status, wiki.text, wikiUrl) || texts.length === 0;
   }
+  let dataUrl = "";
+  let dataSnippets: { text: string; hrefs: string[] }[] = [];
+  let dataBlocked = true;
   if (ddgBlocked && bingBlocked && wikiBlocked) {
+    dataUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`;
+    const data = await pull(fetchText, dataUrl);
+    const texts = data.status >= 200 && data.status < 300 ? wikidataSearchResultTexts(data.text) : [];
+    dataSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
+    dataBlocked = accessBlocked(data.status, data.text, dataUrl) || texts.length === 0;
+  }
+  if (ddgBlocked && bingBlocked && wikiBlocked && dataBlocked) {
     const challenge = ddg.status === 202 || /challenge|captcha/i.test(`${ddgUrl} ${ddg.text.slice(0, 2500)}`);
     attempts.push(
       blockedAttempt(
@@ -706,7 +742,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         ddgUrl,
         challenge
           ? "DuckDuckGo returned a challenge page and is not checkable for free."
-          : "DuckDuckGo, Bing, and Wikipedia did not return a usable results page. Web search is not checkable for free.",
+          : "DuckDuckGo, Bing, Wikipedia, and Wikidata did not return a usable results page. Web search is not checkable for free.",
       ),
     );
   } else {
@@ -714,6 +750,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUrl, platform: "DuckDuckGo" })) : []),
       ...(!bingBlocked ? bingSnippets.map((item) => ({ ...item, url: bingUrl, platform: "Bing" })) : []),
       ...(!wikiBlocked ? wikiSnippets.map((item) => ({ ...item, url: wikiUrl, platform: "Wikipedia" })) : []),
+      ...(!dataBlocked ? dataSnippets.map((item) => ({ ...item, url: dataUrl, platform: "Wikidata" })) : []),
     ];
     const hit = pool
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))

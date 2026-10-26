@@ -251,6 +251,17 @@ function award(earned: boolean, possible: number, yes: string, no: string): Line
   };
 }
 
+/** Half of a person-and-company award, and never the full amount. A zero-weight row stays zero. */
+function companyOnlyPoints(possible: number): number {
+  if (possible <= 1) return 0;
+  return Math.floor(possible / 2);
+}
+
+function unavailableLine(possible: number, reason: string, mode: GradeWeightsMode): Line {
+  if (mode === "r2") return { earned: 0, possible: 0, reason: `${reason}.` };
+  return { earned: 0, possible, reason: `${reason} (0 of ${possible}).` };
+}
+
 function sumLines(lines: Line[]): { earned: number; possible: number; reason: string } {
   const earned = lines.reduce((sum, line) => sum + line.earned, 0);
   const possible = lines.reduce((sum, line) => sum + line.possible, 0);
@@ -353,6 +364,7 @@ function passSentence(check: CheckOutput): string | null {
     case "linkedin-format":
       return `The LinkedIn link looks like a public profile (${source}).`;
     case "linkedin-fetch":
+      if (check.companyOnly) return `The LinkedIn company page confirms the company. company confirmed, person NOT confirmed (${source}). A logged-in page was not opened.`;
       return `A public LinkedIn page included the person's name (${source}). A logged-in page was not opened.`;
     case "duplicate":
       return `This email is not already a member and does not match a declined application (${source}).`;
@@ -370,6 +382,7 @@ function passSentence(check: CheckOutput): string | null {
       return `The other social links are full web addresses (${source}). Those pages were not opened.`;
     case "website":
     case "fixture-website":
+      if (check.companyOnly) return `The company's own site confirms the company. company confirmed, person NOT confirmed (${source}).`;
       return `A public web page included the person or the company name (${source}).`;
     case "edgar":
     case "fixture-edgar":
@@ -422,6 +435,9 @@ function failSentence(check: CheckOutput): string | null {
   }
   if (check.key === "phone-state" && check.status === "FAIL") {
     return `The phone area code does not match the state on the application (${source}).`;
+  }
+  if ((check.key === "website" || check.key === "rdap") && /domain does not resolve/i.test(check.finding)) {
+    return `domain does not resolve (${source}).`;
   }
   if (check.key === "website" && check.status === "FAIL") {
     return `The website responded, but the person and company names were not on the home page, the about page, or the team page (${source}).`;
@@ -514,7 +530,7 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   const org = facts.org?.trim() || "a company they did not name";
   const role = roleLabel(facts.role);
   const location = facts.location?.trim() || "no location was given";
-  const invite = facts.inviteNote?.trim() ? `They came in through invite ${facts.inviteNote.trim()}.` : "No invite code was stored on this file.";
+  const invite = facts.inviteNote?.trim() ? `They came in through invite ${facts.inviteNote.trim()}.` : "no referral supplied.";
   if (subject === "COMPANY") {
     return `This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`;
   }
@@ -524,8 +540,15 @@ function applicantSection(facts: GradeFacts, subject: string): string {
 function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const org = facts.org?.trim() || facts.name?.trim() || "The company";
   const evidence: string[] = [`${org} is the company named on the application.`];
-  if (passedKey(checks, "website", "fixture-website")) {
-    evidence.push(`A public page included the person or the company name (${sourceOf(checks, "website", "fixture-website")}).`);
+  const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  if (website?.status === "PASS" && website.companyOnly) {
+    evidence.push(`The company's own site names the company. company confirmed, person NOT confirmed (${website.source}).`);
+  } else if (website?.status === "PASS") {
+    evidence.push(`A public page included the person or the company name (${website.source}).`);
+  } else if (website?.status === "UNAVAILABLE") {
+    evidence.push("The company website is not checkable for free.");
+  } else if (website?.status === "FAIL" && /domain does not resolve/i.test(website.finding)) {
+    evidence.push("domain does not resolve.");
   } else {
     evidence.push("No company website was confirmed.");
   }
@@ -574,6 +597,40 @@ function payingRole(role: string | undefined): boolean {
   return annualDuesCents(role || "") > 0;
 }
 
+function portionLine(earned: number, possible: number, reason: string): Line {
+  return { earned, possible, reason: `${reason} (${earned} of ${possible}).` };
+}
+
+function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode): Line {
+  const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");
+}
+
+function linkedinAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
+  if (possible <= 0) {
+    return award(Boolean(row?.status === "PASS" && !row.companyOnly), possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
+  }
+  if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
+  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  return award(row?.status === "PASS", possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
+}
+
+function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode): Line {
+  if (!earned && row?.status === "UNAVAILABLE") return unavailableLine(possible, "Web search is not checkable for free", mode);
+  return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
+}
+
+function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
+  if (row?.status === "FAIL") return portionLine(0, possible, "The invite code was supplied but is not valid");
+  const absent = !facts.inviteNote?.trim() || row?.status === "NOT_RUN" || /no referral supplied/i.test(row?.finding || "");
+  if (absent && mode === "r2") return { earned: 0, possible: 0, reason: "no referral supplied." };
+  if (absent) return portionLine(0, possible, "no referral supplied");
+  return award(row?.status === "PASS", possible, "An invite code is on the file", "No invite source was confirmed");
+}
+
 export function gradeChecks(
   checks: CheckOutput[],
   facts: GradeFacts = {},
@@ -581,7 +638,6 @@ export function gradeChecks(
 ): GradeReport {
   const weightsMode = options?.weightsMode || GRADE_WEIGHTS_MODE;
   const weights = weightsFor(weightsMode);
-  const websitePass = passedKey(checks, "website", "fixture-website");
   const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
   const footprintRow = findCheck(checks, "web-footprint");
   const thirdPartyFootprint = passed(footprintRow) && !footprintRow?.selfReported;
@@ -593,25 +649,27 @@ export function gradeChecks(
   const linkedin = findCheck(checks, "linkedin-fetch");
 
   const independent = corroboratingPasses(checks).length > 0;
-  const linkedinFetched = passed(linkedin);
+  const linkedinPerson = passed(linkedin) && !linkedin?.companyOnly;
   const identity = sumLines([
     award(passed(findCheck(checks, "email-syntax")), weights.identity["email-syntax"], "The email address is well formed", "The email address is missing or not well formed"),
     award(passed(findCheck(checks, "disposable-email")), weights.identity["disposable-email"], "The email domain is not disposable", "The disposable-email check did not pass"),
     award(passed(findCheck(checks, "role-address")), weights.identity["role-address"], "The email is not a shared inbox", "The shared-inbox check did not pass"),
     award(passed(findCheck(checks, "phone-state")), weights.identity["phone-state"], "The phone area code fits the state", "The phone area code was not confirmed against the state"),
     award(
-      passed(findCheck(checks, "linkedin-format")) && (linkedinFetched || independent),
+      passed(findCheck(checks, "linkedin-format")) && (linkedinPerson || independent),
       weights.identity["linkedin-format"],
       "The LinkedIn link looks like a public profile",
       "No usable LinkedIn link was confirmed",
     ),
-    award(linkedinFetched, weights.identity["linkedin-fetch"], "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name"),
+    linkedinAward(linkedin, weights.identity["linkedin-fetch"], weightsMode),
   ]);
   const company = sumLines([
-    award(websitePass, weights.company.website, "A public website includes the person or company", "No website confirmed the person or company"),
+    websiteAward(checks, weights.company.website, weightsMode),
     award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
     award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
-    award(passed(findCheck(checks, "rdap")), weights.company.rdap, "A domain record responded", "No domain record was confirmed"),
+    findCheck(checks, "rdap")?.status === "FAIL" && /domain does not resolve/i.test(findCheck(checks, "rdap")?.finding || "")
+      ? portionLine(0, weights.company.rdap, "domain does not resolve")
+      : award(passed(findCheck(checks, "rdap")), weights.company.rdap, "A domain record responded", "No domain record was confirmed"),
     award(
       passed(findCheck(checks, "business-registry")),
       weights.company["business-registry"],
@@ -622,7 +680,7 @@ export function gradeChecks(
     ),
   ]);
   const footprint = sumLines([
-    award(webPass, weights.footprint["web-footprint"], "A public web result names the person and the company", "No public web result confirmed the person and the company"),
+    footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode),
     award(passed(findCheck(checks, "news")), weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
     award(
       passed(findCheck(checks, "social-links")) && independent,
@@ -639,7 +697,7 @@ export function gradeChecks(
   ]);
   const role = sumLines([
     award(passed(findCheck(checks, "plausibility")), weights.role.plausibility, "The name, company, and role are readable", "The name, company, or role is not readable"),
-    award(passed(findCheck(checks, "invite-source")), weights.role["invite-source"], "An invite code is on the file", "No invite source was confirmed"),
+    inviteAward(findCheck(checks, "invite-source"), weights.role["invite-source"], weightsMode, facts),
   ]);
   const statementOk = (facts.statement || "").trim().length >= 40;
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());

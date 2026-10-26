@@ -1,4 +1,6 @@
 import { annualDuesCents } from "@/lib/dues";
+import { normalizeInviteCode } from "@/lib/domain";
+import { factsForSearch } from "@/lib/verify/qa-marker";
 import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { registrableHost } from "@/lib/verify/host";
@@ -269,20 +271,21 @@ function youngerThanMonths(registeredAt: Date, months: number, now: Date): boole
 /** No row for an IP host. A domain younger than 12 months does not earn the points and does not corroborate. */
 export function assessRdap(
   host: string,
-  http: { ok: boolean; status: number; text: string },
+  http: { ok: boolean; status: number; text: string; failure?: string },
   now = new Date(),
 ): CheckOutput | null {
   if (!host || isIpHost(host)) return null;
   const url = `https://rdap.org/domain/${host}`;
   const base = { key: "rdap", weight: 4, source: "RDAP", url };
   if (!http.ok) {
-    const missing = http.status === 404;
+    const dead = http.status === 404 || http.failure === "nxdomain";
     return check({
       ...base,
-      status: missing ? "INCONCLUSIVE" : "UNAVAILABLE",
+      status: dead ? "FAIL" : "UNAVAILABLE",
+      reviewFlag: dead ? true : undefined,
       corroborates: false,
-      finding: missing
-        ? `RDAP responded for ${host}. No data found for that domain.`
+      finding: dead
+        ? `RDAP has no record for ${host}. domain does not resolve.`
         : `RDAP was blocked, timed out, or did not respond for ${host}. This source could not be checked.`,
     });
   }
@@ -558,13 +561,32 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+function inviteToken(note: string): string {
+  const head = note.split("·")[0] || note;
+  return normalizeInviteCode(head);
+}
+
 export function inviteCheck(facts: ApplicantFacts): CheckOutput {
-  if (!facts.inviteNote.trim()) {
+  const note = facts.inviteNote.trim();
+  if (!note) {
     return check({
       key: "invite-source",
-      status: "INCONCLUSIVE",
+      status: "NOT_RUN",
       weight: 6,
-      finding: "No invite note was stored, so the sponsoring member is not named here.",
+      finding: "no referral supplied",
+      source: "Invite code",
+      url: "",
+    });
+  }
+  const token = inviteToken(note);
+  const formatOk = token.length >= 4 && /^[A-Z0-9-]+$/.test(token);
+  if (facts.inviteValid === false || !formatOk) {
+    return check({
+      key: "invite-source",
+      status: "FAIL",
+      weight: 6,
+      reviewFlag: true,
+      finding: "The invite code was supplied but is not valid.",
       source: "Invite code",
       url: "",
     });
@@ -741,6 +763,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     ];
   }
   const fetchText = ctx.fetchText;
+  const searchFacts = factsForSearch(ctx.facts);
   const out: CheckOutput[] = [];
   const domain = domainOf(ctx.facts.email);
   if (domain && !DISPOSABLE.has(domain)) {
@@ -794,11 +817,11 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const judged = assessRdap(rdapHost, rdap);
     if (judged) out.push(judged);
   }
-  out.push(...(await runPublicScreen(ctx.facts, fetchText)));
+  out.push(...(await runPublicScreen(searchFacts, fetchText)));
   if (/\bNY\b/i.test(ctx.facts.location || "")) {
-    const registryUrl = nyRegistryQueryUrl(ctx.facts.org);
+    const registryUrl = nyRegistryQueryUrl(searchFacts.org);
     const registryHttp = await fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    const registry = assessNyRegistry(ctx.facts.org, registryHttp);
+    const registry = assessNyRegistry(searchFacts.org, registryHttp);
     out.push(
       check({
         key: "business-registry",
@@ -811,7 +834,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       }),
     );
   }
-  const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name, fetchText);
+  const edgar = await lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText);
   out.push(
     check({
       key: "edgar",
@@ -826,7 +849,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
   const court = await fetchText(courtUrl);
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
-  const companyQuery = ctx.facts.org.trim();
+  const companyQuery = searchFacts.org.trim();
   const registryHttp = companyQuery
     ? await fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
     : { ok: false, status: 0, text: "" };
@@ -838,7 +861,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
   // Public screening always records web-footprint, including an explicit miss. The direct
   // webFootprintCheck helper is not a second production pass.
-  out.push(...(await newsChecks(ctx.facts, fetchText)));
+  out.push(...(await newsChecks(searchFacts, fetchText)));
   return out;
 }
 

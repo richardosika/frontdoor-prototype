@@ -87,9 +87,10 @@ function tokens(value: string): string[] {
 
 const PLACE_AFTER = "island|beach|drive|dr|lane|blvd|boulevard|road|rd|street|st|avenue|ave";
 
+/** A letter, digit, or hyphen on either side is still the same word. "turner" does not match "page-turner". */
 export function wordHit(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+  return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "i").test(text);
 }
 
 /**
@@ -99,13 +100,13 @@ export function wordHit(text: string, token: string): boolean {
  */
 function companyTokenHit(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const stripped = text.replace(new RegExp(`\\b${escaped}\\s+(?:${PLACE_AFTER})\\b`, "gi"), " ");
+  const stripped = text.replace(new RegExp(`(?<![A-Za-z0-9-])${escaped}\\s+(?:${PLACE_AFTER})(?![A-Za-z0-9-])`, "gi"), " ");
   if (wordHit(stripped, token)) return true;
   if (token.length < 8) return false;
   for (let index = 4; index <= token.length - 3; index += 1) {
     const left = token.slice(0, index);
     const right = token.slice(index);
-    if (new RegExp(`\\b${left}\\s+${right}\\b`, "i").test(stripped)) return true;
+    if (wordHit(stripped, `${left} ${right}`) || new RegExp(`(?<![A-Za-z0-9-])${left}\\s+${right}(?![A-Za-z0-9-])`, "i").test(stripped)) return true;
   }
   return false;
 }
@@ -158,10 +159,10 @@ function looksLikeGivenName(word: string): boolean {
 /** True when every hit is "Givenname Token", as in a different person who shares the surname. */
 function surnameOnly(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const all = text.match(new RegExp(`\\b${escaped}\\b`, "gi")) || [];
+  const all = text.match(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "gi")) || [];
   if (!all.length) return false;
   let nameHits = 0;
-  const pattern = new RegExp(`\\b([A-Za-z]+)["']?\\s+["']?${escaped}\\b`, "gi");
+  const pattern = new RegExp(`(?<![A-Za-z0-9-])([A-Za-z]+)["']?\\s+["']?${escaped}(?![A-Za-z0-9-])`, "gi");
   for (const match of text.matchAll(pattern)) {
     if (looksLikeGivenName(match[1])) nameHits += 1;
   }

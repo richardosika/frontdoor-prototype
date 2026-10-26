@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { assessRdap, cardConsistencyCheck, collectChecks, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, inviteCheck, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany } from "@/lib/verify/public-match";
+import { factsForSearch } from "@/lib/verify/qa-marker";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -515,7 +516,9 @@ describe("EDGAR exact company names", () => {
 
   it("does not match a different firm that shares only a generic word", () => {
     expect(matchEdgarCompany(rows, "CBRE Group")?.ticker).toBe("CBRE");
+    expect(matchEdgarCompany(rows, "CBRE Group, Inc.")?.ticker).toBe("CBRE");
     expect(matchEdgarCompany(rows, "CBRE Group")?.title).not.toMatch(/unum/i);
+    expect(matchEdgarCompany(rows, "QA-TEST CBRE Group, Inc.")).toBeNull();
     expect(matchEdgarCompany(rows, "Madison Realty Capital")).toBeNull();
     expect(matchEdgarCompany(rows, "Group")).toBeNull();
     expect(matchEdgarCompany(rows, "Capital")).toBeNull();
@@ -812,5 +815,145 @@ describe("website text survives the size cap", () => {
       );
       expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(8);
     }
+  });
+});
+
+describe("QA follow-up scoring", () => {
+  it("gives half credit for a company-only official site or LinkedIn company page and cannot approve on that alone", async () => {
+    const applicant = facts({
+      name: "QA Tester",
+      applicantName: "QA Tester",
+      org: "Turner Construction Company",
+      website: "https://www.turnerconstruction.com",
+      linkedinUrl: "https://www.linkedin.com/company/turner-construction/",
+      email: "qa-test-turner-1793031299@privatefloorclub.com",
+      inviteNote: "",
+    });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("turnerconstruction.com")) return { ok: true, status: 200, text: "<html><body>Turner Construction Company</body></html>" };
+      if (url.includes("linkedin.com/company")) return { ok: true, status: 200, text: "Turner Construction Company" };
+      return { ok: false, status: 403, text: "blocked" };
+    });
+    const website = checks.find((check) => check.key === "website");
+    const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+    expect(website?.status).toBe("PASS");
+    expect(website?.companyOnly).toBe(true);
+    expect(website?.corroborates).toBe(false);
+    expect(website?.selfReported).toBe(true);
+    expect(website?.finding).toContain("company confirmed, person NOT confirmed");
+    expect(linkedin?.status).toBe("PASS");
+    expect(linkedin?.companyOnly).toBe(true);
+    expect(linkedin?.corroborates).toBe(false);
+    const graded = gradeChecks(checks, applicant);
+    const company = graded.categories.find((category) => category.id === "company");
+    const identity = graded.categories.find((category) => category.id === "identity");
+    expect(company?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
+    expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
+    expect(identity?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(graded.summary.checkedOut).toContain("company confirmed, person NOT confirmed");
+    expect(graded.summary.company).toContain("company confirmed, person NOT confirmed");
+    expect(graded.summary.company).not.toContain("No company website was confirmed");
+    expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(["D", "F"]).toContain(graded.letter);
+
+    const personMatch = gradeChecks(
+      [row({ key: "website", status: "PASS", finding: "The page names Jane Roe at Turner Construction Company." })],
+      facts({ org: "Turner Construction Company" }),
+    );
+    const companyOnly = gradeChecks(
+      [row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" })],
+      facts({ org: "Turner Construction Company" }),
+    );
+    expect(personMatch.categories.find((category) => category.id === "company")?.earned).toBe(8);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.recommendation.startsWith("APPROVE")).toBe(false);
+  });
+
+  it("fails a domain that does not resolve and leaves a timeout or a 405 blocked", async () => {
+    expect(classifyFetchError(Object.assign(new Error("getaddrinfo ENOTFOUND qa-test-nonexistent.example"), { code: "ENOTFOUND" }))).toBe("nxdomain");
+    const cause = Object.assign(new Error("aborted"), { name: "AbortError" });
+    expect(classifyFetchError(cause)).toBe("timeout");
+    const dead = await runPublicScreen(
+      facts({ website: "https://qa-test-nonexistent.example", org: "Nonexistent Holdings Law Group" }),
+      async () => ({ ok: false, status: 0, text: "", failure: "nxdomain" as const }),
+    );
+    const website = dead.find((check) => check.key === "website");
+    expect(website?.status).toBe("FAIL");
+    expect(website?.finding).toContain("domain does not resolve");
+    const rdap = assessRdap("qa-test-nonexistent.example", { ok: false, status: 404, text: "" });
+    expect(rdap?.status).toBe("FAIL");
+    expect(rdap?.finding).toContain("domain does not resolve");
+    const graded = gradeChecks([website!, rdap!], facts({ website: "https://qa-test-nonexistent.example", org: "Nonexistent Holdings Law Group" }));
+    expect(graded.summary.didNotCheckOut).toContain("domain does not resolve");
+    expect(graded.summary.didNotCheckOut).not.toContain("Nothing in the checks that ran showed a direct conflict");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("domain does not resolve (0 of 8)");
+
+    const blocked = await runPublicScreen(
+      facts({ website: "https://www.cbre.com", org: "CBRE Group" }),
+      async (url) => (url.includes("cbre.com") ? { ok: false, status: 405, text: "" } : { ok: false, status: 403, text: "" }),
+    );
+    const cbre = blocked.find((check) => check.key === "website");
+    expect(cbre?.status).toBe("UNAVAILABLE");
+    expect(cbre?.finding).toContain("blocked by site, ask applicant for a team-page URL");
+    const cbreGrade = gradeChecks(blocked, facts({ website: "https://www.cbre.com", org: "CBRE Group" }));
+    expect(cbreGrade.summary.company).toContain("not checkable for free");
+    expect(cbreGrade.summary.didNotCheckOut).not.toContain("domain does not resolve");
+  });
+
+  it("strips QA-TEST only for a qa-test mailbox and logs it", () => {
+    const logs: string[] = [];
+    const stripped = factsForSearch(
+      facts({
+        name: "QA Tester",
+        applicantName: "QA Tester",
+        email: "qa-test-turner-1793031299@privatefloorclub.com",
+        org: "QA-TEST Turner Construction Company",
+      }),
+      (message) => logs.push(message),
+    );
+    expect(stripped.org).toBe("Turner Construction Company");
+    expect(stripped.applicantName).toBe("QA Tester");
+    expect(logs[0]).toContain("QA marker removed for search only");
+    expect(logs[0]).toContain("qa-test-turner-1793031299@privatefloorclub.com");
+    expect(mentionsCompany("Turner Construction Company builds in New York.", stripped.org)).toBe(true);
+    expect(mentionsCompany("A page-turner for every e-reader tester", stripped.org)).toBe(false);
+    expect(mentionsPerson("e-reader tester", "QA Tester")).toBe(false);
+    expect(
+      factsForSearch(facts({ email: "person@gmail.com", org: "QA-TEST Turner Construction Company" }), () => {
+        throw new Error("production email must not be normalised");
+      }).org,
+    ).toBe("QA-TEST Turner Construction Company");
+    expect(factsForSearch(facts({ email: "qa-test-turner-1793031299@privatefloorclub.com", org: "Turner Construction Company" })).org).toBe(
+      "Turner Construction Company",
+    );
+    expect(mentionsCompany("Turner Construction Company", "QA-TEST Turner Construction Company")).toBe(false);
+  });
+
+  it("treats a missing referral as not applicable under R2 and still fails an invalid code", () => {
+    const empty = inviteCheck(facts({ inviteNote: "" }));
+    expect(empty.status).toBe("NOT_RUN");
+    expect(empty.finding).toBe("no referral supplied");
+    const valid = inviteCheck(facts({ inviteNote: "PF-BENCH-0000 · Benchmark invite code" }));
+    expect(valid.status).toBe("PASS");
+    const invalid = inviteCheck(facts({ inviteNote: "NO", inviteValid: false }));
+    expect(invalid.status).toBe("FAIL");
+    expect(invalid.reviewFlag).toBe(true);
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      empty,
+    ];
+    const standard = gradeChecks(local, facts({ inviteNote: "" }));
+    const proposed = gradeChecks(local, facts({ inviteNote: "" }), { weightsMode: "r2" });
+    expect(standard.categories.find((category) => category.id === "role")?.reason).toContain("no referral supplied (0 of 4)");
+    expect(proposed.categories.find((category) => category.id === "role")?.reason).toContain("no referral supplied.");
+    expect(proposed.categories.find((category) => category.id === "role")?.reason).not.toContain("0 of 4");
+    expect(proposed.summary.couldNotCheck).toContain("Coverage:");
+    expect(standard.score).toBeLessThan(proposed.score);
+    const flagged = gradeChecks([invalid], facts({ inviteNote: "NO" }));
+    expect(flagged.categories.find((category) => category.id === "role")?.reason).toContain("The invite code was supplied but is not valid (0 of 4)");
+    expect(flagged.summary.didNotCheckOut).toContain("The invite code was supplied but is not valid");
   });
 });

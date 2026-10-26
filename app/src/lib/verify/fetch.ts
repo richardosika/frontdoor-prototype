@@ -124,9 +124,28 @@ export function prepareFetchedText(text: string, maxChars: number): string {
   return limitText(decodeHtmlEntities(stripScriptsAndStyles(text)), maxChars);
 }
 
-/** Retry network failures, rate limits, and server errors once. A normal 4xx is final. */
+/** Retry network failures, rate limits, and server errors. A normal 4xx, a challenge page, and NXDOMAIN are final. */
 export function shouldRetryStatus(status: number): boolean {
   return status === 0 || status === 429 || status >= 500;
+}
+
+export type FetchFailure = "nxdomain" | "timeout" | "network";
+
+/** DNS NXDOMAIN/ENOTFOUND is a dead domain. An aborted timer is a timeout. Anything else is a network error. */
+export function classifyFetchError(error: unknown): FetchFailure {
+  const codes: string[] = [];
+  const names: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth += 1) {
+    const record = current as { code?: unknown; name?: unknown; message?: unknown; cause?: unknown };
+    if (typeof record.code === "string") codes.push(record.code);
+    if (typeof record.name === "string") names.push(record.name);
+    if (typeof record.message === "string" && /NXDOMAIN|ENOTFOUND|getaddrinfo/i.test(record.message)) codes.push("ENOTFOUND");
+    current = record.cause;
+  }
+  if (codes.some((code) => code === "ENOTFOUND" || code === "ENODATA" || code === "NXDOMAIN")) return "nxdomain";
+  if (names.some((name) => name === "AbortError" || name === "TimeoutError")) return "timeout";
+  return "network";
 }
 
 export async function politeFetch(
@@ -139,22 +158,25 @@ export async function politeFetch(
     const cached = responseCache.get(url);
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
   }
-  const first = await fetchOnce(url, timeout, options);
-  if (!shouldRetryStatus(first.status)) {
-    if (cacheable(url) && first.status >= 200 && first.status < 300) responseCache.set(url, { at: Date.now(), value: first });
-    return first;
+  let latest = await fetchOnce(url, timeout, options);
+  for (let attempt = 1; attempt <= 2 && retryable(latest); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs(url) * attempt));
+    latest = await fetchOnce(url, timeout, options);
   }
-  await new Promise((resolve) => setTimeout(resolve, retryDelayMs(url)));
-  const second = await fetchOnce(url, timeout, options);
-  if (cacheable(url) && second.status >= 200 && second.status < 300) responseCache.set(url, { at: Date.now(), value: second });
-  return second;
+  if (cacheable(url) && latest.status >= 200 && latest.status < 300) responseCache.set(url, { at: Date.now(), value: latest });
+  return latest;
+}
+
+function retryable(result: { status: number; failure?: FetchFailure }): boolean {
+  if (result.failure === "nxdomain") return false;
+  return shouldRetryStatus(result.status);
 }
 
 async function fetchOnce(
   url: string,
   timeoutMs: number,
   options?: { maxChars?: number },
-): Promise<{ ok: boolean; status: number; text: string }> {
+): Promise<{ ok: boolean; status: number; text: string; failure?: FetchFailure }> {
   let host = "";
   try {
     host = new URL(url).host;
@@ -186,8 +208,8 @@ async function fetchOnce(
     const cap = options?.maxChars ?? fetchLimits(url).maxChars;
     const text = prepareFetchedText(await response.text(), cap);
     return { ok: response.ok, status: response.status, text };
-  } catch {
-    return { ok: false, status: 0, text: "" };
+  } catch (error) {
+    return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
   } finally {
     clearTimeout(timer);
   }

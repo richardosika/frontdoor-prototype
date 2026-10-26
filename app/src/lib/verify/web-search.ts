@@ -16,6 +16,19 @@ export function bingResultTexts(html: string): string[] {
   return blocks.map((match) => stripTags(match[0])).map((text) => text.trim()).filter((text) => text.length > 2);
 }
 
+/** Keyless Wikidata entity search. Used only after DuckDuckGo, Bing, and Wikipedia return nothing usable. */
+export function wikidataSearchResultTexts(payload: string): string[] {
+  try {
+    const parsed = JSON.parse(payload) as { search?: { label?: string; description?: string }[] };
+    if (!Array.isArray(parsed.search)) return [];
+    return parsed.search
+      .map((row) => stripTags(`${row.label || ""} ${row.description || ""}`).trim())
+      .filter((text) => text.length > 2);
+  } catch {
+    return [];
+  }
+}
+
 export function wikipediaRestResultTexts(payload: string): string[] {
   try {
     const parsed = JSON.parse(payload) as { pages?: { title?: string; excerpt?: string; description?: string }[] };
