@@ -32,6 +32,16 @@ export function formatEtDate(date: Date): string {
   }).format(date);
 }
 
+/** Calendar date in America/New_York, such as November 26, 2026. */
+export function formatLongEtDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: AUDIT_TIME_ZONE,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 export function formatAuditTime(date: Date): string {
   const formatted = new Intl.DateTimeFormat("en-US", {
     timeZone: AUDIT_TIME_ZONE,

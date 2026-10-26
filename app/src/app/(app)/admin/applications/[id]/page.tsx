@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { Banner } from "@/components/banner";
+import { RevokeApprovalForm } from "@/components/decision-form";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { PaymentPanel } from "@/components/payment-admin";
 import { CheckTable, ExecutiveSummary, GradeMark } from "@/components/grade-summary";
@@ -269,6 +270,9 @@ export default async function ApplicationDetailPage({
             ))}
           </ul>
         </section>
+        {application.status === "APPROVED" || application.status === "PAYMENT_DUE" ? (
+          <RevokeApprovalForm applicationId={application.id} />
+        ) : null}
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete applicant</h2>
           <p className="mt-2 text-sm text-ink">

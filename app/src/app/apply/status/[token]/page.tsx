@@ -1,12 +1,12 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ApplyReply } from "@/components/apply-reply";
-import { ExpiredLink } from "@/components/expired-link";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
 import { applicationReceivedMessage } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
-import { DUES_BILLING_NOTE, DUES_WAIVED, currentMonthlyCents, duesLabel, offerLabel } from "@/lib/dues";
+import { applicantDuesSentence, currentMonthlyCents } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function ApplicationStatusPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const application = await prisma.application.findUnique({ where: { statusToken: token } });
-  if (!application) return <ExpiredLink kind="status" />;
+  if (!application) notFound();
   const copy = memberStatusCopy(application.status);
   const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
@@ -43,7 +43,10 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
               <p className="mt-1">Verification in progress.</p>
             ) : null}
             <p className="mt-1">
-              {application.duesCents > 0 ? offerLabel(currentMonthlyCents(application.role, application.duesCents)) : duesLabel(0)}. {application.duesCents > 0 ? DUES_BILLING_NOTE : ""} {application.duesWaived ? DUES_WAIVED : ""}
+              {applicantDuesSentence(
+                application.duesCents > 0 ? currentMonthlyCents(application.role, application.duesCents) : 0,
+                application.duesWaived,
+              )}
             </p>
           </div>
           {showNote ? (

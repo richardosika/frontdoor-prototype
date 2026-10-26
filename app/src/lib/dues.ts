@@ -52,6 +52,15 @@ export function offerLabel(monthlyCents: number): string {
 
 export const DUES_WAIVED = "Dues waived by an administrator.";
 
+export const FREE_MEMBERSHIP_LINE = "Free membership. No dues.";
+
+/** Status-page dues line. A free role does not also say an administrator waived dues. */
+export function applicantDuesSentence(monthlyCents: number, waived: boolean): string {
+  if (monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
+  const offer = `${offerLabel(monthlyCents)}. ${DUES_BILLING_NOTE}`;
+  return waived ? `${offer} ${DUES_WAIVED}` : offer;
+}
+
 export const DUES_BILLING_NOTE =
   "Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Due only after approval. Flat, never based on a deal.";
 

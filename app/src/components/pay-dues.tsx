@@ -44,6 +44,9 @@ export function PayDues({
         <Logo />
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership dues</p>
         <h1 className="mt-1 font-serif text-3xl font-normal">Pay membership dues</h1>
+        <p className="mt-3 rounded border border-[#7A2E2E] bg-brass-soft px-3 py-2 text-sm font-semibold text-forest" role="status">
+          Test mode: no real charge
+        </p>
         <p className="mt-2 text-sm text-ink">
           {name} · {roleLabel(role)}
         </p>
@@ -56,12 +59,18 @@ export function PayDues({
             <>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">First month, 50% off</p>
               <p className="mt-1 font-serif text-4xl font-normal">{formatMoney(first)}</p>
-              <p className="mt-2 text-sm text-ink">Then {full} per month. Full price {full} per month.</p>
+              <p className="mt-2 text-sm text-ink">Then {full} per month.</p>
             </>
           )}
           <p className="mt-2 text-sm text-ink">{DUES_BILLING_NOTE}</p>
           <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
-          {status === "WAIVED" ? null : <p className="mt-2 text-sm text-forest">Next charge date {paymentRenewalLabel(renewalAt)}.</p>}
+          {status === "WAIVED" ? null : (
+            <p className="mt-2 text-sm text-forest">
+              {renewalAt
+                ? `Your next full-price payment is on ${paymentRenewalLabel(renewalAt)}.`
+                : `Your first full-price payment would be on ${paymentRenewalLabel(renewalAt)}.`}
+            </p>
+          )}
           {cancelled ? (
             <p className="mt-2 text-sm text-forest">
               Cancellation is recorded.

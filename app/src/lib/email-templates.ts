@@ -72,7 +72,7 @@ It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
     subject: "We have your Private Floor application",
     body: `${APPLICATION_RECEIVED_TEMPLATE}
 
-It is for {role} at {org}.
+Your request is for the {role} role at {org}.
 
 Follow it here
 {status_link}
@@ -142,7 +142,7 @@ See the status
 
 A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
 
-Next charge date: {renewal_date}.
+Your first full-price payment would be on {renewal_date}.
 
 Pay membership dues
 {payment_link}
@@ -287,6 +287,14 @@ Follow it here
 {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+It is for {role} at {org}.
+
+Follow it here
+{status_link}
+
+Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
   ],
   welcome: `Hello {first_name},
 
@@ -376,6 +384,24 @@ Pay annual dues
 {payment_link}
 
 Until the annual dues are recorded, the floor stays on the payment page.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
+
+Next charge date: {renewal_date}.
+
+Pay membership dues
+{payment_link}
+
+Until the first month is recorded, the floor stays on the payment page.
 
 Sign in
 {login_link}

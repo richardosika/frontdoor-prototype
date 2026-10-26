@@ -16,13 +16,14 @@ export function memberLoginHref(signedIn: boolean): "/feed" | "/login" {
   return signedIn ? "/feed" : "/login";
 }
 
-export const JOIN_ENTRY_HASH = "#request-invite";
+export const JOIN_ENTRY_HASH = "#request-to-join";
+const JOIN_ENTRY_HASHES = new Set(["#request-to-join", "#request-invite"]);
 
 /** The public request form and the apply wizard. A signed-in visit to either gets the already-signed-in notice. */
 export function isSignedInJoinEntry(path: string, hash = ""): boolean {
   if (path === "/apply") return true;
   const fragment = hash.startsWith("#") || hash === "" ? hash : `#${hash}`;
-  return fragment === JOIN_ENTRY_HASH && (path === "/" || path === "/feed");
+  return JOIN_ENTRY_HASHES.has(fragment) && (path === "/" || path === "/feed");
 }
 
 export function alreadySignedInNotice(name: string): string {

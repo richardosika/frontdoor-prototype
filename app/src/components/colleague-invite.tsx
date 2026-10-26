@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { confirmApplicationCode, sendApplicationCode } from "@/actions/apply";
 import { CopyCode } from "@/components/copy-code";
 import { btn, field } from "@/components/ui";
 import { applicationReceivedMessage, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
@@ -12,6 +13,9 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [thanksName, setThanksName] = useState("");
+  const [stage, setStage] = useState<"details" | "code">("details");
+  const [emailCode, setEmailCode] = useState("");
+  const [testHint, setTestHint] = useState<string | null>(null);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,6 +23,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
     const form = new FormData(event.currentTarget);
     const firstName = String(form.get("firstName") ?? "");
     const lastName = String(form.get("lastName") ?? "");
+    const email = String(form.get("email") ?? "");
     const nameError = validatePersonName(firstName, lastName)[0];
     const addressError = validateAddress({
       street: String(form.get("street") ?? ""),
@@ -31,13 +36,30 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       return;
     }
     setPending(true);
-    const response = await fetch("/api/request-invite", {
+    if (stage === "details") {
+      const sent = await sendApplicationCode(email);
+      setPending(false);
+      if (!sent.ok) {
+        setError(sent.error);
+        return;
+      }
+      setTestHint(sent.testHint);
+      setStage("code");
+      return;
+    }
+    const confirmed = await confirmApplicationCode(email, emailCode);
+    if (!confirmed.ok) {
+      setPending(false);
+      setError(confirmed.error);
+      return;
+    }
+    const response = await fetch("/api/request-to-join", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         firstName,
         lastName,
-        email: form.get("email"),
+        email,
         role: form.get("role"),
         company: form.get("company"),
         street: form.get("street"),
@@ -88,7 +110,25 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
             <input name="firstName" className={field} placeholder="First name" autoComplete="given-name" required />
             <input name="lastName" className={field} placeholder="Last name" autoComplete="family-name" required />
           </div>
-          <input name="email" type="email" className={field} placeholder="Email" required />
+          <input name="email" type="email" className={field} placeholder="Email" required readOnly={stage === "code"} />
+          {stage === "code" ? (
+            <>
+              <input
+                name="emailCode"
+                className={field}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={4}
+                placeholder="4-digit email code"
+                aria-label="Email code"
+                value={emailCode}
+                onChange={(event) => setEmailCode(event.target.value)}
+                required
+              />
+              <p className="text-xs text-ink">Enter the 4-digit code sent to that email.</p>
+              {testHint ? <p className="text-xs text-forest">{testHint}</p> : null}
+            </>
+          ) : null}
           <select name="role" className={field} defaultValue="DEVELOPER" aria-label="Role">
             {ROLES.map((role) => (
               <option key={role.id} value={role.id}>
@@ -105,7 +145,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
           </div>
           <textarea name="note" className={field} rows={2} placeholder="Short note (optional)" aria-label="Note" />
           <button className={btn} type="submit" disabled={pending}>
-            {pending ? "Sending…" : "Request a code"}
+            {pending ? "Sending…" : stage === "code" ? "Confirm and request to join" : "Email them a code"}
           </button>
         </form>
       )}

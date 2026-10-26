@@ -4,8 +4,7 @@ export const OPEN_APPLICATION_STATUSES = ["PENDING", "SUBMITTED", "IN_REVIEW", "
 export const DECLINED_APPLICATION_STATUSES = ["REJECTED", "DECLINED"] as const;
 
 export function applicationStatusLabel(status: string): string {
-  if (status === "PENDING" || status === "SUBMITTED") return "Submitted";
-  if (status === "IN_REVIEW") return "In review";
+  if (status === "PENDING" || status === "SUBMITTED" || status === "IN_REVIEW") return "In review";
   if (status === "NEEDS_INFO") return "Needs more info";
   if (status === "APPROVED") return "Approved";
   if (status === "PAYMENT_DUE") return "Approved, payment due";

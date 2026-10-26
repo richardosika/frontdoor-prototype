@@ -8,6 +8,7 @@ import { GuidedReview } from "@/components/guided-review";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
+import { publicEvidenceHref } from "@/lib/evidence-link";
 import { httpUrls } from "@/lib/guided-prefill";
 import { prepareGuidedCase } from "@/lib/guided-prefill-db";
 import { formatAuditTime } from "@/lib/format";
@@ -213,6 +214,8 @@ export default async function VerificationCasePage({
             notLegit={memberReview.notLegit}
             confirmLabel={memberReview.confirmLabel}
             mode={memberReview.mode}
+            applicationStatus={memberReview.applicationStatus}
+            verdict={memberReview.verdict}
           />
         </div>
       ) : null}
@@ -253,8 +256,8 @@ export default async function VerificationCasePage({
               <ul className="mt-2 space-y-1 text-sm">
                 {evidenceLinks(currentCheck.evidenceUrl, currentCheck.note).map((url) => (
                   <li key={url}>
-                    <a className="break-all text-forest underline" href={url} target="_blank" rel="noreferrer">
-                      {url}
+                    <a className="break-all text-forest underline" href={publicEvidenceHref(url)} target="_blank" rel="noreferrer">
+                      {publicEvidenceHref(url)}
                     </a>
                   </li>
                 ))}

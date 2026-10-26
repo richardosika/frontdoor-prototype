@@ -3,6 +3,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { isRoleId, roleLabel } from "@/lib/roles";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import {
@@ -207,7 +208,7 @@ export async function submitApplication(
         statement: (input.statement ?? "").trim(),
         website,
         socialLinks,
-        status: "SUBMITTED",
+        status: "IN_REVIEW",
         emailVerifiedAt: verified.verifiedAt,
         duesCents: annualDuesCents(role),
         duesWaived: annualDuesCents(role) === 0,
@@ -261,7 +262,11 @@ export async function submitApplication(
       location,
     },
   });
-  await queueApplicationVerification(application.id, input.org.trim(), { network: true });
+  after(() => {
+    void queueApplicationVerification(application.id, input.org.trim(), { network: true }).catch((error) => {
+      console.error("verification queue failed", error instanceof Error ? error.message : "error");
+    });
+  });
 
   return { ok: true, statusToken };
 }
@@ -314,6 +319,10 @@ export async function respondToApplication(formData: FormData): Promise<{ ok: tr
     subject: `${BRAND.name} reply received`,
     text: `${application.name} replied on the application status page.\n\n${note}`,
   });
-  await queueApplicationVerification(application.id, application.org, { network: true });
+  after(() => {
+    void queueApplicationVerification(application.id, application.org, { network: true }).catch((error) => {
+      console.error("verification queue failed", error instanceof Error ? error.message : "error");
+    });
+  });
   return { ok: true };
 }

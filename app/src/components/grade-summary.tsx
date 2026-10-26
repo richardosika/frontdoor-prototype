@@ -1,6 +1,8 @@
 import { EvidenceChip } from "@/components/evidence-chip";
 import { newsStoryChipLabel } from "@/lib/verify/news";
 import { rubricSections, type GradeReport, type Recommendation } from "@/lib/verify/grade";
+import { publicEvidenceHref } from "@/lib/evidence-link";
+import { reviewCopy } from "@/lib/review-copy";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
 
@@ -64,12 +66,12 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
         </div>
       ) : null}
       <div className="mt-5 space-y-4 text-sm leading-relaxed text-ink">
-        <SummaryBlock title="Applicant" body={report.summary.applicant} />
-        <SummaryBlock title="Company" body={report.summary.company} />
-        <SummaryBlock title="What checked out" body={report.summary.checkedOut} />
-        <SummaryBlock title="What did not check out" body={report.summary.didNotCheckOut} />
-        <SummaryBlock title="What could not be checked for free" body={report.summary.couldNotCheck} />
-        <SummaryBlock title="Recommendation" body={`${report.recommendation}. ${report.summary.reasoning} Next step: ${report.summary.nextStep}`} />
+        <SummaryBlock title="Applicant" body={reviewCopy(report.summary.applicant)} />
+        <SummaryBlock title="Company" body={reviewCopy(report.summary.company)} />
+        <SummaryBlock title="What checked out" body={reviewCopy(report.summary.checkedOut)} />
+        <SummaryBlock title="What did not check out" body={reviewCopy(report.summary.didNotCheckOut)} />
+        <SummaryBlock title="What could not be checked for free" body={reviewCopy(report.summary.couldNotCheck)} />
+        <SummaryBlock title="Recommendation" body={reviewCopy(`${report.recommendation}. ${report.summary.reasoning} Next step: ${report.summary.nextStep}`)} />
       </div>
       {report.changeNote ? <p className="mt-4 text-xs leading-relaxed text-mut">Re-run note: {report.changeNote}</p> : null}
       <div className="mt-6 border-t border-line pt-4">
@@ -82,9 +84,9 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
                 <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${severityTone(item.severity)}`}>
                   {item.severity}
                 </span>
-                <span className="font-serif text-base text-forest">{item.title}</span>
+                <span className="font-serif text-base text-forest">{reviewCopy(item.title)}</span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-ink">{item.detail}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(item.detail)}</p>
             </li>
           ))}
         </ul>
@@ -100,7 +102,7 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
                   {category.earned} / {category.possible}
                 </span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-ink">{category.reason}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(category.reason)}</p>
             </li>
           ))}
         </ul>
@@ -157,11 +159,11 @@ export function CheckTable({
                   <EvidenceLabel row={row} />
                 </td>
                 <td className="max-w-xs py-2 pr-2 break-words">
-                  {row.finding}
+                  {reviewCopy(row.finding)}
                   {row.url ? (
                     <>
                       {" "}
-                      <a className="underline decoration-brass" href={row.url} target="_blank" rel="noreferrer">
+                      <a className="underline decoration-brass" href={publicEvidenceHref(row.url)} target="_blank" rel="noreferrer">
                         {row.checkKey === "news-story" ? "Open article" : "Link"}
                       </a>
                     </>

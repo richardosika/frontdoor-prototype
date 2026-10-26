@@ -300,7 +300,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>
               Continue
             </button>
-            <Link href="/#request-invite" className={`${btnOutline} mt-2 w-full`}>
+            <Link href="/#request-to-join" className={`${btnOutline} mt-2 w-full`}>
               Request to join
             </Link>
           </div>

@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { confirmApplicationCode, sendApplicationCode } from "@/actions/apply";
 import { btn, field, labelCls } from "@/components/ui";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
-export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: string) => void }) {
+export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: string, statusPath: string) => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [stage, setStage] = useState<"details" | "code">("details");
+  const [testHint, setTestHint] = useState<string | null>(null);
+  const [emailCode, setEmailCode] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -15,6 +19,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
     const form = new FormData(event.currentTarget);
     const firstName = String(form.get("firstName") ?? "");
     const lastName = String(form.get("lastName") ?? "");
+    const email = String(form.get("email") ?? "");
     const nameError = validatePersonName(firstName, lastName)[0];
     const addressError = validateAddress({
       street: String(form.get("street") ?? ""),
@@ -27,13 +32,30 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
       return;
     }
     setPending(true);
-    const response = await fetch("/api/request-invite", {
+    if (stage === "details") {
+      const sent = await sendApplicationCode(email);
+      setPending(false);
+      if (!sent.ok) {
+        setError(sent.error);
+        return;
+      }
+      setTestHint(sent.testHint);
+      setStage("code");
+      return;
+    }
+    const confirmed = await confirmApplicationCode(email, emailCode);
+    if (!confirmed.ok) {
+      setPending(false);
+      setError(confirmed.error);
+      return;
+    }
+    const response = await fetch("/api/request-to-join", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         firstName,
         lastName,
-        email: form.get("email"),
+        email,
         role: form.get("role"),
         company: form.get("company"),
         street: form.get("street"),
@@ -44,17 +66,18 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
         website: form.get("website"),
       }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { error?: string; statusUrl?: string } | null;
     setPending(false);
     if (!response.ok) {
       setError(payload?.error || "Could not send that request.");
       return;
     }
-    onSubmitted(firstName.trim());
+    onSubmitted(firstName.trim(), payload?.statusUrl || "");
   }
 
   return (
-    <form id="request-invite" onSubmit={onSubmit} className="mt-6 scroll-mt-6 grid gap-2 rounded border border-brass bg-cream p-4">
+    <form id="request-to-join" onSubmit={onSubmit} className="mt-6 scroll-mt-6 grid gap-2 rounded border border-brass bg-cream p-4">
+      <span id="request-invite" className="absolute -left-[9999px]" />
       <h2 className="font-serif text-2xl font-normal">Request to join</h2>
       <p className="text-sm text-ink">No code yet. A Private Floor administrator reviews every application. You will hear from us by email.</p>
       <label className="absolute -left-[9999px]" aria-hidden="true">
@@ -74,8 +97,26 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
       </div>
       <div>
         <label className={labelCls}>Email</label>
-        <input name="email" type="email" className={field} autoComplete="email" required />
+        <input name="email" type="email" className={field} autoComplete="email" required readOnly={stage === "code"} />
       </div>
+      {stage === "code" ? (
+        <div>
+          <label className={labelCls}>Email code</label>
+          <input
+            name="emailCode"
+            className={field}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={4}
+            placeholder="4-digit code"
+            value={emailCode}
+            onChange={(event) => setEmailCode(event.target.value)}
+            required
+          />
+          <p className="mt-1 text-sm text-ink">Enter the 4-digit code sent to that email. It expires in 15 minutes.</p>
+          {testHint ? <p className="mt-1 text-sm text-forest">{testHint}</p> : null}
+        </div>
+      ) : null}
       <div>
         <label className={labelCls}>Role</label>
         <select name="role" className={field} defaultValue="DEVELOPER">
@@ -113,7 +154,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
         <textarea name="note" className={field} rows={2} />
       </div>
       <button className={btn} type="submit" disabled={pending}>
-        {pending ? "Sending…" : "Request to join"}
+        {pending ? "Sending…" : stage === "code" ? "Confirm and request to join" : "Email me a code"}
       </button>
     </form>
   );

@@ -20,9 +20,14 @@ import { noticeTestRecipient } from "@/lib/brand";
 import { sendNotice } from "@/lib/notices";
 import { notifyAdmins } from "@/lib/notify";
 import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
+import { needsStrongApprovalWarning } from "@/lib/approval-warning";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
+
+function storedInternalNote(existing: string, addition: string): string {
+  return [existing.trim(), addition.trim()].filter(Boolean).join("\n\n").slice(0, 2000);
+}
 
 export async function reviewApplication(formData: FormData) {
   const admin = await requireAdmin();
@@ -56,7 +61,8 @@ export async function reviewApplication(formData: FormData) {
     redirect(`/admin/applications/${applicationId}?notice=${encodeURIComponent(notice)}`);
   };
   const decision = String(formData.get("decision") || "");
-  let note = String(formData.get("note") || "").trim().slice(0, 500);
+  const internalNote = String(formData.get("note") || "").trim().slice(0, 500);
+  const applicantMessage = String(formData.get("applicantMessage") || "").trim().slice(0, 500);
   const normalized = decision === "REJECTED" ? "DECLINED" : decision;
   if (normalized !== "APPROVED" && normalized !== "DECLINED" && normalized !== "NEEDS_INFO") {
     redirect("/admin/applications");
@@ -68,9 +74,10 @@ export async function reviewApplication(formData: FormData) {
     return;
   }
 
-  if (normalized === "NEEDS_INFO" && note.length < 2) {
-    fail("Write what you need from the applicant");
+  if (normalized === "NEEDS_INFO" && applicantMessage.length < 2) {
+    fail("Write the message the applicant should see.");
   }
+  let auditNote = internalNote;
   if (normalized === "APPROVED") {
     const existing = await prisma.user.findUnique({ where: { email: application.email } });
     if (existing) {
@@ -80,16 +87,31 @@ export async function reviewApplication(formData: FormData) {
       where: { applicationId: application.id, subject: "APPLICATION", status: "DONE" },
       orderBy: { createdAt: "desc" },
     });
+    const gradeLetter = parseGradeSnapshot(latest?.gradeSnapshot)?.letter || latest?.gradeLetter || "";
+    const recommendation = parseGradeSnapshot(latest?.gradeSnapshot)?.recommendation || latest?.recommendation || "";
+    const strong = needsStrongApprovalWarning({
+      letter: gradeLetter,
+      recommendation,
+      verdict: latest?.verdict,
+    });
+    if (strong && String(formData.get("confirmStrong") || "") !== "yes") {
+      fail("Confirm the grade warning before approving.");
+    }
     if (latest?.verdict === "NOT_LEGIT" && String(formData.get("confirmNotLegit") || "") !== "yes") {
       fail("Confirm the NOT LEGIT recommendation before approving.");
     }
-    if (latest?.verdict === "NOT_LEGIT") {
-      note = [note, "Approved despite recommendation NOT LEGIT."].filter(Boolean).join(" ");
+    if (strong) {
+      const flags = [
+        gradeLetter === "F" ? "Approved despite grade F." : "",
+        latest?.verdict === "NOT_LEGIT" ? "Approved despite recommendation NOT LEGIT." : "",
+        recommendation === "DECLINE" ? "Approved despite recommendation DECLINE." : "",
+      ].filter(Boolean);
+      auditNote = [auditNote, ...flags].filter(Boolean).join(" ");
       await prisma.moderationEvent.create({
         data: {
           actorId: admin.id,
-          action: "APPROVE_NOT_LEGIT",
-          summary: `${admin.name} approved ${application.name} (${application.email}) despite recommendation NOT LEGIT.`,
+          action: latest?.verdict === "NOT_LEGIT" ? "APPROVE_NOT_LEGIT" : "APPROVE_DESPITE_GRADE",
+          summary: `${admin.name} approved ${application.name} (${application.email}) despite grade ${gradeLetter || "ungraded"}, verdict ${latest?.verdict || "none"}, recommendation ${recommendation || "none"}.`,
         },
       });
     }
@@ -106,7 +128,7 @@ export async function reviewApplication(formData: FormData) {
       applicationId: application.id,
       actorId: admin.id,
       decision: normalized,
-      reason: note,
+      reason: [auditNote, applicantMessage ? `Applicant message: ${applicantMessage}` : ""].filter(Boolean).join("\n").slice(0, 2000),
       gradeLetter: grade?.letter || latestGradeRun?.gradeLetter || "",
       gradeScore: grade?.score ?? latestGradeRun?.gradeScore ?? null,
       recommendation: grade?.recommendation || latestGradeRun?.recommendation || "",
@@ -117,7 +139,13 @@ export async function reviewApplication(formData: FormData) {
   if (normalized === "DECLINED") {
     await prisma.application.update({
       where: { id: application.id },
-      data: { status: "DECLINED", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
+      data: {
+        status: "DECLINED",
+        reviewerNote: "",
+        internalNote: storedInternalNote(application.internalNote, auditNote),
+        reviewedAt: new Date(),
+        reviewerId: admin.id,
+      },
     });
     await sendTemplate({
       key: "declined",
@@ -143,7 +171,13 @@ export async function reviewApplication(formData: FormData) {
   if (normalized === "NEEDS_INFO") {
     await prisma.application.update({
       where: { id: application.id },
-      data: { status: "NEEDS_INFO", reviewerNote: note, reviewedAt: new Date(), reviewerId: admin.id },
+      data: {
+        status: "NEEDS_INFO",
+        reviewerNote: applicantMessage,
+        internalNote: storedInternalNote(application.internalNote, auditNote),
+        reviewedAt: new Date(),
+        reviewerId: admin.id,
+      },
     });
     await sendTemplate({
       key: "needs_info",
@@ -154,7 +188,7 @@ export async function reviewApplication(formData: FormData) {
         role: roleLabel(application.role),
         org: application.org,
         statusLink: `${base}/apply/status/${application.statusToken}`,
-        note,
+        note: applicantMessage,
       }),
       person: { name: application.name, role: application.role, org: application.org, location: application.location },
     });
@@ -217,7 +251,8 @@ export async function reviewApplication(formData: FormData) {
     data: {
       status: paying ? "PAYMENT_DUE" : "APPROVED",
       duesCents,
-      reviewerNote: note,
+      reviewerNote: applicantMessage,
+      internalNote: storedInternalNote(application.internalNote, auditNote),
       reviewedAt: new Date(),
       reviewerId: admin.id,
       userId: user.id,
@@ -245,7 +280,7 @@ export async function reviewApplication(formData: FormData) {
         duesAmount: amounts.duesAmount,
         introAmount: amounts.introAmount,
         renewalDate: paymentRenewalLabel(null),
-        note,
+        note: applicantMessage,
       }),
       person,
     });
@@ -260,7 +295,7 @@ export async function reviewApplication(formData: FormData) {
         org: application.org,
         statusLink: `${base}/apply/status/${application.statusToken}`,
         loginLink: `${base}/login`,
-        note,
+        note: applicantMessage,
       }),
       person,
     });
@@ -292,6 +327,92 @@ async function tellRichard(
     text,
     templateKey: "admin_decision",
   });
+}
+
+export async function revokeApproval(formData: FormData) {
+  const admin = await requireAdmin();
+  const applicationId = String(formData.get("applicationId") || "");
+  const caseId = String(formData.get("caseId") || "");
+  const reason = String(formData.get("reason") || "").trim().slice(0, 500);
+  const back = caseId ? `/admin/verification/${caseId}?step=decision` : `/admin/applications/${applicationId}`;
+  const withNote = (key: "error" | "notice", value: string) => `${back}${back.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
+  if (reason.length < 2) redirect(withNote("error", "Write the reason for revoking approval."));
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { user: true },
+  });
+  if (!application || (application.status !== "APPROVED" && application.status !== "PAYMENT_DUE")) {
+    redirect(withNote("error", "That approval cannot be revoked."));
+  }
+  const audit = `Approval revoked. ${reason}`;
+  if (application.user && application.user.status === "ACTIVE" && application.user.paymentStatus !== "PAID") {
+    await prisma.user.update({
+      where: { id: application.user.id },
+      data: { status: "DISABLED", paymentToken: null },
+    });
+  } else if (application.user) {
+    await prisma.user.update({
+      where: { id: application.user.id },
+      data: { paymentToken: null },
+    });
+  }
+  await prisma.application.update({
+    where: { id: application.id },
+    data: {
+      status: "DECLINED",
+      reviewerNote: "",
+      internalNote: storedInternalNote(application.internalNote, audit),
+      reviewedAt: new Date(),
+      reviewerId: admin.id,
+    },
+  });
+  await prisma.applicationDecision.create({
+    data: {
+      applicationId: application.id,
+      actorId: admin.id,
+      decision: "DECLINED",
+      reason: audit,
+    },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "REVOKE_APPROVAL",
+      summary: `${admin.name} revoked approval for ${application.name} (${application.email}). ${reason}`,
+    },
+  });
+  const linked = caseId
+    ? await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } })
+    : await prisma.verificationCase.findUnique({ where: { applicationId: application.id }, select: { id: true } });
+  if (linked) {
+    await applyDecisionStatus({
+      caseId: linked.id,
+      decision: "DECLINED",
+      actorId: admin.id,
+      actorName: admin.name,
+    });
+  }
+  const base = await appBaseUrl();
+  await sendTemplate({
+    key: "declined",
+    to: application.email,
+    applicationId: application.id,
+    vars: buildMailVars({
+      name: application.name,
+      role: roleLabel(application.role),
+      org: application.org,
+      statusLink: `${base}/apply/status/${application.statusToken}`,
+      note: "",
+    }),
+    person: { name: application.name, role: application.role, org: application.org, location: application.location },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/crm");
+  revalidatePath("/network");
+  if (linked) revalidatePath(`/admin/verification/${linked.id}`);
+  redirect(withNote("notice", "Approval revoked"));
 }
 
 export async function setMemberTier(formData: FormData) {
