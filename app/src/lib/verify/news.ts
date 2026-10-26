@@ -8,9 +8,24 @@ import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/t
 export const NEWS_PERSON_HARD =
   /\b(frauds?|indicted|arrested|ponzi|scams?|sanctions?)\b|\bsec charges\b|\bcriminal charges?\b/i;
 
-/** Civil or company-level trouble. Surfaced for Richard. It does not by itself cap the grade. */
+/**
+ * Civil or company-level trouble. A company-only hit is an attention item.
+ * It caps the grade only when the applicant's own name is in the headline.
+ * REO, a dividend cut or reset, a loss, and a downgrade are ordinary results and are not in this list.
+ */
 export const NEWS_COMPANY_CIVIL =
   /\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|foreclosures?|liens?)\b/i;
+
+/**
+ * A civil caption such as "Zumba v. Sciame Construction".
+ * The parties stay capitalized so "profits vs last year" is not a docket.
+ */
+const CIVIL_DOCKET =
+  /\b[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,6}\s+[vV](?:[sS]\.?|\.)\s+[A-Z]/;
+
+export function civilDocket(text: string): boolean {
+  return CIVIL_DOCKET.test(text);
+}
 
 /**
  * A company name that is only a place collides with unrelated headlines.
@@ -367,10 +382,10 @@ function newsSummary(
     };
   }
   const personHard = items.some((item) => item.kind === "hard" && item.person && (item.company || item.location));
+  const companyHard = items.some((item) => item.kind === "hard" && !item.person && item.company);
+  const personNamedCivil = items.some((item) => item.kind === "civil" && item.person && (item.company || item.location));
   const ambiguousNegative = items.some((item) => item.tone === "negative" && item.person && !item.company && !item.location);
-  const companyLitigation = items.some(
-    (item) => item.tone === "negative" && (item.company || (item.person && item.location)) && !(item.kind === "hard" && item.person),
-  );
+  const companyLitigation = items.some((item) => item.kind === "civil" && !item.person && item.company);
   const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
   const departure = items.some((item) => item.departed && item.person);
   const suffixMismatch = items.find((item) => item.suffixMismatch);
@@ -380,6 +395,22 @@ function newsSummary(
       status: "FAIL",
       reviewFlag: true,
       finding: `Negative coverage names this person with the company or city near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+    };
+  }
+  if (companyHard) {
+    return {
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      finding: `Negative coverage names this company near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+    };
+  }
+  if (personNamedCivil) {
+    return {
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      finding: `A civil headline names this person with the company or city. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
     };
   }
   if (ambiguousNegative) {
@@ -438,8 +469,9 @@ function newsSummary(
 function newsStory(item: Classified, ranAt: string): CheckOutput {
   const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location;
   const personHard = item.kind === "hard" && item.person && (item.company || item.location);
-  const companyCivil = item.tone === "negative" && !personHard;
-  const status: EvidenceStatus = personHard ? "FAIL" : "INCONCLUSIVE";
+  const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location);
+  const companyCivil = item.kind === "civil" && !item.person;
+  const status: EvidenceStatus = personHard || personNamedCivil ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
   const label = item.suffixMismatch
     ? "Different suffix"
@@ -449,15 +481,17 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
         ? "Possible match, review"
         : personHard
           ? "Negative"
-          : companyCivil
-            ? "Company litigation"
-            : "Neutral";
+          : personNamedCivil
+            ? "Civil, names applicant"
+            : companyCivil
+              ? "Company litigation"
+              : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
     status,
     weight: 0,
-    reviewFlag: ambiguous || item.departed || item.suffixMismatch || undefined,
+    reviewFlag: ambiguous || personNamedCivil || item.departed || item.suffixMismatch || undefined,
     finding: `${label} · ${date} · ${item.title.slice(0, 180)}`,
     source: outlet ? `${outlet} via ${item.provider}` : item.provider,
     url: item.url,
@@ -470,8 +504,10 @@ function corroborated(item: Classified): boolean {
 }
 
 function negativeKind(text: string): "hard" | "civil" | "none" {
-  if (!allegedNegative(text)) return "none";
-  return NEWS_PERSON_HARD.test(text) ? "hard" : "civil";
+  if (NEWS_PERSON_HARD.test(text) && allegedNegative(text)) return "hard";
+  if (civilDocket(text)) return "civil";
+  if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
+  return "none";
 }
 
 function feedSentence(responded: string[], blocked: string[]): string {
