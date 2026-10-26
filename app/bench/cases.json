@@ -516,8 +516,14 @@
       "inviteNote": "",
       "applicationSubmitted": true,
       "watchlist": "empty",
-      "expectIncludes": ["applied as a General Contractor", "The phone is toll-free, so the area code is not applicable."],
-      "expectExcludes": ["applied as a Developer", "The phone area code was not confirmed against the state (0 of 3)"]
+      "expectIncludes": [
+        "applied as a General Contractor",
+        "The phone is toll-free, so the area code is not applicable."
+      ],
+      "expectExcludes": [
+        "applied as a Developer",
+        "The phone area code was not confirmed against the state (0 of 3)"
+      ]
     },
     {
       "id": "C02",
@@ -533,8 +539,14 @@
       "inviteNote": "",
       "applicationSubmitted": true,
       "watchlist": "empty",
-      "expectIncludes": ["applied as a General Contractor", "address did not check out"],
-      "expectExcludes": ["applied as a Developer", "A location is on the application (2 of 2)"]
+      "expectIncludes": [
+        "applied as a General Contractor",
+        "address did not check out"
+      ],
+      "expectExcludes": [
+        "applied as a Developer",
+        "A location is on the application (2 of 2)"
+      ]
     },
     {
       "id": "C03",
@@ -550,8 +562,12 @@
       "inviteNote": "",
       "applicationSubmitted": true,
       "watchlist": "empty",
-      "expectIncludes": ["did not check out"],
-      "expectExcludes": ["A domain record responded (2 of 2)"]
+      "expectIncludes": [
+        "did not check out"
+      ],
+      "expectExcludes": [
+        "A domain record responded (2 of 2)"
+      ]
     },
     {
       "id": "C04",
@@ -567,8 +583,13 @@
       "inviteNote": "",
       "applicationSubmitted": false,
       "watchlist": "empty",
-      "expectIncludes": ["Referral or request only — no application submitted; grade based on request fields only.", "applied as a General Contractor"],
-      "expectExcludes": ["applied as a Developer"]
+      "expectIncludes": [
+        "Referral or request only — no application submitted; grade based on request fields only.",
+        "applied as a General Contractor"
+      ],
+      "expectExcludes": [
+        "applied as a Developer"
+      ]
     },
     {
       "id": "C05",
@@ -584,8 +605,12 @@
       "inviteNote": "",
       "applicationSubmitted": true,
       "watchlist": "empty",
-      "expectIncludes": ["A location is on the application (2 of 2)"],
-      "expectExcludes": ["address did not check out"]
+      "expectIncludes": [
+        "A location is on the application (2 of 2)"
+      ],
+      "expectExcludes": [
+        "address did not check out"
+      ]
     },
     {
       "id": "C06",
@@ -601,8 +626,110 @@
       "inviteNote": "",
       "applicationSubmitted": true,
       "watchlist": "empty",
-      "expectIncludes": ["business-registry:PASS:corroborates=false", "LOCKHEED MARTIN CORPORATION", "does not tie a person to the firm"],
+      "expectIncludes": [
+        "business-registry:PASS:corroborates=false",
+        "LOCKHEED MARTIN CORPORATION",
+        "does not tie a person to the firm"
+      ],
       "expectExcludes": []
+    },
+    {
+      "id": "B4R01",
+      "kind": "real",
+      "label": "The Durst Organization / Douglas Durst",
+      "segment": "large NYC family developer",
+      "name": "Douglas Durst",
+      "email": "douglas.durst.b4@gmail.com",
+      "org": "The Durst Organization",
+      "website": "https://www.durst.org",
+      "linkedinUrl": "https://www.linkedin.com/company/thedurstorg/",
+      "location": "New York, NY",
+      "role": "DEVELOPER",
+      "statement": "I chair a family-owned New York developer and owner of office and residential towers and would like to meet other owners and capital partners.",
+      "linkStatus": "verified",
+      "linkSource": "https://www.durst.org/about/executives/douglas-durst (Chairman); durst.org news / Commercial Observer Power 100 2026-05-08. LinkedIn slug thedurstorg confirmed via search.",
+      "personAssumption": "Douglas Durst - https://www.durst.org/about/executives/douglas-durst (Chairman); durst.org news / Commercial Observer Power 100 2026-05-08. LinkedIn slug thedurstorg confirmed via search.; title unconfirmed by Richard"
+    },
+    {
+      "id": "B4R02",
+      "kind": "real",
+      "label": "Tutor Perini Corporation / Ronald Tutor",
+      "segment": "large public GC (EDGAR: Tutor Perini only)",
+      "name": "Ronald Tutor",
+      "email": "ronald.tutor.b4@gmail.com",
+      "org": "Tutor Perini Corporation",
+      "website": "https://www.tutorperini.com",
+      "linkedinUrl": "https://www.linkedin.com/company/tutor-perini-corporation/",
+      "location": "Sylmar, CA",
+      "role": "GENERAL_CONTRACTOR",
+      "statement": "Our company builds major civil infrastructure and building projects nationwide; interested in meeting developers and owners.",
+      "linkStatus": "verified",
+      "linkSource": "https://www.tutorperini.com/about/leadership/ (Executive Chairman since Jan 2025; NOT CEO - Gary Smalley CEO since 2025-01-01); DEF 14A 2026-04-09: Executive Chairman through 2026-12-31; SEC filer TUTOR PERINI CORP CIK 77543. LinkedIn slug tutor-perini-corporation confirmed via search.",
+      "personAssumption": "Ronald Tutor - https://www.tutorperini.com/about/leadership/ (Executive Chairman since Jan 2025; NOT CEO - Gary Smalley CEO since 2025-01-01); DEF 14A 2026-04-09: Executive Chairman through 2026-12-31; SEC filer TUTOR PERINI CORP CIK 77543. LinkedIn slug tutor-perini-corporation confirmed via search.; title unconfirmed by Richard"
+    },
+    {
+      "id": "B4R03",
+      "kind": "real",
+      "label": "Newmark Group / Barry Gosin",
+      "segment": "large public brokerage (EDGAR: Newmark Group Inc only)",
+      "name": "Barry Gosin",
+      "email": "barry.gosin.b4@gmail.com",
+      "org": "Newmark Group",
+      "website": "https://www.nmrk.com",
+      "linkedinUrl": "https://www.linkedin.com/company/nmrk-cre/",
+      "location": "New York, NY",
+      "role": "BROKER",
+      "statement": "I lead a commercial real estate advisory firm serving owners, investors and occupiers and would like to connect with owners and developers.",
+      "linkStatus": "verified",
+      "linkSource": "https://www.nmrk.com/people/barry-m-gosin (CEO); Newmark press release 2026-08-07: steps down as CEO 2026-12-31, stays Chairman of Newmark & Co.; SEC filer Newmark Group, Inc. CIK 1690680. LinkedIn slug nmrk-cre confirmed via search.",
+      "personAssumption": "Barry Gosin - https://www.nmrk.com/people/barry-m-gosin (CEO); Newmark press release 2026-08-07: steps down as CEO 2026-12-31, stays Chairman of Newmark & Co.; SEC filer Newmark Group, Inc. CIK 1690680. LinkedIn slug nmrk-cre confirmed via search.; title unconfirmed by Richard"
+    },
+    {
+      "id": "B4R04",
+      "kind": "real",
+      "label": "Belkin Burden Goldman LLP / Sherwin Belkin",
+      "segment": "NYC real estate law firm (founding partner)",
+      "name": "Sherwin Belkin",
+      "email": "sherwin.belkin.b4@gmail.com",
+      "org": "Belkin Burden Goldman LLP",
+      "website": "https://bbgllp.com",
+      "linkedinUrl": "https://www.linkedin.com/company/belkin-burden-goldman-llp/",
+      "location": "New York, NY",
+      "role": "RE_ATTORNEY",
+      "statement": "I am a founding partner of a New York real estate law firm representing owners in rent regulation, land use and leasing matters.",
+      "linkStatus": "verified",
+      "linkSource": "https://bbgllp.com/attorney/sherwin-belkin/ (founding Partner). Note: announced retirement effective 2026-10-31 (his LinkedIn post 2026-05-21; The Real Deal 2026-05-22) - current today, stale in 5 days. Site URL: canonical is https://bbgllp.com (www.bbgllp.com also exists; both 403 to curl on this box). LinkedIn slug belkin-burden-goldman-llp confirmed via search.",
+      "personAssumption": "Sherwin Belkin - https://bbgllp.com/attorney/sherwin-belkin/ (founding Partner). Note: announced retirement effective 2026-10-31 (his LinkedIn post 2026-05-21; The Real Deal 2026-05-22) - current today, stale in 5 days. Site URL: canonical is https://bbgllp.com (www.bbgllp.com also exists; both 403 to curl on this box). LinkedIn slug belkin-burden-goldman-llp confirmed via search.; title unconfirmed by Richard"
+    },
+    {
+      "id": "B4R05",
+      "kind": "real",
+      "label": "Starwood Property Trust / Barry Sternlicht",
+      "segment": "public CRE lender/REIT (generic 'Property Trust' EDGAR test)",
+      "name": "Barry Sternlicht",
+      "email": "barry.sternlicht.b4@gmail.com",
+      "org": "Starwood Property Trust",
+      "website": "https://www.starwoodpropertytrust.com",
+      "linkedinUrl": "https://www.linkedin.com/company/starwoodproperty/",
+      "location": "Miami Beach, FL",
+      "role": "LENDER",
+      "statement": "We originate and invest in commercial real estate and infrastructure loans globally; looking to meet sponsors and owners.",
+      "linkStatus": "verified",
+      "linkSource": "https://www.starwoodpropertytrust.com/team/ (Chairman & CEO); DEF 14A 2026-03-13; 8-K 2026-04-24 re-elected director; SEC filer STARWOOD PROPERTY TRUST, INC. CIK 1465128. LinkedIn slug starwoodproperty confirmed via search.",
+      "personAssumption": "Barry Sternlicht - https://www.starwoodpropertytrust.com/team/ (Chairman & CEO); DEF 14A 2026-03-13; 8-K 2026-04-24 re-elected director; SEC filer STARWOOD PROPERTY TRUST, INC. CIK 1465128. LinkedIn slug starwoodproperty confirmed via search.; title unconfirmed by Richard"
+    },
+    {
+      "id": "B4F01",
+      "kind": "fake",
+      "label": "Batch-4 fake: invented bridge lender, nonexistent website, personal LinkedIn-format URL, claims $250M fund (generic 'Capital Group' EDGAR control)",
+      "name": "Corvin Ashleigh",
+      "email": "corvin.ashleigh.b4@gmail.com",
+      "org": "Brambleton Keystone Capital Group LLC",
+      "website": "https://www.brambletonkeystonecapital.com",
+      "linkedinUrl": "https://www.linkedin.com/in/corvin-ashleigh-bkcg",
+      "location": "Charlotte, NC",
+      "role": "FAMILY_OFFICE",
+      "statement": "Family office managing a $250M bridge-lending fund for value-add multifamily and industrial real estate; seeking sponsors and co-lenders."
     }
   ]
 }
