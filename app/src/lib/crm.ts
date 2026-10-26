@@ -1,5 +1,5 @@
 import type { CrmStage } from "@prisma/client";
-import { crmStage } from "@/lib/crm-stage";
+import { crmStage, stageOverride } from "@/lib/crm-stage";
 import { prisma } from "@/lib/prisma";
 
 export async function ensureCrmPerson(input: {
@@ -139,12 +139,13 @@ export async function syncCrm() {
 
   for (const row of buckets.values()) {
     const existing = await prisma.crmPerson.findUnique({ where: { email: row.email } });
+    const manualStage = stageOverride(existing?.manualStage);
     const stage = crmStage({
       inviteStatus: row.inviteStatus,
       applicationStatus: row.applicationStatus,
       memberActive: row.memberActive,
       paymentStatus: row.paymentStatus,
-      manualStage: existing?.manualStage,
+      manualStage,
     }) as CrmStage;
     const data = {
       name: row.name,
@@ -152,6 +153,7 @@ export async function syncCrm() {
       org: row.org,
       location: row.location,
       stage,
+      manualStage,
       inviteCode: row.inviteCode || existing?.inviteCode || "",
       inviteRequestId: row.inviteRequestId ?? existing?.inviteRequestId ?? null,
       applicationId: row.applicationId ?? existing?.applicationId ?? null,

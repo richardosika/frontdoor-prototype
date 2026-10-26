@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crmStage, csvCell, followUpDue } from "@/lib/crm-stage";
+import { STAGE_OVERRIDE_OPTIONS, crmStage, csvCell, followUpDue, isDecisionStage, stageOverride } from "@/lib/crm-stage";
 import {
   SIGN_OFF,
   TEMPLATE_DEFS,
@@ -91,6 +91,26 @@ describe("crm stage", () => {
     expect(crmStage({ memberActive: true, paymentStatus: "DUE" })).toBe("APPROVED");
     expect(crmStage({ memberActive: true, paymentStatus: "PAID" })).toBe("ACTIVE");
     expect(crmStage({ applicationStatus: "DECLINED", manualStage: "INVITED" })).toBe("INVITED");
+  });
+
+  it("does not let a stage override approve, activate, or decline", () => {
+    expect(STAGE_OVERRIDE_OPTIONS).toEqual(["INVITED", "APPLIED", "IN_REVIEW"]);
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("APPROVED");
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("ACTIVE");
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("DECLINED");
+    expect(isDecisionStage("APPROVED")).toBe(true);
+    expect(isDecisionStage("ACTIVE")).toBe(true);
+    expect(isDecisionStage("DECLINED")).toBe(true);
+    expect(isDecisionStage("IN_REVIEW")).toBe(false);
+    expect(stageOverride("APPROVED")).toBeNull();
+    expect(stageOverride("ACTIVE")).toBeNull();
+    expect(stageOverride("DECLINED")).toBeNull();
+    expect(stageOverride("APPLIED")).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "APPROVED" })).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "ACTIVE" })).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "DECLINED" })).toBe("APPLIED");
+    expect(crmStage({ manualStage: "ACTIVE" })).toBe("INVITED");
+    expect(crmStage({ applicationStatus: "PAYMENT_DUE", manualStage: "APPROVED" })).toBe("APPROVED");
   });
 
   it("marks a follow-up due and escapes csv cells", () => {

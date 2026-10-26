@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { safeAdminBack } from "@/lib/admin-home";
 import { requireAdmin } from "@/lib/current-user";
 import { ensureCrmPerson, recordCrmEvent } from "@/lib/crm";
-import { CRM_STAGES } from "@/lib/crm-stage";
+import { crmStage, isDecisionStage, stageOverride } from "@/lib/crm-stage";
 import { isTemplateKey, sampleTemplateVars } from "@/lib/email-templates";
 import { buildMailVars, ensureTemplates, sendTemplate, sendTemplateTest } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
@@ -94,7 +94,14 @@ export async function setDeliveryMode(formData: FormData) {
 export async function saveCrmPerson(formData: FormData) {
   const admin = await requireAdmin();
   const personId = String(formData.get("personId") || "");
-  const person = await prisma.crmPerson.findUnique({ where: { id: personId } });
+  const person = await prisma.crmPerson.findUnique({
+    where: { id: personId },
+    include: {
+      application: { select: { status: true } },
+      inviteRequest: { select: { status: true } },
+      user: { select: { status: true, paymentStatus: true } },
+    },
+  });
   if (!person) redirect("/admin/crm");
   const tags = String(formData.get("tags") || "").trim().slice(0, 240);
   const followUpNote = String(formData.get("followUpNote") || "").trim().slice(0, 500);
@@ -108,7 +115,25 @@ export async function saveCrmPerson(formData: FormData) {
     redirect(`/admin/crm/${person.id}?error=Write+why+this+person+should+not+be+contacted`);
   }
   const manualRaw = String(formData.get("manualStage") || "");
-  const manualStage = (CRM_STAGES as readonly string[]).includes(manualRaw) ? manualRaw : null;
+  if (isDecisionStage(manualRaw)) {
+    await prisma.moderationEvent.create({
+      data: {
+        actorId: admin.id,
+        action: "STAGE_OVERRIDE_REFUSED",
+        summary: `${admin.name} tried to set ${person.name} to ${manualRaw} from the CRM stage menu. Approve, Active, and Declined stay on the guided review.`,
+      },
+    });
+    revalidatePath("/admin/audit");
+    redirect(`/admin/crm/${person.id}?error=${encodeURIComponent("Stage override cannot approve, activate, or decline. Use the guided review decision.")}`);
+  }
+  const manualStage = stageOverride(manualRaw);
+  const stage = crmStage({
+    inviteStatus: person.inviteRequest?.status,
+    applicationStatus: person.application?.status,
+    memberActive: person.user?.status === "ACTIVE",
+    paymentStatus: person.user?.paymentStatus,
+    manualStage,
+  });
   await prisma.crmPerson.update({
     where: { id: person.id },
     data: {
@@ -118,8 +143,8 @@ export async function saveCrmPerson(formData: FormData) {
       ownerId: owner?.id || null,
       doNotContact,
       doNotContactReason: doNotContact ? doNotContactReason : "",
-      manualStage: manualStage as typeof person.manualStage,
-      stage: (manualStage as typeof person.stage) || person.stage,
+      manualStage,
+      stage,
     },
   });
   if (followUpRaw !== (person.followUpAt ? person.followUpAt.toISOString().slice(0, 10) : "")) {

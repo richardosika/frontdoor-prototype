@@ -2,6 +2,11 @@ import { blocksMembership } from "@/lib/payments";
 
 export const CRM_STAGES = ["INVITED", "APPLIED", "IN_REVIEW", "APPROVED", "ACTIVE", "DECLINED"] as const;
 
+/** Stages the CRM menu may set. Approve, Active, and Declined come from the guided review decision. */
+export const STAGE_OVERRIDE_OPTIONS = ["INVITED", "APPLIED", "IN_REVIEW"] as const;
+
+const DECISION_STAGES = ["APPROVED", "ACTIVE", "DECLINED"] as const;
+
 export type CrmStageId = (typeof CRM_STAGES)[number];
 
 export const CRM_STAGE_LABELS: Record<CrmStageId, string> = {
@@ -18,6 +23,18 @@ export function crmStageLabel(stage: string): string {
   return stage;
 }
 
+export function isDecisionStage(stage: string): boolean {
+  return (DECISION_STAGES as readonly string[]).includes(stage);
+}
+
+/** A stored override counts only when it does not approve, activate, or decline. */
+export function stageOverride(stage: string | null | undefined): (typeof STAGE_OVERRIDE_OPTIONS)[number] | null {
+  if (stage && (STAGE_OVERRIDE_OPTIONS as readonly string[]).includes(stage)) {
+    return stage as (typeof STAGE_OVERRIDE_OPTIONS)[number];
+  }
+  return null;
+}
+
 export function crmStage(input: {
   inviteStatus?: string | null;
   applicationStatus?: string | null;
@@ -25,9 +42,8 @@ export function crmStage(input: {
   paymentStatus?: string | null;
   manualStage?: string | null;
 }): CrmStageId {
-  if (input.manualStage && (CRM_STAGES as readonly string[]).includes(input.manualStage)) {
-    return input.manualStage as CrmStageId;
-  }
+  const override = stageOverride(input.manualStage);
+  if (override) return override;
   if (input.memberActive) {
     if (input.paymentStatus && blocksMembership(input.paymentStatus)) return "APPROVED";
     return "ACTIVE";

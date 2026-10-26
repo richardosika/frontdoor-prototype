@@ -48,6 +48,7 @@ export default async function ApplicationsPage({
       include: {
         runs: { where: { subject: "APPLICATION" }, orderBy: { createdAt: "desc" }, take: 1 },
         user: { select: { status: true, paymentStatus: true, renewalAt: true, isAdmin: true } },
+        crmPeople: { select: { id: true }, take: 1 },
       },
     }),
     prisma.inviteRequest.findMany({
@@ -157,25 +158,32 @@ export default async function ApplicationsPage({
               const personId = invite.crmPeople[0]?.id;
               return (
                 <li key={invite.id}>
-                  <form action={startGuidedReview} className="mb-2">
+                  <form action={startGuidedReview}>
                     <input type="hidden" name="inviteRequestId" value={invite.id} />
-                    <button className={btn} type="submit">
+                    <button className={`${btn} mb-2`} type="submit">
                       Start review
                     </button>
+                    <button className={`${card} block w-full p-4 text-left`} type="submit">
+                      <h2 className="font-serif text-xl font-normal">{invite.name}</h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <StatusChip status={standing.status} />
+                        {isDemoRecord({ email: invite.email }) ? <DemoChip /> : null}
+                      </div>
+                      <p className="text-sm text-ink">
+                        {invite.org} · {roleLabel(invite.role)} · {invite.location}
+                      </p>
+                      <p className="text-xs text-mut">
+                        {formatAuditTime(invite.createdAt)} · {personStageLabel(standing.stage)}
+                      </p>
+                    </button>
                   </form>
-                  <Link href={personId ? `/admin/crm/${personId}` : "/admin"} className={`${card} block p-4`}>
-                    <h2 className="font-serif text-xl font-normal">{invite.name}</h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <StatusChip status={standing.status} />
-                      {isDemoRecord({ email: invite.email }) ? <DemoChip /> : null}
-                    </div>
-                    <p className="text-sm text-ink">
-                      {invite.org} · {roleLabel(invite.role)} · {invite.location}
+                  {personId ? (
+                    <p className="mt-2 text-sm">
+                      <Link href={`/admin/crm/${personId}`} className="underline decoration-brass">
+                        CRM record
+                      </Link>
                     </p>
-                    <p className="text-xs text-mut">
-                      {formatAuditTime(invite.createdAt)} · {personStageLabel(standing.stage)}
-                    </p>
-                  </Link>
+                  ) : null}
                 </li>
               );
             }
@@ -193,37 +201,47 @@ export default async function ApplicationsPage({
             <li key={application.id} className="flex items-start gap-2">
               <input form="bulk-delete" className="mt-5 h-4 w-4 shrink-0" type="checkbox" name="applicationId" value={application.id} aria-label={`Select ${application.name}`} />
               <div className="min-w-0 flex-1">
-              <form action={startGuidedReview} className="mb-2">
+              <form action={startGuidedReview}>
                 <input type="hidden" name="applicationId" value={application.id} />
-                <button className={btn} type="submit">
+                <button className={`${btn} mb-2`} type="submit">
                   Start review
                 </button>
-              </form>
-              <Link href={`/admin/applications/${application.id}`} className={`${card} block p-4`}>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h2 className="font-serif text-xl font-normal">{application.name}</h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <StatusChip status={standing.status} />
-                      {isDemoRecord({ isTest: application.isTest, email: application.email }) ? <DemoChip /> : null}
+                <button className={`${card} block w-full p-4 text-left`} type="submit">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h2 className="font-serif text-xl font-normal">{application.name}</h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <StatusChip status={standing.status} />
+                        {isDemoRecord({ isTest: application.isTest, email: application.email }) ? <DemoChip /> : null}
+                      </div>
+                      <p className="text-sm text-ink">
+                        {application.org} · {roleLabel(application.role)} · {application.location}
+                      </p>
+                      <p className="text-xs text-mut">
+                        {formatAuditTime(application.createdAt)} · {personStageLabel(standing.stage)} · {applicationStatusLabel(application.status)}
+                        {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
+                        {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
+                      </p>
                     </div>
-                    <p className="text-sm text-ink">
-                      {application.org} · {roleLabel(application.role)} · {application.location}
-                    </p>
-                    <p className="text-xs text-mut">
-                      {formatAuditTime(application.createdAt)} · {personStageLabel(standing.stage)} · {applicationStatusLabel(application.status)}
-                      {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
-                      {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
-                    </p>
+                    <GradeMark
+                      letter={application.runs[0]?.gradeLetter}
+                      score={application.runs[0]?.gradeScore}
+                      recommendation={application.runs[0]?.recommendation}
+                      confidence={application.runs[0]?.gradeConfidence}
+                    />
                   </div>
-                  <GradeMark
-                    letter={application.runs[0]?.gradeLetter}
-                    score={application.runs[0]?.gradeScore}
-                    recommendation={application.runs[0]?.recommendation}
-                    confidence={application.runs[0]?.gradeConfidence}
-                  />
-                </div>
-              </Link>
+                </button>
+              </form>
+              <p className="mt-2 flex flex-wrap gap-3 text-sm">
+                {application.crmPeople[0] ? (
+                  <Link href={`/admin/crm/${application.crmPeople[0].id}`} className="underline decoration-brass">
+                    CRM record
+                  </Link>
+                ) : null}
+                <Link href={`/admin/applications/${application.id}`} className="underline decoration-brass">
+                  Application file
+                </Link>
+              </p>
               <div className="mt-2">
                 <RunAndReload
                   className={btnOutline}

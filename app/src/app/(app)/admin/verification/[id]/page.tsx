@@ -57,6 +57,14 @@ export default async function VerificationCasePage({
     heading.detail = ["Applicant", person?.org, person?.location].filter(Boolean).join(" · ");
   }
   const memberReview = record.subject === "MEMBER" ? await loadMemberReview(record.id, query.step) : null;
+  const crmMatch = [
+    record.applicationId ? { applicationId: record.applicationId } : null,
+    record.inviteRequestId ? { inviteRequestId: record.inviteRequestId } : null,
+    record.userId ? { userId: record.userId } : null,
+  ].filter((item): item is { applicationId: string } | { inviteRequestId: string } | { userId: string } => Boolean(item));
+  const crmPerson = crmMatch.length
+    ? await prisma.crmPerson.findFirst({ where: { OR: crmMatch }, select: { id: true } })
+    : null;
   const grade = parseGradeSnapshot(record.gradeSnapshot);
   const shownGrade = grade
     ? applyReviewSkips(
@@ -92,7 +100,23 @@ export default async function VerificationCasePage({
           Verification queue
         </Link>
         {" · "}
-        {record.subject === "MEMBER" ? "Member" : "Project"} · {verificationStatusLabel(record.status)}
+        {record.subject === "MEMBER" ? "Applicant" : "Project"} · {verificationStatusLabel(record.status)}
+        {crmPerson ? (
+          <>
+            {" · "}
+            <Link href={`/admin/crm/${crmPerson.id}`} className="text-brass">
+              CRM record
+            </Link>
+          </>
+        ) : null}
+        {record.applicationId ? (
+          <>
+            {" · "}
+            <Link href={`/admin/applications/${record.applicationId}`} className="text-brass">
+              Application file
+            </Link>
+          </>
+        ) : null}
       </p>
       <div className="mt-3">
         <Banner error={query.error} notice={query.notice} />
