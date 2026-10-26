@@ -1160,6 +1160,25 @@ export function applyReviewSkips(report: GradeReport, skips: { title: string; re
   return { ...next, plainText: gradePlainText(next) };
 }
 
+export function gradeComparisonLine(
+  latest: { letter: string; score: number } | null,
+  atApplication: { letter: string; score: number } | null,
+): string {
+  if (!latest) return "";
+  if (!atApplication || (atApplication.letter === latest.letter && atApplication.score === latest.score)) {
+    return `Latest check: grade ${latest.letter} ${latest.score}.`;
+  }
+  return `Latest check: grade ${latest.letter} ${latest.score}. Grade at application: grade ${atApplication.letter} ${atApplication.score}.`;
+}
+
+export function rerunAuditSummary(
+  latest: { letter: string; score: number },
+  atApplication: { letter: string; score: number } | null,
+): string {
+  const prior = atApplication ? `grade ${atApplication.letter} ${atApplication.score}` : "no stored application grade";
+  return `Re-ran checks. Latest check: grade ${latest.letter} ${latest.score}. Grade at application was ${prior}.`;
+}
+
 export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeReport, "letter" | "score" | "recommendation" | "confidence" | "attention" | "banner">): string {
   if (!previous) return "First graded run. Nothing earlier to compare.";
   const changes: string[] = [];

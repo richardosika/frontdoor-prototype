@@ -36,5 +36,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   revalidatePath(`/admin/verification/${id}`);
   revalidatePath("/admin/verification");
+  const linked = await prisma.verificationCase.findUnique({ where: { id }, select: { applicationId: true } });
+  if (linked?.applicationId) {
+    revalidatePath(`/admin/applications/${linked.applicationId}`);
+    revalidatePath("/admin/applications");
+  }
+  revalidatePath("/admin/audit");
   return NextResponse.redirect(new URL(rerunChecksHref(id, "done"), request.url), RERUN_STATUS);
 }

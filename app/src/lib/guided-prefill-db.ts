@@ -5,7 +5,7 @@ import { MEMBER_CHECKS, PROJECT_CHECKS } from "@/lib/verification";
 import { ensureVerificationCase } from "@/lib/verification-db";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { fetchForChecks } from "@/lib/verify/fetch";
-import { gradeChecks, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
+import { gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
@@ -69,6 +69,7 @@ async function writeSuggestions(input: {
   grade: GradeReport | null;
   mode: "fill-empty" | "refresh";
   summary: string;
+  audit?: boolean;
 }): Promise<number> {
   const record = await prisma.verificationCase.findUnique({
     where: { id: input.caseId },
@@ -113,7 +114,7 @@ async function writeSuggestions(input: {
       data: { gradeSnapshot: input.grade as unknown as Prisma.InputJsonValue },
     });
   }
-  if (updated > 0) {
+  if (updated > 0 || input.audit) {
     await prisma.verificationEvent.create({
       data: {
         caseId: record.id,
@@ -342,7 +343,38 @@ export async function runLivePrefill(caseId: string): Promise<void> {
   };
   const checks = await collectChecks(ctx);
   const evidence = asEvidence(checks);
-  const grade = await gradeFor(checks, loaded.applicant, loaded.subject);
+  let grade = await gradeFor(checks, loaded.applicant, loaded.subject);
+  const record = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    select: { applicationId: true },
+  });
+  let atApplication: { letter: string; score: number } | null = null;
+  if (record?.applicationId && grade) {
+    const run = await prisma.verificationRun.findFirst({
+      where: { applicationId: record.applicationId, subject: "APPLICATION", status: "DONE" },
+      orderBy: { finishedAt: "desc" },
+      select: { id: true, gradeLetter: true, gradeScore: true, gradeSnapshot: true },
+    });
+    const previous = parseGradeSnapshot(run?.gradeSnapshot);
+    if (previous) atApplication = { letter: previous.letter, score: previous.score };
+    else if (run?.gradeLetter && typeof run.gradeScore === "number") atApplication = { letter: run.gradeLetter, score: run.gradeScore };
+    grade = { ...grade, changeNote: gradeChangeNote(previous, grade) };
+    grade.plainText = gradePlainText(grade);
+    if (run) {
+      await prisma.verificationRun.update({
+        where: { id: run.id },
+        data: {
+          gradeLetter: grade.letter,
+          gradeScore: grade.score,
+          gradeConfidence: grade.confidence,
+          recommendation: grade.recommendation,
+          gradeSnapshot: grade as unknown as Prisma.InputJsonValue,
+          summary: grade.plainText,
+          finishedAt: new Date(),
+        },
+      });
+    }
+  }
   await rememberSources(caseId, evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, evidence);
   await writeSuggestions({
@@ -350,7 +382,10 @@ export async function runLivePrefill(caseId: string): Promise<void> {
     suggestions,
     grade,
     mode: "refresh",
-    summary: "Re-ran free-source checks. Auto-suggested marks were refreshed. Confirmed items and skips were left as they were.",
+    audit: true,
+    summary: grade
+      ? rerunAuditSummary(grade, atApplication)
+      : "Re-ran checks. No grade was stored.",
   });
 }
 

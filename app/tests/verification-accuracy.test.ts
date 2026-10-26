@@ -7,7 +7,7 @@ import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/v
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, dedupeSourceLines, gradeChecks, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, dedupeSourceLines, gradeChecks, gradeComparisonLine, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
@@ -333,6 +333,13 @@ describe("honest labels and the legacy score", () => {
     expect(formatRunScores({ score: 69, gradeLetter: "F", gradeScore: 55 })).toBe("grade F 55 · legacy weight score 69");
     expect(formatRunScores({ score: 63, gradeLetter: "F", gradeScore: 52 })).toBe("grade F 52 · legacy weight score 63");
     expect(formatRunScores({ score: 53 })).toBe("legacy weight score 53");
+    expect(gradeComparisonLine({ letter: "F", score: 53 }, { letter: "F", score: 55 })).toBe(
+      "Latest check: grade F 53. Grade at application: grade F 55.",
+    );
+    expect(gradeComparisonLine({ letter: "F", score: 53 }, { letter: "F", score: 53 })).toBe("Latest check: grade F 53.");
+    expect(rerunAuditSummary({ letter: "F", score: 53 }, { letter: "F", score: 55 })).toBe(
+      "Re-ran checks. Latest check: grade F 53. Grade at application was grade F 55.",
+    );
     expect(scoreOf(passes)).toBe(100);
     expect(scoreOf([...passes, ...blocked])).toBeLessThan(74);
     expect(scoreOf([...passes, blocked[2]])).toBe(100);

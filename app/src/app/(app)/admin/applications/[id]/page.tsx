@@ -17,7 +17,7 @@ import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
-import { applyReviewSkips, gradeFactsFromApplication, gradeForRun } from "@/lib/verify/grade";
+import { applyReviewSkips, gradeComparisonLine, gradeFactsFromApplication, gradeForRun, parseGradeSnapshot } from "@/lib/verify/grade";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -89,12 +89,10 @@ export default async function ApplicationDetailPage({
       cardOnFile,
     },
   });
-  const shownGrade = grade
-    ? applyReviewSkips(
-        grade,
-        skippedFrom(reviewSteps).map((step) => ({ title: step.title, reason: step.saved?.skipReason || "" })),
-      )
-    : null;
+  const skips = skippedFrom(reviewSteps).map((step) => ({ title: step.title, reason: step.saved?.skipReason || "" }));
+  const shownGrade = grade ? applyReviewSkips(grade, skips) : null;
+  const caseGrade = parseGradeSnapshot(reviewCase.gradeSnapshot);
+  const latestGrade = caseGrade ? applyReviewSkips(caseGrade, skips) : shownGrade;
   const verification = { id: reviewCase.id };
 
   return (
@@ -107,11 +105,12 @@ export default async function ApplicationDetailPage({
         </div>
         <p className="mt-3 text-sm text-ink">{ADMIN_INTROS.applications} This grade is a recommendation. Richard Osika approves every member.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <GradeMark letter={shownGrade?.letter} score={shownGrade?.score} recommendation={shownGrade?.recommendation} confidence={shownGrade?.confidence} />
+          <GradeMark letter={latestGrade?.letter} score={latestGrade?.score} recommendation={latestGrade?.recommendation} confidence={latestGrade?.confidence} />
           <span className="text-xs uppercase tracking-wide text-mut">{applicationStatusLabel(application.status)}</span>
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
-        {shownGrade ? <ExecutiveSummary report={shownGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
+        {latestGrade ? <p className="mt-2 text-xs text-mut">{gradeComparisonLine(latestGrade, shownGrade)}</p> : null}
+        {latestGrade ? <ExecutiveSummary report={latestGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
         <div className="mt-4">
           <Link href={`/admin/verification/${reviewCase.id}?step=${progress.current}`} className={`${btn} inline-flex min-h-11 items-center`}>
             Open the review

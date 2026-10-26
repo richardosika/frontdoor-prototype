@@ -213,6 +213,7 @@ export default async function VerificationCasePage({
             confirmLabel={memberReview.confirmLabel}
             mode={memberReview.mode}
             unverified={memberReview.unverified}
+            applicationGrade={memberReview.applicationGrade}
           />
         </div>
       ) : null}

@@ -3,7 +3,7 @@ import { DecisionForm, InviteDecisionForm } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import type { GradeReport } from "@/lib/verify/grade";
+import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
 import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
 
@@ -18,6 +18,7 @@ export function GuidedReview({
   confirmLabel,
   mode = "application",
   unverified = [],
+  applicationGrade = null,
 }: {
   applicationId: string;
   caseId: string;
@@ -29,6 +30,7 @@ export function GuidedReview({
   confirmLabel: string;
   mode?: MemberReviewMode;
   unverified?: string[];
+  applicationGrade?: { letter: string; score: number } | null;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -74,6 +76,7 @@ export function GuidedReview({
           skipped={skipped}
           previous={previous}
           unverified={unverified}
+          applicationGrade={applicationGrade}
         />
       ) : (
         <article className="mt-4">
@@ -158,6 +161,7 @@ function DecisionStep({
   skipped,
   previous,
   unverified,
+  applicationGrade,
 }: {
   applicationId: string;
   caseId: string;
@@ -169,6 +173,7 @@ function DecisionStep({
   skipped: BuiltStep[];
   previous: ReviewStepId;
   unverified: string[];
+  applicationGrade: { letter: string; score: number } | null;
 }) {
   return (
     <div className="mt-4" id="decision-step">
@@ -206,6 +211,7 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">Nothing on the unverified list. A source corroborated this person.</p>
       )}
+      {grade ? <p className="mt-3 text-sm text-ink">{gradeComparisonLine(grade, applicationGrade)}</p> : null}
       {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
         <DecisionForm

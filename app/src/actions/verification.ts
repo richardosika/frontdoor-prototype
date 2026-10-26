@@ -238,6 +238,12 @@ export async function rerunGuidedChecks(formData: FormData) {
     await runLivePrefill(caseId);
     revalidatePath(back);
     revalidatePath("/admin/verification");
+    const linked = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { applicationId: true } });
+    if (linked?.applicationId) {
+      revalidatePath(`/admin/applications/${linked.applicationId}`);
+      revalidatePath("/admin/applications");
+    }
+    revalidatePath("/admin/audit");
   } catch (error) {
     unstable_rethrow(error);
     console.error("re-run checks failed", caseId, error instanceof Error ? error.message : "error");

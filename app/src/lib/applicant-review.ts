@@ -26,6 +26,7 @@ export type MemberReview = {
   inviteRequestId: string | null;
   mode: MemberReviewMode;
   unverified: string[];
+  applicationGrade: { letter: string; score: number } | null;
 };
 
 function rowsFromSnapshot(value: unknown): StepEvidence[] {
@@ -71,6 +72,7 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
 
   let evidence = rowsFromSnapshot(record.sourceSnapshot);
   let verdict = "";
+  let applicationGrade: { letter: string; score: number } | null = null;
   const applicationId = application?.id || null;
   if (applicationId) {
     const run = await prisma.verificationRun.findFirst({
@@ -79,6 +81,9 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
       include: { evidence: true },
     });
     verdict = run?.verdict || "";
+    if (run?.gradeLetter && typeof run.gradeScore === "number") {
+      applicationGrade = { letter: run.gradeLetter, score: run.gradeScore };
+    }
     if (!evidence.length) {
       evidence = (run?.evidence ?? []).map((item) => ({
         checkKey: item.checkKey,
@@ -141,5 +146,6 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
     inviteRequestId: invite?.id || null,
     mode: open ? "application" : invitePending ? "invite" : "closed",
     unverified: unverifiedPersonItems(evidence),
+    applicationGrade,
   };
 }
