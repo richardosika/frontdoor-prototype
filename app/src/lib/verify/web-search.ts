@@ -4,17 +4,32 @@ import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const NEGATIVE = /\b(fraud|lawsuit|indicted|scam|ponzi)\b/i;
 
+/** A LinkedIn people-directory or search page is not a profile or a company page. */
+export function isLinkedInDirectory(value: string): boolean {
+  const text = value.replace(/&amp;/g, "&").replace(/&gt;/g, ">");
+  if (/linkedin\.com\/(?:pub\/dir|directory|search)(?:\/|\b)/i.test(text)) return true;
+  return /linkedin\.com\s*(?:›|>|\u203a)\s*pub\s*(?:›|>|\u203a)\s*dir\b/i.test(text);
+}
+
 export function duckDuckGoResultTexts(html: string): string[] {
   const withoutChrome = html
     .replace(/<title[\s\S]*?<\/title>/gi, " ")
     .replace(/<form[\s\S]*?<\/form>/gi, " ");
   const chunks = [...withoutChrome.matchAll(/class="result__(?:a|snippet|extras__url)"[^>]*>([\s\S]*?)<\/a>/gi)];
-  return chunks.map((match) => stripTags(match[1])).map((text) => text.trim()).filter((text) => text.length > 2);
+  return chunks
+    .filter((match) => !isLinkedInDirectory(match[0]))
+    .map((match) => stripTags(match[1]))
+    .map((text) => text.trim())
+    .filter((text) => text.length > 2);
 }
 
 export function bingResultTexts(html: string): string[] {
   const blocks = [...html.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)];
-  return blocks.map((match) => stripTags(match[0])).map((text) => text.trim()).filter((text) => text.length > 2);
+  return blocks
+    .filter((match) => !isLinkedInDirectory(match[0]))
+    .map((match) => stripTags(match[0]))
+    .map((text) => text.trim())
+    .filter((text) => text.length > 2);
 }
 
 /** Keyless Wikidata entity search. Used only after DuckDuckGo, Bing, and Wikipedia return nothing usable. */
@@ -159,7 +174,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       response = { ok: false, status: 0, text: "" };
     }
     const snippets = response.status >= 200 && response.status < 300
-      ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query))
+      ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query) && !isLinkedInDirectory(text))
       : [];
     const state = providerAttemptState(response.status, snippets.length);
     if (state === "unavailable") {

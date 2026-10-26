@@ -2,7 +2,7 @@ import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 
@@ -751,6 +751,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .map((match) => match[1].replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").trim())
       .slice(1, 16);
     for (const title of titles) {
+      if (isLinkedInDirectory(title)) continue;
       const score = scorePublicText(title, queryFacts);
       if (!socialMatch(score)) continue;
       if (!bestNews || rank(score) > rank(bestNews.score)) bestNews = { title, score, url: newsUrl };
@@ -837,6 +838,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       ...(!dataBlocked ? dataSnippets.map((item) => ({ ...item, url: dataUrl, platform: "Wikidata" })) : []),
     ];
     const hit = pool
+      .filter((item) => !isLinkedInDirectory(item.text) && !item.hrefs.some((href) => isLinkedInDirectory(href)))
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
       .find((item) => item.score.name && item.score.company);
     if (hit) {

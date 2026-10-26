@@ -14,6 +14,7 @@ import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
+import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -1624,5 +1625,37 @@ describe("batch 4 company search terms", () => {
     expect(decodeURIComponent(instagram?.url || "").toLowerCase()).not.toContain("/tags/tutor");
     expect(youtube?.finding).toContain(`"Ronald Tutor" "perini"`);
     expect(youtube?.finding.toLowerCase()).not.toContain(`"tutor" "tutor"`);
+  });
+});
+
+describe("batch 4 LinkedIn directory pages", () => {
+  it("does not treat a LinkedIn directory result as evidence", async () => {
+    expect(isLinkedInDirectory("https://www.linkedin.com/pub/dir/Thomas/Gilbane+Jr")).toBe(true);
+    expect(isLinkedInDirectory("linkedin.com › pub › dir › Thomas › Gilbane+Jr")).toBe(true);
+    expect(isLinkedInDirectory("https://www.linkedin.com/in/thomas-gilbane")).toBe(false);
+    const directory = `<html><body><a class="result__a" href="https://www.linkedin.com/pub/dir/Thomas/Gilbane+Jr">Thomas Gilbane Jr - Gilbane Building Company linkedin.com › pub › dir</a></body></html>`;
+    const gilbane = facts({
+      name: "Thomas Gilbane Jr.",
+      applicantName: "Thomas Gilbane Jr.",
+      org: "Gilbane Building Company",
+      location: "Providence, RI",
+    });
+    const checks = await runPublicScreen(gilbane, async (url) => {
+      if (url.includes("duckduckgo")) return { ok: true, status: 200, text: directory };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(web?.status).not.toBe("PASS");
+    expect(web?.corroborates).not.toBe(true);
+    expect(footprint?.status).not.toBe("PASS");
+    expect(footprint?.corroborates).not.toBe(true);
+
+    const direct = await webFootprintCheck(gilbane, async (url) => {
+      if (url.includes("duckduckgo")) return { ok: true, status: 200, text: directory };
+      return { ok: false, status: 404, text: "" };
+    });
+    expect(direct.status).not.toBe("PASS");
+    expect(direct.corroborates).not.toBe(true);
   });
 });
