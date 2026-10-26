@@ -76,6 +76,12 @@ export const APPLICATION_FILTERS: { id: ApplicationFilter; label: string }[] = [
 
 const TERMINAL = new Set(["APPROVED", "PAYMENT_DUE", "REJECTED", "DECLINED"]);
 
+/** A finished verification run may move only a still-open submission into review. */
+export function applicationStatusAfterVerification(status: string): "IN_REVIEW" | null {
+  if (status === "SUBMITTED" || status === "PENDING") return "IN_REVIEW";
+  return null;
+}
+
 export function matchesApplicationFilter(
   filter: ApplicationFilter,
   status: string,

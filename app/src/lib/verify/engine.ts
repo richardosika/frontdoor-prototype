@@ -1,4 +1,5 @@
 import type { EvidenceStatus, Prisma, RunSubject, Verdict } from "@prisma/client";
+import { applicationStatusAfterVerification } from "@/lib/application-status";
 import { prisma } from "@/lib/prisma";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { failedGrade, gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot } from "@/lib/verify/grade";
@@ -91,12 +92,7 @@ export async function executeVerificationRun(runId: string, options?: { network?
         finishedAt,
       },
     });
-    if (run.application && (run.application.status === "SUBMITTED" || run.application.status === "PENDING")) {
-      await prisma.application.update({
-        where: { id: run.application.id },
-        data: { status: "IN_REVIEW" },
-      });
-    }
+    if (run.applicationId) await advanceApplicationToReview(run.applicationId);
     if (run.applicationId) {
       const { prefillFromApplication } = await import("@/lib/guided-prefill-db");
       await prefillFromApplication(run.applicationId).catch((prefillError) => {
@@ -129,6 +125,20 @@ export async function executeVerificationRun(runId: string, options?: { network?
       },
     });
   }
+}
+
+/** Re-reads status and updates only a row that is still submitted. A decision made during the run stays. */
+export async function advanceApplicationToReview(applicationId: string): Promise<boolean> {
+  const current = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { status: true },
+  });
+  if (!current || !applicationStatusAfterVerification(current.status)) return false;
+  const updated = await prisma.application.updateMany({
+    where: { id: applicationId, status: { in: ["PENDING", "SUBMITTED"] } },
+    data: { status: "IN_REVIEW" },
+  });
+  return updated.count === 1;
 }
 
 async function factsForRun(run: {

@@ -23,6 +23,18 @@ export function shouldDiscardInviteRequest(honeypot: string): boolean {
   return honeypot.trim().length > 0;
 }
 
+/** A declined request with no account and no open application may request again. */
+export function duplicateJoinMessage(input: {
+  hasAccount: boolean;
+  hasOpenApplication: boolean;
+  hasOpenRequest: boolean;
+}): string | null {
+  if (input.hasAccount) return "An account with that email already exists. Sign in instead.";
+  if (input.hasOpenApplication) return "An application for that email is already under review.";
+  if (input.hasOpenRequest) return "A request to join for that email is already waiting.";
+  return null;
+}
+
 export function validateInviteRequest(input: InviteRequestInput): string[] {
   const errors: string[] = [];
   errors.push(...validatePersonName(input.firstName, input.lastName));

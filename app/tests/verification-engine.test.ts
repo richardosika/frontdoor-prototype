@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { noticeTestRecipient } from "@/lib/brand";
 import { DUES_WAIVED, annualDuesCents } from "@/lib/dues";
-import { matchesApplicationFilter } from "@/lib/application-status";
+import { applicationStatusAfterVerification, matchesApplicationFilter } from "@/lib/application-status";
 import { resolvePublicBase } from "@/lib/url";
 import { cardConsistencyCheck, collectChecks, emailChecks, sanctionsCheck } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
@@ -138,6 +138,17 @@ describe("dues and notices", () => {
     expect(matchesApplicationFilter("action", "SUBMITTED", "NOT_LEGIT")).toBe(true);
     expect(matchesApplicationFilter("action", "APPROVED", "LEGIT")).toBe(false);
     expect(matchesApplicationFilter("action", "DECLINED", "NOT_LEGIT")).toBe(false);
+  });
+
+  it("lets a finished verification run move only a still-open submission into review", () => {
+    expect(applicationStatusAfterVerification("SUBMITTED")).toBe("IN_REVIEW");
+    expect(applicationStatusAfterVerification("PENDING")).toBe("IN_REVIEW");
+    expect(applicationStatusAfterVerification("NEEDS_INFO")).toBeNull();
+    expect(applicationStatusAfterVerification("IN_REVIEW")).toBeNull();
+    expect(applicationStatusAfterVerification("APPROVED")).toBeNull();
+    expect(applicationStatusAfterVerification("PAYMENT_DUE")).toBeNull();
+    expect(applicationStatusAfterVerification("DECLINED")).toBeNull();
+    expect(applicationStatusAfterVerification("REJECTED")).toBeNull();
   });
 });
 

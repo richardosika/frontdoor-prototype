@@ -10,7 +10,7 @@ import {
 } from "@/lib/application-code";
 import { applicationReceivedMessage, APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO } from "@/lib/applicant-copy";
 import { validateApplication } from "@/lib/domain";
-import { validateInviteRequest } from "@/lib/invite-request";
+import { duplicateJoinMessage, validateInviteRequest } from "@/lib/invite-request";
 import { formatAddress, validatePhone } from "@/lib/person-fields";
 
 const ADDRESS = {
@@ -76,6 +76,21 @@ describe("applicant details", () => {
     expect(INVITE_STATUS_COPY.PENDING.body).not.toContain("has not issued a code");
     expect(INVITE_STATUS_COPY.ISSUED.body).toContain("invite code");
     expect(INVITE_STATUS_COPY.DECLINED.title).toBe("Thank you for applying");
+  });
+
+  it("blocks a second request to join while an account, application, or open request exists", () => {
+    expect(
+      duplicateJoinMessage({ hasAccount: true, hasOpenApplication: false, hasOpenRequest: false }),
+    ).toBe("An account with that email already exists. Sign in instead.");
+    expect(
+      duplicateJoinMessage({ hasAccount: false, hasOpenApplication: true, hasOpenRequest: false }),
+    ).toBe("An application for that email is already under review.");
+    expect(
+      duplicateJoinMessage({ hasAccount: false, hasOpenApplication: false, hasOpenRequest: true }),
+    ).toBe("A request to join for that email is already waiting.");
+    expect(
+      duplicateJoinMessage({ hasAccount: false, hasOpenApplication: false, hasOpenRequest: false }),
+    ).toBeNull();
   });
 });
 

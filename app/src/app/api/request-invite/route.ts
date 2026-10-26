@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { inviteRequestAddress, INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
+import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
+import { duplicateJoinMessage, inviteRequestAddress, INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { withinRateLimit } from "@/lib/messaging";
 import { joinName } from "@/lib/person-fields";
@@ -47,6 +48,24 @@ export async function POST(request: Request) {
   if (!withinRateLimit(recent, INVITE_REQUESTS_PER_EMAIL_PER_DAY)) {
     return Response.json({ error: "Too many requests for that email. Try again tomorrow." }, { status: 429 });
   }
+
+  const [existingUser, openApplication, openRequest] = await Promise.all([
+    prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    prisma.application.findFirst({
+      where: { email, status: { in: [...OPEN_APPLICATION_STATUSES] } },
+      select: { id: true },
+    }),
+    prisma.inviteRequest.findFirst({
+      where: { email, status: { in: ["PENDING", "ISSUED"] } },
+      select: { id: true },
+    }),
+  ]);
+  const duplicate = duplicateJoinMessage({
+    hasAccount: Boolean(existingUser),
+    hasOpenApplication: Boolean(openApplication),
+    hasOpenRequest: Boolean(openRequest),
+  });
+  if (duplicate) return Response.json({ error: duplicate }, { status: 409 });
 
   const name = joinName(input.firstName, input.lastName);
   const location = inviteRequestAddress(input);
