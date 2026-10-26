@@ -1,6 +1,6 @@
 import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
-import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
+import { cityPhrase, googleNewsUrl, instagramCompanyTag, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
@@ -611,7 +611,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
-  const shortQuery = `"${person}" ${distinctiveCompanyTokens(facts.org)[0] || facts.org}`;
+  const shortQuery = socialSearchQuery(person, facts.org);
+  const companyTag = instagramCompanyTag(facts.org, person);
   const profileUrl = (platform: string, fallback: string) => socials.find((item) => item.platform === platform)?.url || fallback;
   const platformJobs: { key: string; platform: string; url: string; searched: string; fromSite: boolean; read: (text: string) => string }[] = [
     {
@@ -635,7 +636,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       platform: "Instagram",
       url: profileUrl(
         "Instagram",
-        `https://www.instagram.com/explore/tags/${encodeURIComponent(distinctiveCompanyTokens(facts.org)[0] || "search")}/`,
+        companyTag ? `https://www.instagram.com/explore/tags/${encodeURIComponent(companyTag)}/` : "https://www.instagram.com/",
       ),
       searched: `${facts.org} on Instagram`,
       fromSite: socials.some((item) => item.platform === "Instagram"),
@@ -655,8 +656,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     {
       key: "screen-tiktok",
       platform: "TikTok",
-      url: profileUrl("TikTok", `https://www.tiktok.com/search?q=${encodeURIComponent(`${person} ${facts.org}`)}`),
-      searched: `${person} ${facts.org} on TikTok`,
+      url: profileUrl("TikTok", `https://www.tiktok.com/search?q=${encodeURIComponent(shortQuery)}`),
+      searched: `${shortQuery} on TikTok`,
       fromSite: socials.some((item) => item.platform === "TikTok"),
       read: (text) => tiktokProfileText(text) || visible(text).slice(0, 500),
     },
@@ -681,7 +682,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       if (job.platform === "YouTube" && !job.fromSite && !socialMatch(scorePublicText(text, queryFacts))) {
         const altName = alternatePersonNames(person).find((item) => item.toLowerCase() !== person.trim().toLowerCase());
         if (altName) {
-          const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`"${altName}" ${distinctiveCompanyTokens(facts.org)[0] || facts.org}`)}`;
+          const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(socialSearchQuery(altName, facts.org))}`;
           const second = await pull(fetchText, altUrl);
           const extra = [...youtubeTitles(second.text), ...youtubeSnippets(second.text)];
           if (!accessBlocked(second.status, second.text, altUrl) && extra.length && socialMatch(scorePublicText(extra.join("\n"), queryFacts))) {

@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { companyPhraseTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { companyPhraseTokens, companySearchTerm, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -85,19 +85,62 @@ export function cityPhrase(location: string): string {
   return raw.length >= 4 ? raw : "";
 }
 
+function wordsOf(value: string): string[] {
+  return value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 2);
+}
+
+/**
+ * Person plus the company search term. A word already in the person's name is not repeated,
+ * so "Ronald Tutor" is not searched as "tutor" "tutor".
+ */
+export function personCompanyQuery(person: string, companyTerm: string): string | null {
+  const cleanedPerson = person.trim();
+  if (!cleanedPerson || !companyTerm.trim()) return null;
+  const seen = new Set(wordsOf(cleanedPerson));
+  const kept = companyTerm.split(/\s+/).filter((word) => {
+    const token = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return token.length >= 2 && !seen.has(token);
+  });
+  if (!kept.length) return null;
+  return `"${cleanedPerson}" "${kept.join(" ")}"`;
+}
+
+/** Quoted person-and-company query used by news, YouTube, and the other public searches. */
+export function socialSearchQuery(person: string, org: string): string {
+  const cleaned = personWithoutSuffix(stripQuotes(person));
+  const term = companySearchTerm(stripQuotes(org), cleaned);
+  return personCompanyQuery(cleaned, term) || (cleaned ? `"${cleaned}"` : "");
+}
+
+/** Instagram tag. A tag that is only the applicant's surname is not used. */
+export function instagramCompanyTag(org: string, person: string): string {
+  const cleaned = personWithoutSuffix(stripQuotes(person));
+  const term = companySearchTerm(stripQuotes(org), cleaned);
+  const surname = surnameForSearch(cleaned).toLowerCase();
+  const tag = term.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const personWords = new Set(wordsOf(cleaned));
+  if (tag && tag !== surname && !personWords.has(tag)) return tag;
+  return companyPhraseTokens(stripQuotes(org))
+    .filter((word) => word !== surname && !personWords.has(word))
+    .join("");
+}
+
 export function newsSearchQueries(facts: ApplicantFacts): string[] {
   const person = personWithoutSuffix(stripQuotes(facts.applicantName));
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
-  const companyPhrase = companyPhraseTokens(company).join(" ") || company;
+  const term = companySearchTerm(company, person);
   const last = surnameForSearch(person);
   const queries: string[] = [];
-  if (person && companyPhrase && normalizeName(person) !== normalizeName(company)) {
-    queries.push(`"${person}" "${companyPhrase}"`);
-    if (last && normalizeName(last) !== normalizeName(person)) queries.push(`"${last}" "${companyPhrase}"`);
-  } else if (person || company) queries.push(`"${person || company}"`);
+  const personQuery = personCompanyQuery(person, term);
+  if (personQuery) queries.push(personQuery);
+  else if (person || company) queries.push(`"${person || company}"`);
+  if (last && normalizeName(last) !== normalizeName(person)) {
+    const lastQuery = personCompanyQuery(last, term);
+    if (lastQuery) queries.push(lastQuery);
+  }
   if (company && city && normalizeName(city) !== normalizeName(company)) queries.push(`"${company}" "${city}"`);
-  return queries.slice(0, 3);
+  return [...new Set(queries)].slice(0, 3);
 }
 
 export function gdeltQuery(facts: ApplicantFacts): string {

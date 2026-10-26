@@ -193,6 +193,20 @@ export function distinctiveCompanyTokens(org: string): string[] {
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 
+/** First firm word that identifies the company and is not the applicant's own name. Otherwise the full phrase. */
+export function companySearchTerm(org: string, person = ""): string {
+  const phrase = companyPhraseTokens(org);
+  if (!phrase.length) return "";
+  const parsed = parsePersonName(person);
+  const names = new Set(
+    [...(parsed?.given || []), parsed?.surname || "", ...tokens(person)]
+      .map((part) => part.toLowerCase())
+      .filter(Boolean),
+  );
+  const term = phrase.find((token) => isDistinctiveCompanyToken(token) && !names.has(token));
+  return term || phrase.join(" ");
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

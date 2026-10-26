@@ -11,7 +11,7 @@ import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/gr
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -1567,5 +1567,62 @@ describe("batch 4 bot challenges", () => {
     expect(website?.finding).toContain("Name: yes");
     expect(website?.finding).toContain("Company: yes");
     expect(website?.status).not.toBe("UNAVAILABLE");
+  });
+});
+
+describe("batch 4 company search terms", () => {
+  function words(query: string): string[] {
+    return query.toLowerCase().match(/[a-z0-9]+/g) || [];
+  }
+
+  function noRepeatedWord(queries: string[]) {
+    for (const query of queries) {
+      const tokens = words(query);
+      expect(new Set(tokens).size).toBe(tokens.length);
+    }
+  }
+
+  it("searches a firm word that is not the applicant's surname", async () => {
+    expect(companySearchTerm("Tutor Perini Corporation", "Ronald Tutor")).toBe("perini");
+    expect(companySearchTerm("Belkin Burden Goldman LLP", "Sherwin Belkin")).toBe("burden");
+    expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("organization");
+    expect(companySearchTerm("Related Companies", "Stephen Ross")).toBe("related companies");
+
+    const tutor = facts({
+      name: "Ronald Tutor",
+      applicantName: "Ronald Tutor",
+      org: "Tutor Perini Corporation",
+      location: "Sylmar, CA",
+    });
+    const belkin = facts({
+      name: "Sherwin Belkin",
+      applicantName: "Sherwin Belkin",
+      org: "Belkin Burden Goldman LLP",
+      location: "New York, NY",
+    });
+    const durst = facts({
+      name: "Douglas Durst",
+      applicantName: "Douglas Durst",
+      org: "The Durst Organization",
+      location: "New York, NY",
+    });
+    expect(newsSearchQueries(tutor)[0]).toBe(`"Ronald Tutor" "perini"`);
+    expect(newsSearchQueries(belkin)[0]).toBe(`"Sherwin Belkin" "burden"`);
+    expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "organization"`);
+    expect(newsSearchQueries(facts({ name: "Stephen Ross", applicantName: "Stephen Ross", org: "Related Companies" }))[0]).toBe(
+      `"Stephen Ross" "related companies"`,
+    );
+    noRepeatedWord([...newsSearchQueries(tutor), ...newsSearchQueries(belkin), ...newsSearchQueries(durst)]);
+
+    const checks = await runPublicScreen(tutor, async () => ({ ok: false, status: 404, text: "" }));
+    const youtube = checks.find((check) => check.key === "screen-youtube");
+    const instagram = checks.find((check) => check.key === "screen-instagram");
+    expect(decodeURIComponent(youtube?.url || "").toLowerCase()).toContain("perini");
+    expect(decodeURIComponent(youtube?.url || "").toLowerCase()).not.toContain("tutor%20tutor");
+    expect(youtube?.finding.toLowerCase()).toContain("perini");
+    expect(decodeURIComponent(instagram?.url || "").toLowerCase()).toContain("/tags/perini");
+    expect(decodeURIComponent(instagram?.url || "").toLowerCase()).not.toContain("/tags/tutor");
+    expect(youtube?.finding).toContain(`"Ronald Tutor" "perini"`);
+    expect(youtube?.finding.toLowerCase()).not.toContain(`"tutor" "tutor"`);
   });
 });
