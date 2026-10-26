@@ -1,7 +1,7 @@
 import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
-import { cityPhrase, googleNewsUrl, instagramCompanyTag, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
+import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
@@ -48,6 +48,9 @@ type Attempt = {
   redirectedTo?: string;
   /** The landed brand is not the company on the application. Review only. It does not corroborate. */
   aliasOnly?: boolean;
+  /** Set on screen-news so it uses the same headline judgement as the news check. */
+  headlineKind?: "hard" | "civil" | "none";
+  foreclosureOnly?: boolean;
 };
 
 const COMPANY_ONLY = "company confirmed, person NOT confirmed";
@@ -159,7 +162,39 @@ export function tiktokProfileText(html: string): string {
   return [nickname, uniqueId, signature].filter(Boolean).join(" ");
 }
 
-const TEAM_PAGE = /about|contact|team|leader|leadership|people|executive|management|our-company|our-firm|our-story|our-team|who-we|professionals?|attorneys?|lawyers?|staff|\bbio\b/i;
+const TEAM_PAGE = /about|contact|team|leader|leadership|people|executive|our-company|our-firm|our-story|our-team|who-we|professionals?|attorneys?|lawyers?|staff|\bbio\b/i;
+
+/** A service page such as /asset-management is not a leadership page. /about/executive-management still is. */
+function isServiceManagementSlug(pathname: string): boolean {
+  return /(?:^|\/)[^/]*-management(?:\/|$)/i.test(pathname);
+}
+
+function isTeamLink(pathname: string, raw: string): boolean {
+  if (isServiceManagementSlug(pathname) && !/leadership|about|team|people|executive|professionals|attorneys|lawyers|staff|\bbio\b/i.test(pathname)) {
+    return false;
+  }
+  return TEAM_PAGE.test(`${pathname} ${raw}`);
+}
+
+function teamPriority(pathname: string): number {
+  if (/leadership|executive/i.test(pathname)) return 0;
+  if (/about/i.test(pathname)) return 1;
+  if (/team|people|professional|attorney|lawyer|staff|\bbio\b/i.test(pathname)) return 2;
+  return 3;
+}
+
+/** href attributes plus JSON url fields. Escaped slashes in script JSON are real paths. */
+function rawHrefs(html: string): string[] {
+  const source = html.replace(/\\\//g, "/").replace(/\\"/g, '"');
+  const hrefs: string[] = [];
+  for (const match of source.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'=<>`]+))/gi)) {
+    hrefs.push(match[1] || match[2] || match[3] || "");
+  }
+  for (const match of source.matchAll(/"(?:url|href|permalink|path)"\s*:\s*"([^"]+)"/gi)) {
+    hrefs.push(match[1]);
+  }
+  return hrefs;
+}
 
 /** Probed when the nav did not already link them. A JavaScript menu still leaves these paths. */
 export const TEAM_FALLBACK_PATHS = [
@@ -205,8 +240,7 @@ export function sameOriginPages(html: string, base: string): string[] {
   }
   const found: string[] = [];
   const seen = new Set<string>();
-  for (const match of html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'=<>`]+))/gi)) {
-    const raw = match[1] || match[2] || match[3] || "";
+  for (const raw of rawHrefs(html)) {
     let url: URL;
     try {
       url = new URL(raw, base);
@@ -214,15 +248,16 @@ export function sameOriginPages(html: string, base: string): string[] {
       continue;
     }
     if (url.origin !== origin) continue;
-    if (!TEAM_PAGE.test(`${url.pathname} ${raw}`)) continue;
+    if (!isTeamLink(url.pathname, raw)) continue;
     url.hash = "";
     const href = url.toString();
     if (seen.has(href) || href === new URL(base).toString()) continue;
     seen.add(href);
     found.push(href);
-    if (found.length >= 4) break;
   }
-  return found;
+  return found
+    .sort((left, right) => teamPriority(new URL(left).pathname) - teamPriority(new URL(right).pathname))
+    .slice(0, 4);
 }
 
 /** Up to eight sitemap URLs whose path contains the person's last name. Other sitemap paths are not fetched. */
@@ -268,8 +303,7 @@ export function surnamePageUrls(html: string, base: string, lastName: string): s
   }
   const found: string[] = [];
   const seen = new Set<string>();
-  for (const match of html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'=<>`]+))/gi)) {
-    const raw = match[1] || match[2] || match[3] || "";
+  for (const raw of rawHrefs(html)) {
     let url: URL;
     try {
       url = new URL(raw, base);
@@ -337,7 +371,7 @@ export function socialLinksFrom(html: string): { platform: string; url: string }
   const patterns: { platform: string; re: RegExp }[] = [
     { platform: "LinkedIn", re: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[a-z0-9\-_%&.]+\/?/gi },
     { platform: "X", re: /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[a-z0-9_]+\/?/gi },
-    { platform: "Facebook", re: /https?:\/\/(?:www\.)?facebook\.com\/[a-z0-9.\-]+\/?/gi },
+    { platform: "Facebook", re: /https?:\/\/(?:www\.)?facebook\.com\/(?:people\/[a-z0-9.\-]+\/\d+|[a-z0-9.\-]+)\/?/gi },
     { platform: "Instagram", re: /https?:\/\/(?:www\.)?instagram\.com\/[a-z0-9._]+\/?/gi },
     { platform: "YouTube", re: /https?:\/\/(?:www\.)?youtube\.com\/(?:@[a-z0-9_\-]+|channel\/[a-z0-9_\-]+|c\/[a-z0-9_\-]+)/gi },
     { platform: "TikTok", re: /https?:\/\/(?:www\.)?tiktok\.com\/@[a-z0-9._]+\/?/gi },
@@ -435,6 +469,22 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       finding: `Searched: ${attempt.searched}. ${redirectNote} Found: ${attempt.detail} ${COMPANY_ONLY}. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
+  if (attempt.key === "screen-news" && attempt.headlineKind && attempt.headlineKind !== "none") {
+    const companyLevel = attempt.foreclosureOnly || (attempt.headlineKind === "civil" && !attempt.score.name);
+    if (companyLevel) {
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        finding: `Searched: ${attempt.searched}. Company-level litigation headline. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      };
+    }
+    return {
+      status: "FAIL",
+      corroborates: false,
+      reviewFlag: true,
+      finding: `Searched: ${attempt.searched}. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
   if (attempt.score.name && !attempt.score.company && attempt.score.city) {
     return {
       status: "INCONCLUSIVE",
@@ -508,6 +558,61 @@ function hostLabel(url: string): string {
   } catch {
     return "";
   }
+}
+
+function unwrapResultUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
+    const inner = url.searchParams.get("uddg");
+    return inner || url.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
+/** Host and path, without www or a trailing slash, so the same page is not counted twice. */
+function canonicalPage(value: string): string {
+  try {
+    const url = new URL(unwrapResultUrl(value));
+    url.hash = "";
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    const path = url.pathname.replace(/\/$/, "") || "/";
+    return `${host}${path}`;
+  } catch {
+    return value.trim().toLowerCase();
+  }
+}
+
+function rssHeadlines(xml: string): { title: string; url: string }[] {
+  const items: { title: string; url: string }[] = [];
+  for (const block of xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)) {
+    const chunk = block[0];
+    const title = (chunk.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "")
+      .replace(/<!\[CDATA\[|\]\]>/g, "")
+      .replace(/&amp;/g, "&")
+      .trim();
+    const link = (chunk.match(/<link>([\s\S]*?)<\/link>/i)?.[1] || "").replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    if (title) items.push({ title, url: link });
+  }
+  return items.slice(0, 15);
+}
+
+function headlineImportance(judged: {
+  kind: "hard" | "civil" | "none";
+  person: boolean;
+  company: boolean;
+  location: boolean;
+  foreclosureOnly: boolean;
+}): number {
+  if (judged.kind === "hard" && judged.person && (judged.company || judged.location)) return 0;
+  if (judged.kind === "hard" && !judged.person && judged.company) return 1;
+  if (judged.kind === "civil" && judged.person && (judged.company || judged.location) && !judged.foreclosureOnly) return 2;
+  if (judged.foreclosureOnly && judged.company) return 3;
+  if (judged.kind === "civil" && !judged.person && judged.company) return 3;
+  if (judged.kind === "none" && judged.person && judged.company) return 4;
+  return 5;
 }
 
 function snippetFrom(html: string): { text: string; hrefs: string[] } {
@@ -881,7 +986,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const searchedNews = newsQueries.join(" | ") || `${person} ${facts.org}`;
   let newsBlocked = 0;
   let newsResponded = 0;
-  let bestNews: { title: string; score: MatchScore; url: string } | null = null;
+  let bestNews: { title: string; score: MatchScore; url: string; kind: "hard" | "civil" | "none"; foreclosureOnly: boolean; rank: number } | null = null;
   for (const query of newsQueries) {
     const newsUrl = googleNewsUrl(query);
     const news = await pull(fetchText, newsUrl);
@@ -895,16 +1000,21 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       continue;
     }
     newsResponded += 1;
-    const titles = [...news.text.matchAll(/<title>([\s\S]*?)<\/title>/gi)]
-      .map((match) => match[1].replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").trim())
-      .slice(1, 16);
-    for (const title of titles) {
-      if (isLinkedInDirectory(title)) continue;
-      const score = scorePublicText(title, queryFacts);
-      if (!socialMatch(score)) continue;
-      if (!bestNews || rank(score) > rank(bestNews.score)) bestNews = { title, score, url: newsUrl };
+    const titles = rssHeadlines(news.text);
+    let decided: { title: string; url: string; score: MatchScore; kind: "hard" | "civil" | "none"; foreclosureOnly: boolean; rank: number } | null = null;
+    for (const story of titles) {
+      if (isLinkedInDirectory(story.title)) continue;
+      const judged = judgeHeadline(story.title, queryFacts);
+      if (!judged.person && !judged.company) continue;
+      const score = scorePublicText(story.title, queryFacts);
+      const importance = headlineImportance(judged);
+      const articleUrl = story.url || newsUrl;
+      if (!decided || importance < decided.rank) {
+        decided = { title: story.title, url: articleUrl, score, kind: judged.kind, foreclosureOnly: judged.foreclosureOnly, rank: importance };
+      }
     }
-    if (bestNews?.score.confidence === "high") break;
+    if (decided && (!bestNews || decided.rank < bestNews.rank)) bestNews = decided;
+    if (bestNews && bestNews.rank === 0) break;
   }
   if (!bestNews && newsBlocked > 0 && newsResponded === 0) {
     attempts.push(
@@ -925,6 +1035,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       outcome: "found",
       score: bestNews.score,
       detail: bestNews.title.slice(0, 180),
+      headlineKind: bestNews.kind,
+      foreclosureOnly: bestNews.foreclosureOnly,
     });
   } else {
     attempts.push({
@@ -985,10 +1097,11 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       ...(!wikiBlocked ? wikiSnippets.map((item) => ({ ...item, url: wikiUrl, platform: "Wikipedia" })) : []),
       ...(!dataBlocked ? dataSnippets.map((item) => ({ ...item, url: dataUrl, platform: "Wikidata" })) : []),
     ];
-    const hit = pool
+    const matched = pool
       .filter((item) => !isLinkedInDirectory(item.text) && !item.hrefs.some((href) => isLinkedInDirectory(href)))
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
-      .find((item) => item.score.name && item.score.company);
+      .filter((item) => item.score.name && item.score.company);
+    const hit = matched[0];
     if (hit) {
       attempts.push({
         key: "screen-web",
@@ -998,7 +1111,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         outcome: "found",
         score: hit.score,
         detail: hit.text.slice(0, 180),
-        linkedUrl: hit.hrefs.join(" "),
+        linkedUrl: matched.flatMap((item) => item.hrefs).join(" "),
       });
     } else {
       attempts.push({
@@ -1015,11 +1128,25 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const ownHost = applicantHost(website);
   if (!attempts.some((item) => item.key === "web-footprint")) {
-    const best = attempts.find(
-      (item) => item.outcome === "found" && item.score.name && item.score.company && !attemptOnOwnSite(item, ownHost),
+    const credited = new Set(
+      attempts.filter((item) => item.outcome === "found" && item.key !== "web-footprint").map((item) => canonicalPage(item.url)),
     );
-    if (best) {
-      attempts.push({ ...best, key: "web-footprint", platform: best.platform });
+    const webHit = attempts.find(
+      (item) => item.key === "screen-web" && item.outcome === "found" && item.score.name && item.score.company && !attemptOnOwnSite(item, ownHost),
+    );
+    const fresh = (webHit?.linkedUrl || "")
+      .split(/\s+/)
+      .map((href) => unwrapResultUrl(href))
+      .find((href) => {
+        if (!/^https?:\/\//i.test(href)) return false;
+        if (isLinkedInDirectory(href)) return false;
+        const page = canonicalPage(href);
+        if (credited.has(page)) return false;
+        if (ownHost && page.includes(ownHost)) return false;
+        return true;
+      });
+    if (webHit && fresh) {
+      attempts.push({ ...webHit, key: "web-footprint", url: fresh, linkedUrl: undefined });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
       const web = attempts.find((item) => item.key === "screen-web");
       attempts.push(
