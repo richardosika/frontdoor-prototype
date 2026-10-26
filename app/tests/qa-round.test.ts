@@ -102,6 +102,17 @@ describe("QA fixes that stay outside grading", () => {
     const member = readFileSync(path.join(ROOT, "app/(app)/admin/members/[id]/page.tsx"), "utf8");
     expect(member).toContain("ConfirmSubmitButton");
     expect(member).toContain("Remove member");
+    const queue = readFileSync(path.join(ROOT, "app/(app)/admin/verification/page.tsx"), "utf8");
+    const casePage = readFileSync(path.join(ROOT, "app/(app)/admin/verification/[id]/page.tsx"), "utf8");
+    expect(queue).toContain("Delete case");
+    expect(queue).toContain("ConfirmSubmitButton");
+    expect(casePage).toContain("Delete case");
+    expect(casePage).toContain("ConfirmSubmitButton");
+    expect(queue).not.toContain("window.confirm");
+    expect(casePage).not.toContain("window.confirm");
+    const owner = readFileSync(path.join(ROOT, "actions/owner.ts"), "utf8");
+    expect(owner).toContain("deleteVerificationCase");
+    expect(owner).toContain("verificationCase.delete");
     const where = outboxTiedToEmails(["Ada@Example.com"], { applicationIds: ["app_1"], tokens: ["status-token"] });
     expect(JSON.stringify(where)).toContain("insensitive");
     expect(JSON.stringify(where)).toContain("Intended recipient: Ada@Example.com");

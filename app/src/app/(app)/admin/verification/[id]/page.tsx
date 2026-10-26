@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteVerificationCase } from "@/actions/owner";
 import { deleteBusinessCard, rerunGuidedChecks, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { loadMemberReview } from "@/lib/applicant-review";
 import { Banner } from "@/components/banner";
 import { ExecutiveSummary } from "@/components/grade-summary";
@@ -347,6 +349,23 @@ export default async function VerificationCasePage({
           ))}
         </ul>
       </details> : null}
+
+      <section className={`${card} mt-6 p-4`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete case</h2>
+        <p className="mt-2 text-sm text-ink">
+          Removes this verification file, its checklist, and its audit log. The member, application, and request stay.
+        </p>
+        <form id="delete-case" action={deleteVerificationCase} className="mt-3">
+          <input type="hidden" name="caseId" value={record.id} />
+          <ConfirmSubmitButton
+            form="delete-case"
+            className={btnOutline}
+            message={`Delete the verification case for ${heading.title}? This removes the checklist and the audit log on this file. The member, application, and request stay. This cannot be undone.`}
+          >
+            Delete case
+          </ConfirmSubmitButton>
+        </form>
+      </section>
 
       <h2 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Audit log</h2>
       <ul className={`${card} divide-y divide-line px-4`}>

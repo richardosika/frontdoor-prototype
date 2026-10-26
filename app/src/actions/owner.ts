@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { MemberRole } from "@prisma/client";
-import { requireAdmin } from "@/lib/current-user";
+import { requireAdmin, requireVerificationAdmin } from "@/lib/current-user";
 import { initialsFromName, orderedPair } from "@/lib/domain";
 import { applicantRemovalList, cleanupWindowHours } from "@/lib/demo-cleanup";
 import { annualDuesCents } from "@/lib/dues";
@@ -277,6 +277,41 @@ export async function removeMember(formData: FormData) {
   await deleteMemberAccount(userId);
   revalidatePath("/admin/members");
   redirect("/admin/members?notice=Member+removed");
+}
+
+export async function deleteVerificationCase(formData: FormData) {
+  const admin = await requireVerificationAdmin();
+  const caseId = String(formData.get("caseId") || "");
+  const record = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    select: {
+      id: true,
+      subject: true,
+      user: { select: { name: true, email: true } },
+      application: { select: { name: true, email: true, org: true } },
+      inviteRequest: { select: { name: true, email: true, org: true } },
+      project: { select: { name: true } },
+    },
+  });
+  if (!record) redirect("/admin/verification?error=That+case+was+not+found");
+  const label =
+    record.user?.name ||
+    record.application?.name ||
+    record.inviteRequest?.name ||
+    record.project?.name ||
+    record.id;
+  const email = record.user?.email || record.application?.email || record.inviteRequest?.email || "";
+  const org = record.application?.org || record.inviteRequest?.org || "";
+  await prisma.verificationCase.delete({ where: { id: record.id } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "DELETE_VERIFICATION_CASE",
+      summary: `${admin.name} deleted the verification case for ${label}${email ? ` <${email}>` : ""}${org ? ` at ${org}` : ""}.`,
+    },
+  });
+  revalidatePath("/admin/verification");
+  redirect("/admin/verification?notice=Case+deleted");
 }
 
 export async function seedMemberNetwork() {
