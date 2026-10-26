@@ -4,9 +4,16 @@ import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
+/** Fraud, sanctions, or a criminal charge. A person-tied hit of this kind can cap the grade. */
+export const NEWS_PERSON_HARD =
+  /\b(frauds?|indicted|arrested|ponzi|scams?|sanctions?)\b|\bsec charges\b|\bcriminal charges?\b/i;
+
+/** Civil or company-level trouble. Surfaced for Richard. It does not by itself cap the grade. */
+export const NEWS_COMPANY_CIVIL =
+  /\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|foreclosures?|liens?)\b/i;
+
 /** Negative coverage terms. Plurals are included. "client" does not match "lien". */
-export const NEWS_NEGATIVE =
-  /\b(frauds?|indicted|lawsuits?|sued|arrested|ponzi|scams?|bankruptc(?:y|ies)|sanctions?|investigations?|foreclosures?|liens?)\b|\bsec charges\b/i;
+export const NEWS_NEGATIVE = new RegExp(`${NEWS_PERSON_HARD.source}|${NEWS_COMPANY_CIVIL.source}`, "i");
 
 const COMMENTARY_BEFORE_NEGATIVE =
   /\b(says|said|plays down|played down|dismisses|dismissed|warns|warned|comments|commented|discusses|discussed|notes|noted)\b/i;
@@ -34,6 +41,7 @@ type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: s
 
 type Classified = NewsItem & {
   tone: "negative" | "neutral";
+  kind: "hard" | "civil" | "none";
   person: boolean;
   company: boolean;
   location: boolean;
@@ -186,10 +194,12 @@ export function classifyNews(
         const person = Boolean(personName) && textHasName(blob, personName);
         const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);
         if (!person && !company) return [];
+        const kind = negativeKind(blob);
         return [
           {
             ...item,
-            tone: allegedNegative(blob) ? ("negative" as const) : ("neutral" as const),
+            tone: kind === "none" ? ("neutral" as const) : ("negative" as const),
+            kind,
             person,
             company,
             location: textHasLocation(blob, facts.location),
@@ -248,15 +258,18 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
       finding: `News could not be checked. ${feeds}`.trim(),
     };
   }
-  const corroboratedNegative = items.some((item) => item.tone === "negative" && corroborated(item));
+  const personHard = items.some((item) => item.kind === "hard" && item.person && (item.company || item.location));
   const ambiguousNegative = items.some((item) => item.tone === "negative" && item.person && !item.company && !item.location);
+  const companyLitigation = items.some(
+    (item) => item.tone === "negative" && (item.company || (item.person && item.location)) && !(item.kind === "hard" && item.person),
+  );
   const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company);
-  if (corroboratedNegative) {
+  if (personHard) {
     return {
       ...base,
       status: "FAIL",
       reviewFlag: true,
-      finding: `Negative coverage names this person or company with the company or city in the same headline. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+      finding: `Negative coverage names this person with the company or city near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
     };
   }
   if (ambiguousNegative) {
@@ -265,6 +278,13 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
       status: "INCONCLUSIVE",
       reviewFlag: true,
       finding: `Possible match, needs review. A headline names this person near a negative term without the company or city. This is not a failure. ${feeds}`.trim(),
+    };
+  }
+  if (companyLitigation) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `Company-level litigation headline. A lawsuit or similar civil term names the company. This is an attention item for Richard, not an automatic review flag, and it does not tie fraud or a criminal charge to the person. ${feeds}`.trim(),
     };
   }
   if (aligned) {
@@ -291,9 +311,11 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
 
 function newsStory(item: Classified, ranAt: string): CheckOutput {
   const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location;
-  const status: EvidenceStatus = ambiguous ? "INCONCLUSIVE" : item.tone === "negative" ? "FAIL" : item.person && item.company ? "PASS" : "INCONCLUSIVE";
+  const personHard = item.kind === "hard" && item.person && (item.company || item.location);
+  const companyCivil = item.tone === "negative" && !personHard;
+  const status: EvidenceStatus = personHard ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
-  const label = ambiguous ? "Possible match, review" : item.tone === "negative" ? "Negative" : "Neutral";
+  const label = ambiguous ? "Possible match, review" : personHard ? "Negative" : companyCivil ? "Company litigation" : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
@@ -308,9 +330,12 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
 }
 
 function corroborated(item: Classified): boolean {
-  if (item.tone !== "negative") return false;
-  if (item.person && (item.company || item.location)) return true;
-  return item.company && !item.person;
+  return item.kind === "hard" && item.person && (item.company || item.location);
+}
+
+function negativeKind(text: string): "hard" | "civil" | "none" {
+  if (!allegedNegative(text)) return "none";
+  return NEWS_PERSON_HARD.test(text) ? "hard" : "civil";
 }
 
 function feedSentence(responded: string[], blocked: string[]): string {

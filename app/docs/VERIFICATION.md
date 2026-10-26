@@ -14,7 +14,7 @@ Members never see the score, the verdict, the checklist, the notes, or the sourc
 
 Score = round(100 × weight of PASS checks / weight of checks that are not `NOT_RUN`).
 
-`INCONCLUSIVE` and `FAIL` stay in the denominator and earn 0. A thin file cannot look strong. `NOT_RUN` is left out.
+`INCONCLUSIVE`, `FAIL`, and `UNAVAILABLE` stay in the denominator and earn 0. A blocked source does not shrink the denominator. A thin file cannot look strong. `NOT_RUN` is left out, because that check was not attempted.
 
 ## Verdict
 
@@ -24,7 +24,7 @@ Evaluated in this order:
 2. Otherwise `LEGIT` only when the score is at least **72**, at least **3** passing checks have `corroborates` and weight of at least **8**, and no check has `reviewFlag` or status `FAIL`.
 3. Everything else → `NEEDS_OWNER_DECISION`.
 
-Absence of a sanctions hit is not corroboration. A private email (Gmail and the like) is allowed. An email domain that matches the company is a bonus, not a requirement.
+Absence of a sanctions hit is not corroboration. A private email (Gmail and the like) is allowed. The engine does not match an email domain to a website, and an email domain is never evidence that a company is real.
 
 `NOT_LEGIT` is reserved for hard red flags:
 
@@ -52,9 +52,9 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 
 Letters before caps: A 90–100, B 80–89, C 70–79, D 60–69, F 0–59. Caps only lower the letter.
 
-- No person-and-company corroboration: cannot exceed B.
-- Negative headline that is only a name match: cannot exceed C. The file says “possible match, verify” and does not state the headline as fact.
-- Disposable email that still has a public page, sanctions name without country or date of birth, or a negative headline or court result that also names the company: cannot exceed D, with a red banner.
+- No independent person-and-company corroboration: cannot exceed B. The applicant's own website and a footprint taken from that same page count as one self-reported source. They do not lift this cap or confidence by themselves. A company-name-only EDGAR or registry hit is company-exists evidence and does not corroborate the person. A LinkedIn or social URL that was not fetched does not earn its points unless an independent source already corroborated the file.
+- Negative headline that is only a name match: cannot exceed C. The file says “possible match, verify” and does not state the headline as fact. A headline is attributed to the person only on a full-name match, not a single surname token.
+- Disposable email that still has a public page, sanctions name without country or date of birth, or fraud, sanctions, or a criminal charge tied to the person together with the company or city: cannot exceed D, with a red banner. A company-level lawsuit or lien is an attention item for Richard. It is not that cap. Separate news headlines are not separate conflicts. An OpenSanctions hard flag, if that paid source ever answers, uses the same sanctions caps.
 - Corroborated sanctions, fraud-pattern text, disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed F, with a red banner.
 - Two or more conflicting checks: cannot exceed C.
 
@@ -75,11 +75,11 @@ The stored summary text is the executive summary plus a short legacy line. It is
 
 ## Jobs
 
-Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A source that answers with nothing relevant is `INCONCLUSIVE` (“No data found”). A source that is blocked, times out, or errors is `UNAVAILABLE` and is left out of the score. Neither one fails the job by itself. Each check shows a status chip.
+Submitting an application queues an application run and a company run. A new project queues a project run. Pending and running jobs resume on server boot. A source that answers with nothing relevant is `INCONCLUSIVE` (“No data found”). A source that is blocked, times out, or errors is `UNAVAILABLE`, stays in the score denominator, and earns 0. Neither one fails the job by itself. Each check shows a status chip. The recommendation is computed again after a skipped review step lowers confidence, so a skip can move APPROVE to NEEDS MORE INFO.
 
 Test-console samples run with the network off. The strong sample adds three local fixture checks so a `LEGIT` recommendation is visible without outside sites. **Re-run verification** turns the network on and does not add those fixtures. The verdict can change. The test console can also create one `is_test` applicant with a name, company, email, and website you type, then queue a live run.
 
-Image OCR is not installed, and this host does not add a WASM OCR package. An uploaded card with no extracted text is `UNAVAILABLE`: the summary says the image could not be checked and an administrator should read the file. If card text is already on the application, the checker scores name and company consistency. No upload is `NOT_RUN`.
+OCR is installed (`tesseract.js`). An uploaded card that comes back with no text is `UNAVAILABLE`: the summary says the image could not be checked and an administrator should read the file. If card text is already on the application, the checker requires the full first and last name and a real company match. That match is self-reported. No upload is `NOT_RUN`.
 
 ## Free sources
 
@@ -87,17 +87,19 @@ Image OCR is not installed, and this host does not add a WASM OCR package. An up
 | --- | --- | --- |
 | Email syntax, disposable list, free provider, role address | Bundled lists | Always local |
 | MX | DNS | Skipped on offline passes and disposable domains |
-| Website, /about, /team | Public HTTP | No company site and the email is a free provider |
+| Website, /about, /team | Public HTTP | A blank website is missing, not blocked. A page that names the company is company-exists evidence. The applicant's own page is self-reported. |
 | RDAP | rdap.org | No company host |
-| Sanctions | Full OFAC SDN CSV plus the alternate-names file, cached in `SourceCache`, plus the local name Alexei Sanctionhit | Empty cache still has the test overlay. A name match is `NOT_LEGIT` only when the country or a date of birth also lines up. |
-| EDGAR | efts.sec.gov full-text search | A block or timeout is `UNAVAILABLE`. A response with zero hits is `INCONCLUSIVE`. |
-| Courts | CourtListener public search, per result | 401, 403, or no response is `UNAVAILABLE`. A severe word in a different result is ignored. A full-name hit without the company is “possible match, needs review” and is not a failure. |
-| Web | DuckDuckGo HTML, then Wikipedia, Wikidata, GDELT, and Bing | A page title that only repeats the query does not count. If every provider is blocked or empty, the check is `UNAVAILABLE`. |
-| News | Google News RSS, Bing News RSS, and GDELT | Quoted person name, quoted company name, and company plus city. Items older than five years are dropped. The name has to appear in the headline or snippet. A headline that only repeats the query does not count. A negative term with the company or city in the same item is a failure for review, not an automatic decline. A negative term on the person alone is “possible match, needs review” and is not a failure. A blocked feed is `UNAVAILABLE` and is listed under what could not be checked for free. GDELT waits five seconds between calls and caches a success. |
-| LinkedIn | Public page only | A block is `UNAVAILABLE`. A response without the name is `INCONCLUSIVE`. Logged-in pages are not scraped. |
+| Sanctions | Full OFAC SDN CSV plus the alternate-names file, cached in `SourceCache`. The cache refreshes on startup when it is missing or older than a day. | An empty cache is `NOT_RUN` and earns 0. The local name Alexei Sanctionhit can still flag that labelled sample. It is not a loaded list. A name match is a hard flag only when the country or a date of birth also lines up. |
+| OpenSanctions | api.opensanctions.org | Not checkable for free. HTTP 401 without a paid key is `UNAVAILABLE`. A hard flag, if a list is ever returned, uses the sanctions caps. |
+| OpenCorporates | api.opencorporates.com | Not checkable for free. HTTP 401 without a paid token is `UNAVAILABLE`. A company-name hit would be company-exists evidence only. |
+| EDGAR | SEC company list and efts.sec.gov full-text search | A 4-letter distinctive token such as “toll” can match. A block or timeout is `UNAVAILABLE`. A response with zero hits is `INCONCLUSIVE`. A company-name hit does not corroborate the person unless a filing also names them. Lookup uses the run's fetch function, so an offline test does not call the network. |
+| Courts | CourtListener public search, per result | 401, 403, or no response is `UNAVAILABLE`. A clean no-hit is “no record found in CourtListener federal data” and is not a clearance of all litigation. Its weight is 2. A severe word in a different result is ignored. A full-name hit without the company is “possible match, needs review” and is not a failure. |
+| Web | Public screening (DuckDuckGo and Bing), not a second fallback pass | An empty but reachable results page is `INCONCLUSIVE`. A challenge page is `UNAVAILABLE`. A footprint taken from the applicant's own site is the same self-reported source as that site. |
+| News | Google News RSS, Bing News RSS, and GDELT | Quoted person name, quoted company name, and company plus city. Items older than five years are dropped. The full name has to appear. A single surname token is not the person. A headline that only repeats the query does not count. Fraud, sanctions, or a criminal charge tied to the person with the company or city is a failure for review, not an automatic decline. A company-level lawsuit is an attention item, not a grade cap. A negative term on the person alone is “possible match, needs review” and is not a failure. A blocked feed is `UNAVAILABLE` and is listed under what could not be checked for free. GDELT waits five seconds between calls and caches a success. |
+| LinkedIn and other social pages | Public HTTP with an identifying user agent, not a browser spoof | A block is `UNAVAILABLE` and not checkable for free. A response without the name is `INCONCLUSIVE`. Logged-in pages are not scraped. A URL may include a query string or a sub-path. The shape of a URL does not earn points by itself. |
 | RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404 is “No data found”. |
 | State registry | Deep link only | Always `NOT_RUN` with a manual link for NJ, NY, DE, FL, and TX |
-| Business card | Local text compare | `NOT_RUN` when nothing was uploaded. `UNAVAILABLE` when an image was uploaded and OCR is not installed. |
+| Business card | Local text compare. OCR is installed (tesseract.js). | `NOT_RUN` when nothing was uploaded. `UNAVAILABLE` when an image was uploaded and OCR returned no text. A text match requires the full name and the company, and it is self-reported. |
 
 State registry links:
 
@@ -107,7 +109,7 @@ State registry links:
 - FL: https://search.sunbiz.org/Inquiry/CorporationSearch/ByName
 - TX: https://mycpa.cpa.state.tx.us/coa/
 
-Refresh the OFAC cache from **Admin → Verification settings**.
+Refresh the OFAC cache from **Admin → Verification settings**. The server also refreshes it on startup when the cache is missing or older than a day. Social fetches use `PrivateFloorClub/1.0` and do not pretend to be a browser. LinkedIn, X, Facebook, Instagram, YouTube, and TikTok often block that agent; a block is not checkable for free.
 
 ## Notices
 

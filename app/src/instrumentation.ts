@@ -37,4 +37,8 @@ export async function register() {
   resumeVerificationJobs().catch((error) => {
     console.error("Could not resume verification jobs", error);
   });
+  const { ensureWatchlistFresh } = await import("@/lib/verify/watchlist");
+  ensureWatchlistFresh().catch((error) => {
+    console.error("Could not refresh the OFAC cache", error);
+  });
 }

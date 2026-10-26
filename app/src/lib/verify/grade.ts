@@ -30,7 +30,8 @@ export const LETTER_FLOORS = { A: 90, B: 80, C: 70, D: 60 } as const;
  * noCorroboration: no passing check that actually ties the person to the company.
  * ambiguousNews: a negative headline names the person and not the company or city.
  * reviewRedFlag: a disposable address that still has a public page, a sanctions name
- *   without country or date of birth, or a negative headline/case that also names the company.
+ *   without country or date of birth, or fraud, sanctions, or a criminal charge tied to the
+ *   person with the company or city. A company-level lawsuit is an attention item, not this cap.
  * hardRedFlag: corroborated sanctions, fraud-pattern text, disposable address with no
  *   website or LinkedIn, or an email that already belongs to a member or a declined applicant.
  * twoConflicts: two or more failed checks that disagree with the application.
@@ -207,7 +208,7 @@ function withData(check: CheckOutput): boolean {
 }
 
 export function corroboratingPasses(checks: CheckOutput[]): CheckOutput[] {
-  return checks.filter((check) => check.status === "PASS" && check.corroborates);
+  return checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
 }
 
 function confidenceOf(checks: CheckOutput[]): Confidence {
@@ -221,11 +222,11 @@ function confidenceOf(checks: CheckOutput[]): Confidence {
 }
 
 function isHardSanctions(check: CheckOutput): boolean {
-  return check.key === "sanctions" && Boolean(check.hardFlag);
+  return (check.key === "sanctions" || check.key === "opensanctions") && Boolean(check.hardFlag);
 }
 
 function isPossibleSanctions(check: CheckOutput): boolean {
-  return check.key === "sanctions" && Boolean(check.reviewFlag) && !check.hardFlag;
+  return (check.key === "sanctions" || check.key === "opensanctions") && Boolean(check.reviewFlag) && !check.hardFlag;
 }
 
 function isDisposableHard(check: CheckOutput): boolean {
@@ -261,6 +262,7 @@ function isCorroboratedNegative(check: CheckOutput): boolean {
 }
 
 function isConflict(check: CheckOutput): boolean {
+  if (check.key === "news-story") return false;
   if (check.status !== "FAIL" || check.hardFlag) return false;
   if (isDisposableReview(check) || isPossibleSanctions(check) || isCorroboratedNegative(check)) return false;
   return true;
@@ -487,6 +489,8 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push("Court records were not checked, or the court source did not answer.");
   } else if (isCorroboratedNegative(courts)) {
     evidence.push("A court result may name this person and company near a serious word. Possible match, verify. It is not treated as a confirmed case.");
+  } else if (courts.status === "PASS") {
+    evidence.push("No record was found in CourtListener federal data. That is not a clearance of all litigation.");
   } else {
     evidence.push("The court search did not confirm a case against this person and company.");
   }
@@ -520,13 +524,20 @@ export function gradeChecks(
   const card = findCheck(checks, "business-card");
   const linkedin = findCheck(checks, "linkedin-fetch");
 
+  const independent = corroboratingPasses(checks).length > 0;
+  const linkedinFetched = passed(linkedin);
   const identity = sumLines([
     award(passed(findCheck(checks, "email-syntax")), weights.identity["email-syntax"], "The email address is well formed", "The email address is missing or not well formed"),
     award(passed(findCheck(checks, "disposable-email")), weights.identity["disposable-email"], "The email domain is not disposable", "The disposable-email check did not pass"),
     award(passed(findCheck(checks, "role-address")), weights.identity["role-address"], "The email is not a shared inbox", "The shared-inbox check did not pass"),
     award(passed(findCheck(checks, "phone-state")), weights.identity["phone-state"], "The phone area code fits the state", "The phone area code was not confirmed against the state"),
-    award(passed(findCheck(checks, "linkedin-format")), weights.identity["linkedin-format"], "The LinkedIn link looks like a public profile", "No usable LinkedIn link was confirmed"),
-    award(passed(linkedin), weights.identity["linkedin-fetch"], "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name"),
+    award(
+      passed(findCheck(checks, "linkedin-format")) && (linkedinFetched || independent),
+      weights.identity["linkedin-format"],
+      "The LinkedIn link looks like a public profile",
+      "No usable LinkedIn link was confirmed",
+    ),
+    award(linkedinFetched, weights.identity["linkedin-fetch"], "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name"),
   ]);
   const company = sumLines([
     award(websitePass, weights.company.website, "A public website includes the person or company", "No website confirmed the person or company"),
@@ -538,7 +549,12 @@ export function gradeChecks(
   const footprint = sumLines([
     award(webPass, weights.footprint["web-footprint"], "A public web result names the person and the company", "No public web result confirmed the person and the company"),
     award(passed(findCheck(checks, "news")), weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
-    award(passed(findCheck(checks, "social-links")), weights.footprint["social-links"], "Social links are full web addresses", "Social links were missing or not usable"),
+    award(
+      passed(findCheck(checks, "social-links")) && independent,
+      weights.footprint["social-links"],
+      "Social links are full web addresses",
+      "Social links were missing or not usable",
+    ),
   ]);
   const risk = sumLines([
     award(passed(findCheck(checks, "sanctions")), weights.risk.sanctions, "The loaded sanctions lists had no name match", "Sanctions were not cleared"),
@@ -659,10 +675,30 @@ export function gradeChecks(
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
   if (corroboratingPasses(checks).length === 0) {
+    const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
     pushAttention({
       severity: "Medium",
       title: "Thin public record",
-      detail: "No free source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean.",
+      detail: selfReported
+        ? "The applicant's own website or card is one self-reported source. No independent source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean."
+        : "No free source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean.",
+    });
+  }
+  for (const check of checks) {
+    if (check.key === "news" && /company-level litigation/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Company litigation headline",
+        detail: check.finding,
+      });
+    }
+  }
+  const phone = findCheck(checks, "phone-state");
+  if (phone?.status === "INCONCLUSIVE" && /usually maps to/i.test(phone.finding)) {
+    pushAttention({
+      severity: "Low",
+      title: "Phone area code is outside the stated state",
+      detail: phone.finding,
     });
   }
   const importantMissing = ["website", "edgar", "courts", "web-footprint", "news", "sanctions", "linkedin-fetch", "business-registry"].filter((key) => {
@@ -819,7 +855,13 @@ function lowerConfidence(confidence: Confidence): Confidence {
   return "Low";
 }
 
-/** A skipped review step is not a pass. The letter and score stay put. Confidence drops one step. */
+function recommendationAfterConfidence(recommendation: Recommendation, confidence: Confidence): Recommendation {
+  if (confidence === "Low" && (recommendation === "APPROVE" || recommendation === "APPROVE WITH CONDITIONS")) return "NEEDS MORE INFO";
+  if (confidence !== "High" && recommendation === "APPROVE") return "APPROVE WITH CONDITIONS";
+  return recommendation;
+}
+
+/** A skipped review step is not a pass. The letter and score stay put. Confidence drops one step, and that drop can lower the recommendation. */
 export function applyReviewSkips(report: GradeReport, skips: { title: string; reason: string }[]): GradeReport {
   if (!skips.length) return report;
   const extra: AttentionItem[] = skips.map((skip) => ({
@@ -827,9 +869,32 @@ export function applyReviewSkips(report: GradeReport, skips: { title: string; re
     title: `Skipped: ${skip.title}`,
     detail: `Skipped, not a pass. Reason: ${skip.reason || "No reason recorded."} This does not confirm the step.`,
   }));
+  const confidence = lowerConfidence(report.confidence);
+  const recommendation = recommendationAfterConfidence(report.recommendation, confidence);
+  const summary =
+    recommendation === report.recommendation
+      ? report.summary
+      : {
+          ...report.summary,
+          reasoning: reasoningFor({
+            recommendation,
+            letter: report.letter,
+            score: report.score,
+            confidence,
+            paying: /month to month/i.test(report.summary.reasoning),
+            hard: false,
+            review: false,
+          }),
+          nextStep:
+            recommendation === "NEEDS MORE INFO"
+              ? "Read the skipped steps. A skipped step is not a pass, and confidence is too low to recommend approval."
+              : report.summary.nextStep,
+        };
   const next: GradeReport = {
     ...report,
-    confidence: lowerConfidence(report.confidence),
+    confidence,
+    recommendation,
+    summary,
     attention: [...extra, ...report.attention],
   };
   return { ...next, plainText: gradePlainText(next) };
@@ -874,7 +939,7 @@ export function rubricSections(): { title: string; body: string }[] {
     },
     {
       title: "Caps",
-      body: `No person-and-company corroboration: cannot exceed ${CAP_RULES.noCorroboration}. A negative headline that is only a name match: cannot exceed ${CAP_RULES.ambiguousNews}, and the file says possible match, verify. Disposable email with some public page, an uncorroborated sanctions name, or a negative headline or court result that also names the company: cannot exceed ${CAP_RULES.reviewRedFlag}, with a red banner. Corroborated sanctions, fraud-pattern text, a disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed ${CAP_RULES.hardRedFlag}, with a red banner. Two or more conflicting checks: cannot exceed ${CAP_RULES.twoConflicts}.`,
+      body: `No independent person-and-company corroboration: cannot exceed ${CAP_RULES.noCorroboration}. The applicant's own site and a footprint from that same site count as one self-reported source and do not lift this cap. A negative headline that is only a name match: cannot exceed ${CAP_RULES.ambiguousNews}, and the file says possible match, verify. Disposable email with some public page, an uncorroborated sanctions name, or fraud, sanctions, or a criminal charge tied to the person with the company or city: cannot exceed ${CAP_RULES.reviewRedFlag}, with a red banner. A company-level lawsuit is an attention item and does not use that cap. Corroborated sanctions, including an OpenSanctions hard flag when that source answers, fraud-pattern text, a disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed ${CAP_RULES.hardRedFlag}, with a red banner. Two or more conflicting checks: cannot exceed ${CAP_RULES.twoConflicts}. Separate news headlines are not separate conflicts.`,
     },
     {
       title: "Confidence",
@@ -946,7 +1011,7 @@ export function parseGradeSnapshot(value: unknown): GradeReport | null {
 export function inferFlags(key: string, status: EvidenceStatus | string, finding: string): { hardFlag: boolean; reviewFlag: boolean; corroborates: boolean } {
   const text = finding.toLowerCase();
   const hard =
-    (key === "sanctions" && status === "FAIL" && text.includes("lines up")) ||
+    ((key === "sanctions" || key === "opensanctions") && status === "FAIL" && text.includes("lines up")) ||
     (key === "disposable-email" && status === "FAIL" && text.includes("no website or linkedin")) ||
     (key === "duplicate" && status === "FAIL") ||
     (key === "text-risk" && status === "FAIL" && text.includes("fraud pattern"));

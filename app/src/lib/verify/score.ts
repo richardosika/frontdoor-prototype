@@ -3,8 +3,10 @@ import type { CheckOutput, ScoredReport, Verdict } from "@/lib/verify/types";
 
 /**
  * Score is the share of weight earned by PASS checks.
- * NOT_RUN and UNAVAILABLE checks are left out. INCONCLUSIVE and FAIL earn nothing and stay in the denominator,
- * so a thin file cannot look strong. UNAVAILABLE means the source was blocked or timed out.
+ * NOT_RUN checks are left out, because the check was not attempted.
+ * UNAVAILABLE, INCONCLUSIVE, and FAIL earn nothing and stay in the denominator,
+ * so a thin file cannot look strong when sources are blocked.
+ * UNAVAILABLE means the source was blocked or timed out.
  * INCONCLUSIVE means the source responded and no matching data was found.
  * Thresholds are also described in app/docs/VERIFICATION.md.
  */
@@ -13,7 +15,7 @@ export const CORROBORATION_WEIGHT = 8;
 export const CORROBORATION_COUNT = 3;
 
 export function scoreOf(checks: CheckOutput[]): number {
-  const counted = checks.filter((check) => check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE");
+  const counted = checks.filter((check) => check.status !== "NOT_RUN");
   const possible = counted.reduce((sum, check) => sum + Math.max(0, check.weight), 0);
   if (!possible) return 0;
   const earned = counted.filter((check) => check.status === "PASS").reduce((sum, check) => sum + check.weight, 0);

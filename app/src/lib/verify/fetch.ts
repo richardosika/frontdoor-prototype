@@ -1,10 +1,8 @@
-const USER_AGENT = "PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)";
-const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+export const USER_AGENT = "PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)";
 
-function userAgentFor(host: string): string {
-  if (/(^|\.)linkedin\.com$|(^|\.)tiktok\.com$|(^|\.)youtube\.com$|(^|\.)facebook\.com$|(^|\.)instagram\.com$|(^|\.)x\.com$|(^|\.)twitter\.com$/.test(host)) {
-    return BROWSER_UA;
-  }
+/** Honest identifying agent for every host. Social sites that block it are not checkable for free. */
+export function userAgentFor(host: string): string {
+  void host;
   return USER_AGENT;
 }
 const lastByHost = new Map<string, number>();

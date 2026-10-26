@@ -31,9 +31,10 @@ type Attempt = {
   platform: string;
   searched: string;
   url: string;
-  outcome: "found" | "not-found" | "blocked";
+  outcome: "found" | "not-found" | "blocked" | "missing";
   score: MatchScore;
   detail: string;
+  selfReported?: boolean;
 };
 
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
@@ -153,7 +154,7 @@ export function socialLinksFrom(html: string): { platform: string; url: string }
 }
 
 export function serpUnusable(snippets: string[], facts: { name: string; org: string; location: string }): boolean {
-  if (!snippets.length) return true;
+  if (!snippets.length) return false;
   return !snippets.some((snippet) => {
     const score = scorePublicText(snippet, facts);
     return score.name || score.company;
@@ -166,11 +167,18 @@ function strong(score: MatchScore): boolean {
 
 function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean } {
   const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${attempt.score.company ? "yes" : "no"}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
+  if (attempt.outcome === "missing") {
+    return {
+      status: "NOT_RUN",
+      corroborates: false,
+      finding: `Searched: ${attempt.searched}. ${attempt.detail} The website is missing, not provided. It was not blocked.`.replace(/\s+/g, " ").trim(),
+    };
+  }
   if (attempt.outcome === "blocked") {
     return {
       status: "UNAVAILABLE",
       corroborates: false,
-      finding: `Searched: ${attempt.searched}. ${attempt.detail} ${COULD_NOT_CHECK}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${attempt.detail} ${COULD_NOT_CHECK} Not checkable for free.`.replace(/\s+/g, " ").trim(),
     };
   }
   if (attempt.outcome === "not-found") {
@@ -180,10 +188,22 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       finding: `Searched: ${attempt.searched}. No result found that names this person and this company. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
+  const tied = strong(attempt.score);
+  const companyOnOwnSite = attempt.key === "website" && attempt.score.company && !tied;
+  if (companyOnOwnSite) {
+    return {
+      status: "PASS",
+      corroborates: false,
+      finding: `Searched: ${attempt.searched}. Found: ${attempt.detail} The company name is on the applicant's site. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  const selfReportedNote = attempt.selfReported
+    ? " Self-reported page. Together with a footprint from the same site, this is one applicant-supplied source. It does not by itself corroborate the person."
+    : "";
   return {
-    status: strong(attempt.score) ? "PASS" : "INCONCLUSIVE",
-    corroborates: strong(attempt.score),
-    finding: `Searched: ${attempt.searched}. Found: ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    status: tied ? "PASS" : "INCONCLUSIVE",
+    corroborates: tied && !attempt.selfReported,
+    finding: `Searched: ${attempt.searched}. Found: ${attempt.detail}${selfReportedNote} ${scoreLine}`.replace(/\s+/g, " ").trim(),
   };
 }
 
@@ -198,6 +218,7 @@ function toCheck(attempt: Attempt): CheckOutput {
     url: attempt.url,
     ranAt: new Date().toISOString(),
     corroborates: judged.corroborates,
+    selfReported: attempt.selfReported,
   };
 }
 
@@ -243,15 +264,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
   const pages: { url: string; text: string; raw: string }[] = [];
   if (!website) {
-    attempts.push(
-      blockedAttempt(
-        "website",
-        "Company website",
-        "the website field on the application",
-        "",
-        "No company website was on the application.",
-      ),
-    );
+    attempts.push({
+      key: "website",
+      platform: "Company website",
+      searched: "the website field on the application",
+      url: "",
+      outcome: "missing",
+      score: emptyScore(),
+      detail: "No company website was on the application.",
+      selfReported: true,
+    });
   } else {
     let home = await pull(fetchText, website);
     let homeUrl = website;
@@ -285,6 +307,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           outcome: "found",
           score: best.score,
           detail: "a page on the company site",
+          selfReported: true,
         });
       } else {
         attempts.push({
@@ -295,6 +318,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           outcome: "not-found",
           score: best?.score || emptyScore(),
           detail: "the company site responded",
+          selfReported: true,
         });
       }
       const named = pages
@@ -309,6 +333,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           outcome: "found",
           score: named.score,
           detail: "a public page names this person and this company",
+          selfReported: true,
         });
       }
     }

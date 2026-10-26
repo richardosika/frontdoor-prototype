@@ -92,8 +92,8 @@ export function assessOpenCorporates(org: string, http: { ok: boolean; status: n
       ...base,
       status: "PASS",
       url: match.url,
-      corroborates: true,
-      finding: `OpenCorporates returned ${match.name}. Open the record and confirm it is the same firm.`,
+      corroborates: false,
+      finding: `OpenCorporates returned ${match.name}. That is company-exists evidence only. It does not tie a person to the firm.`,
     };
   }
   return {

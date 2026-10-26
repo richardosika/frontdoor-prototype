@@ -294,7 +294,9 @@ describe("news feeds", () => {
       [{ name: "Google News", state: "responded" }, { name: "Bing News", state: "responded" }, { name: "GDELT", state: "responded" }],
       NOW,
     );
-    expect(lien[0].status).toBe("FAIL");
+    expect(lien[0].status).toBe("INCONCLUSIVE");
+    expect(lien[0].reviewFlag).toBeUndefined();
+    expect(lien[0].finding).toContain("Company-level litigation");
 
     const client = classifyNews(
       facts({ name: "John Smith", applicantName: "John Smith", org: "Acme Realty", location: "Austin, TX" }),
@@ -330,8 +332,10 @@ describe("news feeds", () => {
       [{ name: "Google News", state: "responded" }, { name: "Bing News", state: "responded" }, { name: "GDELT", state: "responded" }],
       NOW,
     );
-    expect(city[0].status).toBe("FAIL");
-    expect(city[1].status).toBe("FAIL");
+    expect(city[0].status).toBe("INCONCLUSIVE");
+    expect(city[0].reviewFlag).toBeUndefined();
+    expect(city[0].finding).toContain("Company-level litigation");
+    expect(city[1].status).toBe("INCONCLUSIVE");
   });
 
   it("asks Google, Bing, and GDELT and records which feeds were blocked", async () => {

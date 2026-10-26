@@ -111,23 +111,42 @@ export function assessEdgarMatch(input: {
   }
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
   const personSentence = personLine ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.` : "";
+  const personTied = Boolean(personLine);
   return {
     status: "PASS",
-    corroborates: true,
+    corroborates: personTied,
     url: edgarCompanyUrl(match.cik),
-    finding: `EDGAR lists ${titled}. Confirm it is the same firm.${personSentence}`,
+    finding: personTied
+      ? `EDGAR lists ${titled}. Confirm it is the same firm.${personSentence}`
+      : `EDGAR lists ${titled}. That shows a company by this name exists. It does not tie the person to the firm.`,
   };
 }
 
-async function loadTickers(): Promise<EdgarCompany[] | null> {
+type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
+
+async function defaultFetch(url: string): Promise<{ ok: boolean; status: number; text: string }> {
+  const cap = url.includes("company_tickers") ? 2_000_000 : 1_500_000;
+  const timeout = url.includes("company_tickers") ? 20000 : 15000;
+  return politeFetch(url, timeout, { maxChars: cap });
+}
+
+export function clearEdgarTickerCache(): void {
+  tickerCache = null;
+}
+
+async function loadTickers(fetchText: FetchText): Promise<EdgarCompany[] | null> {
   if (tickerCache && Date.now() - tickerCache.at < TICKER_TTL_MS) return tickerCache.rows;
-  const response = await politeFetch(TICKER_URL, 20000, { maxChars: 2_000_000 });
+  const response = await fetchText(TICKER_URL);
   const rows = response.ok ? parseCompanyTickers(response.text) : null;
   if (rows) tickerCache = { at: Date.now(), rows };
   return rows;
 }
 
-export async function lookupEdgar(org: string, person: string): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates">> {
+export async function lookupEdgar(
+  org: string,
+  person: string,
+  fetchText?: FetchText,
+): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates">> {
   const tokens = org.trim();
   if (!tokens) {
     return {
@@ -137,15 +156,16 @@ export async function lookupEdgar(org: string, person: string): Promise<Pick<Che
       finding: "EDGAR was not searched. No company name was on the application.",
     };
   }
-  const companies = await loadTickers().catch(() => null);
+  const fetchImpl = fetchText ?? defaultFetch;
+  const companies = await loadTickers(fetchImpl).catch(() => null);
   const last = person.split(/\s+/).filter((part) => part.length >= 3).slice(-1)[0] || "";
-  const distinctive = org.split(/\s+/).filter((part) => part.length >= 5)[0] || org;
+  const distinctive = distinctiveCompanyTokens(org)[0] || org;
   const searchUrl = last
     ? `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${last}" "${distinctive}"`)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`
     : "";
   let names: string[] = [];
   if (searchUrl) {
-    const filing = await politeFetch(searchUrl, 15000, { maxChars: 1_500_000 }).catch(() => ({ ok: false, status: 0, text: "" }));
+    const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
     names = filing.ok ? filingNames(filing.text) || [] : [];
   }
   return assessEdgarMatch({

@@ -16,6 +16,11 @@ export type CheckOutput = {
   reviewFlag?: boolean;
   /** True only when this pass corroborates the person and the company, not merely the absence of a red flag. */
   corroborates?: boolean;
+  /**
+   * Applicant-supplied material (their own site, a footprint from that same site, or their card).
+   * Several of these together are one self-reported source. They do not corroborate the person.
+   */
+  selfReported?: boolean;
 };
 
 export type ApplicantFacts = {

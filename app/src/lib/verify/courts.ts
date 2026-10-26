@@ -97,7 +97,9 @@ export function assessCourts(
   }
   return {
     ...base,
-    status: "INCONCLUSIVE",
-    finding: `CourtListener returned ${results.length} opinion(s). None matched the full name. No data linking this person to a case.`,
+    status: "PASS",
+    weight: 2,
+    corroborates: false,
+    finding: `No record found in CourtListener federal data (${results.length} opinion(s) came back). This is not a clearance of all litigation.`,
   };
 }

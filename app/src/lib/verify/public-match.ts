@@ -16,6 +16,31 @@ const NICKNAMES: Record<string, string[]> = {
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp"]);
+/** Four-letter words that show up in too many firm names to identify one company. "toll" is not in this set. */
+const SHORT_GENERIC = new Set([
+  "home",
+  "fund",
+  "bank",
+  "city",
+  "east",
+  "west",
+  "land",
+  "park",
+  "hill",
+  "view",
+  "gold",
+  "star",
+  "peak",
+  "rise",
+  "core",
+  "lake",
+  "rock",
+  "wood",
+  "ford",
+  "club",
+  "sons",
+  "bros",
+]);
 const GENERIC = new Set([
   "construction",
   "services",
@@ -95,10 +120,14 @@ export function alternatePersonNames(name: string): string[] {
   return [...names];
 }
 
-/** Words that distinguish this firm. A common word such as "related" is kept only together with the rest of the name. */
+/**
+ * Words that distinguish this firm. A common word such as "related" is kept only together with the rest of the name.
+ * A 4-letter token is kept when it is not generic ("toll" in "Toll Brothers") so a real short name can match.
+ * A single short token still has to be the whole distinctive name; a longer different firm does not fit.
+ */
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
-  const distinctive = kept.filter((token) => token.length >= 5 && !GENERIC.has(token));
+  const distinctive = kept.filter((token) => token.length >= 4 && !GENERIC.has(token) && !SHORT_GENERIC.has(token));
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 
@@ -109,7 +138,7 @@ export function mentionsPerson(text: string, name: string): boolean {
 }
 
 function looksLikeGivenName(word: string): boolean {
-  if (word.length < 3 || word.length > 20) return false;
+  if (word.length < 2 || word.length > 20) return false;
   if (word !== word[0].toUpperCase() + word.slice(1).toLowerCase()) return false;
   const particles = new Set(["the", "of", "at", "and", "for", "with", "from", "by", "on", "in", "to", "a", "an"]);
   if (particles.has(word.toLowerCase())) return false;
@@ -123,10 +152,11 @@ function surnameOnly(text: string, token: string): boolean {
   const all = text.match(new RegExp(`\\b${escaped}\\b`, "gi")) || [];
   if (!all.length) return false;
   let nameHits = 0;
-  for (const match of text.matchAll(new RegExp(`\\b([A-Za-z]+)\\s+${escaped}\\b`, "gi"))) {
+  const pattern = new RegExp(`\\b([A-Za-z]+)["']?\\s+["']?${escaped}\\b`, "gi");
+  for (const match of text.matchAll(pattern)) {
     if (looksLikeGivenName(match[1])) nameHits += 1;
   }
-  return nameHits === all.length;
+  return nameHits > 0 && nameHits >= all.length;
 }
 
 function looseToken(text: string, token: string): boolean {
@@ -138,15 +168,15 @@ function looseToken(text: string, token: string): boolean {
 }
 
 export function mentionsCompany(text: string, org: string, person = ""): boolean {
-  const kept = tokens(org).filter((token) => !LEGAL.has(token) && token.length >= 5);
-  const distinctive = kept.filter((token) => !GENERIC.has(token));
-  const companyTokens = distinctive.length ? distinctive : kept;
-  if (!companyTokens.length) return false;
-  if (distinctive.length) {
-    if (!distinctive.every((token) => companyTokenHit(text, token))) return false;
-    if (distinctive.length === 1 && surnameOnly(text, distinctive[0])) return false;
+  const named = distinctiveCompanyTokens(org);
+  const genericOnly = !named.length || named.every((token) => GENERIC.has(token));
+  if (!genericOnly) {
+    if (!named.every((token) => companyTokenHit(text, token))) return false;
+    if (named.length === 1 && surnameOnly(text, named[0])) return false;
     return true;
   }
+  const companyTokens = tokens(org).filter((token) => !LEGAL.has(token) && token.length >= 5);
+  if (!companyTokens.length) return false;
   if (companyTokens.every((token) => companyTokenHit(text, token))) return true;
   if (!person || !mentionsPerson(text, person)) return false;
   return companyTokens.some((token) => token.length >= 7 && looseToken(text, token));

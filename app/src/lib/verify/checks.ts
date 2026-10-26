@@ -2,12 +2,12 @@ import { annualDuesCents } from "@/lib/dues";
 import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { registrableHost } from "@/lib/verify/host";
+import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { runPublicScreen } from "@/lib/verify/screen";
-import { webFootprintCheck } from "@/lib/verify/web-search";
 
 const DISPOSABLE = new Set([
   "mailinator.com",
@@ -44,36 +44,35 @@ const FREE_PROVIDERS = new Set([
   "gmx.com",
 ]);
 
-const AREA_TO_STATE: Record<string, string> = {
-  "201": "NJ",
-  "551": "NJ",
-  "609": "NJ",
-  "732": "NJ",
-  "848": "NJ",
-  "856": "NJ",
-  "862": "NJ",
-  "908": "NJ",
-  "973": "NJ",
-  "212": "NY",
-  "332": "NY",
-  "347": "NY",
-  "516": "NY",
-  "518": "NY",
-  "585": "NY",
-  "607": "NY",
-  "631": "NY",
-  "646": "NY",
-  "716": "NY",
-  "718": "NY",
-  "845": "NY",
-  "914": "NY",
-  "917": "NY",
-  "929": "NY",
-  "203": "CT",
-  "475": "CT",
-  "860": "CT",
-  "959": "CT",
+const STATE_AREA_CODES: Record<string, string[]> = {
+  NJ: ["201", "551", "609", "640", "732", "848", "856", "862", "908", "973"],
+  NY: ["212", "315", "332", "347", "363", "516", "518", "585", "607", "631", "646", "680", "716", "718", "838", "845", "914", "917", "929", "934"],
+  CT: ["203", "475", "860", "959"],
+  CA: ["209", "213", "279", "310", "323", "341", "408", "415", "424", "442", "510", "530", "559", "562", "619", "626", "628", "650", "657", "661", "669", "707", "714", "747", "760", "805", "818", "820", "831", "840", "858", "909", "916", "925", "949", "951"],
+  TX: ["210", "214", "254", "281", "325", "346", "361", "409", "430", "432", "469", "512", "682", "713", "726", "737", "806", "817", "830", "832", "903", "915", "936", "940", "945", "956", "972", "979"],
+  FL: ["239", "305", "321", "352", "386", "407", "448", "561", "656", "689", "727", "754", "772", "786", "813", "850", "863", "904", "941", "954"],
+  DE: ["302"],
+  PA: ["215", "223", "267", "272", "412", "445", "484", "570", "582", "610", "717", "724", "814", "835", "878"],
+  SC: ["803", "839", "843", "854"],
+  IL: ["217", "224", "309", "312", "331", "447", "464", "618", "630", "708", "773", "779", "815", "847", "872"],
+  MA: ["339", "351", "413", "508", "617", "774", "781", "857", "978"],
+  GA: ["229", "404", "470", "478", "678", "706", "762", "770", "912"],
+  DC: ["202"],
+  MD: ["227", "240", "301", "410", "443", "667"],
+  CO: ["303", "719", "720", "970", "983"],
+  VA: ["276", "434", "540", "571", "703", "757", "804", "826", "948"],
+  WA: ["206", "253", "360", "425", "509", "564"],
+  NC: ["252", "336", "472", "704", "743", "828", "910", "919", "980", "984"],
+  AZ: ["480", "520", "602", "623", "928"],
+  OH: ["216", "220", "234", "283", "326", "330", "380", "419", "436", "440", "513", "567", "614", "740", "937"],
+  MI: ["231", "248", "269", "313", "517", "586", "616", "679", "734", "810", "906", "947", "989"],
 };
+
+const AREA_TO_STATE: Record<string, string> = {};
+for (const [state, codes] of Object.entries(STATE_AREA_CODES)) {
+  for (const code of codes) AREA_TO_STATE[code] = state;
+}
+const PHONE_STATE_RE = new RegExp(`\\b(${Object.keys(STATE_AREA_CODES).join("|")})\\b`);
 
 /** Local overlay so the test console can show a corroborated sanctions hit without a paid list. */
 export const TEST_WATCHLIST = [{ name: "Alexei Sanctionhit", location: "Newark United States" }];
@@ -176,7 +175,7 @@ export function emailChecks(facts: ApplicantFacts): CheckOutput[] {
 export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
   const digits = facts.phone.replace(/\D/g, "");
   const area = digits.length >= 10 ? digits.slice(-10, -7) : "";
-  const state = facts.location.toUpperCase().match(/\b(NJ|NY|CT|FL|TX|DE|CA)\b/)?.[1] || "";
+  const state = facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
   const expected = area ? AREA_TO_STATE[area] : "";
   if (!area || !expected || !state) {
     return check({
@@ -188,15 +187,21 @@ export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const match = expected === state;
+  if (expected === state) {
+    return check({
+      key: "phone-state",
+      status: "PASS",
+      weight: 4,
+      finding: `The area code ${area} fits ${state}.`,
+      source: "Local area-code table",
+      url: "",
+    });
+  }
   return check({
     key: "phone-state",
-    status: match ? "PASS" : "FAIL",
+    status: "INCONCLUSIVE",
     weight: 4,
-    reviewFlag: !match,
-    finding: match
-      ? `The area code ${area} fits ${state}.`
-      : `The area code ${area} usually maps to ${expected}, while the application says ${state}. Look at the phone before you decide.`,
+    finding: `The area code ${area} usually maps to ${expected}, while the application says ${state}. This is inconclusive, not a failure. Look at the phone before you decide.`,
     source: "Local area-code table",
     url: "",
   });
@@ -268,6 +273,7 @@ export function duplicateCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[]): CheckOutput {
+  const realLoaded = watchlist.length > 0;
   const lists = [...TEST_WATCHLIST, ...watchlist];
   let best = { score: 0, entry: null as WatchlistEntry | null, field: "" };
   for (const entry of lists) {
@@ -277,15 +283,24 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
     const field = person >= company ? "name" : "company";
     if (score > best.score) best = { score, entry, field };
   }
+  const overlayHit = Boolean(best.entry && TEST_WATCHLIST.some((entry) => entry.name === best.entry?.name) && !watchlist.some((entry) => entry.name === best.entry?.name));
   if (!best.entry || best.score < SANCTIONS_MATCH_THRESHOLD) {
+    if (!realLoaded) {
+      return check({
+        key: "sanctions",
+        status: "NOT_RUN",
+        weight: 10,
+        finding: "No OFAC watchlist was loaded, so this check did not run. The local test name is not a loaded list and is not a pass.",
+        source: "OFAC SDN cache",
+        url: "https://ofac.treasury.gov/sanctions-list-service",
+      });
+    }
     return check({
       key: "sanctions",
-      status: lists.length ? "PASS" : "NOT_RUN",
+      status: "PASS",
       weight: 10,
-      finding: lists.length
-        ? "No corroborated sanctions or watchlist name match on the lists that were loaded."
-        : "No watchlist was loaded, so this check did not run.",
-      source: "OFAC cache plus Private Floor test overlay",
+      finding: "No corroborated sanctions or watchlist name match on the OFAC list that was loaded.",
+      source: "OFAC SDN cache",
       url: "https://ofac.treasury.gov/sanctions-list-service",
     });
   }
@@ -302,7 +317,7 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
         ? `Watchlist name match on ${best.entry.name} (${best.field}) and the application location lines up with ${best.entry.location}.`
         : `Watchlist name match on ${best.entry.name} (${best.field}) and a date of birth in the file lines up with ${best.entry.dob}.`
       : `Possible watchlist match on ${best.entry.name} without country or date-of-birth corroboration. Owner review, not an automatic red flag.`,
-    source: "OFAC cache plus Private Floor test overlay",
+    source: overlayHit ? "Private Floor test overlay (not a loaded sanctions list)" : "OFAC SDN cache",
     url: "https://ofac.treasury.gov/sanctions-list-service",
   });
 }
@@ -319,7 +334,7 @@ export function linkedinFormatCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const ok = /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[a-z0-9\-_%]+\/?$/i.test(url);
+  const ok = /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[a-z0-9\-_%]+(?:\/[a-z0-9\-_%]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
   return check({
     key: "linkedin-format",
     status: ok ? "PASS" : "FAIL",
@@ -408,7 +423,7 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
         status: "UNAVAILABLE",
         weight: 10,
         finding:
-          "The business card image could not be checked for free. OCR is not installed on this host, so the image was not read. The file is on the application for a Private Floor administrator to read.",
+          "The business card image could not be checked. OCR is installed (tesseract.js) and did not return readable text. The file is on the application for a Private Floor administrator to read.",
         source: "Card text compare",
         url: "",
       });
@@ -422,17 +437,18 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const nameHit = nameMatchScore(facts.name, card) >= 0.5 || card.toLowerCase().includes(facts.name.toLowerCase().split(" ")[0] || "");
-  const orgHit = facts.org.length > 2 && card.toLowerCase().includes(facts.org.toLowerCase().slice(0, 8));
+  const nameHit = mentionsPerson(card, facts.name);
+  const orgHit = facts.org.trim().length > 2 && mentionsCompany(card, facts.org, facts.name);
   if (nameHit && orgHit) {
     return check({
       key: "business-card",
       status: "PASS",
       weight: 10,
-      finding: "The card text includes the applicant name and company.",
+      finding: "The card text includes the applicant's full first and last name and the company. The card is self-reported. It does not independently tie the person to the company.",
       source: "Card text compare",
       url: "",
-      corroborates: true,
+      corroborates: false,
+      selfReported: true,
     });
   }
   return check({
@@ -686,7 +702,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     );
   }
   out.push(...(await runPublicScreen(ctx.facts, fetchText)));
-  const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name);
+  const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name, fetchText);
   out.push(
     check({
       key: "edgar",
@@ -711,7 +727,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     ? await fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
-  if (!out.some((item) => item.key === "web-footprint")) out.push(await webFootprintCheck(ctx.facts, fetchText));
+  // Public screening always records web-footprint, including an explicit miss. The direct
+  // webFootprintCheck helper is not a second production pass.
   out.push(...(await newsChecks(ctx.facts, fetchText)));
   return out;
 }

@@ -42,7 +42,7 @@ export default async function VerificationSettingsPage({
         </div>
         <section className={`${card} mt-4 p-4 text-sm`}>
           <p>
-            Verification settings. OFAC SDN cache: {cache ? `${names} names, refreshed ${formatAuditTime(cache.fetchedAt)}` : "not downloaded yet"}. A local test name, Alexei Sanctionhit, is always included so the sample hit still works if the download fails.
+            Verification settings. OFAC SDN cache: {cache ? `${names} names, refreshed ${formatAuditTime(cache.fetchedAt)}` : "not downloaded yet"}. The labelled test name Alexei Sanctionhit can still match that sample. It does not count as a loaded list. An empty cache is not a pass. The cache refreshes on startup when it is missing or older than a day.
           </p>
           <div className="mt-3">
             <RunAndReload className={btn} label="Refresh watchlists now" pendingLabel="Refreshing watchlists…" run={refreshWatchlists} />
