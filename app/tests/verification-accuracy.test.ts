@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardConsistencyCheck, collectChecks, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
@@ -370,30 +370,69 @@ describe("honest labels and the legacy score", () => {
 });
 
 describe("low-risk check fixes", () => {
-  it("treats an out-of-area phone as inconclusive and accepts a wider match", () => {
+  it("treats an out-of-area or toll-free phone as inconclusive and accepts a wider match", () => {
     const mismatch = phoneStateCheck(facts({ phone: "212-555-0100", location: "Newark, NJ" }));
     expect(mismatch.status).toBe("INCONCLUSIVE");
+    expect(mismatch.status).not.toBe("FAIL");
     expect(mismatch.reviewFlag).toBeUndefined();
-    expect(mismatch.finding).toContain("usually maps to");
+    expect(mismatch.finding).toContain("outside the stated state");
     const charleston = phoneStateCheck(facts({ phone: "843-555-0100", location: "Charleston, SC" }));
     expect(charleston.status).toBe("PASS");
+    const nashville = phoneStateCheck(facts({ phone: "615-555-0100", location: "Nashville, TN" }));
+    expect(nashville.status).toBe("PASS");
+    const tollFree = phoneStateCheck(facts({ phone: "800-555-0100", location: "Newark, NJ" }));
+    expect(tollFree.status).toBe("INCONCLUSIVE");
+    expect(tollFree.reviewFlag).toBeUndefined();
+    expect(tollFree.finding).toContain("toll-free");
     const graded = gradeChecks([mismatch], facts({ phone: "212-555-0100", location: "Newark, NJ" }));
     expect(graded.attention.some((item) => item.title === "Phone area code is outside the stated state")).toBe(true);
+    const tollGraded = gradeChecks([tollFree], facts({ phone: "800-555-0100", location: "Newark, NJ" }));
+    expect(tollGraded.attention.some((item) => item.title === "Toll-free phone number")).toBe(true);
   });
 
-  it("accepts a LinkedIn URL with a query string", () => {
+  it("accepts a LinkedIn URL with a query, a hash, a locale, or a country subdomain", () => {
     const shaped = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/in/marisol-quentin-vale?trk=public_profile" }));
     expect(shaped.status).toBe("PASS");
     const nested = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/toll-brothers/about/" }));
     expect(nested.status).toBe("PASS");
+    const hashed = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/in/marisol-quentin-vale#experience" }));
+    expect(hashed.status).toBe("PASS");
+    const locale = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/en/in/marisol-quentin-vale" }));
+    expect(locale.status).toBe("PASS");
+    const regional = linkedinFormatCheck(facts({ linkedinUrl: "https://nj.linkedin.com/in/marisol-quentin-vale" }));
+    expect(regional.status).toBe("PASS");
     const bare = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/feed/" }));
     expect(bare.status).toBe("FAIL");
+  });
+
+  it("skips RDAP for an IP and does not treat a young domain as corroboration", () => {
+    expect(assessRdap("192.0.2.10", { ok: true, status: 200, text: "{}" })).toBeNull();
+    expect(assessRdap("[2001:db8::1]", { ok: true, status: 200, text: "{}" })).toBeNull();
+    const now = new Date("2026-10-26T00:00:00.000Z");
+    const young = assessRdap(
+      "example.com",
+      { ok: true, status: 200, text: JSON.stringify({ events: [{ eventAction: "registration", eventDate: "2026-06-01T00:00:00.000Z" }] }) },
+      now,
+    );
+    expect(young?.status).toBe("INCONCLUSIVE");
+    expect(young?.corroborates).toBe(false);
+    expect(young?.finding).toContain("not corroboration");
+    const older = assessRdap(
+      "example.com",
+      { ok: true, status: 200, text: JSON.stringify({ events: [{ eventAction: "registration", eventDate: "2014-06-01T00:00:00.000Z" }] }) },
+      now,
+    );
+    expect(older?.status).toBe("PASS");
+    expect(older?.corroborates).toBe(false);
+    const graded = gradeChecks([young!], facts());
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
   });
 
   it("reports a CourtListener no-hit without calling the person cleared", () => {
     const clean = assessCourts(JSON.stringify({ results: [] }), { ok: true, status: 200 }, facts());
     expect(clean.status).toBe("PASS");
-    expect(clean.weight).toBeLessThanOrEqual(2);
+    expect(clean.weight).toBe(0);
+    expect(clean.finding).toContain("Not checkable for free.");
     expect(clean.corroborates).toBe(false);
     expect(clean.finding).toContain("No record found in CourtListener federal data");
     expect(clean.finding.toLowerCase()).toContain("not a clearance of all litigation");

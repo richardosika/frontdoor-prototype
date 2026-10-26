@@ -146,6 +146,8 @@ describe("free company and sanctions sources", () => {
     expect(openCorporatesCompanies(payload)[0]?.url).toContain("opencorporates.com");
     const hit = assessOpenCorporates("Lopez Homes", { ok: true, status: 200, text: payload });
     expect(hit.status).toBe("PASS");
+    expect(hit.weight).toBe(0);
+    expect(hit.finding).toContain("Not checkable for free.");
     expect(hit.url).toContain("https://opencorporates.com/companies/");
     const blocked = assessOpenCorporates("Lopez Homes", { ok: false, status: 401, text: "" });
     expect(blocked.status).toBe("UNAVAILABLE");
@@ -156,6 +158,8 @@ describe("free company and sanctions sources", () => {
     expect(openSanctionsHits(JSON.stringify({ results: [] }))).toEqual([]);
     const clear = assessOpenSanctions({ name: "Ada Lopez", org: "Lopez Homes", location: "Newark, NJ" }, { ok: true, status: 200, text: "{\"results\":[]}" });
     expect(clear.status).toBe("PASS");
+    expect(clear.weight).toBe(0);
+    expect(clear.finding).toContain("Not checkable for free.");
     expect(clear.url).toContain("opensanctions.org");
     const blocked = assessOpenSanctions({ name: "Ada Lopez", org: "", location: "" }, { ok: false, status: 401, text: "" });
     expect(blocked.status).toBe("UNAVAILABLE");

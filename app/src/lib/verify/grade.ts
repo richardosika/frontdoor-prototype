@@ -783,7 +783,13 @@ export function gradeChecks(
     }
   }
   const phone = findCheck(checks, "phone-state");
-  if (phone?.status === "INCONCLUSIVE" && /usually maps to/i.test(phone.finding)) {
+  if (phone?.status === "INCONCLUSIVE" && /toll-free/i.test(phone.finding)) {
+    pushAttention({
+      severity: "Low",
+      title: "Toll-free phone number",
+      detail: phone.finding,
+    });
+  } else if (phone?.status === "INCONCLUSIVE" && /outside the stated state/i.test(phone.finding)) {
     pushAttention({
       severity: "Low",
       title: "Phone area code is outside the stated state",

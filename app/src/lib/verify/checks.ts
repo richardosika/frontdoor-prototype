@@ -67,7 +67,39 @@ const STATE_AREA_CODES: Record<string, string[]> = {
   AZ: ["480", "520", "602", "623", "928"],
   OH: ["216", "220", "234", "283", "326", "330", "380", "419", "436", "440", "513", "567", "614", "740", "937"],
   MI: ["231", "248", "269", "313", "517", "586", "616", "679", "734", "810", "906", "947", "989"],
+  AL: ["205", "251", "256", "334", "659", "938"],
+  AK: ["907"],
+  AR: ["479", "501", "870"],
+  HI: ["808"],
+  ID: ["208", "986"],
+  IN: ["219", "260", "317", "463", "574", "765", "812", "930"],
+  IA: ["319", "515", "563", "641", "712"],
+  KS: ["316", "620", "785", "913"],
+  KY: ["270", "364", "502", "606", "859"],
+  LA: ["225", "318", "337", "504", "985"],
+  ME: ["207"],
+  MN: ["218", "320", "507", "612", "651", "763", "952"],
+  MS: ["228", "601", "662", "769"],
+  MO: ["314", "417", "557", "573", "636", "660", "816"],
+  MT: ["406"],
+  NE: ["308", "402", "531"],
+  NV: ["702", "725", "775"],
+  NH: ["603"],
+  NM: ["505", "575"],
+  ND: ["701"],
+  OK: ["405", "539", "572", "580", "918"],
+  OR: ["458", "503", "541", "971"],
+  RI: ["401"],
+  SD: ["605"],
+  TN: ["423", "615", "629", "731", "865", "901", "931"],
+  UT: ["385", "435", "801"],
+  VT: ["802"],
+  WV: ["304", "681"],
+  WI: ["262", "274", "414", "534", "608", "715", "920"],
+  WY: ["307"],
 };
+
+const TOLL_FREE_AREA_CODES = new Set(["800", "833", "844", "855", "866", "877", "888"]);
 
 const AREA_TO_STATE: Record<string, string> = {};
 for (const [state, codes] of Object.entries(STATE_AREA_CODES)) {
@@ -175,36 +207,99 @@ export function emailChecks(facts: ApplicantFacts): CheckOutput[] {
 
 export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
   const digits = facts.phone.replace(/\D/g, "");
-  const area = digits.length >= 10 ? digits.slice(-10, -7) : "";
+  const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits.length >= 10 ? digits.slice(-10) : "";
+  const area = national.length === 10 ? national.slice(0, 3) : "";
   const state = facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
-  const expected = area ? AREA_TO_STATE[area] : "";
-  if (!area || !expected || !state) {
+  const base = { key: "phone-state", weight: 4, source: "Local area-code table", url: "" };
+  if (!area || !state) {
     return check({
-      key: "phone-state",
+      ...base,
       status: "INCONCLUSIVE",
-      weight: 4,
       finding: "Phone area code and state could not both be read, so this check is inconclusive.",
-      source: "Local area-code table",
-      url: "",
     });
   }
-  if (expected === state) {
+  if (TOLL_FREE_AREA_CODES.has(area)) {
     return check({
-      key: "phone-state",
-      status: "PASS",
-      weight: 4,
-      finding: `The area code ${area} fits ${state}.`,
-      source: "Local area-code table",
-      url: "",
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `The area code ${area} is toll-free, so it does not confirm ${state}. This is inconclusive, not a failure.`,
+    });
+  }
+  const expected = AREA_TO_STATE[area] || "";
+  if (!expected || expected !== state) {
+    const where = expected ? `It is used in ${expected}.` : "It is not in the US area-code table.";
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `The area code ${area} is outside the stated state ${state}. ${where} This is inconclusive, not a failure.`,
     });
   }
   return check({
-    key: "phone-state",
-    status: "INCONCLUSIVE",
-    weight: 4,
-    finding: `The area code ${area} usually maps to ${expected}, while the application says ${state}. This is inconclusive, not a failure. Look at the phone before you decide.`,
-    source: "Local area-code table",
-    url: "",
+    ...base,
+    status: "PASS",
+    finding: `The area code ${area} fits ${state}.`,
+  });
+}
+
+function isIpHost(host: string): boolean {
+  const bare = host.replace(/^\[|\]$/g, "");
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(bare)) return true;
+  return bare.includes(":");
+}
+
+export function rdapRegisteredAt(payload: string): Date | null {
+  try {
+    const parsed = JSON.parse(payload) as { events?: { eventAction?: string; eventDate?: string }[] };
+    const events = Array.isArray(parsed.events) ? parsed.events : [];
+    const registration = events.find((event) => /registration|registered/i.test(event.eventAction || ""));
+    if (!registration?.eventDate) return null;
+    const date = new Date(registration.eventDate);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+function youngerThanMonths(registeredAt: Date, months: number, now: Date): boolean {
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return registeredAt.getTime() > cutoff.getTime();
+}
+
+/** No row for an IP host. A domain younger than 12 months does not earn the points and does not corroborate. */
+export function assessRdap(
+  host: string,
+  http: { ok: boolean; status: number; text: string },
+  now = new Date(),
+): CheckOutput | null {
+  if (!host || isIpHost(host)) return null;
+  const url = `https://rdap.org/domain/${host}`;
+  const base = { key: "rdap", weight: 4, source: "RDAP", url };
+  if (!http.ok) {
+    const missing = http.status === 404;
+    return check({
+      ...base,
+      status: missing ? "INCONCLUSIVE" : "UNAVAILABLE",
+      corroborates: false,
+      finding: missing
+        ? `RDAP responded for ${host}. No data found for that domain.`
+        : `RDAP was blocked, timed out, or did not respond for ${host}. This source could not be checked.`,
+    });
+  }
+  const registered = rdapRegisteredAt(http.text);
+  if (registered && youngerThanMonths(registered, 12, now)) {
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      finding: `RDAP shows ${host} was registered within the last 12 months. A young domain is not corroboration.`,
+    });
+  }
+  return check({
+    ...base,
+    status: "PASS",
+    corroborates: false,
+    finding: `RDAP responded for ${host}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`,
   });
 }
 
@@ -335,7 +430,7 @@ export function linkedinFormatCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const ok = /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[a-z0-9\-_%]+(?:\/[a-z0-9\-_%]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
+  const ok = /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:in|company)\/[a-z0-9\-_%]+(?:\/[a-z0-9\-_%]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
   return check({
     key: "linkedin-format",
     status: ok ? "PASS" : "FAIL",
@@ -694,23 +789,10 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     host = "";
   }
   const rdapHost = host ? registrableHost(host) : "";
-  if (rdapHost && !FREE_PROVIDERS.has(rdapHost)) {
+  if (rdapHost && !FREE_PROVIDERS.has(rdapHost) && !isIpHost(rdapHost)) {
     const rdap = await pageText(fetchText, `https://rdap.org/domain/${rdapHost}`);
-    const rdapMissing = rdap.status === 404;
-    out.push(
-      check({
-        key: "rdap",
-        status: rdap.ok ? "PASS" : rdapMissing ? "INCONCLUSIVE" : "UNAVAILABLE",
-        weight: 4,
-        finding: rdap.ok
-          ? `RDAP responded for ${rdapHost}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`
-          : rdapMissing
-            ? `RDAP responded for ${rdapHost}. No data found for that domain.`
-            : `RDAP was blocked, timed out, or did not respond for ${rdapHost}. This source could not be checked.`,
-        source: "RDAP",
-        url: `https://rdap.org/domain/${rdapHost}`,
-      }),
-    );
+    const judged = assessRdap(rdapHost, rdap);
+    if (judged) out.push(judged);
   }
   out.push(...(await runPublicScreen(ctx.facts, fetchText)));
   if (/\bNY\b/i.test(ctx.facts.location || "")) {

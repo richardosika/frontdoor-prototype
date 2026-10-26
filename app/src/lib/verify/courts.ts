@@ -34,31 +34,28 @@ function companyIn(text: string, org: string): boolean {
   return normalizeName(text).includes(phrase);
 }
 
+function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weight"> & { url?: string }): Omit<CheckOutput, "ranAt"> {
+  const finding = partial.finding.includes("Not checkable for free.") ? partial.finding : `${partial.finding} Not checkable for free.`;
+  return { key: "courts", weight: 0, source: "CourtListener", url: partial.url || "", ...partial, finding };
+}
+
 export function assessCourts(
   payload: string,
   http: { ok: boolean; status: number },
   facts: ApplicantFacts,
 ): Omit<CheckOutput, "ranAt"> {
-  const base = {
-    key: "courts",
-    weight: 8,
-    source: "CourtListener",
-    url: "",
-  };
   if (http.status === 401 || http.status === 403 || http.status === 0 || !http.ok) {
-    return {
-      ...base,
+    return courtRow({
       status: "UNAVAILABLE",
       finding: "CourtListener was blocked, timed out, or did not respond. This source could not be checked.",
-    };
+    });
   }
   const results = courtResults(payload);
   if (!results) {
-    return {
-      ...base,
+    return courtRow({
       status: "INCONCLUSIVE",
       finding: "CourtListener responded, but the payload was not a result list. No keyword in that page was treated as a case.",
-    };
+    });
   }
   let nameHits = 0;
   let severeNearName = 0;
@@ -74,32 +71,27 @@ export function assessCourts(
     if (companyIn(blob, facts.org)) corroborated += 1;
   }
   if (corroborated > 0) {
-    return {
-      ...base,
+    return courtRow({
       status: "INCONCLUSIVE",
       reviewFlag: true,
       finding: `Possible match, needs review. ${corroborated} CourtListener result(s) name this person and company near a severe term. This is not a failure and not an automatic decline.`,
-    };
+    });
   }
   if (severeNearName > 0) {
-    return {
-      ...base,
+    return courtRow({
       status: "INCONCLUSIVE",
       finding: `Possible match, needs review. A result mentions the full name near a severe term, without the company. A keyword elsewhere in the list was ignored. ${results.length} opinion(s) came back.`,
-    };
+    });
   }
   if (nameHits > 0) {
-    return {
-      ...base,
+    return courtRow({
       status: "INCONCLUSIVE",
       finding: `CourtListener returned ${results.length} opinion(s). ${nameHits} mention the full name and none pair it with the company and a severe term.`,
-    };
+    });
   }
-  return {
-    ...base,
+  return courtRow({
     status: "PASS",
-    weight: 2,
     corroborates: false,
     finding: `No record found in CourtListener federal data (${results.length} opinion(s) came back). This is not a clearance of all litigation.`,
-  };
+  });
 }
