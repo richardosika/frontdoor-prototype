@@ -424,6 +424,11 @@ function scoreClause(check: CheckOutput): string {
   return score?.[0] || "";
 }
 
+/** YouTube, TikTok, and news count only when the person is named with the company or the city. */
+function socialScoreQualified(score: string): boolean {
+  return /Name: yes\./.test(score) && (/Company: yes\./.test(score) || /City: yes\./.test(score));
+}
+
 function failSentence(check: CheckOutput): string | null {
   if (check.status !== "FAIL") return null;
   const source = check.source || "the check";
@@ -501,6 +506,13 @@ function uncheckedSentence(check: CheckOutput): string | null {
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
+  }
+  if (check.key === "screen-youtube" || check.key === "screen-tiktok" || check.key === "screen-news") {
+    const score = scoreClause(check);
+    if (score && socialScoreQualified(score)) {
+      return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
+    }
+    return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
   }
   if (check.key.startsWith("screen-")) {
     const score = scoreClause(check);

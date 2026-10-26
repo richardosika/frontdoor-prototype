@@ -209,11 +209,13 @@ describe("public screening", () => {
     expect(site?.url).toContain("/en/about");
     expect(web?.corroborates).toBe(false);
     expect(web?.url || "").not.toContain("/en/about");
+    expect(youtube?.finding).toContain("no match found");
+    expect(youtube?.finding).toContain("Name: yes");
+    expect(youtube?.finding).toContain("Company: no");
     expect(youtube?.finding).toContain("Confidence: low");
-    expect(youtube?.finding).toContain("Rich Osika");
     expect(youtube?.finding.toLowerCase()).not.toContain("not found");
     expect(news?.status).toBe("INCONCLUSIVE");
-    expect(news?.finding.toLowerCase()).toContain("no result found");
+    expect(news?.finding.toLowerCase()).toContain("no match found");
     expect(x?.status).toBe("UNAVAILABLE");
     expect(x?.finding).toContain("Couldn't check for free");
     expect(x?.finding.toLowerCase()).not.toContain("not found");
@@ -248,8 +250,9 @@ describe("public screening", () => {
     expect(publicFinding("UNAVAILABLE", "LinkedIn blocked automated access. Couldn't check for free.")).not.toMatch(/not found/i);
 
     const grade = gradeChecks(checks, { applicantName: facts.name, org: facts.org, location: facts.location, website: "https://www.buildpro-cs.com" });
-    expect(grade.summary.couldNotCheck).toContain("YouTube returned a public result");
+    expect(grade.summary.couldNotCheck).toContain("YouTube: no match found");
     expect(grade.summary.couldNotCheck).toContain("Confidence: low");
+    expect(grade.summary.couldNotCheck).not.toContain("YouTube returned a public result");
     expect(grade.summary.couldNotCheck).toContain("Couldn't check for free");
     expect(grade.summary.checkedOut).toContain("A public web page included the person or the company name");
     expect(grade.summary.checkedOut).not.toContain("names both the person and the company");

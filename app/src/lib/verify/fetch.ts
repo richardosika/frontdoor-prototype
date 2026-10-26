@@ -1,10 +1,6 @@
 export const USER_AGENT = "PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)";
 
-/** Used once, only after a company website returns HTTP 403. Social hosts stay on USER_AGENT. */
-export const BROWSER_UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-
-/** Honest identifying agent for every host. Social sites that block it are not checkable for free. */
+/** Honest identifying agent for every host. Social sites that block it are not checkable for free. A 403 is not retried with a browser user agent. */
 export function userAgentFor(host: string): string {
   void host;
   return USER_AGENT;
@@ -155,7 +151,7 @@ export function classifyFetchError(error: unknown): FetchFailure {
 export async function politeFetch(
   url: string,
   timeoutMs = 8000,
-  options?: { maxChars?: number; userAgent?: string },
+  options?: { maxChars?: number },
 ): Promise<{ ok: boolean; status: number; text: string }> {
   const timeout = Math.max(timeoutMs, fetchLimits(url).timeoutMs);
   if (cacheable(url)) {
@@ -171,9 +167,9 @@ export async function politeFetch(
   return latest;
 }
 
-/** Check pipeline fetch. The optional second argument is a user agent, not a timeout. */
-export function fetchForChecks(url: string, init?: { userAgent?: string }): Promise<{ ok: boolean; status: number; text: string }> {
-  return politeFetch(url, 8000, { userAgent: init?.userAgent });
+/** Check pipeline fetch. A caller cannot substitute a browser user agent. */
+export function fetchForChecks(url: string): Promise<{ ok: boolean; status: number; text: string }> {
+  return politeFetch(url, 8000);
 }
 
 function retryable(result: { status: number; failure?: FetchFailure }): boolean {
@@ -184,7 +180,7 @@ function retryable(result: { status: number; failure?: FetchFailure }): boolean 
 async function fetchOnce(
   url: string,
   timeoutMs: number,
-  options?: { maxChars?: number; userAgent?: string },
+  options?: { maxChars?: number },
 ): Promise<{ ok: boolean; status: number; text: string; failure?: FetchFailure }> {
   let host = "";
   try {
@@ -205,7 +201,7 @@ async function fetchOnce(
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "user-agent": options?.userAgent || userAgentFor(host),
+        "user-agent": userAgentFor(host),
         accept: wiki
           ? "application/json"
           : news

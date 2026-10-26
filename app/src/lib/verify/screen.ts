@@ -1,4 +1,4 @@
-import { BROWSER_UA, classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
+import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
@@ -63,6 +63,24 @@ export function scorePublicText(text: string, facts: { name: string; org: string
 
 export function emptyScore(): MatchScore {
   return { name: false, company: false, city: false, confidence: "none" };
+}
+
+/** A YouTube, TikTok, or news hit counts only when the person is named with the company or the city. */
+export function socialMatch(score: MatchScore): boolean {
+  return Boolean(score.name && (score.company || score.city));
+}
+
+export function readableWordCount(text: string): number {
+  return text.split(/\s+/).filter((word) => /[A-Za-z]{3,}/.test(word)).length;
+}
+
+/** A JavaScript shell with nothing to read. A short real page is not this. */
+export function isScriptRenderedShell(raw: string, text: string): boolean {
+  const words = readableWordCount(text);
+  if (words >= 24) return false;
+  const marker = /enable javascript|__next_data__|id=["']__next["']|id=["']root["']|data-reactroot|ng-version|<app-root\b/i.test(raw);
+  if (marker) return true;
+  return words < 8 && /<script\b/i.test(raw);
 }
 
 /** A login wall or a bot challenge is a blocked source, not an empty result. */
@@ -300,10 +318,11 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
     };
   }
   if (attempt.outcome === "not-found") {
+    const lead = attempt.detail === "no match found" ? "no match found" : "No result found that names this person and this company.";
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
-      finding: `Searched: ${attempt.searched}. No result found that names this person and this company. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${lead} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   if (attempt.score.suffixMismatch) {
@@ -436,12 +455,6 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         homeUrl = alt;
       }
     }
-    if (home.status === 403) {
-      const retried = await pull(fetchText, homeUrl, { userAgent: BROWSER_UA });
-      if (retried.ok) {
-        home = retried;
-      }
-    }
     if (home.failure === "nxdomain") {
       attempts.push({
         key: "website",
@@ -455,15 +468,13 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
     } else if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
       const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 405 || home.status === 999;
-      attempts.push(
-        blockedAttempt(
-          "website",
-          "Company website",
-          website,
-          homeUrl,
-          blockedBySite ? "blocked by site, ask applicant for a team-page URL" : "The company website did not respond.",
-        ),
-      );
+      const detail =
+        home.status === 403
+          ? "blocked by site (403) — not checkable for free; ask applicant for a team-page URL"
+          : blockedBySite
+            ? "blocked by site, ask applicant for a team-page URL"
+            : "The company website did not respond.";
+      attempts.push(blockedAttempt("website", "Company website", website, homeUrl, detail));
     } else {
       pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
       const linked = sameOriginPages(home.text, homeUrl);
@@ -486,7 +497,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const best = pages
         .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
-      if (best && best.score.confidence !== "none") {
+      if (pages.length && pages.every((page) => isScriptRenderedShell(page.raw, page.text))) {
+        attempts.push(
+          blockedAttempt(
+            "website",
+            "Company website",
+            website,
+            homeUrl,
+            "site is script-rendered; nothing readable",
+          ),
+        );
+      } else if (best && best.score.confidence !== "none") {
         attempts.push({
           key: "website",
           platform: "Company website",
@@ -626,13 +647,14 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       let text = job.read(response.text);
       let url = job.url;
-      if (job.platform === "YouTube" && !job.fromSite && !scorePublicText(text, queryFacts).name) {
+      const needsNameAndPlace = job.platform === "YouTube" || job.platform === "TikTok";
+      if (job.platform === "YouTube" && !job.fromSite && !socialMatch(scorePublicText(text, queryFacts))) {
         const altName = alternatePersonNames(person).find((item) => item.toLowerCase() !== person.trim().toLowerCase());
         if (altName) {
           const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`"${altName}" ${distinctiveCompanyTokens(facts.org)[0] || facts.org}`)}`;
           const second = await pull(fetchText, altUrl);
           const extra = [...youtubeTitles(second.text), ...youtubeSnippets(second.text)];
-          if (!accessBlocked(second.status, second.text, altUrl) && extra.length && scorePublicText(extra.join("\n"), queryFacts).name) {
+          if (!accessBlocked(second.status, second.text, altUrl) && extra.length && socialMatch(scorePublicText(extra.join("\n"), queryFacts))) {
             text = [text, ...extra].filter(Boolean).join("\n");
             url = altUrl;
           }
@@ -642,7 +664,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         return blockedAttempt(job.key, job.platform, job.searched, job.url, "YouTube did not include readable video titles.");
       }
       const score = scorePublicText(text, queryFacts);
-      if (score.confidence === "none") {
+      const counts = needsNameAndPlace ? socialMatch(score) : score.confidence !== "none";
+      if (!counts) {
         return {
           key: job.key,
           platform: job.platform,
@@ -650,7 +673,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           url,
           outcome: "not-found" as const,
           score,
-          detail: `${job.platform} responded`,
+          detail: needsNameAndPlace ? "no match found" : `${job.platform} responded`,
         };
       }
       const ranked = text
@@ -698,7 +721,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .slice(1, 16);
     for (const title of titles) {
       const score = scorePublicText(title, queryFacts);
-      if (!score.name || !score.company) continue;
+      if (!socialMatch(score)) continue;
       if (!bestNews || rank(score) > rank(bestNews.score)) bestNews = { title, score, url: newsUrl };
     }
     if (bestNews?.score.confidence === "high") break;
@@ -731,7 +754,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       url: googleNewsUrl(newsQueries[0] || person),
       outcome: "not-found",
       score: emptyScore(),
-      detail: "Google News responded",
+      detail: "no match found",
     });
   }
 

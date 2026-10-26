@@ -6,7 +6,7 @@ import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { BROWSER_UA, classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
@@ -698,13 +698,16 @@ describe("blocked sites and search fallbacks", () => {
     );
     const website = blocked.find((check) => check.key === "website");
     expect(website?.status).toBe("UNAVAILABLE");
-    expect(website?.finding).toContain("blocked by site, ask applicant for a team-page URL");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.status).not.toBe("FAIL");
+    expect(website?.finding).toContain("blocked by site (403) — not checkable for free; ask applicant for a team-page URL");
     const silent = await runPublicScreen(
       facts({ website: "https://blackstone.example" }),
       async (url) => (url.includes("blackstone.example") ? { ok: false, status: 0, text: "" } : { ok: false, status: 403, text: "" }),
     );
     const quiet = silent.find((check) => check.key === "website");
     expect(quiet?.finding).toContain("The company website did not respond.");
+    expect(quiet?.finding).not.toContain("blocked by site (403)");
     expect(quiet?.finding).not.toContain("blocked by site, ask applicant for a team-page URL");
 
     const wiki = await runPublicScreen(
@@ -1315,8 +1318,8 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     expect(ampersand.reviewFlag).not.toBe(true);
   });
 
-  it("retries one company-website 403 with the browser user agent", async () => {
-    const agents: string[] = [];
+  it("leaves a company-website 403 unchecked and does not send a browser user agent", async () => {
+    const calls: string[] = [];
     const checks = await runPublicScreen(
       facts({
         name: "Dana Pellam",
@@ -1325,21 +1328,75 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
         website: "https://bramblewick-group.example",
         location: "Hackensack, NJ",
       }),
-      async (url, init) => {
-        agents.push(init?.userAgent || "default");
-        if (url.startsWith("https://bramblewick-group.example") && init?.userAgent === BROWSER_UA) {
-          return { ok: true, status: 200, text: "<html><p>Dana Pellam leads Bramblewick Group in Hackensack.</p></html>" };
-        }
+      async (url) => {
+        calls.push(url);
         if (url.startsWith("https://bramblewick-group.example")) return { ok: false, status: 403, text: "" };
         return { ok: false, status: 404, text: "" };
       },
     );
-    expect(agents.filter((agent) => agent === BROWSER_UA)).toHaveLength(1);
-    expect(userAgentFor("bramblewick-group.example")).toBe(USER_AGENT);
-    expect(userAgentFor("www.linkedin.com").toLowerCase()).not.toContain("chrome");
+    expect(calls.filter((url) => url.startsWith("https://bramblewick-group.example"))).toHaveLength(1);
+    for (const host of ["bramblewick-group.example", "www.linkedin.com", "x.com", "www.facebook.com", "www.instagram.com", "www.youtube.com", "www.tiktok.com"]) {
+      expect(userAgentFor(host)).toBe(USER_AGENT);
+      expect(userAgentFor(host).toLowerCase()).not.toContain("chrome");
+    }
     const website = checks.find((check) => check.key === "website");
-    expect(website?.status).toBe("PASS");
-    expect(website?.finding).toContain("Name: yes");
+    expect(website?.status).toBe("UNAVAILABLE");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.status).not.toBe("FAIL");
+    expect(website?.finding).toContain("blocked by site (403) — not checkable for free; ask applicant for a team-page URL");
+  });
+
+  it("treats a script-rendered company site as not checkable", async () => {
+    const shell = `<html><head><script>window.__NEXT_DATA__={}</script></head><body><div id="__next"></div></body></html>`;
+    const blocked = await runPublicScreen(
+      facts({ name: "Gary Barnett", applicantName: "Gary Barnett", org: "Extell", website: "https://extell.example", location: "New York, NY" }),
+      async (url) => (url.includes("extell.example") ? { ok: true, status: 200, text: shell } : { ok: false, status: 404, text: "" }),
+    );
+    const website = blocked.find((check) => check.key === "website");
+    expect(website?.status).toBe("UNAVAILABLE");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.status).not.toBe("FAIL");
+    expect(website?.finding).toContain("site is script-rendered; nothing readable");
+    expect(website?.finding.toLowerCase()).not.toContain("person not found");
+    expect(website?.finding).not.toContain("No result found");
+
+    const readable = await runPublicScreen(
+      facts({ name: "Gary Barnett", applicantName: "Gary Barnett", org: "Extell", website: "https://extell.example", location: "New York, NY" }),
+      async (url) => {
+        if (url.includes("/team")) return { ok: true, status: 200, text: "<html><p>Gary Barnett leads Extell in New York.</p></html>" };
+        if (url.includes("extell.example")) return { ok: true, status: 200, text: shell };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const team = readable.find((check) => check.key === "website");
+    expect(team?.finding).not.toContain("site is script-rendered");
+    expect(team?.finding).toContain("Name: yes");
+  });
+
+  it("searches Related Companies with and without the QA-TEST prefix", () => {
+    const page = "Related Companies is based at 30 Hudson Yards in New York.";
+    const prefixed = factsForSearch(
+      facts({
+        name: "Jeff Blau",
+        applicantName: "Jeff Blau",
+        email: "qa-test-related-1793031299@privatefloorclub.com",
+        org: "QA-TEST Related Companies",
+        location: "30 Hudson Yards, New York, NY 10001",
+      }),
+    );
+    expect(prefixed.org).toBe("Related Companies");
+    expect(prefixed.applicantName).toBe("Jeff Blau");
+    expect(mentionsCompany(page, prefixed.org)).toBe(true);
+    const kept = facts({
+      name: "Jeff Blau",
+      applicantName: "Jeff Blau",
+      email: "person@gmail.com",
+      org: "QA-TEST Related Companies",
+      location: "30 Hudson Yards, New York, NY 10001",
+    });
+    expect(factsForSearch(kept).org).toBe("QA-TEST Related Companies");
+    expect(mentionsCompany(page, kept.org)).toBe(false);
+    expect(mentionsCompany(page, "Related Companies")).toBe(true);
   });
 
   it("keeps CBRE off Unum and keeps fake B2F01 and B3F01 off C", async () => {
