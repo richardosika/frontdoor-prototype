@@ -471,6 +471,9 @@ function failSentence(check: CheckOutput): string | null {
   if ((check.key === "website" || check.key === "rdap") && /domain does not resolve/i.test(check.finding)) {
     return `domain does not resolve (${source}).`;
   }
+  if (check.key === "rdap" && /not registered/i.test(check.finding)) {
+    return `This domain is not registered (${source}).`;
+  }
   if (check.key === "rdap" && /did not check out/i.test(check.finding)) {
     return `did not check out (${source}).`;
   }
@@ -688,9 +691,11 @@ function phoneAward(row: CheckOutput | undefined, possible: number): Line {
   return award(passed(row), possible, "The phone area code fits the state", "The phone area code was not confirmed against the state");
 }
 
-function rdapAward(row: CheckOutput | undefined, possible: number): Line {
+function rdapAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
   if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "FAIL" && /not registered/i.test(row.finding)) return portionLine(0, possible, "domain is not registered");
   if (row?.status === "FAIL" && /did not check out/i.test(row.finding)) return portionLine(0, possible, "did not check out");
+  if (row?.status === "UNAVAILABLE" && /couldn't check for free/i.test(row.finding)) return unavailableLine(possible, "RDAP couldn't check for free", mode);
   return award(passed(row), possible, "A domain record responded", "No domain record was confirmed");
 }
 
@@ -762,7 +767,7 @@ export function gradeChecks(
     websiteAward(checks, weights.company.website, weightsMode),
     award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
     award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
-    rdapAward(findCheck(checks, "rdap"), weights.company.rdap),
+    rdapAward(findCheck(checks, "rdap"), weights.company.rdap, weightsMode),
     registryAward(findCheck(checks, "business-registry"), weights.company["business-registry"], weightsMode),
   ]);
   const footprint = sumLines([

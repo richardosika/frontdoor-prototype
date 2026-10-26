@@ -271,6 +271,13 @@ function youngerThanMonths(registeredAt: Date, months: number, now: Date): boole
   return registeredAt.getTime() > cutoff.getTime();
 }
 
+/** .us has no RDAP service. A bootstrap reply that names no server is the same gap. */
+export function rdapServiceMissing(host: string, text: string): boolean {
+  const tld = host.split(".").filter(Boolean).pop()?.toLowerCase() || "";
+  if (tld === "us") return true;
+  return /no rdap servers|no rdap service|unsupported tld|rdap servers? (?:were|was)? not found/i.test(text.slice(0, 800));
+}
+
 /** No row for an IP host. A reserved or example name does not earn points. A domain younger than 12 months does not corroborate. */
 export function assessRdap(
   host: string,
@@ -290,15 +297,37 @@ export function assessRdap(
     });
   }
   if (!http.ok) {
-    const dead = http.status === 404 || http.failure === "nxdomain";
+    if (rdapServiceMissing(host, http.text) && http.failure !== "nxdomain") {
+      return check({
+        ...base,
+        status: "UNAVAILABLE",
+        corroborates: false,
+        finding: `RDAP couldn't check for free. ${host} uses a TLD with no RDAP service.`,
+      });
+    }
+    if (http.failure === "nxdomain") {
+      return check({
+        ...base,
+        status: "FAIL",
+        reviewFlag: true,
+        corroborates: false,
+        finding: `RDAP has no record for ${host}. domain does not resolve.`,
+      });
+    }
+    if (http.status === 404) {
+      return check({
+        ...base,
+        status: "FAIL",
+        reviewFlag: true,
+        corroborates: false,
+        finding: `RDAP has no registration for ${host}. This domain is not registered. This counts against the company.`,
+      });
+    }
     return check({
       ...base,
-      status: dead ? "FAIL" : "UNAVAILABLE",
-      reviewFlag: dead ? true : undefined,
+      status: "UNAVAILABLE",
       corroborates: false,
-      finding: dead
-        ? `RDAP has no record for ${host}. domain does not resolve.`
-        : `RDAP was blocked, timed out, or did not respond for ${host}. This source could not be checked.`,
+      finding: `RDAP was blocked, timed out, or did not respond for ${host}. This source could not be checked.`,
     });
   }
   const registered = rdapRegisteredAt(http.text);
