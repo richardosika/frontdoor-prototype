@@ -10,19 +10,77 @@ import { renderTemplate, repairDoubledTerminalPeriod, templateDef } from "@/lib/
 import { paymentReceiptText } from "@/lib/payment-record";
 import { noticeHtml } from "@/lib/resend-mail";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
+import { publicAbsoluteUrl } from "@/lib/public-origin";
+import { payPageState } from "@/lib/dues";
+import { guidedGradeApplicant } from "@/lib/guided-prefill-db";
+import { emptyPrefillFacts } from "@/lib/guided-prefill";
 import { reviewCopy } from "@/lib/review-copy";
 import { isSignedInJoinEntry } from "@/lib/session-gate";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+const ROOT = path.resolve(__dirname, "../src");
+
 describe("QA fixes that stay outside grading", () => {
   it("keeps an internal note off the applicant-facing strings and rewords referral copy", () => {
-    const source = "No invite code was stored on this file. Invite source came back without a usable match (none). They came in through invite ABC. No invite source was confirmed (0 of 4).";
-    const shown = reviewCopy(source);
+    const source = "No invite code was stored on this file. An invite code is on the file (PF-1). Invite source came back without a usable match (none). They came in through invite ABC. No invite source was confirmed (0 of 4). Ada applied as a Developer at Build Co.";
+    const shown = reviewCopy(source, "GENERAL_CONTRACTOR");
     expect(shown).toContain("No referral code was stored on this request.");
+    expect(shown).toContain("A referral code is on the file");
+    expect(shown).not.toContain("An invite code is on the file");
     expect(shown).toContain("The request source came back without a usable match");
     expect(shown).toContain("They came in through referral ABC.");
     expect(shown).toContain("No invite source was confirmed (0 of 4).");
+    expect(shown).toContain("applied as a General Contractor");
+    expect(shown).not.toContain("applied as a Developer");
+    expect(reviewCopy("Ada applied as a Developer at Build Co.", "DEVELOPER")).toContain("applied as a Developer");
+  });
+
+  it("builds status and pay redirects from the public origin", () => {
+    const forwarded = new Headers({
+      host: "0.0.0.0:10000",
+      "x-forwarded-host": "cornicio-mvp.onrender.com",
+      "x-forwarded-proto": "https",
+    });
+    const location = publicAbsoluteUrl("/pay/view/token", forwarded, {});
+    expect(location).toBe("https://cornicio-mvp.onrender.com/pay/view/token");
+    expect(location).not.toContain("0.0.0.0");
+    expect(publicAbsoluteUrl("/apply/status/view/abc", new Headers({ host: "0.0.0.0:10000" }), { APP_URL: "https://cornicio-mvp.onrender.com" })).toBe(
+      "https://cornicio-mvp.onrender.com/apply/status/view/abc",
+    );
+    expect(
+      publicAbsoluteUrl("/request-status/view/abc", new Headers({ host: "0.0.0.0:10000" }), { NEXTAUTH_URL: "https://cornicio-mvp.onrender.com/" }),
+    ).toBe("https://cornicio-mvp.onrender.com/request-status/view/abc");
+    for (const file of ["app/pay/[token]/route.ts", "app/apply/status/[token]/route.ts", "app/request-status/[token]/route.ts", "middleware.ts"]) {
+      const route = readFileSync(path.join(ROOT, file), "utf8");
+      expect(route).toContain("publicAbsoluteUrl");
+      expect(route).not.toContain("request.url");
+      expect(route).not.toMatch(/new URL\([^)]*(?:request\.url|req\.nextUrl)/);
+    }
+  });
+
+  it("shows only the active membership after payment and keeps the real role on a request", () => {
+    expect(payPageState("PAID")).toBe("active");
+    expect(payPageState("DUE")).toBe("due");
+    const pay = readFileSync(path.join(ROOT, "components/pay-dues.tsx"), "utf8");
+    expect(pay).toContain('payPageState(status) === "active"');
+    expect(pay).toContain("This membership is active");
+    const payments = readFileSync(path.join(ROOT, "app/(app)/admin/payments/page.tsx"), "utf8");
+    expect(payments).toContain("First month");
+    expect(payments).toContain("firstMonthCents");
+    const decision = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
+    expect(decision).not.toContain("window.confirm");
+    expect(decision).toContain("Approval was not recorded. Nothing was sent.");
+    expect(decision).toContain('role="dialog"');
+    const applicant = guidedGradeApplicant(emptyPrefillFacts({ name: "Ada", org: "Build Co" }), { role: "GENERAL_CONTRACTOR" });
+    expect(applicant.role).toBe("GENERAL_CONTRACTOR");
+    const removal = readFileSync(path.join(ROOT, "lib/remove-member.ts"), "utf8");
+    expect(removal).toContain("application.deleteMany");
+    expect(removal).toContain("crmPerson.deleteMany");
+    const requestDelete = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
+    expect(requestDelete).toContain("verificationCase.deleteMany");
+    expect(requestDelete).toContain("outboxNotice.deleteMany");
+    expect(requestDelete).toContain("crmPerson.deleteMany");
   });
 
   it("opens CourtListener on the public search page", () => {

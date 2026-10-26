@@ -36,13 +36,16 @@ type AssetEnv = {
   NEXT_PUBLIC_APP_URL?: string;
   RENDER_EXTERNAL_URL?: string;
   AUTH_URL?: string;
+  NEXTAUTH_URL?: string;
 };
 
 export function emailLogoUrl(env: AssetEnv = process.env as AssetEnv): string {
   const origin = resolvePublicBase({
     appUrl: env.APP_URL,
     nextPublicAppUrl: env.NEXT_PUBLIC_APP_URL,
-    renderExternalUrl: env.RENDER_EXTERNAL_URL || env.AUTH_URL,
+    renderExternalUrl: env.RENDER_EXTERNAL_URL,
+    authUrl: env.AUTH_URL,
+    nextAuthUrl: env.NEXTAUTH_URL,
   }).replace(/\/$/, "");
   return `${origin}/email-assets/lockup.png`;
 }

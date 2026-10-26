@@ -5,7 +5,7 @@ import { DuesLanguages } from "@/components/dues-languages";
 import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { DUES_BILLING_NOTE, DUES_WAIVED, firstMonthCents, formatMoney } from "@/lib/dues";
+import { DUES_BILLING_NOTE, DUES_WAIVED, firstMonthCents, formatMoney, payPageState } from "@/lib/dues";
 import { formatEtDate } from "@/lib/format";
 import { DUES_COVERS, paymentRenewalLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
@@ -35,13 +35,45 @@ export function PayDues({
   error?: string;
   notice?: string;
 }) {
-  const open = status === "PAID" || status === "WAIVED" || status === "NOT_REQUIRED";
+  const active = payPageState(status) === "active";
   const first = firstMonthCents(cents);
   const full = formatMoney(cents);
   return (
     <main className="min-h-dvh bg-cream text-forest md:flex md:items-center md:justify-center md:px-4 md:py-10">
       <article className="mx-auto w-full max-w-lg bg-paper px-6 py-8 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.28)]">
         <Logo />
+        {active ? (
+          <>
+            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership</p>
+            <h1 className="mt-1 font-serif text-3xl font-normal">This membership is active</h1>
+            <p className="mt-2 text-sm text-ink">
+              {name} · {roleLabel(role)}
+            </p>
+            {error ? <p className="mt-3 text-sm text-brass">{error}</p> : null}
+            {notice ? <p className="mt-3 text-sm text-forest">{notice}</p> : null}
+            <p className="mt-4 text-sm text-forest">
+              This membership is active{renewalAt ? `. Next charge date ${formatEtDate(renewalAt)}` : ""}.
+              {status === "WAIVED" ? ` ${DUES_WAIVED}` : ""}
+            </p>
+            {cancelled ? (
+              <p className="mt-2 text-sm text-forest">
+                Cancellation is recorded.
+                {renewalAt && status === "PAID" ? ` Access continues through ${formatEtDate(renewalAt)}.` : " Nothing further is scheduled."}
+              </p>
+            ) : null}
+            <Link href={signedIn ? "/feed" : "/login"} className={`${btn} mt-4`}>
+              {signedIn ? "Open the floor" : "Sign in"}
+            </Link>
+            {signedIn ? (
+              <form action={logoutAction} className="mt-6">
+                <button className="text-sm underline decoration-brass" type="submit">
+                  Sign out
+                </button>
+              </form>
+            ) : null}
+          </>
+        ) : (
+          <>
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership dues</p>
         <h1 className="mt-1 font-serif text-3xl font-normal">Pay membership dues</h1>
         <p className="mt-3 rounded border border-[#7A2E2E] bg-brass-soft px-3 py-2 text-sm font-semibold text-forest" role="status">
@@ -94,14 +126,7 @@ export function PayDues({
             Stripe test mode. The first invoice is 50% off. No live charge. {BRAND.name} does not store your card number.
           </p>
         )}
-        {open ? (
-          <div className="mt-4 text-sm">
-            <p>This membership is active{renewalAt ? `. Next charge date ${formatEtDate(renewalAt)}` : ""}.</p>
-            <Link href={signedIn ? "/feed" : "/login"} className={`${btn} mt-3`}>
-              {signedIn ? "Open the floor" : "Sign in"}
-            </Link>
-          </div>
-        ) : mode === "stripe" ? (
+        {mode === "stripe" ? (
           <form action={startStripeCheckout} className="mt-4">
             <input type="hidden" name="token" value={token} />
             <button className={btn} type="submit">
@@ -140,6 +165,8 @@ export function PayDues({
             </button>
           </form>
         ) : null}
+          </>
+        )}
       </article>
     </main>
   );

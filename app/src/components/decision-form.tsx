@@ -1,9 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+
+function ConfirmModal({
+  title,
+  body,
+  confirmLabel,
+  error,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  error: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-forest/50 p-4 sm:items-center">
+      <div role="dialog" aria-modal="true" aria-labelledby="decision-confirm-title" className="w-full max-w-md rounded border border-line bg-paper p-4 shadow-[0_30px_80px_rgba(0,0,0,.28)]">
+        <h2 id="decision-confirm-title" className="font-serif text-2xl font-normal text-forest">
+          {title}
+        </h2>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">{body}</p>
+        {error ? (
+          <p className="mt-3 text-sm text-brass" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+          <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function DecisionForm({
   applicationId,
@@ -22,13 +62,69 @@ export function DecisionForm({
   strongWarning?: boolean;
   warningText?: string;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const allowSubmit = useRef(false);
   const [error, setError] = useState("");
+  const [result, setResult] = useState("");
+  const [modalError, setModalError] = useState("");
+  const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
+
+  function approveBody() {
+    const dues = paying
+      ? "Approve this person? The membership-dues link goes out only after you approve."
+      : "Approve this person? This role can sign in right away.";
+    const warning = notLegit ? ` ${confirmLabel}` : "";
+    const second = strongWarning ? `\n\n${warningText || "Approve this file despite the grade?"}` : "";
+    return `${dues}${warning}${second}`;
+  }
+
+  function cancelPending() {
+    const decision = pending;
+    setPending(null);
+    setModalError("");
+    setResult(
+      decision === "DECLINED"
+        ? "Decline was not recorded. Nothing was sent."
+        : "Approval was not recorded. Nothing was sent.",
+    );
+  }
+
+  function confirmPending() {
+    const form = formRef.current;
+    if (!form || !pending) return;
+    if (pending === "APPROVED" && strongWarning) {
+      const box = form.querySelector('input[name="acknowledgeGrade"]');
+      if (!(box instanceof HTMLInputElement) || !box.checked) {
+        setModalError("Check the box to confirm this approval. Approval was not sent.");
+        return;
+      }
+      const strong = form.querySelector('input[name="confirmStrong"]');
+      if (strong instanceof HTMLInputElement) strong.value = "yes";
+    }
+    if (pending === "APPROVED" && (notLegit || strongWarning)) {
+      const input = form.querySelector('input[name="confirmNotLegit"]');
+      if (input instanceof HTMLInputElement) input.value = "yes";
+    }
+    const button = form.querySelector(`button[value="${pending}"]`);
+    setPending(null);
+    setModalError("");
+    setResult("");
+    allowSubmit.current = true;
+    if (button instanceof HTMLButtonElement) form.requestSubmit(button);
+  }
+
   return (
     <form
+      ref={formRef}
       action={reviewApplication}
       className="mt-3 space-y-2"
       onSubmit={(event) => {
+        if (allowSubmit.current) {
+          allowSubmit.current = false;
+          return;
+        }
         setError("");
+        setResult("");
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
         const message = String(new FormData(event.currentTarget).get("applicantMessage") || "").trim();
@@ -37,39 +133,10 @@ export function DecisionForm({
           setError("Write the message the applicant should see.");
           return;
         }
-        if (decision === "APPROVED") {
-          const dues = paying
-            ? "Approve this person? The membership-dues link goes out only after you approve."
-            : "Approve this person? This role can sign in right away.";
-          const warning = notLegit ? ` ${confirmLabel}` : "";
-          const confirmed = window.confirm(`${dues}${warning}`);
-          if (!confirmed) {
-            event.preventDefault();
-            return;
-          }
-          if (strongWarning) {
-            const box = event.currentTarget.querySelector('input[name="acknowledgeGrade"]');
-            if (box instanceof HTMLInputElement && !box.checked) {
-              event.preventDefault();
-              setError("Check the box to confirm this approval.");
-              return;
-            }
-            const second = window.confirm(warningText || "Approve this file despite the grade?");
-            if (!second) {
-              event.preventDefault();
-              return;
-            }
-            const strong = event.currentTarget.querySelector('input[name="confirmStrong"]');
-            if (strong instanceof HTMLInputElement) strong.value = "yes";
-          }
-          if (notLegit || strongWarning) {
-            const input = event.currentTarget.querySelector('input[name="confirmNotLegit"]');
-            if (input instanceof HTMLInputElement) input.value = "yes";
-          }
-        }
-        if (decision === "DECLINED") {
-          const confirmed = window.confirm("Decline this application? A short notice goes out. The applicant does not see your reason.");
-          if (!confirmed) event.preventDefault();
+        if (decision === "APPROVED" || decision === "DECLINED") {
+          event.preventDefault();
+          setModalError("");
+          setPending(decision);
         }
       }}
     >
@@ -79,6 +146,11 @@ export function DecisionForm({
       <input type="hidden" name="confirmNotLegit" value="" />
       <input type="hidden" name="confirmStrong" value="" />
       {error ? <p className="text-sm text-brass">{error}</p> : null}
+      {result ? (
+        <p className="text-sm text-forest" role="status">
+          {result}
+        </p>
+      ) : null}
       {strongWarning ? (
         <div className="rounded border border-[#7A2E2E] bg-cream p-3 text-sm text-[#7A2E2E]" role="alert">
           <p className="font-semibold">This file is not a clean approval.</p>
@@ -112,27 +184,51 @@ export function DecisionForm({
           Decline
         </button>
       </div>
+      {pending ? (
+        <ConfirmModal
+          title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
+          body={
+            pending === "APPROVED"
+              ? approveBody()
+              : "Decline this application? A short notice goes out. The applicant does not see your reason."
+          }
+          confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
+          error={modalError}
+          onConfirm={confirmPending}
+          onCancel={cancelPending}
+        />
+      ) : null}
     </form>
   );
 }
 
 export function RevokeApprovalForm({ applicationId, caseId }: { applicationId: string; caseId?: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const allowSubmit = useRef(false);
   const [error, setError] = useState("");
+  const [result, setResult] = useState("");
+  const [open, setOpen] = useState(false);
   return (
     <form
+      ref={formRef}
       action={revokeApproval}
       className="mt-4 space-y-2 rounded border border-[#7A2E2E] p-3"
       onSubmit={(event) => {
+        if (allowSubmit.current) {
+          allowSubmit.current = false;
+          return;
+        }
         const reason = String(new FormData(event.currentTarget).get("reason") || "").trim();
         if (reason.length < 2) {
           event.preventDefault();
           setError("Write the reason for revoking approval.");
+          setResult("");
           return;
         }
-        const confirmed = window.confirm(
-          "Revoke this approval? The pay link stops working. Membership access ends when it is unpaid and still active. The reason is written to the audit log and is not emailed.",
-        );
-        if (!confirmed) event.preventDefault();
+        event.preventDefault();
+        setError("");
+        setResult("");
+        setOpen(true);
       }}
     >
       <input type="hidden" name="applicationId" value={applicationId} />
@@ -140,34 +236,68 @@ export function RevokeApprovalForm({ applicationId, caseId }: { applicationId: s
       <p className="text-sm font-semibold text-[#7A2E2E]">Revoke approval</p>
       <p className="text-sm text-ink">The pay link is deactivated. An unpaid active membership loses access. Delete stays available below.</p>
       {error ? <p className="text-sm text-brass">{error}</p> : null}
+      {result ? (
+        <p className="text-sm text-forest" role="status">
+          {result}
+        </p>
+      ) : null}
       <label className={labelCls}>Reason</label>
       <textarea name="reason" className={field} rows={3} placeholder="Private. Logged on this file. Not shown to the applicant." />
       <button className={`${btnOutline} min-h-12 w-full border-[#7A2E2E] text-[#7A2E2E] sm:w-auto`} type="submit">
         Revoke approval
       </button>
+      {open ? (
+        <ConfirmModal
+          title="Confirm revoke"
+          body="Revoke this approval? The pay link stops working. Membership access ends when it is unpaid and still active. The reason is written to the audit log and is not emailed."
+          confirmLabel="Revoke approval"
+          error=""
+          onConfirm={() => {
+            setOpen(false);
+            setResult("");
+            allowSubmit.current = true;
+            formRef.current?.requestSubmit();
+          }}
+          onCancel={() => {
+            setOpen(false);
+            setResult("Revoke was not recorded. The approval is unchanged.");
+          }}
+        />
+      ) : null}
     </form>
   );
 }
 
 export function InviteDecisionForm({ caseId }: { caseId: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const allowSubmit = useRef(false);
+  const [result, setResult] = useState("");
+  const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
   return (
     <form
+      ref={formRef}
       action={decideInviteReview}
       className="mt-3 space-y-2"
       onSubmit={(event) => {
+        if (allowSubmit.current) {
+          allowSubmit.current = false;
+          return;
+        }
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
-        if (decision === "APPROVED") {
-          const confirmed = window.confirm("Approve this request to join? A referral code goes out, and this file is marked Verified.");
-          if (!confirmed) event.preventDefault();
-        }
-        if (decision === "DECLINED") {
-          const confirmed = window.confirm("Decline this request to join? This file is marked Rejected.");
-          if (!confirmed) event.preventDefault();
+        if (decision === "APPROVED" || decision === "DECLINED") {
+          event.preventDefault();
+          setResult("");
+          setPending(decision);
         }
       }}
     >
       <input type="hidden" name="caseId" value={caseId} />
+      {result ? (
+        <p className="text-sm text-forest" role="status">
+          {result}
+        </p>
+      ) : null}
       <label className={labelCls}>Internal note</label>
       <textarea name="note" className={field} rows={3} placeholder="Private. Shown on this file. Not emailed." />
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -181,6 +311,35 @@ export function InviteDecisionForm({ caseId }: { caseId: string }) {
           Decline
         </button>
       </div>
+      {pending ? (
+        <ConfirmModal
+          title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
+          body={
+            pending === "APPROVED"
+              ? "Approve this request to join? A referral code goes out, and this file is marked Verified."
+              : "Decline this request to join? This file is marked Rejected."
+          }
+          confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
+          error=""
+          onConfirm={() => {
+            const decision = pending;
+            setPending(null);
+            setResult("");
+            allowSubmit.current = true;
+            const button = formRef.current?.querySelector(`button[value="${decision}"]`);
+            if (button instanceof HTMLButtonElement) formRef.current?.requestSubmit(button);
+          }}
+          onCancel={() => {
+            const decision = pending;
+            setPending(null);
+            setResult(
+              decision === "DECLINED"
+                ? "Decline was not recorded. Nothing was sent."
+                : "Approval was not recorded. Nothing was sent.",
+            );
+          }}
+        />
+      ) : null}
     </form>
   );
 }

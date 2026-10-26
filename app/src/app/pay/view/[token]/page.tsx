@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/current-user";
 import { currentMonthlyCents } from "@/lib/dues";
 import { checkoutModeForRole } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function PayTokenPage({
   const { token } = await params;
   const query = await searchParams;
   const member = await prisma.user.findUnique({ where: { paymentToken: token } });
-  if (!member || member.status !== "ACTIVE") redirect(`/pay/${encodeURIComponent(token)}`);
+  if (!member || member.status !== "ACTIVE") redirect(`${await appBaseUrl()}/pay/${encodeURIComponent(token)}`);
   const viewer = await currentUser();
   if (viewer && viewer.id !== member.id) {
     return (

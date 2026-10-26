@@ -17,7 +17,21 @@ export async function deleteMemberAccount(userId: string): Promise<boolean> {
     await tx.dealEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
     await tx.moderationEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
     await tx.businessCard.updateMany({ where: { userId }, data: { userId: null } });
-    await tx.crmPerson.deleteMany({ where: { OR: [{ userId }, { email: user.email }] } });
+    const applications = await tx.application.findMany({
+      where: { OR: [{ userId }, { email: user.email }] },
+      select: { id: true },
+    });
+    const applicationIds = applications.map((row) => row.id);
+    await tx.crmPerson.deleteMany({
+      where: {
+        OR: [{ userId }, { email: user.email }, ...(applicationIds.length ? [{ applicationId: { in: applicationIds } }] : [])],
+      },
+    });
+    if (applicationIds.length) {
+      await tx.verificationCase.deleteMany({ where: { applicationId: { in: applicationIds } } });
+      await tx.outboxNotice.deleteMany({ where: { applicationId: { in: applicationIds } } });
+      await tx.application.deleteMany({ where: { id: { in: applicationIds } } });
+    }
     await tx.dealMessage.deleteMany({ where: { authorId: userId } });
     await tx.dealDocument.deleteMany({ where: { authorId: userId } });
     await tx.message.deleteMany({ where: { senderId: userId } });

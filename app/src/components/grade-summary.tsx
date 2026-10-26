@@ -40,7 +40,7 @@ export function RecommendationChip({ recommendation }: { recommendation: string 
   );
 }
 
-export function ExecutiveSummary({ report, title = "Executive summary" }: { report: GradeReport; title?: string }) {
+export function ExecutiveSummary({ report, title = "Executive summary", role }: { report: GradeReport; title?: string; role?: string | null }) {
   const rubric = rubricSections();
   return (
     <section className={`${card} mt-4 p-4 md:p-6`}>
@@ -66,7 +66,7 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
         </div>
       ) : null}
       <div className="mt-5 space-y-4 text-sm leading-relaxed text-ink">
-        <SummaryBlock title="Applicant" body={reviewCopy(report.summary.applicant)} />
+        <SummaryBlock title="Applicant" body={reviewCopy(report.summary.applicant, role)} />
         <SummaryBlock title="Company" body={reviewCopy(report.summary.company)} />
         <SummaryBlock title="What checked out" body={reviewCopy(report.summary.checkedOut)} />
         <SummaryBlock title="What did not check out" body={reviewCopy(report.summary.didNotCheckOut)} />

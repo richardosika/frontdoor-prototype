@@ -112,7 +112,7 @@ export default async function ApplicationDetailPage({
           <span className="text-xs uppercase tracking-wide text-mut">{applicationStatusLabel(application.status)}</span>
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
-        {shownGrade ? <ExecutiveSummary report={shownGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
+        {shownGrade ? <ExecutiveSummary report={shownGrade} role={application.role} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
         <div className="mt-4">
           <Link href={`/admin/verification/${reviewCase.id}?step=${progress.current}`} className={`${btn} inline-flex min-h-11 items-center`}>
             Open the review
@@ -209,7 +209,7 @@ export default async function ApplicationDetailPage({
         <details className={`${card} mt-4 p-4`}>
           <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
           <CheckSection title="Application checks" run={report} />
-          {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" /> : null}
+          {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" role={application.role} /> : null}
           <CheckSection title="Company checks" run={company} />
         </details>
         <div className="mt-4">

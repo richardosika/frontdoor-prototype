@@ -7,6 +7,7 @@ import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-stat
 import { BRAND } from "@/lib/brand";
 import { applicantDuesSentence, monthlyDuesCents } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
     where: { statusToken: token },
     select: { name: true, status: true, role: true },
   });
-  if (!request) redirect(`/request-status/${encodeURIComponent(token)}`);
+  if (!request) redirect(`${await appBaseUrl()}/request-status/${encodeURIComponent(token)}`);
   const pending = request.status === "PENDING";
   const status = request.status === "DECLINED" ? "DECLINED" : "IN_REVIEW";
   const copy = pending ? memberStatusCopy("IN_REVIEW") : INVITE_STATUS_COPY[request.status];

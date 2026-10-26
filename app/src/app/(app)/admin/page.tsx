@@ -276,7 +276,7 @@ export default async function AdminPage({
                 <ConfirmSubmitButton
                   form={`delete-request-${request.id}`}
                   className={btnOutline}
-                  message={`Delete the request to join for ${request.name}? The CRM person stays.`}
+                  message={`Delete the request to join for ${request.name}? This also deletes the CRM person, the verification file, and the outbox notices for this request.`}
                 >
                   Delete request
                 </ConfirmSubmitButton>

@@ -19,6 +19,7 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
 import { sendNotice } from "@/lib/notices";
 import { notifyAdmins } from "@/lib/notify";
+import { reviewCopy } from "@/lib/review-copy";
 import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import { needsStrongApprovalWarning } from "@/lib/approval-warning";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
@@ -310,11 +311,11 @@ export async function reviewApplication(formData: FormData) {
 }
 
 async function tellRichard(
-  application: { id: string; name: string },
+  application: { id: string; name: string; role?: string },
   decision: string,
   grade: GradeReport | null,
 ) {
-  const text = decisionNoticeText({ name: application.name, decision, grade });
+  const text = reviewCopy(decisionNoticeText({ name: application.name, decision, grade }), application.role);
   await notifyAdmins({
     title: `${application.name}: ${decision} · grade ${grade?.letter || "ungraded"}`,
     body: text.slice(0, 600),
@@ -608,8 +609,26 @@ export async function deleteInviteRequest(formData: FormData) {
   const requestId = String(formData.get("requestId") || "");
   const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
   if (!request) redirect("/admin?error=That+request+was+not+found");
-  await prisma.crmPerson.updateMany({ where: { inviteRequestId: request.id }, data: { inviteRequestId: null } });
-  await prisma.inviteRequest.delete({ where: { id: request.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.verificationCase.deleteMany({ where: { inviteRequestId: request.id } });
+    await tx.outboxNotice.deleteMany({
+      where: {
+        OR: [
+          { intendedTo: request.email, applicationId: null },
+          { body: { contains: `/request-status/${request.statusToken}` } },
+        ],
+      },
+    });
+    await tx.crmPerson.deleteMany({
+      where: {
+        OR: [
+          { inviteRequestId: request.id },
+          { email: request.email, applicationId: null, userId: null },
+        ],
+      },
+    });
+    await tx.inviteRequest.delete({ where: { id: request.id } });
+  });
   await prisma.moderationEvent.create({
     data: {
       actorId: admin.id,

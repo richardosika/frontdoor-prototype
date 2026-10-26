@@ -24,6 +24,12 @@ export function currentMonthlyCents(role: string, stored = 0): number {
   return stored;
 }
 
+/** Paid, waived, and free memberships show the active state. Everything else still needs a payment. */
+export function payPageState(status: string): "active" | "due" {
+  if (status === "PAID" || status === "WAIVED" || status === "NOT_REQUIRED") return "active";
+  return "due";
+}
+
 export function firstMonthCents(monthlyCents: number): number {
   if (monthlyCents <= 0) return 0;
   return Math.round(monthlyCents / 2);

@@ -23,6 +23,7 @@ export function GuidedReview({
   mode = "application",
   applicationStatus = null,
   verdict = "",
+  role = "",
 }: {
   applicationId: string;
   caseId: string;
@@ -35,6 +36,7 @@ export function GuidedReview({
   mode?: MemberReviewMode;
   applicationStatus?: string | null;
   verdict?: string;
+  role?: string;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -82,6 +84,7 @@ export function GuidedReview({
           applicationStatus={applicationStatus}
           verdict={verdict}
           steps={steps}
+          role={role}
         />
       ) : (
         <article className="mt-4">
@@ -168,6 +171,7 @@ function DecisionStep({
   applicationStatus,
   verdict,
   steps,
+  role,
 }: {
   applicationId: string;
   caseId: string;
@@ -181,6 +185,7 @@ function DecisionStep({
   applicationStatus: string | null;
   verdict: string;
   steps: BuiltStep[];
+  role: string;
 }) {
   const strongWarning = needsStrongApprovalWarning({
     letter: grade?.letter,
@@ -220,7 +225,7 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">No steps were skipped.</p>
       )}
-      {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
+      {grade ? <ExecutiveSummary report={grade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
         <DecisionForm
           applicationId={applicationId}

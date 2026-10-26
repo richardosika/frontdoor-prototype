@@ -39,9 +39,9 @@ export default async function VerificationCasePage({
   const record = await prisma.verificationCase.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, org: true, location: true } },
-      application: { select: { name: true, org: true, location: true } },
-      inviteRequest: { select: { name: true, org: true, location: true } },
+      user: { select: { id: true, name: true, org: true, location: true, role: true } },
+      application: { select: { name: true, org: true, location: true, role: true } },
+      inviteRequest: { select: { name: true, org: true, location: true, role: true } },
       project: { select: { id: true, name: true, location: true, year: true, userId: true, user: { select: { name: true } } } },
       checks: { orderBy: { label: "asc" }, include: { reviewer: { select: { name: true } } } },
       events: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
@@ -216,6 +216,7 @@ export default async function VerificationCasePage({
             mode={memberReview.mode}
             applicationStatus={memberReview.applicationStatus}
             verdict={memberReview.verdict}
+            role={record.application?.role || record.user?.role || record.inviteRequest?.role || ""}
           />
         </div>
       ) : null}

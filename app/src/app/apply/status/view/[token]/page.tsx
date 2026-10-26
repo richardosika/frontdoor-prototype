@@ -8,13 +8,14 @@ import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-stat
 import { BRAND } from "@/lib/brand";
 import { applicantDuesSentence, currentMonthlyCents } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationStatusPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const application = await prisma.application.findUnique({ where: { statusToken: token } });
-  if (!application) redirect(`/apply/status/${encodeURIComponent(token)}`);
+  if (!application) redirect(`${await appBaseUrl()}/apply/status/${encodeURIComponent(token)}`);
   const copy = memberStatusCopy(application.status);
   const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
