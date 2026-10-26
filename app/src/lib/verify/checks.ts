@@ -445,7 +445,7 @@ export function linkedinFormatCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const ok = /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:in|company)\/[a-z0-9\-_%&]+(?:\/[a-z0-9\-_%&]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
+  const ok = /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:in|company)\/[a-z0-9\-_%&.]+(?:\/[a-z0-9\-_%&.]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
   return check({
     key: "linkedin-format",
     status: ok ? "PASS" : "FAIL",
