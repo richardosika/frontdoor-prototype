@@ -18,6 +18,12 @@ const CODE_RE = /\bcode is\s+(\d{4})\b/i;
 
 const FOOTER_LINE = `${BRAND.legalName}, ${BRAND.address} · 800-399-3745 · ${BRAND.contactEmail}`;
 const FOOTER_NOTE = "Private Floor does not offer securities or process payments through the platform.";
+export const RECEIPT_SUBJECT = "Private Floor payment receipt";
+export const RECEIPT_FOOTER_NOTE = "Membership dues only. Private Floor does not offer securities or take investments.";
+
+export function footerNoteFor(headline: string): string {
+  return headline.trim() === RECEIPT_SUBJECT ? RECEIPT_FOOTER_NOTE : FOOTER_NOTE;
+}
 
 type Block =
   | { type: "p"; html: string }
@@ -171,7 +177,7 @@ export function brandedNoticeHtml(input: { text: string; headline: string; logoU
 ${body}
 </td></tr>
 <tr><td bgcolor="${CREAM}" style="background:${CREAM};padding:18px 36px 28px;font-family:${SERIF};font-size:12px;line-height:1.55;color:${INK};">
-${escapeHtml(FOOTER_LINE)}<br>${escapeHtml(FOOTER_NOTE)}
+${escapeHtml(FOOTER_LINE)}<br>${escapeHtml(footerNoteFor(input.headline))}
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

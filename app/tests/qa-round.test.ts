@@ -4,7 +4,11 @@ import { needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalIt
 import { applicantDuesSentence, FREE_MEMBERSHIP_LINE } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
+import { DUES_LOCALES } from "@/lib/dues";
+import { RECEIPT_FOOTER_NOTE, RECEIPT_SUBJECT, footerNoteFor } from "@/lib/email-layout";
 import { renderTemplate, repairDoubledTerminalPeriod, templateDef } from "@/lib/email-templates";
+import { paymentReceiptText } from "@/lib/payment-record";
+import { noticeHtml } from "@/lib/resend-mail";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { reviewCopy } from "@/lib/review-copy";
 import { isSignedInJoinEntry } from "@/lib/session-gate";
@@ -85,6 +89,35 @@ describe("QA fixes that stay outside grading", () => {
     expect(templateDef("payment_due")?.body).not.toContain("if recorded today");
     expect(templateDef("application_thanks")?.body).toContain("Your request is for the {role} role at {org}.");
     expect(templateDef("application_thanks")?.body).not.toContain("It is for {role}");
+    const money = /\$|dues|price|charge|fee|primer mes|erster Monat|初月/i;
+    for (const key of ["application_thanks", "invite_received"] as const) {
+      const body = templateDef(key)?.body || "";
+      expect(body).toContain("personally review");
+      expect(body).toContain("{status_link}");
+      expect(body).not.toMatch(money);
+      for (const row of DUES_LOCALES) {
+        expect(body).not.toContain(row.text.slice(0, 48));
+      }
+    }
+    const receipt = paymentReceiptText({
+      firstName: "Ada",
+      role: "General Contractor",
+      firstCharge: "$74.50",
+      monthly: "$149",
+      renewal: "November 26, 2026",
+      modeLine: "Recorded as a simulated TEST payment. No card was charged.",
+      loginLink: "https://cornicio-mvp.onrender.com/login",
+    });
+    expect(receipt).toContain("First month $74.50");
+    expect(receipt).toContain("Full price $149 per month starts");
+    expect(receipt).not.toContain("per month per month");
+    expect(receipt).toContain("Sign in\nhttps://cornicio-mvp.onrender.com/login");
+    expect(receipt.trimEnd().endsWith("Richard Osika, Founder")).toBe(true);
+    const html = noticeHtml(receipt, { headline: RECEIPT_SUBJECT });
+    expect(html).toContain(">SIGN IN</a>");
+    expect(html).toContain(RECEIPT_FOOTER_NOTE);
+    expect(html).not.toContain("process payments through the platform");
+    expect(footerNoteFor("We have your Private Floor application")).toContain("process payments through the platform");
   });
 
   it("does not name the demo member on the administrator sign-in page", () => {

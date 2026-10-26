@@ -1,4 +1,6 @@
 import { currentMonthlyCents, firstMonthCents, formatMoney, mailDuesAmounts } from "@/lib/dues";
+import { RECEIPT_SUBJECT } from "@/lib/email-layout";
+import { SIGN_OFF } from "@/lib/email-templates";
 import { formatEtDate } from "@/lib/format";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { notify } from "@/lib/notify";
@@ -7,6 +9,27 @@ import { paymentRenewalLabel, renewalInOneMonth, renewalReminderDue } from "@/li
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
+
+/** Plain-text receipt. Amounts stay. The founder sign-off and sign-in link match the other letters. */
+export function paymentReceiptText(input: {
+  firstName: string;
+  role: string;
+  firstCharge: string;
+  monthly: string;
+  renewal: string;
+  modeLine: string;
+  loginLink: string;
+}): string {
+  return `Hello ${input.firstName},
+
+Receipt. First month ${input.firstCharge} recorded for ${input.role}. Full price ${input.monthly} per month starts ${input.renewal}. Month to month. No long-term contract. Cancel anytime in Settings before that date. A reminder goes out before the full-price charge. ${input.modeLine}
+
+Sign in
+${input.loginLink}
+
+${SIGN_OFF}
+`;
+}
 
 /** Returns false when this processor event was already recorded. */
 export async function claimPaymentEvent(id: string, userId: string | null, kind: string): Promise<boolean> {
@@ -75,8 +98,16 @@ export async function activatePaidMembership(input: {
           : "Recorded as a simulated TEST payment. No card was charged.";
     await sendNotice({
       intendedTo: user.email,
-      subject: "Private Floor payment receipt",
-      text: `Hello ${user.name.trim().split(/\s+/)[0] || "there"},\n\nReceipt. First month ${firstCharge} recorded for ${roleLabel(user.role)}. Full price ${formatMoney(monthlyCents)} per month starts ${formatEtDate(renewalAt)}. Month to month. No long-term contract. Cancel anytime in Settings before that date. A reminder goes out before the full-price charge. ${modeLine}\n`,
+      subject: RECEIPT_SUBJECT,
+      text: paymentReceiptText({
+        firstName: user.name.trim().split(/\s+/)[0] || "there",
+        role: roleLabel(user.role),
+        firstCharge,
+        monthly: formatMoney(monthlyCents),
+        renewal: formatEtDate(renewalAt),
+        modeLine,
+        loginLink: `${base}/login`,
+      }),
       templateKey: "payment_due",
     });
   }

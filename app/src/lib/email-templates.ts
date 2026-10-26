@@ -75,9 +75,7 @@ It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
 Your request is for the {role} role at {org}.
 
 Follow it here
-{status_link}
-
-Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
+{status_link}${SIGN}`,
   },
   {
     key: "welcome",
@@ -290,6 +288,14 @@ Nothing is charged at this step. If your role has annual dues, they are a flat f
     `${APPLICATION_RECEIVED_TEMPLATE}
 
 It is for {role} at {org}.
+
+Follow it here
+{status_link}
+
+Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+Your request is for the {role} role at {org}.
 
 Follow it here
 {status_link}
