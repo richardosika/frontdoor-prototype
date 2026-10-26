@@ -3,13 +3,15 @@ import { normalizeInviteCode } from "@/lib/domain";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
-import { registrableHost } from "@/lib/verify/host";
+import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
+import { isReservedDomain, registrableHost } from "@/lib/verify/host";
 import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
+import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
@@ -213,18 +215,19 @@ export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
   const area = national.length === 10 ? national.slice(0, 3) : "";
   const state = facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
   const base = { key: "phone-state", weight: 4, source: "Local area-code table", url: "" };
+  if (area && TOLL_FREE_AREA_CODES.has(area)) {
+    const where = state ? `so it does not confirm ${state}` : "so it does not confirm a state";
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `The area code ${area} is toll-free, ${where}. This is inconclusive, not a failure.`,
+    });
+  }
   if (!area || !state) {
     return check({
       ...base,
       status: "INCONCLUSIVE",
       finding: "Phone area code and state could not both be read, so this check is inconclusive.",
-    });
-  }
-  if (TOLL_FREE_AREA_CODES.has(area)) {
-    return check({
-      ...base,
-      status: "INCONCLUSIVE",
-      finding: `The area code ${area} is toll-free, so it does not confirm ${state}. This is inconclusive, not a failure.`,
     });
   }
   const expected = AREA_TO_STATE[area] || "";
@@ -268,7 +271,7 @@ function youngerThanMonths(registeredAt: Date, months: number, now: Date): boole
   return registeredAt.getTime() > cutoff.getTime();
 }
 
-/** No row for an IP host. A domain younger than 12 months does not earn the points and does not corroborate. */
+/** No row for an IP host. A reserved or example name does not earn points. A domain younger than 12 months does not corroborate. */
 export function assessRdap(
   host: string,
   http: { ok: boolean; status: number; text: string; failure?: string },
@@ -277,6 +280,15 @@ export function assessRdap(
   if (!host || isIpHost(host)) return null;
   const url = `https://rdap.org/domain/${host}`;
   const base = { key: "rdap", weight: 4, source: "RDAP", url };
+  if (isReservedDomain(host)) {
+    return check({
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      corroborates: false,
+      finding: `RDAP was not treated as a pass for ${host}. This is a reserved or example domain and did not check out.`,
+    });
+  }
   if (!http.ok) {
     const dead = http.status === 404 || http.failure === "nxdomain";
     return check({
@@ -683,7 +695,18 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA)\b/)?.[1];
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA)\b/)?.[1];
+  const portal = state ? registryPortal(state) : undefined;
+  if (portal) {
+    return check({
+      key: "business-registry",
+      status: "NOT_RUN",
+      weight: 8,
+      finding: `${portal.label} was not searched on this pass. A skipped search is not a pass.`,
+      source: portal.source,
+      url: portal.portalUrl,
+    });
+  }
   const links: Record<string, string> = {
     NJ: "https://www.njportal.com/DOR/BusinessNameSearch/",
     NY: "https://apps.dos.ny.gov/publicInquiry/",
@@ -701,17 +724,9 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     MD: "https://egov.maryland.gov/businessexpress/entitysearch",
     CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
     VA: "https://cis.scc.virginia.gov/",
+    OR: "https://sos.oregon.gov/business/Pages/find.aspx",
+    IA: "https://sos.iowa.gov/search/business/search.aspx",
   };
-  if (state === "NY") {
-    return check({
-      key: "business-registry",
-      status: "NOT_RUN",
-      weight: 8,
-      finding: "NY Active Corporations was not searched on this pass. A skipped search is not a pass.",
-      source: "NY Active Corporations",
-      url: "https://data.ny.gov/d/n9v6-gdp6",
-    });
-  }
   if (!state || !links[state]) {
     return check({
       key: "business-registry",
@@ -812,23 +827,28 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     host = "";
   }
   const rdapHost = host ? registrableHost(host) : "";
-  if (rdapHost && !FREE_PROVIDERS.has(rdapHost) && !isIpHost(rdapHost)) {
+  if (rdapHost && isReservedDomain(rdapHost)) {
+    const judged = assessRdap(rdapHost, { ok: false, status: 0, text: "" });
+    if (judged) out.push(judged);
+  } else if (rdapHost && !FREE_PROVIDERS.has(rdapHost) && !isIpHost(rdapHost)) {
     const rdap = await pageText(fetchText, `https://rdap.org/domain/${rdapHost}`);
     const judged = assessRdap(rdapHost, rdap);
     if (judged) out.push(judged);
   }
   out.push(...(await runPublicScreen(searchFacts, fetchText)));
-  if (/\bNY\b/i.test(ctx.facts.location || "")) {
-    const registryUrl = nyRegistryQueryUrl(searchFacts.org);
+  const registryState = statedUsState(ctx.facts.location || "");
+  const portal = registryState ? registryPortal(registryState) : undefined;
+  if (portal) {
+    const registryUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
     const registryHttp = await fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    const registry = assessNyRegistry(searchFacts.org, registryHttp);
+    const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp);
     out.push(
       check({
         key: "business-registry",
         status: registry.status,
         weight: 8,
         finding: registry.finding,
-        source: "NY Active Corporations",
+        source: portal.source,
         url: registry.url,
         corroborates: false,
       }),
@@ -897,8 +917,87 @@ export function strongFixtureChecks(): CheckOutput[] {
   ];
 }
 
+const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder when a street is present";
+
+export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutput | null> {
+  const local = assessLocalAddress(ctx.facts.location || "");
+  const base = { key: "address", weight: 2, source: ADDRESS_SOURCE, url: "" };
+  if (local.kind === "absent") return null;
+  if (local.kind === "invalid") {
+    return check({ ...base, status: "FAIL", reviewFlag: true, corroborates: false, finding: local.finding });
+  }
+  if (local.kind === "unstructured") {
+    return check({
+      ...base,
+      status: "PASS",
+      corroborates: false,
+      finding: "A location is on the application. It is not a US street address, so the state and ZIP were not checked.",
+    });
+  }
+  if (!local.geocode || !ctx.network || !ctx.fetchText) {
+    const finding = local.parsed.zip
+      ? "The state and ZIP on the application check out. No street was sent to the Census geocoder."
+      : "The state on the application is a US state code. No ZIP or street was sent to the Census geocoder.";
+    return check({
+      ...base,
+      status: "PASS",
+      corroborates: false,
+      finding,
+    });
+  }
+  const url = censusGeocodeUrl(local.parsed);
+  try {
+    const http = await ctx.fetchText(url);
+    if (!http.ok) {
+      return check({
+        ...base,
+        status: "UNAVAILABLE",
+        url,
+        corroborates: false,
+        finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+      });
+    }
+    const judged = assessCensusBody(http.text);
+    if (judged === "match") {
+      return check({
+        ...base,
+        status: "PASS",
+        url,
+        corroborates: false,
+        finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
+      });
+    }
+    if (judged === "none") {
+      return check({
+        ...base,
+        status: "FAIL",
+        url,
+        reviewFlag: true,
+        corroborates: false,
+        finding: "The address did not check out. The Census geocoder returned no match for this street.",
+      });
+    }
+    return check({
+      ...base,
+      status: "UNAVAILABLE",
+      url,
+      corroborates: false,
+      finding: "The address is not checkable. The Census geocoder did not return a readable result. This is not a pass and not a failure.",
+    });
+  } catch {
+    return check({
+      ...base,
+      status: "UNAVAILABLE",
+      url,
+      corroborates: false,
+      finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+    });
+  }
+}
+
 export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
-  const nyOnNetwork = Boolean(ctx.network && /\bNY\b/i.test(ctx.facts.location || ""));
+  const registryState = statedUsState(ctx.facts.location || "");
+  const registryOnNetwork = Boolean(ctx.network && registryState && registryPortal(registryState));
   const local = [
     ...emailChecks(ctx.facts),
     phoneStateCheck(ctx.facts),
@@ -911,9 +1010,10 @@ export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     plausibilityCheck(ctx.facts),
     velocityCheck(ctx.facts),
     socialFormatCheck(ctx.facts),
-    ...(nyOnNetwork ? [] : [registryLinkCheck(ctx.facts)]),
+    ...(registryOnNetwork ? [] : [registryLinkCheck(ctx.facts)]),
   ];
+  const address = await resolveAddressCheck(ctx);
   const remote = await networkChecks(ctx);
   const fixture = ctx.facts.testProfile === "strong" && !ctx.network ? strongFixtureChecks() : [];
-  return [...local, ...remote, ...fixture];
+  return [...local, ...(address ? [address] : []), ...remote, ...fixture];
 }

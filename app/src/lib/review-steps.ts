@@ -84,7 +84,7 @@ const STEP_META: Record<Exclude<ReviewStepId, "decision">, { title: string; abou
   },
   company: {
     title: "Company and registry",
-    about: "Website, SEC EDGAR, domain registration, and the state registry. NY Active Corporations is an exact-name company check. Other states are a manual link.",
+    about: "Website, SEC EDGAR, domain registration, and the state registry. NY, CT, CO, OR, and PA are exact-name company checks. NJ, WA, IA, and other states without a free API are a manual link.",
     keys: ["website", "edgar", "rdap", "business-registry"],
   },
   news: {

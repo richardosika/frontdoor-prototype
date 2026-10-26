@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { assessRdap, cardConsistencyCheck, collectChecks, inviteCheck, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessLocalAddress, zipMatchesState } from "@/lib/verify/address";
+import { isReservedDomain } from "@/lib/verify/host";
+import { assessRdap, cardConsistencyCheck, collectChecks, inviteCheck, linkedinFormatCheck, phoneStateCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
+import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
@@ -411,7 +415,7 @@ describe("low-risk check fixes", () => {
     expect(assessRdap("[2001:db8::1]", { ok: true, status: 200, text: "{}" })).toBeNull();
     const now = new Date("2026-10-26T00:00:00.000Z");
     const young = assessRdap(
-      "example.com",
+      "acme-builders.com",
       { ok: true, status: 200, text: JSON.stringify({ events: [{ eventAction: "registration", eventDate: "2026-06-01T00:00:00.000Z" }] }) },
       now,
     );
@@ -419,7 +423,7 @@ describe("low-risk check fixes", () => {
     expect(young?.corroborates).toBe(false);
     expect(young?.finding).toContain("not corroboration");
     const older = assessRdap(
-      "example.com",
+      "acme-builders.com",
       { ok: true, status: 200, text: JSON.stringify({ events: [{ eventAction: "registration", eventDate: "2014-06-01T00:00:00.000Z" }] }) },
       now,
     );
@@ -880,7 +884,7 @@ describe("QA follow-up scoring", () => {
     const website = dead.find((check) => check.key === "website");
     expect(website?.status).toBe("FAIL");
     expect(website?.finding).toContain("domain does not resolve");
-    const rdap = assessRdap("qa-test-nonexistent.example", { ok: false, status: 404, text: "" });
+    const rdap = assessRdap("qa-test-nonexistent-holdings.com", { ok: false, status: 404, text: "" });
     expect(rdap?.status).toBe("FAIL");
     expect(rdap?.finding).toContain("domain does not resolve");
     const graded = gradeChecks([website!, rdap!], facts({ website: "https://qa-test-nonexistent.example", org: "Nonexistent Holdings Law Group" }));
@@ -969,5 +973,231 @@ describe("QA follow-up scoring", () => {
     expect(unmatched.categories.find((category) => category.id === "role")?.reason).toContain("The referral could not be matched (0 of 4)");
     expect(unmatched.summary.couldNotCheck).toContain("The referral could not be matched.");
     expect(unmatched.summary.couldNotCheck).not.toMatch(/invite/i);
+  });
+});
+
+describe("admin pass on role, address, reserved domains, requests, and toll-free lines", () => {
+  it("grades a general contractor with the stated role, not Developer", () => {
+    const graded = gradeChecks(
+      [],
+      facts({
+        name: "Richard Osika",
+        applicantName: "Richard Osika",
+        org: "Osika Construction",
+        location: "Newark, NJ",
+        role: "GENERAL_CONTRACTOR",
+        applicationSubmitted: true,
+      }),
+    );
+    expect(graded.summary.applicant).toContain("applied as a General Contractor");
+    expect(graded.summary.applicant).not.toContain("Developer");
+  });
+
+  it("says a referral request was graded from the request fields only", () => {
+    const graded = gradeChecks(
+      [],
+      facts({
+        name: "Richard Osika",
+        applicantName: "Richard Osika",
+        role: "GENERAL_CONTRACTOR",
+        org: "Osika Construction",
+        applicationSubmitted: false,
+      }),
+    );
+    expect(graded.summary.applicant).toContain("Referral or request only — no application submitted; grade based on request fields only.");
+    expect(graded.summary.applicant).toContain("applied as a General Contractor");
+    expect(graded.summary.applicant).not.toContain("invite code");
+  });
+
+  it("gives an invalid state or ZIP zero location points and says the address did not check out", async () => {
+    expect(zipMatchesState("NJ", "07102")).toBe(true);
+    expect(zipMatchesState("NJ", "00000")).toBe(false);
+    expect(zipMatchesState("NY", "10001")).toBe(true);
+    const invalid = assessLocalAddress("9 Fake Road, Nowhere, ZZ 00000");
+    expect(invalid.kind).toBe("invalid");
+    const checks = await collectChecks({
+      facts: facts({ location: "9 Fake Road, Nowhere, ZZ 00000", website: "", phone: "" }),
+      watchlist: [],
+      network: false,
+    });
+    const address = checks.find((check) => check.key === "address");
+    expect(address?.status).toBe("FAIL");
+    expect(address?.finding.toLowerCase()).toContain("address did not check out");
+    const graded = gradeChecks(checks, facts({ location: "9 Fake Road, Nowhere, ZZ 00000" }));
+    const completeness = graded.categories.find((category) => category.id === "completeness");
+    expect(completeness?.reason).toContain("address did not check out (0 of 2)");
+    expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).toContain("address did not check out");
+
+    const city = await resolveAddressCheck({
+      facts: facts({ location: "Newark, NJ" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(city?.status).toBe("PASS");
+    const cityGrade = gradeChecks([city!], facts({ location: "Newark, NJ" }));
+    expect(cityGrade.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
+  });
+
+  it("fails a Census miss and leaves a geocoder timeout not checkable", async () => {
+    const missed = await resolveAddressCheck({
+      facts: facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }),
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        expect(url).toContain("geocoding.geo.census.gov");
+        expect(url).not.toContain("googleapis");
+        expect(url).not.toContain("usps.com");
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(missed?.status).toBe("FAIL");
+    expect(missed?.finding.toLowerCase()).toContain("address did not check out");
+
+    const down = await resolveAddressCheck({
+      facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
+      watchlist: [],
+      network: true,
+      fetchText: async () => {
+        throw new Error("timeout");
+      },
+    });
+    expect(down?.status).toBe("UNAVAILABLE");
+    expect(down?.finding.toLowerCase()).toContain("not checkable");
+    const graded = gradeChecks([down!], facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }));
+    const completeness = graded.categories.find((category) => category.id === "completeness");
+    expect(completeness?.reason).toContain("The address is not checkable.");
+    expect(completeness?.reason).not.toContain("address did not check out");
+    expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("not checkable");
+
+    const matched = await resolveAddressCheck({
+      facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
+      watchlist: [],
+      network: true,
+      fetchText: async () => ({
+        ok: true,
+        status: 200,
+        text: JSON.stringify({ result: { addressMatches: [{ matchedAddress: "4600 SILVER HILL RD, WASHINGTON, DC, 20233" }] } }),
+      }),
+    });
+    expect(matched?.status).toBe("PASS");
+  });
+
+  it("does not award RDAP points for a reserved or example domain and still fails a dead domain", () => {
+    for (const host of ["example.com", "www.example.com", "qa.example", "foo.test", "bar.invalid", "localhost", "db.localhost"]) {
+      expect(isReservedDomain(host)).toBe(true);
+      const row = assessRdap(host, { ok: true, status: 200, text: JSON.stringify({ events: [{ eventAction: "registration", eventDate: "2010-01-01" }] }) });
+      expect(row?.status).toBe("FAIL");
+      expect(row?.finding.toLowerCase()).toContain("did not check out");
+      expect(row?.corroborates).toBe(false);
+    }
+    expect(isReservedDomain("acme-builders.com")).toBe(false);
+    const dead = assessRdap("qa-test-nonexistent-holdings.com", { ok: false, status: 404, text: "", failure: "nxdomain" });
+    expect(dead?.status).toBe("FAIL");
+    expect(dead?.finding).toContain("domain does not resolve");
+    const graded = gradeChecks(
+      [assessRdap("example.com", { ok: true, status: 200, text: "{}" })!],
+      facts({ website: "https://example.com" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("did not check out (0 of 2)");
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(graded.summary.didNotCheckOut.toLowerCase()).toContain("did not check out");
+  });
+
+  it("treats every toll-free area code as not applicable instead of 0 of 3", () => {
+    for (const area of ["800", "833", "844", "855", "866", "877", "888"]) {
+      const row = phoneStateCheck(facts({ phone: `${area}-555-0199`, location: "Newark, NJ" }));
+      expect(row.status).toBe("INCONCLUSIVE");
+      expect(row.finding).toContain("toll-free");
+      const graded = gradeChecks([row], facts({ phone: `1-${area}-555-0199`, location: "Newark, NJ" }));
+      const identity = graded.categories.find((category) => category.id === "identity");
+      expect(identity?.reason).toContain("The phone is toll-free, so the area code is not applicable.");
+      expect(identity?.reason).not.toContain("The phone area code was not confirmed against the state (0 of 3)");
+      expect(identity?.possible).toBe(15);
+    }
+    const noState = phoneStateCheck(facts({ phone: "800-555-0199", location: "Nowhere, ZZ 00000" }));
+    expect(noState.status).toBe("INCONCLUSIVE");
+    expect(noState.finding).toContain("toll-free");
+    const noStateGrade = gradeChecks([noState], facts({ phone: "800-555-0199", location: "Nowhere, ZZ 00000" }));
+    expect(noStateGrade.categories.find((category) => category.id === "identity")?.reason).not.toContain("The phone area code was not confirmed against the state (0 of 3)");
+    const out = phoneStateCheck(facts({ phone: "212-555-0100", location: "Newark, NJ" }));
+    const outGraded = gradeChecks([out], facts({ phone: "212-555-0100", location: "Newark, NJ" }));
+    expect(outGraded.categories.find((category) => category.id === "identity")?.reason).toContain("0 of 3");
+  });
+
+  it("uses a keyless company-name registry for CT, CO, OR, and PA and leaves NJ, WA, and IA not checkable", () => {
+    expect(registryPortal("NJ")).toBeUndefined();
+    expect(registryPortal("WA")).toBeUndefined();
+    expect(registryPortal("IA")).toBeUndefined();
+    expect(registryLinkCheck(facts({ location: "Newark, NJ", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
+    expect(registryLinkCheck(facts({ location: "Seattle, WA", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
+    expect(registryLinkCheck(facts({ location: "Des Moines, IA", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
+
+    const colorado = registryPortal("CO");
+    expect(colorado).toBeTruthy();
+    const url = socrataRegistryUrl(colorado!, "Lockheed Martin Corporation");
+    expect(url).toContain("data.colorado.gov/resource/4ykn-tg5h.json");
+    expect(url).toContain("entityname");
+    expect(url.toLowerCase()).not.toContain("agent");
+    const hit = assessStateRegistry(colorado!, "Lockheed Martin Corporation", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ entityname: "LOCKHEED MARTIN CORPORATION", entitystatus: "Good Standing", agentlastname: "Osika" }]),
+    });
+    expect(hit.status).toBe("PASS");
+    expect(hit.corroborates).toBe(false);
+    expect(hit.finding).toContain("LOCKHEED MARTIN CORPORATION");
+    expect(hit.finding.toLowerCase()).not.toContain("osika");
+
+    const oregon = assessStateRegistry(registryPortal("OR")!, "Nike, Inc.", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ business_name: "NIKE, INC.", first_name: "Richard", last_name: "Osika" }]),
+    });
+    expect(oregon.status).toBe("PASS");
+    expect(oregon.corroborates).toBe(false);
+    expect(oregon.finding.toLowerCase()).not.toContain("richard");
+    expect(oregon.finding.toLowerCase()).not.toContain("osika");
+
+    const connecticut = assessStateRegistry(registryPortal("CT")!, "Cigna Management Company", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ name: "CIGNA MANAGEMENT COMPANY LLC", status: "Expired Reservation" }]),
+    });
+    expect(connecticut.status).toBe("INCONCLUSIVE");
+    expect(connecticut.corroborates).toBe(false);
+
+    const activeCt = assessStateRegistry(registryPortal("CT")!, "Cigna Management Company", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ name: "CIGNA MANAGEMENT COMPANY LLC", status: "Active" }]),
+    });
+    expect(activeCt.status).toBe("PASS");
+    expect(activeCt.corroborates).toBe(false);
+
+    const pennsylvania = assessStateRegistry(registryPortal("PA")!, "Comcast Corporation", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ business_name: "Comcast Corporation", party_type: "Officer" }]),
+    });
+    expect(pennsylvania.status).toBe("PASS");
+    expect(pennsylvania.finding.toLowerCase()).not.toContain("officer");
+
+    const down = assessStateRegistry(registryPortal("CT")!, "Cigna Management Company", { ok: false, status: 0, text: "" });
+    expect(down.status).toBe("UNAVAILABLE");
+    expect(down.finding.toLowerCase()).toContain("not a pass");
+  });
+
+  it("sends a no-JS re-run to a 303 location instead of an error page", () => {
+    expect(RERUN_STATUS).toBe(303);
+    const done = rerunChecksHref("ckcase1", "done");
+    expect(done).toContain("/admin/verification/ckcase1?step=identity");
+    expect(done).toContain("notice=");
+    expect(done).not.toContain("error=");
+    expect(rerunChecksHref("ckcase1", "failed")).toContain("error=");
+    expect(rerunChecksHref("", "done")).toContain("/admin/verification?error=");
+    expect(rerunChecksHref("../admin", "done")).toContain("/admin/verification?error=");
   });
 });

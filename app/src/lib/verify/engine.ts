@@ -198,6 +198,7 @@ async function factsForRun(run: {
     org,
     location: application?.location || "",
     role: application?.role || "DEVELOPER",
+    applicationSubmitted: application ? true : undefined,
     phone: application?.phone || "",
     website: application?.website || "",
     linkedinUrl: application?.linkedinUrl || "",

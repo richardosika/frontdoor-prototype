@@ -170,7 +170,7 @@ function DecisionStep({
       <h3 className="font-serif text-xl font-normal">Your decision</h3>
       <p className="mt-1 text-sm leading-relaxed text-ink">
         {mode === "invite"
-          ? "This person asked to join and has not submitted an application. Approve sends an invite code and marks this file Verified. Request more info marks it Needs info. Decline marks it Rejected."
+          ? "This person asked to join and has not submitted an application. Approve sends a referral code and marks this file Verified. Request more info marks it Needs info. Decline marks it Rejected."
           : "This is a recommendation for Richard Osika. He approves every member. Approve sends the membership-dues link for a paid role, and opens the floor right away for a free role. Decline sends a short notice. The applicant does not see the grade. The file status follows this decision."}
       </p>
       {skipped.length ? (

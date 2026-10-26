@@ -46,6 +46,7 @@ function factsToApplicant(facts: PrefillFacts, extra: Partial<ApplicantFacts> = 
     org: facts.org,
     location: facts.location,
     role: extra.role || "DEVELOPER",
+    applicationSubmitted: extra.applicationSubmitted,
     phone: extra.phone || "",
     website: facts.website,
     linkedinUrl: facts.linkedinUrl,
@@ -239,6 +240,7 @@ export async function factsForCase(caseId: string): Promise<{ facts: PrefillFact
     applicant: factsToApplicant(facts, {
       email: application?.email || user?.email || invite?.email || "",
       role: application?.role || user?.role || invite?.role || "DEVELOPER",
+      applicationSubmitted: Boolean(application),
       phone: application?.phone || user?.phone || "",
       socialLinks: application?.socialLinks || "",
       inviteNote: application?.inviteCode ? `${application.inviteCode.code} ${application.inviteCode.note}` : "",
@@ -249,8 +251,8 @@ export async function factsForCase(caseId: string): Promise<{ facts: PrefillFact
   };
 }
 
-async function gradeFor(checks: CheckOutput[], facts: PrefillFacts, subject: string): Promise<GradeReport> {
-  return gradeChecks(checks, factsToApplicant(facts), { gradedAt: new Date().toISOString(), subject });
+async function gradeFor(checks: CheckOutput[], applicant: ApplicantFacts, subject: string): Promise<GradeReport> {
+  return gradeChecks(checks, applicant, { gradedAt: new Date().toISOString(), subject });
 }
 
 const EVIDENCE_STATUSES = new Set(["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN", "UNAVAILABLE"]);
@@ -278,8 +280,8 @@ export async function prepareGuidedCase(caseId: string): Promise<void> {
   if (stored.evidence.length) await rememberSources(caseId, stored.evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
   const grade = stored.evidence.length
-    ? stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject))
-    : await gradeFor([], loaded.facts, loaded.subject);
+    ? stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.applicant, loaded.subject))
+    : await gradeFor([], loaded.applicant, loaded.subject);
   await writeSuggestions({
     caseId,
     suggestions,
@@ -303,7 +305,7 @@ export async function refreshGuidedCase(caseId: string): Promise<void> {
     return;
   }
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
-  const grade = stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject));
+  const grade = stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.applicant, loaded.subject));
   await rememberSources(caseId, stored.evidence);
   await writeSuggestions({
     caseId,
@@ -340,7 +342,7 @@ export async function runLivePrefill(caseId: string): Promise<void> {
   };
   const checks = await collectChecks(ctx);
   const evidence = asEvidence(checks);
-  const grade = await gradeFor(checks, loaded.facts, loaded.subject);
+  const grade = await gradeFor(checks, loaded.applicant, loaded.subject);
   await rememberSources(caseId, evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, evidence);
   await writeSuggestions({

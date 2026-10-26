@@ -36,6 +36,11 @@ export type ApplicantFacts = {
   org: string;
   location: string;
   role: string;
+  /**
+   * False when the file is a referral or request and no application was submitted.
+   * Absent on older runs and on project files.
+   */
+  applicationSubmitted?: boolean;
   phone: string;
   website: string;
   linkedinUrl: string;

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { issueInviteCodeForRequest } from "@/lib/invite-issue";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/verification-db";
 import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
 import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
+import { rerunChecksHref } from "@/lib/rerun-checks";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
 export async function updateVerificationCase(formData: FormData) {
@@ -231,12 +232,18 @@ export async function rerunGuidedChecks(formData: FormData) {
   await requireVerificationAdmin();
   const caseId = String(formData.get("caseId") || "");
   const back = `/admin/verification/${caseId}`;
-  const existing = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } });
-  if (!existing) notFound();
-  await runLivePrefill(caseId);
-  revalidatePath(back);
-  revalidatePath("/admin/verification");
-  redirect(`${back}?step=identity&notice=${encodeURIComponent("Free-source checks finished. Marks stay Auto-suggested until you confirm them.")}`);
+  try {
+    const existing = caseId ? await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } }) : null;
+    if (!existing) redirect(rerunChecksHref(caseId, "missing"));
+    await runLivePrefill(caseId);
+    revalidatePath(back);
+    revalidatePath("/admin/verification");
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("re-run checks failed", caseId, error instanceof Error ? error.message : "error");
+    redirect(rerunChecksHref(caseId, "failed"));
+  }
+  redirect(rerunChecksHref(caseId, "done"));
 }
 
 export async function decideInviteReview(formData: FormData) {

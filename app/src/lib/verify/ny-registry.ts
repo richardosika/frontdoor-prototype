@@ -23,9 +23,19 @@ export function nyRegistryCandidates(org: string): string[] {
   return [...new Set(suffixes.map((suffix) => `${stem}${suffix}`.trim()))];
 }
 
+/** Exact spellings to ask a registry for, including the name as typed. */
+export function registryNameLiterals(org: string): string[] {
+  const raw = org.trim().toUpperCase().replace(/\s+/g, " ");
+  return [...new Set([raw, ...nyRegistryCandidates(org)])].filter((name) => name.length > 0);
+}
+
 export function nyRegistryQueryUrl(org: string): string {
-  const names = nyRegistryCandidates(org).map((name) => `'${name.replace(/'/g, "''")}'`);
+  const names = registryNameLiterals(org).map((name) => `'${name.replace(/'/g, "''")}'`);
   const params = new URLSearchParams();
+  if (!names.length) {
+    params.set("$limit", "0");
+    return `${DATASET}?${params.toString()}`;
+  }
   params.set("$select", "current_entity_name,dos_id,entity_type");
   params.set("$where", `upper(current_entity_name) in(${names.join(",")})`);
   params.set("$limit", "10");

@@ -1,5 +1,6 @@
 import { annualDuesCents } from "@/lib/dues";
 import { roleLabel } from "@/lib/roles";
+import { US_POSTAL_CODES, statedUsState } from "@/lib/verify/address";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus, Verdict } from "@/lib/verify/types";
 
 /**
@@ -146,7 +147,12 @@ export function r2CheckablePossible(checks: CheckOutput[], weights: GradeWeightT
   let excluded = 0;
   for (const [key, weight] of pairs) {
     const row = checks.find((check) => check.key === key);
-    if (row && (row.status === "NOT_RUN" || row.status === "UNAVAILABLE")) excluded += weight;
+    if (!row) continue;
+    if (row.status === "NOT_RUN" || row.status === "UNAVAILABLE") {
+      excluded += weight;
+      continue;
+    }
+    if (key === "phone-state" && row.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) excluded += weight;
   }
   return Math.max(0, 100 - excluded);
 }
@@ -439,6 +445,12 @@ function failSentence(check: CheckOutput): string | null {
   if ((check.key === "website" || check.key === "rdap") && /domain does not resolve/i.test(check.finding)) {
     return `domain does not resolve (${source}).`;
   }
+  if (check.key === "rdap" && /did not check out/i.test(check.finding)) {
+    return `did not check out (${source}).`;
+  }
+  if (check.key === "address") {
+    return `address did not check out (${source}).`;
+  }
   if (check.key === "website" && check.status === "FAIL") {
     return `The website responded, but the person and company names were not on the home page, the about page, or the team page (${source}).`;
   }
@@ -473,6 +485,9 @@ function uncheckedSentence(check: CheckOutput): string | null {
   if (check.key === "invite-source") {
     if (check.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(check.finding)) return "No referral was supplied.";
     return "The referral could not be matched.";
+  }
+  if (check.key === "address" && check.status === "UNAVAILABLE") {
+    return "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.";
   }
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
@@ -518,6 +533,7 @@ function labelFor(key: string): string {
     "screen-tiktok": "TikTok",
     news: "News search",
     courts: "Court search",
+    address: "Address",
   };
   return labels[key] || key;
 }
@@ -535,10 +551,14 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   const role = roleLabel(facts.role);
   const location = facts.location?.trim() || "no location was given";
   const invite = facts.inviteNote?.trim() ? `They came in through a referral or request: ${facts.inviteNote.trim()}.` : "No referral was supplied.";
+  const requestOnly =
+    facts.applicationSubmitted === false
+      ? "Referral or request only — no application submitted; grade based on request fields only."
+      : "";
   if (subject === "COMPANY") {
-    return `This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`;
+    return `${requestOnly} This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`.trim();
   }
-  return `${name} applied as a ${role} at ${org}, ${location}. ${quoteStatement(facts.statement)} ${invite}`;
+  return `${requestOnly} ${name} applied as a ${role} at ${org}, ${location}. ${quoteStatement(facts.statement)} ${invite}`.trim();
 }
 
 function companySection(checks: CheckOutput[], facts: GradeFacts): string {
@@ -581,7 +601,7 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   }
   const registry = findCheck(checks, "business-registry");
   if (registry?.status === "PASS") {
-    evidence.push("NY Active Corporations has this exact company name. That is company-exists evidence, not a person-to-company link.");
+    evidence.push(registry.finding);
   } else if (registry?.status === "INCONCLUSIVE" || registry?.status === "UNAVAILABLE") {
     evidence.push(registry.finding);
   } else if (registry?.url) {
@@ -594,7 +614,8 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
 }
 
 function usStateKnown(location: string | undefined): boolean {
-  return /\b(NJ|NY|DE|FL|TX|CT|CA)\b/i.test(location || "");
+  const state = statedUsState(location || "");
+  return Boolean(state && US_POSTAL_CODES.has(state));
 }
 
 function payingRole(role: string | undefined): boolean {
@@ -625,6 +646,41 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
 function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode): Line {
   if (!earned && row?.status === "UNAVAILABLE") return unavailableLine(possible, "Web search is not checkable for free", mode);
   return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
+}
+
+function phoneAward(row: CheckOutput | undefined, possible: number): Line {
+  if (row?.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) {
+    return { earned: 0, possible: 0, reason: "The phone is toll-free, so the area code is not applicable." };
+  }
+  return award(passed(row), possible, "The phone area code fits the state", "The phone area code was not confirmed against the state");
+}
+
+function rdapAward(row: CheckOutput | undefined, possible: number): Line {
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "FAIL" && /did not check out/i.test(row.finding)) return portionLine(0, possible, "did not check out");
+  return award(passed(row), possible, "A domain record responded", "No domain record was confirmed");
+}
+
+function registryAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
+  if (!row || row.status === "NOT_RUN") {
+    return award(false, possible, "A free state registry has this exact company name", "The state registry is not searched for free");
+  }
+  if (row.status === "UNAVAILABLE") return unavailableLine(possible, "The state registry is not checkable for free", mode);
+  return award(
+    row.status === "PASS",
+    possible,
+    "A free state registry has this exact company name",
+    "The state registry did not confirm this exact company name",
+  );
+}
+
+function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number): Line {
+  const row = findCheck(checks, "address");
+  if (!row) return award(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application");
+  if (row.status === "FAIL") return portionLine(0, possible, "address did not check out");
+  if (row.status === "UNAVAILABLE") return { earned: 0, possible: 0, reason: "The address is not checkable." };
+  if (row.status === "PASS") return award(true, possible, "A location is on the application", "No location is on the application");
+  return award(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application");
 }
 
 function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
@@ -660,7 +716,7 @@ export function gradeChecks(
     award(passed(findCheck(checks, "email-syntax")), weights.identity["email-syntax"], "The email address is well formed", "The email address is missing or not well formed"),
     award(passed(findCheck(checks, "disposable-email")), weights.identity["disposable-email"], "The email domain is not disposable", "The disposable-email check did not pass"),
     award(passed(findCheck(checks, "role-address")), weights.identity["role-address"], "The email is not a shared inbox", "The shared-inbox check did not pass"),
-    award(passed(findCheck(checks, "phone-state")), weights.identity["phone-state"], "The phone area code fits the state", "The phone area code was not confirmed against the state"),
+    phoneAward(findCheck(checks, "phone-state"), weights.identity["phone-state"]),
     award(
       passed(findCheck(checks, "linkedin-format")) && (linkedinPerson || independent),
       weights.identity["linkedin-format"],
@@ -673,17 +729,8 @@ export function gradeChecks(
     websiteAward(checks, weights.company.website, weightsMode),
     award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
     award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
-    findCheck(checks, "rdap")?.status === "FAIL" && /domain does not resolve/i.test(findCheck(checks, "rdap")?.finding || "")
-      ? portionLine(0, weights.company.rdap, "domain does not resolve")
-      : award(passed(findCheck(checks, "rdap")), weights.company.rdap, "A domain record responded", "No domain record was confirmed"),
-    award(
-      passed(findCheck(checks, "business-registry")),
-      weights.company["business-registry"],
-      "NY Active Corporations has this exact company name",
-      !findCheck(checks, "business-registry") || findCheck(checks, "business-registry")?.status === "NOT_RUN"
-        ? "The state registry is not searched for free"
-        : "The state registry did not confirm this exact company name",
-    ),
+    rdapAward(findCheck(checks, "rdap"), weights.company.rdap),
+    registryAward(findCheck(checks, "business-registry"), weights.company["business-registry"], weightsMode),
   ]);
   const footprint = sumLines([
     footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode),
@@ -709,7 +756,7 @@ export function gradeChecks(
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());
   const completeness = sumLines([
     award(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application"),
-    award(Boolean(facts.location?.trim()), weights.completeness.location, "A location is on the application", "No location is on the application"),
+    locationAward(checks, facts, weights.completeness.location),
     award(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application"),
     award(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short"),
     award(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded"),
@@ -1101,7 +1148,7 @@ export function rubricSections(mode: GradeWeightsMode = GRADE_WEIGHTS_MODE): { t
   const registrySentence =
     mode === "r2"
       ? "The state registry is 0 under R2."
-      : "The registry row is 2 only when NY Active Corporations has the exact company name, and that hit does not corroborate a person. Other states are not searched for free and earn 0.";
+      : "The registry row is 2 only when a free state list has the exact company name (NY, CT, CO, OR, PA). That hit does not corroborate a person. NJ, WA, IA, and states with no keyless API are not checkable for free and earn 0.";
   const r2Note =
     mode === "r2"
       ? " R2 is on: LinkedIn fetch is 0 and the state registry is 0. Those 6 points sit on the website and the web footprint instead. The displayed score rescales earned points over the checkable points. A check that did not run, or did not answer, leaves the denominator. No SEC registrant stays in the denominator as 0 of 6. Letter floors are unchanged."

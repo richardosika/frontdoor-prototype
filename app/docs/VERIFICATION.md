@@ -43,8 +43,8 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 
 | Category | Possible | What earns the points |
 | --- | --- | --- |
-| Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4, or a LinkedIn company page names the company only 2 |
-| Company legitimacy | 22 | Website names the person and company 8, or the company only on the firm's own site 4, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (NY Active Corporations exact name only; other states earn 0) |
+| Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4, or a LinkedIn company page names the company only 2. A toll-free number (800, 833, 844, 855, 866, 877, 888) is not applicable: those 3 points leave the line and it is not scored 0 of 3. |
+| Company legitimacy | 22 | Website names the person and company 8, or the company only on the firm's own site 4, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (exact company name on NY, CT, CO, OR, or PA open data; other states earn 0) |
 | Public footprint and reputation | 18 | Web result names person and company 8, headline names both 8, social links are full URLs 2 |
 | Risk and sanctions | 20 | Sanctions list clear 8, not a duplicate 6, no fraud-pattern text 4, no application burst 2 |
 | Role fit and plausibility | 12 | Name, company, and role readable 8, referral or request code on file 4 |
@@ -99,14 +99,18 @@ OCR is installed (`tesseract.js`). An uploaded card that comes back with no text
 | Web | DuckDuckGo HTML, then Bing, then Wikipedia REST, then keyless Wikidata `wbsearchentities` | An empty but reachable results page is `INCONCLUSIVE`. A challenge page is `UNAVAILABLE` and says “not checkable for free”. Under proposal R2 that row leaves the coverage denominator. A footprint taken from the applicant's own site is the same self-reported source as that site. |
 | News | Google News RSS, Bing News RSS, and GDELT | Quoted full person name, quoted full company phrase, and company plus city. A hyphen is part of the word, so “turner” does not match “page-turner”. Identical headlines are dropped before they are scored or saved. Items older than five years are dropped. The full name has to appear. A single surname token is not the person. A headline that only repeats the query does not count. Fraud, sanctions, or a criminal charge tied to the person with the company or city is a failure for review, not an automatic decline. A company-level lawsuit is an attention item, not a grade cap. A negative term on the person alone is “possible match, needs review” and is not a failure. A blocked feed is `UNAVAILABLE` and is listed under what could not be checked for free. GDELT waits five seconds between calls and caches a success. |
 | LinkedIn and other social pages | Public HTTP with an identifying user agent, not a browser spoof | A block is `UNAVAILABLE` and not checkable for free. A response without the name is `INCONCLUSIVE`. Logged-in pages are not scraped. A URL may include a query string or a sub-path. The shape of a URL does not earn points by itself. |
-| RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404, or DNS NXDOMAIN, is `FAIL`: “domain does not resolve”. |
-| State registry | Deep link only | Always `NOT_RUN` with a manual link for NJ, NY, DE, FL, and TX |
+| RDAP | rdap.org on the registrable domain (`www.related.com` is looked up as `related.com`) | A timeout or block is `UNAVAILABLE`. HTTP 404, or DNS NXDOMAIN, is `FAIL`: “domain does not resolve”. `example.com`, `example.net`, `example.org`, and names under `.example`, `.test`, `.invalid`, or `localhost` are `FAIL`: “did not check out”. They earn 0. |
+| Address | Local US state code and ZIP-5 range. A full street is sent to the keyless US Census Geocoder (`geocoding.geo.census.gov`) | An invalid state or ZIP, or a geocoder miss, earns 0 and the line says “address did not check out”. A geocoder timeout is “not checkable”: not a pass and not a failure. A city and state with no street still earns the 2 location points when the state is real. No USPS or Google key is used. |
+| State registry | Keyless Socrata for NY, CT, CO, OR, and PA. Exact normalized company name only | Company-exists evidence. It does not corroborate a person. A portal that does not respond is not checkable for free. NJ, WA, IA, TX, FL, DE, IL, CA, MA, and MD were checked from this server and have no free company-name API. |
 | Business card | Local text compare. OCR is installed (tesseract.js). | `NOT_RUN` when nothing was uploaded. `UNAVAILABLE` when an image was uploaded and OCR returned no text. A text match requires the full name and the company, and it is self-reported. |
 
-State registry links:
+A file that has not submitted an application is still graded from the referral or request fields. The summary says: “Referral or request only — no application submitted; grade based on request fields only.” The role in that sentence is the role on the request, the same role the list shows.
+
+Manual registry links for states with no free company-name API:
 
 - NJ: https://www.njportal.com/DOR/BusinessNameSearch/
-- NY: https://apps.dos.ny.gov/publicInquiry/
+- WA: https://ccfs.sos.wa.gov/
+- IA: https://sos.iowa.gov/search/business/search.aspx
 - DE: https://icis.corp.delaware.gov/Ecorp/EntitySearch/NameSearch.aspx
 - FL: https://search.sunbiz.org/Inquiry/CorporationSearch/ByName
 - TX: https://mycpa.cpa.state.tx.us/coa/

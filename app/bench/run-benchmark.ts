@@ -23,7 +23,7 @@ import { parseWatchlists, splitCsv } from "@/lib/verify/watchlist";
 
 type Case = {
   id: string;
-  kind: "real" | "fake" | "qa";
+  kind: "real" | "fake" | "qa" | "check";
   label: string;
   companyOnly?: boolean;
   qaExpect?: "firm" | "fake";
@@ -44,6 +44,9 @@ type Case = {
   mustSanctions?: string;
   mustHardFlag?: boolean;
   fixture?: { title: string; body: string };
+  applicationSubmitted?: boolean;
+  expectIncludes?: string[];
+  expectExcludes?: string[];
 };
 
 const BENCH_DIR = __dirname;
@@ -64,7 +67,7 @@ const refreshOfac = args.includes("--refresh-ofac");
 
 const LOCAL_KEYS = new Set([
   "email-syntax", "email-provider", "disposable-email", "role-address", "phone-state", "text-risk", "duplicate", "sanctions",
-  "linkedin-format", "business-card", "invite-source", "plausibility", "velocity", "social-links", "business-registry",
+  "linkedin-format", "business-card", "invite-source", "plausibility", "velocity", "social-links", "business-registry", "address",
 ]);
 const COMPANY_EVIDENCE = (key: string) => ["website", "edgar", "web-footprint", "news", "linkedin-fetch"].includes(key) || key.startsWith("screen-");
 const CODE: Record<string, string> = { PASS: "P", FAIL: "F", INCONCLUSIVE: "I", UNAVAILABLE: "U", NOT_RUN: "N" };
@@ -198,6 +201,7 @@ function buildFacts(c: Case, defaults: Record<string, string>, name: string, web
     duplicateOfDeclined: false,
     recentApplications: 0,
     referenceCount: 0,
+    ...(typeof c.applicationSubmitted === "boolean" ? { applicationSubmitted: c.applicationSubmitted } : {}),
   };
 }
 
@@ -210,7 +214,35 @@ function coverage(checks: CheckOutput[], filter?: (c: CheckOutput) => boolean) {
 
 const short = (s: string, n = 150) => (s.length > n ? `${s.slice(0, n - 1)}…` : s).replace(/\s+/g, " ").replace(/\|/g, "/");
 
-function evaluate(c: Case, grade: { letter: string; recommendation: string }, checks: CheckOutput[]) {
+function evaluate(
+  c: Case,
+  grade: {
+    letter: string;
+    recommendation: string;
+    summary: { applicant: string; didNotCheckOut: string; couldNotCheck: string };
+    categories: { id: string; reason: string }[];
+  },
+  checks: CheckOutput[],
+) {
+  if (c.kind === "check") {
+    const blob = [
+      grade.summary.applicant,
+      grade.summary.didNotCheckOut,
+      grade.summary.couldNotCheck,
+      ...grade.categories.map((category) => category.reason),
+      ...checks.map((check) => `${check.key}:${check.status}:corroborates=${check.corroborates} ${check.finding}`),
+    ].join("\n");
+    const reasons: string[] = [];
+    for (const phrase of c.expectIncludes || []) if (!blob.includes(phrase)) reasons.push(`Missing: ${phrase}`);
+    for (const phrase of c.expectExcludes || []) if (blob.includes(phrase)) reasons.push(`Unexpected: ${phrase}`);
+    return {
+      ok: reasons.length === 0,
+      falsePositive: false,
+      falseNegative: false,
+      expected: "admin-pass check",
+      reasons,
+    };
+  }
   const sanctions = checks.find((x) => x.key === "sanctions");
   const reasons: string[] = [];
   let ok: boolean;
