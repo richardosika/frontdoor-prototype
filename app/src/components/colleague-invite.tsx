@@ -60,12 +60,12 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
 
   return (
     <div className="rounded border border-line bg-paper p-4">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Invite a colleague</h2>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Refer a colleague</h2>
       {codes.length ? (
         <div className="mt-2 space-y-2">
           <p className="text-xs text-ink">Unused codes you can pass along. Private Floor does not email them.</p>
           {codes.map((item) => (
-            <CopyCode key={item.code} code={item.code} caption={item.note || "Invite code"} />
+            <CopyCode key={item.code} code={item.code} caption={item.note || "Referral code"} />
           ))}
         </div>
       ) : null}
@@ -77,7 +77,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
           <p className="text-xs text-ink">
-            Request a code for a colleague. A Private Floor administrator reviews every application. They will hear from us by email.
+            Ask for a colleague to be reviewed. A referral code is optional. A Private Floor administrator reviews every application. They will hear from us by email.
           </p>
           <label className="absolute -left-[9999px]" aria-hidden="true">
             Website

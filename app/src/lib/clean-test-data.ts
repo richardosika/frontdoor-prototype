@@ -99,7 +99,7 @@ export function keptUser(user: CleanUser): boolean {
 
 export type CleanSnapshot = {
   users: CleanUser[];
-  applications: { id: string; statusToken: string; inviteCodeId: string }[];
+  applications: { id: string; statusToken: string; inviteCodeId: string | null }[];
   applicationDecisions: { id: string; applicationId: string }[];
   inviteRequests: { id: string; statusToken: string }[];
   inviteCodes: { id: string; code: string; uses: number; maxUses: number }[];

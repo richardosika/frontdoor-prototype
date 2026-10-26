@@ -255,6 +255,7 @@ async function main() {
   if (!reset && members > 0) {
     await alignSeededDemo();
     console.log("Database already has members. Aligned seeded verification, tiers, and access. Set SEED=reset to wipe and reseed.");
+    await syncOwnerPassword();
     return;
   }
   if (reset) {
@@ -1058,6 +1059,13 @@ async function ensureDemoAccessAndNotices() {
     kind: "DEAL",
     body: `Tara Nguyen asked a question in the deal room for 18-unit multifamily, Newark NJ: What is the current occupancy?`,
   });
+  await syncOwnerPassword();
+}
+
+async function syncOwnerPassword() {
+  const { syncAdminPasswords } = await import("../src/lib/admin-password");
+  const result = await syncAdminPasswords();
+  console.log(`ADMIN_PASSWORD result=${result}`);
 }
 
 async function ensureSystemLine(input: { a: string; b: string; from: string; kind: string; body: string }) {

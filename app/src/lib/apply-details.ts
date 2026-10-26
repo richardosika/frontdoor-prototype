@@ -1,8 +1,6 @@
-import { validatePhone } from "@/lib/person-fields";
+import { stateIssue, validatePhone, zipIssue } from "@/lib/person-fields";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const STATE = /^[A-Za-z]{2}$/;
-const ZIP = /^\d{5}(?:-\d{4})?$/;
 const HTTP = /^https?:\/\//i;
 
 export const DETAILS_CONTINUE_MESSAGE = "Please complete the highlighted fields.";
@@ -53,8 +51,8 @@ export function applyDetailsIssues(input: ApplyDetailsInput): ApplyDetailsIssue[
   add("apply-company", "company", input.org.trim().length < 2 ? "Enter your company or firm." : null);
   add("apply-street", "street", input.street.trim().length < 2 ? "Enter your street address." : null);
   add("apply-city", "city", input.city.trim().length < 2 ? "Enter your city." : null);
-  add("apply-state", "state", STATE.test(input.state.trim()) ? null : "Enter a two-letter state.");
-  add("apply-zip", "ZIP", ZIP.test(input.zip.trim()) ? null : "Enter a ZIP code.");
+  add("apply-state", "state", stateIssue(input.state));
+  add("apply-zip", "ZIP", zipIssue(input.zip));
   add("apply-phone", "contact phone", validatePhone(input.phone));
   add("apply-linkedin", "LinkedIn URL", httpMessage("LinkedIn URL", input.linkedinUrl));
   add("apply-website", "website", httpMessage("Website", input.website));

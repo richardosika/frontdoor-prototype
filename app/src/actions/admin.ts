@@ -408,7 +408,7 @@ export async function createInvite(formData: FormData) {
     redirect("/admin?error=That+code+already+exists");
   }
   revalidatePath("/admin");
-  redirect("/admin?notice=Invite+created");
+  redirect("/admin?notice=Referral+code+created");
 }
 
 export async function issueInviteForRequest(formData: FormData) {
@@ -419,7 +419,7 @@ export async function issueInviteForRequest(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/outbox");
   redirect(
-    `/admin?issued=${encodeURIComponent(issued.code)}&issuedFor=${encodeURIComponent(issued.email)}&notice=${encodeURIComponent("Invite code issued. The information email is in the Outbox for the test recipient. Copy the code below.")}`,
+    `/admin?issued=${encodeURIComponent(issued.code)}&issuedFor=${encodeURIComponent(issued.email)}&notice=${encodeURIComponent("Referral code issued. The information email is in the Outbox for the test recipient. Copy the code below.")}`,
   );
 }
 
@@ -486,18 +486,18 @@ export async function deleteInviteRequest(formData: FormData) {
   const admin = await requireAdmin();
   const requestId = String(formData.get("requestId") || "");
   const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
-  if (!request) redirect("/admin?error=That+invite+request+was+not+found");
+  if (!request) redirect("/admin?error=That+request+was+not+found");
   await prisma.crmPerson.updateMany({ where: { inviteRequestId: request.id }, data: { inviteRequestId: null } });
   await prisma.inviteRequest.delete({ where: { id: request.id } });
   await prisma.moderationEvent.create({
     data: {
       actorId: admin.id,
       action: "DELETE_INVITE_REQUEST",
-      summary: `${admin.name} deleted the invite request for ${request.name} <${request.email}>.`,
+      summary: `${admin.name} deleted the request to join for ${request.name} <${request.email}>.`,
     },
   });
   revalidatePath("/admin");
-  redirect("/admin?notice=Invite+request+deleted");
+  redirect("/admin?notice=Request+deleted");
 }
 
 export async function deleteInviteCode(formData: FormData) {
@@ -507,7 +507,7 @@ export async function deleteInviteCode(formData: FormData) {
     where: { id: inviteId },
     include: { applications: { select: { id: true } } },
   });
-  if (!invite) redirect("/admin?error=That+invite+code+was+not+found");
+  if (!invite) redirect("/admin?error=That+referral+code+was+not+found");
   if (invite.applications.length) {
     redirect("/admin?error=This+code+has+applications.+Delete+those+applicants+first.");
   }
@@ -517,19 +517,19 @@ export async function deleteInviteCode(formData: FormData) {
     data: {
       actorId: admin.id,
       action: "DELETE_INVITE_CODE",
-      summary: `${admin.name} deleted invite code ${invite.code}.`,
+      summary: `${admin.name} deleted referral code ${invite.code}.`,
     },
   });
   revalidatePath("/admin");
-  redirect("/admin?notice=Invite+code+deleted");
+  redirect("/admin?notice=Referral+code+deleted");
 }
 
 export async function declineInviteRequest(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") || "");
   const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
-  if (!request || request.status !== "PENDING") redirect("/admin?error=That+invite+request+is+not+waiting");
+  if (!request || request.status !== "PENDING") redirect("/admin?error=That+request+is+not+waiting");
   await prisma.inviteRequest.update({ where: { id: request.id }, data: { status: "DECLINED" } });
   revalidatePath("/admin");
-  redirect("/admin?notice=Invite+request+declined");
+  redirect("/admin?notice=Request+declined");
 }

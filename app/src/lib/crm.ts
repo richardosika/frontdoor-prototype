@@ -173,7 +173,7 @@ export async function syncCrm() {
   };
 
   for (const invite of invites) {
-    push(invite.email, "invited", `Invite request ${invite.status.toLowerCase()}${invite.inviteCode ? ` · ${invite.inviteCode.code}` : ""}.`, `invite:${invite.id}`, invite.createdAt);
+    push(invite.email, "invited", `Request to join ${invite.status.toLowerCase()}${invite.inviteCode ? ` · ${invite.inviteCode.code}` : ""}.`, `invite:${invite.id}`, invite.createdAt);
   }
   for (const application of applications) {
     push(application.email, "applied", `Application submitted for ${application.role}.`, `application:${application.id}`, application.createdAt);

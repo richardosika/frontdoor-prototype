@@ -23,11 +23,13 @@ describe("expired pay and status links", () => {
     const pay = readFileSync(path.join(ROOT, "app/pay/[token]/not-found.tsx"), "utf8");
     const application = readFileSync(path.join(ROOT, "app/apply/status/[token]/not-found.tsx"), "utf8");
     const invite = readFileSync(path.join(ROOT, "app/invite-status/[token]/not-found.tsx"), "utf8");
+    const request = readFileSync(path.join(ROOT, "app/request-status/[token]/page.tsx"), "utf8");
     expect(pay).toContain('kind="payment"');
     expect(application).toContain('kind="status"');
     expect(invite).toContain('kind="status"');
+    expect(request).toContain('kind="status"');
     expect(readFileSync(path.join(ROOT, "app/pay/[token]/page.tsx"), "utf8")).toContain("notFound()");
-    expect(readFileSync(path.join(ROOT, "app/apply/status/[token]/page.tsx"), "utf8")).toContain("notFound()");
-    expect(readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8")).toContain("notFound()");
+    expect(readFileSync(path.join(ROOT, "app/apply/status/[token]/page.tsx"), "utf8")).toContain("ExpiredLink");
+    expect(readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8")).toContain("/request-status/");
   });
 });

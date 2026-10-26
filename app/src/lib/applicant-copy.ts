@@ -22,11 +22,11 @@ export const INVITE_STATUS_COPY = {
     body: APPLICATION_RECEIVED_TEMPLATE,
   },
   ISSUED: {
-    title: "Your invite is on its way",
-    body: "Thank you. A Private Floor administrator will send your invite code by email. This page does not show the code.",
+    title: "Your request is with Private Floor",
+    body: "Thank you. A Private Floor administrator will email you about the next step. This page does not show a code.",
   },
   DECLINED: {
     title: "Thank you for applying",
-    body: "A Private Floor administrator reviewed your request and is not able to offer an invite at this time. We appreciate you writing to us.",
+    body: "A Private Floor administrator reviewed your request and is not able to offer membership at this time. We appreciate you writing to us.",
   },
 } as const;

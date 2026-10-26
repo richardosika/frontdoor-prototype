@@ -31,7 +31,7 @@ export default async function TestConsolePage({
             Create sample applicants adds six people: a strong legit file, an ambiguous file, a sanctions-style hit on the fake name Alexei Sanctionhit, a thin private-email file, a disposable email, and a duplicate of an existing member. The first pass runs offline so each verdict is visible without waiting on outside sites. Re-run on an application uses live sources.
           </p>
           <p className="mt-2">Delete all test data removes only is_test applications and is_test members, including anyone created with the form below.</p>
-          <p className="mt-2">Delete records from the last N hours removes applications, non-admin members, CRM people, invite requests, and unused invite codes created in that window. Administrators stay. Use it for a probe, not for the seeded samples, unless those samples were created inside the window.</p>
+          <p className="mt-2">Delete records from the last N hours removes applications, non-admin members, CRM people, requests to join, and unused referral codes created in that window. Administrators stay. Use it for a probe, not for the seeded samples, unless those samples were created inside the window.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <form action={createSampleApplicants}>
               <button className={btn} type="submit">
@@ -56,7 +56,7 @@ export default async function TestConsolePage({
           <ConfirmSubmitButton
             form="delete-recent"
             className={`${btnOutline} mt-2`}
-            message="Delete applications, non-admin members, CRM people, invite requests, and unused invite codes created in this window? Administrators stay. This cannot be undone."
+            message="Delete applications, non-admin members, CRM people, requests to join, and unused referral codes created in this window? Administrators stay. This cannot be undone."
           >
             Delete records from the last N hours
           </ConfirmSubmitButton>

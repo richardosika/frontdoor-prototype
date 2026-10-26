@@ -188,6 +188,27 @@ describe("network and verification", () => {
     expect(tierAfterAdminApprovesVouch("CONFIRMED")).toBe("CONFIRMED");
   });
 
+  it("lets an application omit a referral code and rejects a fake address", () => {
+    const base = {
+      code: "",
+      role: "DEVELOPER" as const,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      password: "long-enough",
+      org: "Analytical Engines",
+      street: "12 Market Street",
+      city: "Newark",
+      state: "NJ",
+      zip: "07102",
+      phone: "201-555-0100",
+      referenceEmails: [],
+    };
+    expect(validateApplication(base)).toEqual([]);
+    expect(validateApplication({ ...base, state: "ZZ" })).toEqual(["Enter a real two-letter US state."]);
+    expect(validateApplication({ ...base, zip: "00000" })).toEqual(["Enter a real ZIP code."]);
+  });
+
   it("validates applications", () => {
     expect(
       validateApplication({

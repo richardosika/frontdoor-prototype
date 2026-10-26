@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ADMIN_PASSWORD_TOO_SHORT,
+  adminEnvPasswordMatches,
   adminPasswordAction,
   adminPasswordShape,
+  credentialsAccepted,
   normalizeAdminPassword,
   syncAdminPasswordsFromEnv,
   type AdminPasswordAccount,
@@ -90,6 +92,20 @@ describe("ADMIN_PASSWORD", () => {
     expect(listed).not.toHaveBeenCalled();
     expect(warnings).toEqual([ADMIN_PASSWORD_TOO_SHORT]);
     expect(warnings.join(" ")).not.toContain(secret);
+  });
+
+  it("accepts the env password when the stored hash is stale, and still blocks the member portal", () => {
+    const secret = "correct-horse";
+    expect(adminEnvPasswordMatches(`  ${secret}\n`, secret)).toBe(true);
+    expect(adminEnvPasswordMatches("other-secret", secret)).toBe(false);
+    expect(adminEnvPasswordMatches(secret, "short")).toBe(false);
+    const admin = { isAdmin: true, allowedAdmin: true, hashMatches: false, envMatches: true };
+    expect(credentialsAccepted({ ...admin, portal: "admin" })).toBe(true);
+    expect(credentialsAccepted({ ...admin, portal: undefined })).toBe(true);
+    expect(credentialsAccepted({ ...admin, portal: "member" })).toBe(false);
+    expect(credentialsAccepted({ ...admin, allowedAdmin: false, portal: "admin" })).toBe(false);
+    expect(credentialsAccepted({ isAdmin: false, allowedAdmin: false, hashMatches: true, envMatches: false, portal: "member" })).toBe(true);
+    expect(JSON.stringify({ matched: adminEnvPasswordMatches(secret, secret) })).not.toContain(secret);
   });
 });
 

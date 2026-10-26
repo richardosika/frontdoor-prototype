@@ -35,6 +35,35 @@ export function adminPasswordShape(value: string | undefined): { chars: number; 
   };
 }
 
+/** True when the typed password is exactly the normalized env password. The value is not returned. */
+export function adminEnvPasswordMatches(typed: string, envValue: string | undefined): boolean {
+  if (adminPasswordAction(envValue) !== "apply") return false;
+  const env = normalizeAdminPassword(envValue);
+  if (!env) return false;
+  return typed.trim() === env;
+}
+
+/**
+ * Member sign-in stays on the member portal. An allowed administrator is accepted
+ * with the stored hash or with ADMIN_PASSWORD, including when the portal field was omitted.
+ */
+export function credentialsAccepted(input: {
+  isAdmin: boolean;
+  allowedAdmin: boolean;
+  hashMatches: boolean;
+  envMatches: boolean;
+  portal: unknown;
+}): boolean {
+  const portal = input.portal == null || input.portal === "" ? "" : String(input.portal);
+  if (portal === "member") return !input.isAdmin && input.hashMatches;
+  if (portal === "admin") return input.allowedAdmin && (input.hashMatches || input.envMatches);
+  if (portal === "") {
+    if (input.isAdmin) return input.allowedAdmin && (input.hashMatches || input.envMatches);
+    return input.hashMatches;
+  }
+  return false;
+}
+
 /** Unset stays as seeded. A short value is refused. The password itself is never included in the result. */
 export function adminPasswordAction(value: string | undefined): "unset" | "too-short" | "apply" {
   const normalized = normalizeAdminPassword(value);

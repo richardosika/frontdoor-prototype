@@ -29,7 +29,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "signup",
     title: "How signup works",
-    body: "Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. Use the invite code on Apply, with your real name, role, company, and location. A business card is optional. Private Floor does not ask for a government ID. Two consent boxes start unchecked, and both are required. After you submit, keep the status link. That page is where you reply if a Private Floor administrator asks for more information.",
+    body: "Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. Apply asks for your real name, role, company, and location. A referral code is optional and is never required. A business card is optional. Private Floor does not ask for a government ID. Two consent boxes start unchecked, and both are required. After you submit, keep the status link. That page is where you reply if a Private Floor administrator asks for more information.",
   },
   {
     slug: "verification",

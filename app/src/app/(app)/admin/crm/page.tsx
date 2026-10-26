@@ -157,7 +157,7 @@ export default async function CrmPage({
         </div>
         <section className={`${card} mt-6 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Add a prospect</h2>
-          <p className="mt-1 text-sm text-ink">Mints an invite code. The information email goes to the Outbox for the test recipient when the box is checked.</p>
+          <p className="mt-1 text-sm text-ink">Mints a referral code. The information email goes to the Outbox for the test recipient when the box is checked.</p>
           <form action={addProspect} className="mt-3 grid gap-3 md:grid-cols-2">
             <label>
               <span className={labelCls}>Name</span>

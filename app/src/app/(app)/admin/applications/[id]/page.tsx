@@ -153,8 +153,10 @@ export default async function ApplicationDetailPage({
             <b>Submitted:</b> {formatAuditTime(application.createdAt)}
           </p>
           <p>
-            <b>Invite:</b> {application.inviteCode.code}
-            {application.inviteCode.note ? ` · ${application.inviteCode.note}` : ""}
+            <b>Referral code:</b>{" "}
+            {application.inviteCode
+              ? `${application.inviteCode.code}${application.inviteCode.note ? ` · ${application.inviteCode.note}` : ""}`
+              : "None"}
           </p>
           <p>
             <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}

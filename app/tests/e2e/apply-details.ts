@@ -10,7 +10,7 @@ async function field(page: Page, label: string): Promise<Locator> {
 
 async function openDetails(page: Page) {
   await page.goto(`${BASE}/apply`, { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: "Invite code" }).waitFor();
+  await page.getByRole("heading", { name: "Referral code" }).waitFor();
   await page.getByPlaceholder("PF-XXXX-XXXX").fill("PF-7K2M-91QX");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("heading", { name: "Choose role" }).waitFor();

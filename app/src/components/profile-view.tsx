@@ -247,7 +247,7 @@ export function ProfileView({
         <div className="mt-3 rounded border border-line bg-cream px-3 py-2 text-[12px] leading-relaxed text-ink">
           <b>How verification works</b>
           <ol className="mt-1 list-decimal pl-4">
-            <li>Request to join, or use an invite code from an existing member.</li>
+            <li>Request to join. A referral code from a member is optional.</li>
             <li>A business card is optional. A Private Floor administrator matches it to public records.</li>
             <li>A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.</li>
             <li>A project can request a confirmation only after that project file is Verified. Accepting it does not change membership.</li>

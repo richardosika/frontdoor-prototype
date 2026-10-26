@@ -10,7 +10,7 @@ const DECISION_STAGES = ["APPROVED", "ACTIVE", "DECLINED"] as const;
 export type CrmStageId = (typeof CRM_STAGES)[number];
 
 export const CRM_STAGE_LABELS: Record<CrmStageId, string> = {
-  INVITED: "Invited",
+  INVITED: "Requested",
   APPLIED: "Applied",
   IN_REVIEW: "In review",
   APPROVED: "Approved",
@@ -77,7 +77,7 @@ export function parseTags(value: string): string[] {
 }
 
 export function eventKindLabel(kind: string): string {
-  if (kind === "invited") return "Invited";
+  if (kind === "invited") return "Requested";
   if (kind === "applied") return "Applied";
   if (kind === "email") return "Email";
   if (kind === "verification") return "Verification";

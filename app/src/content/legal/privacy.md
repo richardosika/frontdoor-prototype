@@ -8,7 +8,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 **Effective date:** [DATE]
 
 **Summary at the top (plain English; the full policy below controls)**
-- **What we collect:** invite requests from our website, your application details (name, email, company, city, role), admin-only contact details (phone and LinkedIn), an optional business card image, optional references, what you post and send on the Platform, consent records, and basic usage and security logs. We do not ask for government ID, license documents, or license numbers.
+- **What we collect:** requests to join from our website, your application details (name, email, company, city, role), admin-only contact details (phone and LinkedIn), an optional business card image, optional references, what you post and send on the Platform, consent records, and basic usage and security logs. We do not ask for government ID, license documents, or license numbers.
 - **Automated verification:** when you apply, our platform checks free, public sources (such as your email domain, your company website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal score, summary, and recommendation. **A person makes every membership decision.** You consent to these checks when you apply.
 - **Who sees what:** other members see your profile and posts, never your email, phone, LinkedIn, business card, references, or anything from verification. Applicants see only the status of their application.
 - **Admin access:** our moderators and administrators can read messages and deal-room content for safety, moderation, and verification. Every such access is recorded in an audit log.
@@ -17,13 +17,15 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 
 This Privacy Policy explains how Private Floor Club LLC, a New Jersey limited liability company [to be formed] ("Private Floor," "we," "us," or "our") collects, uses, shares, and protects personal information through Private Floor Club, privatefloorclub.com, and related services (the "Platform"). Private Floor is a separate company from Captiva Development, BuildPro, and other businesses affiliated with our owners; we do not share your personal information with those companies except as described in this policy.
 
-The Platform is designed for real estate professionals acting in a business capacity. This policy covers applicants, members, people who request an invite on our website, people named as references, and visitors to our website. Our website is available in English, Spanish, German, and Japanese; **the English version of this policy governs** if a translation differs.
+The Platform is designed for real estate professionals acting in a business capacity. This policy covers applicants, members, people who request to join on our website, people named as references, and visitors to our website. Our website is available in English, Spanish, German, and Japanese; **the English version of this policy governs** if a translation differs.
+
+Request to join. A referral code is optional and is never required. Solicita unirte. Un código de referencia es opcional y nunca es obligatorio. Beitritt anfragen. Ein Empfehlungscode ist freiwillig und nie erforderlich. 参加を申し込む。紹介コードは任意で、必須ではありません。
 
 ## 1. Information we collect
 
 ### 1.1 Information you give us
 
-- **Invite requests (website):** your name, email address, professional role, company, and, if you choose, your city and a short note.
+- **Requests to join (website):** your name, email address, professional role, company, and, if you choose, your city and a short note. A referral code is optional.
 - **Application and account information:** name, email address, password (stored in hashed form), company, company website, city, and professional role.
 - **Admin-only contact details:** phone number and LinkedIn profile URL. These are visible to our administrators only and are never shown to other members.
 - **Business card image (optional):** a JPG, PNG, or PDF image of your business card. Business card images are stored privately, are visible to administrators only, and are never shown to other members.
@@ -99,7 +101,7 @@ We run these checks only after you consent to them in the Applicant Consent and 
 
 We use personal information to:
 
-- review invite requests and applications, run the automated checks described in Section 2, and support human review and membership decisions;
+- review requests to join and applications, run the automated checks described in Section 2, and support human review and membership decisions;
 - create and operate your account and provide the Platform, including messaging and deal rooms;
 - record consents and NDA acknowledgements and manage deal-room access;
 - moderate content, investigate reports, enforce our Terms and Policies, and prevent fraud, abuse, spam, duplicate accounts, and security incidents;
@@ -159,7 +161,7 @@ We keep personal information only as long as needed for the purposes in this pol
 - **Consent records and NDA acknowledgements:** for as long as the account exists and up to [7] years after.
 - **Business card images:** deleted within [30] days after the decision on your application; extracted text kept with the verification report.
 - **Reference details:** deleted within [90] days after the decision, except a short note that a reference was or was not confirmed.
-- **Invite requests that do not lead to membership:** up to [24] months.
+- **Requests to join that do not lead to membership:** up to [24] months.
 - **Billing records (paid categories):** [7] years for tax and accounting.
 - **Backups:** deleted on the normal backup cycle of up to [35] days.
 

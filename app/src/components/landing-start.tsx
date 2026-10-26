@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { JoinLanguages } from "@/components/join-languages";
 import { RequestInviteForm } from "@/components/request-invite-form";
 import { btn, btnOutline } from "@/components/ui";
 import { applicationReceivedMessage, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
@@ -27,12 +28,13 @@ export function LandingStart({ signedIn = false }: { signedIn?: boolean }) {
           Request to join
         </a>
         <Link href="/apply" className={btnOutline}>
-          Apply with an invite
+          Apply
         </Link>
         <Link href={memberLoginHref(signedIn)} className={btnOutline}>
           Sign in
         </Link>
       </div>
+      <JoinLanguages />
       <RequestInviteForm
         onSubmitted={(firstName) => {
           setThanksName(firstName);

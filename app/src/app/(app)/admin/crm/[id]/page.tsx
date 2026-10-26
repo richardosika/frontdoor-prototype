@@ -60,7 +60,7 @@ export default async function CrmPersonPage({
             {person.org ? ` · ${person.org}` : ""}
             {person.location ? ` · ${person.location}` : ""}
           </p>
-          {person.inviteCode ? <p>Invite code {person.inviteCode}</p> : null}
+          {person.inviteCode ? <p>Referral code {person.inviteCode}</p> : null}
           {person.doNotContact ? <p className="text-brass">Do not contact. {person.doNotContactReason}</p> : null}
           {followUpDue(person.followUpAt) ? <p className="text-brass">Follow-up due {person.followUpAt?.toISOString().slice(0, 10)}</p> : null}
           <form action={startGuidedReview} className="pt-2">

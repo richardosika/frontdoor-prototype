@@ -37,12 +37,13 @@ const CODE_MINUTES = 15;
 
 export async function checkInvite(code: string): Promise<{ ok: true; note: string } | { ok: false; error: string }> {
   const normalized = normalizeInviteCode(code);
-  if (normalized.length < 4) return { ok: false, error: "Enter the invite code a member shared with you." };
+  if (!normalized) return { ok: true, note: "" };
+  if (normalized.length < 4) return { ok: false, error: "That referral code is not valid." };
   const invite = await prisma.inviteCode.findUnique({ where: { code: normalized } });
   if (!invite || !isInviteUsable(invite)) {
-    return { ok: false, error: "That invite code is not active. Ask a member for a current code." };
+    return { ok: false, error: "That referral code is not active." };
   }
-  return { ok: true, note: invite.note || "Invite accepted." };
+  return { ok: true, note: invite.note || "Referral code accepted." };
 }
 
 function textField(formData: FormData, key: string): string {
@@ -173,9 +174,9 @@ export async function submitApplication(
   });
   if (pending) return { ok: false, error: "An application for that email is already under review." };
 
-  const invite = await prisma.inviteCode.findUnique({ where: { code } });
-  if (!invite || !isInviteUsable(invite)) {
-    return { ok: false, error: "That invite code is not active." };
+  const invite = code ? await prisma.inviteCode.findUnique({ where: { code } }) : null;
+  if (code && (!invite || !isInviteUsable(invite))) {
+    return { ok: false, error: "That referral code is not active." };
   }
 
   const references = (input.referenceEmails ?? []).map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -191,7 +192,7 @@ export async function submitApplication(
   const application = await prisma.$transaction(async (tx) => {
     const created = await tx.application.create({
       data: {
-        inviteCodeId: invite.id,
+        inviteCodeId: invite?.id,
         email,
         statusToken,
         name,
@@ -233,10 +234,12 @@ export async function submitApplication(
         ipHash,
       })),
     });
-    await tx.inviteCode.update({
-      where: { id: invite.id },
-      data: { uses: { increment: 1 } },
-    });
+    if (invite) {
+      await tx.inviteCode.update({
+        where: { id: invite.id },
+        data: { uses: { increment: 1 } },
+      });
+    }
     return created;
   });
 

@@ -43,13 +43,13 @@ ${JOIN_CTA}
 
 A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
-Code: {invite_code}
+Referral code, optional: {invite_code}
 
 ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   },
   {
     key: "invite_received",
-    name: "Invite request received",
+    name: "Request received",
     subject: "Thank you for applying to Private Floor",
     body: `${APPLICATION_RECEIVED_TEMPLATE}
 
@@ -108,7 +108,7 @@ Reply
   {
     key: "approved",
     name: "Approved",
-    subject: "You're approved for Private Floor",
+    subject: "You're approved to Private Floor",
     body: `Hello {first_name},
 
 A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no monthly dues. Developers, investors and LPs, family offices, and lenders are free.
@@ -236,6 +236,18 @@ A Private Floor administrator reviews every application. The check uses public r
 Code: {invite_code}
 
 Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+    `Hello {first_name},
+
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Code: {invite_code}
+
+${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   ],
   invite_received: `Hello {first_name},
 
@@ -406,6 +418,18 @@ Your flat annual dues of {dues_amount} renew on {renewal_date}. They are billed 
 Billing: {billing_link}${SIGN}`,
   ],
 };
+
+const PREVIOUS_SUBJECTS: Partial<Record<TemplateKey, string[]>> = {
+  approved: ["You're invited to Private Floor", "You're approved for Private Floor"],
+  info: ["You're invited to Private Floor"],
+  payment_due: ["You're approved — annual dues are next"],
+};
+
+/** True when a stored subject is an older default that should be replaced. */
+export function staleTemplateSubject(key: string, subject: string): boolean {
+  if (!isTemplateKey(key)) return false;
+  return (PREVIOUS_SUBJECTS[key] ?? []).includes(subject);
+}
 
 /** The new default body when the stored letter is still the previous default. */
 export function replacementTemplateBody(key: string, current: string): string | null {

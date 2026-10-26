@@ -78,7 +78,7 @@ export function InviteDecisionForm({ caseId }: { caseId: string }) {
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
         if (decision === "APPROVED") {
-          const confirmed = window.confirm("Approve this request to join? An invite code goes out, and this file is marked Verified.");
+          const confirmed = window.confirm("Approve this request to join? A referral code goes out, and this file is marked Verified.");
           if (!confirmed) event.preventDefault();
         }
         if (decision === "DECLINED") {

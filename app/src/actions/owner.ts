@@ -134,7 +134,7 @@ export async function refreshWatchlists(): Promise<{ href: string }> {
 
 export async function insertSampleApplicants(actorId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const invite = await prisma.inviteCode.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!invite) return { ok: false, error: "Create an invite code first" };
+  if (!invite) return { ok: false, error: "Create a referral code first" };
   if (invite.uses + SAMPLES.length > invite.maxUses) {
     await prisma.inviteCode.update({
       where: { id: invite.id },
@@ -220,7 +220,10 @@ export async function deleteApplicantRecords(ids: string[], actorId: string): Pr
   });
   await prisma.emailChallenge.deleteMany({ where: { email: { in: emails } } });
   const counts = new Map<string, number>();
-  for (const row of applications) counts.set(row.inviteCodeId, (counts.get(row.inviteCodeId) ?? 0) + 1);
+  for (const row of applications) {
+    if (!row.inviteCodeId) continue;
+    counts.set(row.inviteCodeId, (counts.get(row.inviteCodeId) ?? 0) + 1);
+  }
   for (const [inviteCodeId, count] of counts) {
     const invite = await prisma.inviteCode.findUnique({ where: { id: inviteCodeId } });
     if (!invite) continue;
@@ -560,7 +563,7 @@ export async function seedPaymentDueMember() {
     redirect("/admin/test?notice=Gina+Paytest+is+already+on+the+floor.+Password+is+cornicio-demo.");
   }
   const invite = await prisma.inviteCode.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!invite) redirect("/admin/test?error=Create+an+invite+code+first");
+  if (!invite) redirect("/admin/test?error=Create+a+referral+code+first");
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   const paymentToken = randomBytes(24).toString("hex");
   const user = await prisma.user.create({
@@ -666,7 +669,7 @@ export async function deleteRecentRecords(formData: FormData) {
   revalidatePath("/admin/crm");
   redirect(
     `/admin/test?notice=${encodeURIComponent(
-      `Deleted records from the last ${hours} hours: ${applications.length} application(s), ${members.length} member account(s), ${people.count} CRM people, ${requests.length} invite request(s), ${codes.length} unused invite code(s). Administrators were kept. ${notice}`.trim(),
+      `Deleted records from the last ${hours} hours: ${applications.length} application(s), ${members.length} member account(s), ${people.count} CRM people, ${requests.length} request(s) to join, ${codes.length} unused referral code(s). Administrators were kept. ${notice}`.trim(),
     )}`,
   );
 }
@@ -704,7 +707,7 @@ export async function createCustomTestApplicant(
     return { error: "Name, company, and a valid email are required." };
   }
   const invite = await prisma.inviteCode.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!invite) return { error: "Create an invite code first." };
+  if (!invite) return { error: "Create a referral code first." };
   if (invite.uses >= invite.maxUses) {
     await prisma.inviteCode.update({ where: { id: invite.id }, data: { maxUses: invite.uses + 1 } });
   }

@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   await openInviteReview(created.id).catch((error) => {
     console.error("guided prefill failed", error instanceof Error ? error.message : "error");
   });
-  const statusUrl = `${await appBaseUrl()}/invite-status/${statusToken}`;
+  const statusUrl = `${await appBaseUrl()}/request-status/${statusToken}`;
   try {
     await sendTemplate({
       key: "invite_received",
