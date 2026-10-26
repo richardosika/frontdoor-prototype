@@ -10,7 +10,8 @@ import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDe
 import { applicationReceivedMessage, APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
 import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
-import { DUES_ANNUAL_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, DUES_WAIVED, duesForRole } from "@/lib/dues";
+import { DuesLanguages } from "@/components/dues-languages";
+import { DUES_BILLING_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, duesForRole, formatMoney } from "@/lib/dues";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
 
@@ -300,10 +301,10 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         {!done && step === 2 ? (
           <div>
             <StepIntro title="Choose role">
-              <p>Pick the role that best describes you. Each card shows the annual dues for that role.</p>
+              <p>Pick the role that best describes you. Each card shows the monthly dues for that role, with the half-price first month next to the full price.</p>
             </StepIntro>
             <div className="mb-4 rounded border border-line bg-cream px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Annual dues</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership dues</p>
               <p className="mt-2 text-sm leading-relaxed text-ink">{DUES_SCHEDULE_SENTENCE}</p>
             </div>
             <div className="mt-3 max-h-[420px] overflow-y-auto pr-1">
@@ -488,18 +489,25 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ) : null}
         {!done && step === 5 ? (
           <div>
-            <StepIntro title="Annual dues">
+            <StepIntro title="Membership dues">
               <p>{selected.label}</p>
             </StepIntro>
             <div className="rounded border border-brass bg-brass-soft p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Annual dues</p>
-              <p className="mt-1 font-serif text-3xl">{dues.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Membership dues</p>
+              {dues.cents > 0 ? (
+                <>
+                  <p className="mt-1 font-serif text-3xl">{formatMoney(dues.firstCents)}</p>
+                  <p className="mt-2 text-sm text-ink">First month, 50% off. Then {formatMoney(dues.cents)} per month.</p>
+                </>
+              ) : (
+                <p className="mt-1 font-serif text-3xl">{dues.label}</p>
+              )}
               <p className="mt-2 text-sm leading-relaxed text-ink">
                 {dues.cents > 0
-                  ? `${DUES_ANNUAL_NOTE} No card is collected on this form. The renewal date is one year after these annual dues are recorded.`
+                  ? `${DUES_BILLING_NOTE} No card is collected on this form. The next charge is one month after the first month is recorded. A reminder goes out before that full-price charge.`
                   : `${DUES_FREE_LINE} Approval opens the floor. Nothing is charged.`}
               </p>
-              {dues.cents > 0 ? <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p> : null}
+              {dues.cents > 0 ? <DuesLanguages /> : null}
             </div>
             <section className="mt-5 rounded border border-brass bg-paper px-4 py-5">
               <h2 className="font-serif text-xl font-normal">Your agreement</h2>

@@ -10,9 +10,9 @@ const BUTTON: Partial<Record<TemplateKey, string>> = {
   needs_info: ">REPLY</a>",
   approved: ">SIGN IN</a>",
   declined: ">CHECK YOUR STATUS</a>",
-  payment_due: ">PAY ANNUAL DUES</a>",
-  dues_reminder: ">PAY ANNUAL DUES</a>",
-  renewal: ">VIEW BILLING</a>",
+  payment_due: ">PAY MEMBERSHIP DUES</a>",
+  dues_reminder: ">PAY MEMBERSHIP DUES</a>",
+  renewal: ">CANCEL ANYTIME</a>",
 };
 
 function letter(key: TemplateKey) {
@@ -60,9 +60,11 @@ describe("branded email layout", () => {
 
   it("gives the dues letter a pay button inside the same wrapper", () => {
     const { text, html } = letter("payment_due");
-    expect(text).toContain("Pay annual dues");
+    expect(text).toContain("Pay membership dues");
+    expect(text).toContain("$74.50");
+    expect(text).toContain("$149 per month");
     expect(text).toContain("https://cornicio-mvp.onrender.com/pay/preview");
-    expect(html).toContain(">PAY ANNUAL DUES</a>");
+    expect(html).toContain(">PAY MEMBERSHIP DUES</a>");
     expect(html).toContain('href="https://cornicio-mvp.onrender.com/pay/preview"');
     expect(html).toContain(">SIGN IN</a>");
     expect(html).toContain(">VIEW THE DECISION</a>");

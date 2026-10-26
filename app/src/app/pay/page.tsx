@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { confirmStripeReturn } from "@/actions/payments";
 import { PayDues } from "@/components/pay-dues";
 import { requireAccount } from "@/lib/current-user";
-import { annualDuesCents } from "@/lib/dues";
+import { currentMonthlyCents } from "@/lib/dues";
 import { blocksMembership, checkoutModeForRole } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 
@@ -22,12 +22,13 @@ export default async function PayPage({
     <PayDues
       name={fresh.name}
       role={fresh.role}
-      cents={fresh.duesCents || annualDuesCents(fresh.role)}
+      cents={currentMonthlyCents(fresh.role, fresh.duesCents)}
       token={fresh.paymentToken || ""}
       mode={checkoutModeForRole(fresh.role)}
       status={fresh.paymentStatus}
       renewalAt={fresh.renewalAt}
       signedIn
+      cancelled={Boolean(fresh.cancelRequestedAt)}
       error={params.error}
       notice={params.notice}
     />

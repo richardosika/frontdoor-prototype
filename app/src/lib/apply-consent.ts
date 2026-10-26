@@ -1,4 +1,4 @@
-import { DUES_ANNUAL_NOTE, DUES_TABLE } from "@/lib/dues";
+import { DUES_BILLING_NOTE, DUES_TABLE } from "@/lib/dues";
 
 export const BEFORE_SUBMIT_INTRO = "Private Floor is a vetted network. To review your application:";
 
@@ -51,8 +51,8 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
   {
     id: "dues",
     label: "Dues",
-    title: "A flat annual fee",
-    body: DUES_ANNUAL_NOTE,
+    title: "A flat monthly fee",
+    body: DUES_BILLING_NOTE,
     dues: true,
   },
   {

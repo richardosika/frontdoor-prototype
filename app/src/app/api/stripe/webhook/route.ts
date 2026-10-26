@@ -1,5 +1,5 @@
 import { activatePaidMembership, claimPaymentEvent, markPaymentFailed } from "@/lib/payment-record";
-import { renewalInOneYear, verifyStripeSignature } from "@/lib/payments";
+import { renewalInOneMonth, verifyStripeSignature } from "@/lib/payments";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ function renewalFromInvoice(object: Record<string, unknown>): Date {
   const lines = object.lines as { data?: { period?: { end?: number } }[] } | undefined;
   const end = lines?.data?.[0]?.period?.end;
   if (typeof end === "number") return new Date(end * 1000);
-  return renewalInOneYear();
+  return renewalInOneMonth();
 }
 
 export async function POST(request: Request) {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       await activatePaidMembership({
         userId,
         mode: "stripe",
-        renewalAt: renewalInOneYear(),
+        renewalAt: renewalInOneMonth(),
         stripeCustomerId: String(object.customer || ""),
         stripeSubscriptionId: String(object.subscription || ""),
         welcome: true,

@@ -64,7 +64,7 @@ const SIGN_OFF_LINE = "\n\nRichard Osika, Founder";
 /** Payment letters always name the renewal date, even when an older template omitted it. */
 export function withRenewalLine(text: string, key: string, renewal: string | undefined): string {
   if ((key !== "payment_due" && key !== "dues_reminder") || !renewal || text.includes(renewal)) return text;
-  const line = `Annual dues are billed once a year. Renewal date: ${renewal}.`;
+  const line = `Membership is month to month. Next charge date: ${renewal}.`;
   if (text.endsWith(SIGN_OFF_LINE)) return `${text.slice(0, -SIGN_OFF_LINE.length)}\n\n${line}${SIGN_OFF_LINE}`;
   return `${text}\n\n${line}`;
 }
@@ -79,6 +79,7 @@ export function buildMailVars(input: {
   billingLink?: string;
   applyLink?: string;
   duesAmount?: string;
+  introAmount?: string;
   renewalDate?: string;
   note?: string;
   inviteCode?: string;
@@ -95,6 +96,7 @@ export function buildMailVars(input: {
     billing_link: input.billingLink || "",
     apply_link: input.applyLink || "",
     dues_amount: input.duesAmount || "",
+    intro_amount: input.introAmount || "",
     renewal_date: input.renewalDate || "",
     note: input.note || "",
     invite_code: input.inviteCode || "",

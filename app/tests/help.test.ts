@@ -24,7 +24,7 @@ describe("help assistant", () => {
     const result = await composeAnswer({ question: "What are the annual dues for a general contractor?", chunks });
     expect(result.confidence).toBe("high");
     expect(result.unanswered).toBe(false);
-    expect(result.answer).toContain("$2,400");
+    expect(result.answer).toContain("$149");
     expect(result.answer).toContain("not legal, tax, or investment advice");
     expect(result.answer.toLowerCase()).not.toContain("you will be approved");
     expect(result.provider).toBe("keyword");
@@ -68,14 +68,14 @@ describe("help assistant", () => {
 
   it("prefers an edited FAQ article over the original wording", async () => {
     const edited = DEFAULT_FAQ.map((article) =>
-      article.slug === "dues" ? { ...article, body: "Edited dues note: brokers pay $1,800 a year after approval." } : article,
+      article.slug === "dues" ? { ...article, body: "Edited dues note: brokers pay $129 per month, first month $64.50, after approval." } : article,
     );
     const result = await composeAnswer({
-      question: "What do brokers pay in annual dues?",
+      question: "What do brokers pay in monthly dues?",
       chunks: knowledgeChunks(edited),
     });
     expect(result.answer).toContain("Edited dues note");
-    expect(result.answer).toContain("$1,800");
+    expect(result.answer).toContain("$129");
   });
 
   it("replaces a model answer that leaks a source and falls back when the model fails", async () => {
@@ -120,14 +120,14 @@ describe("help assistant", () => {
   it("answers membership price, a held post, and how to request an introduction", async () => {
     const dues = await composeAnswer({ question: "What does a GC pay for membership?", chunks });
     expect(dues.confidence).toBe("high");
-    expect(dues.answer).toContain("$2,400");
-    expect(dues.answer).toContain("$1,800");
-    expect(dues.answer).toContain("$1,200");
+    expect(dues.answer).toContain("$149");
+    expect(dues.answer).toContain("$74.50");
+    expect(dues.answer).toContain("$129");
     expect(dues.answer.toLowerCase()).toContain("after");
     expect(dues.answer).not.toContain("Help cannot say whether an application will be approved");
 
     const contractor = await composeAnswer({ question: "What does a general contractor pay for membership?", chunks });
-    expect(contractor.answer).toContain("$2,400");
+    expect(contractor.answer).toContain("$149");
     expect(contractor.answer).not.toContain("[DATE]");
     expect(contractor.answer).not.toContain("**");
 

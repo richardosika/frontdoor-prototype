@@ -16,6 +16,27 @@ async function stripeForm(secret: string, path: string, body: URLSearchParams): 
   return { ok: true, value: payload };
 }
 
+/** A one-time 50% coupon for the first invoice. Test secrets only. */
+export async function createIntroCoupon(secret: string): Promise<string | null> {
+  if (!secret.startsWith("sk_test")) return null;
+  const body = new URLSearchParams();
+  body.set("percent_off", "50");
+  body.set("duration", "once");
+  body.set("name", "First month 50 percent off");
+  const created = await stripeForm(secret, "coupons", body);
+  if (!created.ok) return null;
+  const id = String(created.value.id || "");
+  return id || null;
+}
+
+export async function cancelStripeAtPeriodEnd(secret: string, subscriptionId: string): Promise<boolean> {
+  if (!secret.startsWith("sk_test") || !subscriptionId) return false;
+  const body = new URLSearchParams();
+  body.set("cancel_at_period_end", "true");
+  const updated = await stripeForm(secret, `subscriptions/${encodeURIComponent(subscriptionId)}`, body);
+  return updated.ok;
+}
+
 export async function createDuesCheckout(input: {
   secret: string;
   priceId: string;
@@ -24,6 +45,7 @@ export async function createDuesCheckout(input: {
   customerId: string;
   successUrl: string;
   cancelUrl: string;
+  couponId?: string;
 }): Promise<StripeResult<{ url: string }>> {
   const body = new URLSearchParams();
   body.set("mode", "subscription");
@@ -34,6 +56,7 @@ export async function createDuesCheckout(input: {
   body.set("client_reference_id", input.userId);
   body.set("metadata[userId]", input.userId);
   body.set("subscription_data[metadata][userId]", input.userId);
+  if (input.couponId) body.set("discounts[0][coupon]", input.couponId);
   if (input.customerId) body.set("customer", input.customerId);
   else body.set("customer_email", input.email);
   const created = await stripeForm(input.secret, "checkout/sessions", body);

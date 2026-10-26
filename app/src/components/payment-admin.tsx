@@ -7,7 +7,7 @@ import {
   waiveDues,
 } from "@/actions/payments";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
-import { duesLabel } from "@/lib/dues";
+import { currentMonthlyCents, offerLabel } from "@/lib/dues";
 import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { paymentRequired, paymentStatusLabel } from "@/lib/payments";
 
@@ -38,7 +38,7 @@ export function PaymentPanel({
     return (
       <section className={`${card} mt-4 p-4 text-sm`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Dues</h2>
-        <p className="mt-2 text-ink">No annual dues. This role activates as soon as you approve it.</p>
+        <p className="mt-2 text-ink">No monthly dues. This role activates as soon as you approve it.</p>
       </section>
     );
   }
@@ -47,7 +47,7 @@ export function PaymentPanel({
     <section className={`${card} mt-4 p-4 text-sm`}>
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Dues</h2>
       <p className="mt-2">
-        <b>Payment status:</b> {paymentStatusLabel(status)} · {duesLabel(duesCents)}
+        <b>Payment status:</b> {paymentStatusLabel(status)} · {offerLabel(currentMonthlyCents(role, duesCents))}
       </p>
       <p className="mt-1">
         <b>Renewal date:</b> {renewalAt ? formatEtDate(renewalAt) : "Not set"}
@@ -76,7 +76,7 @@ export function PaymentPanel({
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="back" value={back} />
           <button className={btnOutline} type="submit">
-            Send renewal reminder
+            Send full-price reminder
           </button>
         </form>
         <form action={sendFailedPaymentNotice}>

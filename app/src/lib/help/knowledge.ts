@@ -38,8 +38,8 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   },
   {
     slug: "dues",
-    title: "Annual dues and refunds",
-    body: "Developers, investors and limited partners, family offices, and lenders pay no annual dues and become active when approved. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Annual dues are a flat fee, billed once a year, and due only after approval. They are never based on a deal. During testing, Pay dues can be a labelled simulated payment. No card number is stored. A founding-member waiver is applied by an administrator and is not automatic. Refund wording lives on the Membership Dues and Refund Terms page, which is still a draft.",
+    title: "Monthly dues and cancellation",
+    body: "Developers, investors and LPs, family offices, and lenders pay no monthly dues and become active when approved. General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. They are never based on a deal. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues. A waiver is not automatic. Cancel on the payment page or in Settings. A reminder goes out before the first full-price charge.",
   },
   {
     slug: "posts",
@@ -69,7 +69,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "gc-dues",
     title: "What a general contractor pays for membership",
-    body: "General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and limited partners, family offices, and lenders are free. Annual dues are a flat fee, billed once a year, and due only after a Private Floor administrator approves the application. They are never based on a deal.",
+    body: "General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50. Developers, investors and LPs, family offices, and lenders are free. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after a Private Floor administrator approves the application. They are never based on a deal.",
   },
   {
     slug: "post-held",

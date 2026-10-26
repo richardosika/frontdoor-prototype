@@ -1,4 +1,5 @@
 import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+import { DUES_SCHEDULE_SENTENCE } from "@/lib/dues";
 import { JOIN_CTA, MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 
 export const SIGN_OFF = "Richard Osika, Founder";
@@ -44,7 +45,7 @@ A Private Floor administrator reviews every application. The check uses public r
 
 Code: {invite_code}
 
-Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   },
   {
     key: "invite_received",
@@ -76,7 +77,7 @@ It is for {role} at {org}.
 Follow it here
 {status_link}
 
-Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
   },
   {
     key: "welcome",
@@ -110,7 +111,7 @@ Reply
     subject: "You're approved for Private Floor",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no monthly dues. Developers, investors and LPs, family offices, and lenders are free.
 
 Sign in with the email and password you chose.
 
@@ -136,17 +137,17 @@ See the status
   {
     key: "payment_due",
     name: "Payment due",
-    subject: "You're approved — annual dues are next",
+    subject: "You're approved — membership dues are next",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. They are a flat fee, billed once a year, and due only after approval. They are never based on a deal, and Private Floor does not store a card number.
+A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
 
-Renewal date: {renewal_date}.
+Next charge date: {renewal_date}.
 
-Pay annual dues
+Pay membership dues
 {payment_link}
 
-Until the annual dues are recorded, the floor stays on the payment page.
+Until the first month is recorded, the floor stays on the payment page.
 
 Sign in
 {login_link}
@@ -162,9 +163,9 @@ View the decision
     subject: "Your Private Floor dues still need attention",
     body: `Hello {first_name},
 
-Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored.
+Your membership dues still need attention. The first month is {intro_amount} (50% off), then {dues_amount}. Month to month. No long-term contract. Cancel anytime. Next charge date: {renewal_date}. No card number is stored.
 
-Pay annual dues
+Pay membership dues
 {payment_link}
 
 The fee stays flat and is never based on a deal.${SIGN}`,
@@ -172,12 +173,15 @@ The fee stays flat and is never based on a deal.${SIGN}`,
   {
     key: "renewal",
     name: "Renewal",
-    subject: "Your Private Floor dues renew soon",
+    subject: "Your full monthly price starts soon",
     body: `Hello {first_name},
 
-Your flat annual dues of {dues_amount} renew on {renewal_date}. They are billed once a year and are never based on a deal. Write to connect@privatefloorclub.com if you want to cancel before that date.
+Your first month was {intro_amount}, half of the monthly price. On {renewal_date} the charge is the full price, {dues_amount}. Membership is month to month. There is no long-term contract. Cancel anytime before that date and the full-price charge does not run.
 
-Billing: {billing_link}${SIGN}`,
+Cancel anytime
+{billing_link}
+
+The fee is flat and is never based on a deal. No card number is stored.${SIGN}`,
   },
 ];
 
@@ -192,6 +196,7 @@ export const TEMPLATE_VARIABLES = [
   "billing_link",
   "apply_link",
   "dues_amount",
+  "intro_amount",
   "renewal_date",
   "note",
   "invite_code",
@@ -219,6 +224,18 @@ A Private Floor administrator reviews every application. The check uses public r
 Invite code: {invite_code}
 
 Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+    `Hello {first_name},
+
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Code: {invite_code}
+
+Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
   ],
   invite_received: `Hello {first_name},
 
@@ -248,6 +265,14 @@ Nothing is charged at this step. If your role has annual dues, they are a flat f
     `${APPLICATION_RECEIVED_TEMPLATE}
 
 It is for {role} at {org}. You can follow it here: {status_link}
+
+Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+It is for {role} at {org}.
+
+Follow it here
+{status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
   ],
@@ -285,6 +310,19 @@ A Private Floor administrator approved your application. You are approved. Revie
 Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+
+Sign in with the email and password you chose.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
   ],
   declined: `Hello {first_name},
 
@@ -316,6 +354,24 @@ You can also sign in at {login_link}. Until the annual dues are recorded, the fl
 The decision is here: {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. They are a flat fee, billed once a year, and due only after approval. They are never based on a deal, and Private Floor does not store a card number.
+
+Renewal date: {renewal_date}.
+
+Pay annual dues
+{payment_link}
+
+Until the annual dues are recorded, the floor stays on the payment page.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
   ],
   dues_reminder: [
     `Hello {first_name},
@@ -328,12 +384,27 @@ The fee stays flat and is not tied to a deal.${SIGN}`,
 Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored. You can try again here: {payment_link}
 
 The fee stays flat and is never based on a deal.${SIGN}`,
+    `Hello {first_name},
+
+Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored.
+
+Pay annual dues
+{payment_link}
+
+The fee stays flat and is never based on a deal.${SIGN}`,
   ],
-  renewal: `Hello {first_name},
+  renewal: [
+    `Hello {first_name},
 
 Your flat annual dues of {dues_amount} renew on {renewal_date}. This is not a deal fee. Write to connect@privatefloorclub.com if you want to cancel before that date.
 
 Billing: {billing_link}${SIGN}`,
+    `Hello {first_name},
+
+Your flat annual dues of {dues_amount} renew on {renewal_date}. They are billed once a year and are never based on a deal. Write to connect@privatefloorclub.com if you want to cancel before that date.
+
+Billing: {billing_link}${SIGN}`,
+  ],
 };
 
 /** The new default body when the stored letter is still the previous default. */
@@ -390,8 +461,9 @@ export function sampleTemplateVars(): Record<string, string> {
     login_link: "https://cornicio-mvp.onrender.com/login",
     billing_link: "https://cornicio-mvp.onrender.com/settings",
     apply_link: "https://cornicio-mvp.onrender.com/apply",
-    dues_amount: "$2,400 per year",
-    renewal_date: "2027-10-24",
+    dues_amount: "$149 per month",
+    intro_amount: "$74.50",
+    renewal_date: "2026-11-24",
     note: "A short note from the administrator.",
     invite_code: "PF-PREVIEW",
     code: "1234",

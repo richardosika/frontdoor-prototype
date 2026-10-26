@@ -71,9 +71,9 @@ export default async function AdminSettingsPage({
         </section>
 
         <section className={`${card} mt-4 p-4`}>
-          <h2 className={sectionLabel}>Annual dues</h2>
+          <h2 className={sectionLabel}>Membership dues</h2>
           <p className="mt-2 text-sm text-ink">
-            Flat annual amounts, billed once a year and due only after approval. They are not edited on this page and they are never based on a deal. Founding member: dues waived during testing is a note. Waive a person from their member page.
+            Month to month. The first month is 50% off, then the full monthly price. Due only after approval. They are not edited on this page and they are never based on a deal. Waive a person from their member page.
           </p>
           <table className="mt-3 w-full text-left text-sm">
             <thead>

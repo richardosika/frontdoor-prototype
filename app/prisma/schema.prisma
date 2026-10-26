@@ -212,6 +212,7 @@ model User {
   waiverReason   String           @default("")
   refundNote     String           @default("")
   lastRenewalReminderAt DateTime?
+  cancelRequestedAt DateTime?
   createdAt      DateTime         @default(now())
 
   posts                Post[]

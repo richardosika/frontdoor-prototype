@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { logoutAction } from "@/actions/auth";
-import { simulateFailedPayment, simulatePayment, startStripeCheckout } from "@/actions/payments";
+import { cancelMembership, simulateFailedPayment, simulatePayment, startStripeCheckout } from "@/actions/payments";
+import { DuesLanguages } from "@/components/dues-languages";
 import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { DUES_ANNUAL_NOTE, DUES_WAIVED, duesLabel } from "@/lib/dues";
+import { DUES_BILLING_NOTE, DUES_WAIVED, firstMonthCents, formatMoney } from "@/lib/dues";
 import { formatEtDate } from "@/lib/format";
 import { DUES_COVERS, paymentRenewalLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
@@ -18,6 +19,7 @@ export function PayDues({
   status,
   renewalAt,
   signedIn,
+  cancelled,
   error,
   notice,
 }: {
@@ -29,48 +31,63 @@ export function PayDues({
   status: string;
   renewalAt: Date | null;
   signedIn?: boolean;
+  cancelled?: boolean;
   error?: string;
   notice?: string;
 }) {
   const open = status === "PAID" || status === "WAIVED" || status === "NOT_REQUIRED";
+  const first = firstMonthCents(cents);
+  const full = formatMoney(cents);
   return (
     <main className="min-h-dvh bg-cream text-forest md:flex md:items-center md:justify-center md:px-4 md:py-10">
       <article className="mx-auto w-full max-w-lg bg-paper px-6 py-8 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.28)]">
         <Logo />
-        <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Annual dues</p>
-        <h1 className="mt-1 font-serif text-3xl font-normal">Pay annual dues</h1>
+        <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership dues</p>
+        <h1 className="mt-1 font-serif text-3xl font-normal">Pay membership dues</h1>
         <p className="mt-2 text-sm text-ink">
           {name} · {roleLabel(role)}
         </p>
         {error ? <p className="mt-3 text-sm text-brass">{error}</p> : null}
         {notice ? <p className="mt-3 text-sm text-forest">{notice}</p> : null}
         <div className="mt-4 rounded border border-brass bg-brass-soft p-4">
-          <p className="font-serif text-4xl font-normal">{duesLabel(cents)}</p>
-          <p className="mt-2 text-sm text-ink">{DUES_ANNUAL_NOTE}</p>
-          <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
-          {status === "WAIVED" ? <p className="mt-2 text-sm text-forest">{DUES_WAIVED}</p> : null}
-          {status === "WAIVED" ? null : (
-            <p className="mt-2 text-sm text-forest">Renewal date {paymentRenewalLabel(renewalAt)}.</p>
+          {status === "WAIVED" ? (
+            <p className="font-serif text-3xl font-normal">{DUES_WAIVED}</p>
+          ) : (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">First month, 50% off</p>
+              <p className="mt-1 font-serif text-4xl font-normal">{formatMoney(first)}</p>
+              <p className="mt-2 text-sm text-ink">Then {full} per month. Full price {full} per month.</p>
+            </>
           )}
-          <p className="mt-2 text-sm text-ink">Until this is recorded, the rest of the floor stays closed.</p>
+          <p className="mt-2 text-sm text-ink">{DUES_BILLING_NOTE}</p>
+          <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
+          {status === "WAIVED" ? null : <p className="mt-2 text-sm text-forest">Next charge date {paymentRenewalLabel(renewalAt)}.</p>}
+          {cancelled ? (
+            <p className="mt-2 text-sm text-forest">
+              Cancellation is recorded.
+              {renewalAt && status === "PAID" ? ` Access continues through ${formatEtDate(renewalAt)}.` : " Nothing further is scheduled."}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm text-ink">Until the first month is recorded, the rest of the floor stays closed.</p>
         </div>
         <p className="mt-3 text-sm">
           <Link href="/legal/membership-dues" className="underline decoration-brass">
             Membership Dues and Refund Terms
           </Link>
         </p>
+        <DuesLanguages />
         {mode === "simulated" ? (
           <p className="mt-3 rounded border border-brass px-3 py-2 text-sm text-forest">
             TEST. Simulated payment. {BRAND.name} does not store a card number, and this button does not charge one.
           </p>
         ) : (
           <p className="mt-3 rounded border border-line px-3 py-2 text-sm text-ink">
-            Stripe test mode. No live charge. {BRAND.name} does not store your card number.
+            Stripe test mode. The first invoice is 50% off. No live charge. {BRAND.name} does not store your card number.
           </p>
         )}
         {open ? (
           <div className="mt-4 text-sm">
-            <p>This membership is active{renewalAt ? `. Renewal date ${formatEtDate(renewalAt)}` : ""}.</p>
+            <p>This membership is active{renewalAt ? `. Next charge date ${formatEtDate(renewalAt)}` : ""}.</p>
             <Link href={signedIn ? "/feed" : "/login"} className={`${btn} mt-3`}>
               {signedIn ? "Open the floor" : "Sign in"}
             </Link>
@@ -87,7 +104,7 @@ export function PayDues({
             <form action={simulatePayment}>
               <input type="hidden" name="token" value={token} />
               <button className={btn} type="submit">
-                Pay annual dues (test)
+                Pay first month {formatMoney(first)} (test)
               </button>
             </form>
             <form action={simulateFailedPayment}>
@@ -97,6 +114,15 @@ export function PayDues({
               </button>
             </form>
           </div>
+        )}
+        {cancelled ? null : (
+          <form action={cancelMembership} className="mt-4">
+            <input type="hidden" name="token" value={token} />
+            <button className={btnOutline} type="submit">
+              Cancel anytime
+            </button>
+            <p className="mt-2 text-sm text-ink">Month to month. No long-term contract. Cancellation stops the next charge.</p>
+          </form>
         )}
         {signedIn ? (
           <form action={logoutAction} className="mt-6">

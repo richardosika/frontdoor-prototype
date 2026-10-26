@@ -160,7 +160,7 @@ export function Composer({
           <div className="mt-2 max-h-64 overflow-y-auto text-sm" dangerouslySetInnerHTML={{ __html: rulesHtml }} />
           <label className="mt-3 flex items-start gap-2 text-sm text-ink">
             <input type="checkbox" name="rulesAck" value="yes" required className="mt-1" />
-            <span>I have read these rules. This post does not offer securities or promise a return. Annual dues are a flat fee, billed once a year, and none are charged on this test.</span>
+            <span>I have read these rules. This post does not offer securities or promise a return. Membership dues are month to month, and this post does not charge them.</span>
           </label>
         </div>
       ) : null}

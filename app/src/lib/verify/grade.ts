@@ -766,7 +766,7 @@ function reasoningFor(input: {
   }
   if (input.recommendation === "APPROVE WITH CONDITIONS") {
     const dues = input.paying
-      ? ` ${roleLabel(input.role)} is a paying role. Annual dues are a flat fee, billed once a year, and due only after you approve.`
+      ? ` ${roleLabel(input.role)} is a paying role. Membership is month to month. The first month is 50% off, then the full monthly price, and the link goes out only after you approve.`
       : " I would still ask you to look at the attention list before you approve.";
     return `${grade} The checks that found something line up well enough to recommend approval with conditions.${dues}`;
   }
@@ -785,7 +785,7 @@ function nextStepFor(input: { recommendation: Recommendation; checks: CheckOutpu
   if (input.checks.some(isAmbiguousNews) || input.checks.some(isCorroboratedNegative) || input.checks.some(isPossibleSanctions)) {
     asks.unshift("open the possible match and confirm it is this person");
   }
-  if (input.paying) asks.push("if you approve, the annual-dues link goes out only after your approval");
+  if (input.paying) asks.push("if you approve, the membership-dues link goes out only after your approval");
   if (!asks.length) return "Read the grade breakdown, then approve, ask for more, or decline.";
   const lead = asks.slice(0, 3).join(", ");
   return `${lead.charAt(0).toUpperCase()}${lead.slice(1)}.`;

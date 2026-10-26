@@ -287,8 +287,8 @@ describe("executive grade profiles", () => {
   it("recommends approval with conditions for a paying role", () => {
     const report = gradeChecks(strongChecks(), { ...fullFacts, role: "GENERAL_CONTRACTOR" });
     expect(report.recommendation).toBe("APPROVE WITH CONDITIONS");
-    expect(report.summary.reasoning.toLowerCase()).toContain("annual dues");
-    expect(report.summary.nextStep.toLowerCase()).toContain("annual-dues");
+    expect(report.summary.reasoning.toLowerCase()).toContain("month to month");
+    expect(report.summary.nextStep.toLowerCase()).toContain("membership-dues");
     expect(report.letter === "A" || report.letter === "B").toBe(true);
   });
 

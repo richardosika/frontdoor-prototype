@@ -18,11 +18,11 @@ const DAY = 24 * 60 * 60 * 1000;
 
 describe("annual dues", () => {
   it("charges the flat role amounts and never a deal fee", () => {
-    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(240_000);
-    expect(annualDuesCents("BROKER")).toBe(180_000);
-    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(180_000);
-    expect(annualDuesCents("RE_ATTORNEY")).toBe(120_000);
-    expect(annualDuesCents("ARCHITECT_ENGINEER")).toBe(120_000);
+    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(14_900);
+    expect(annualDuesCents("BROKER")).toBe(12_900);
+    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(12_900);
+    expect(annualDuesCents("RE_ATTORNEY")).toBe(12_900);
+    expect(annualDuesCents("ARCHITECT_ENGINEER")).toBe(12_900);
     expect(annualDuesCents("DEVELOPER")).toBe(0);
     expect(annualDuesCents("INVESTOR_PE")).toBe(0);
     expect(annualDuesCents("FAMILY_OFFICE")).toBe(0);
@@ -55,6 +55,7 @@ describe("annual dues", () => {
 describe("checkout mode", () => {
   it("stays simulated unless the test secret, webhook secret, and role price are all set", () => {
     expect(checkoutMode({ secretKey: "sk_test", webhookSecret: "whsec", priceId: "price_gc" })).toBe("stripe");
+    expect(checkoutMode({ secretKey: "sk_live_secret", webhookSecret: "whsec", priceId: "price_gc" })).toBe("simulated");
     expect(checkoutMode({ secretKey: "", webhookSecret: "whsec", priceId: "price_gc" })).toBe("simulated");
     expect(checkoutMode({ secretKey: "sk_test", webhookSecret: "", priceId: "price_gc" })).toBe("simulated");
     expect(checkoutMode({ secretKey: "sk_test", webhookSecret: "whsec", priceId: "" })).toBe("simulated");
@@ -105,13 +106,13 @@ describe("stripe signature", () => {
 describe("renewal reminders", () => {
   const now = new Date("2026-10-24T12:00:00Z");
 
-  it("is due inside 30 days and at most weekly", () => {
-    const renewalAt = new Date(now.getTime() + 10 * DAY);
+  it("is due inside 7 days and once per cycle", () => {
+    const renewalAt = new Date(now.getTime() + 5 * DAY);
     expect(renewalReminderDue({ renewalAt: null, lastSentAt: null, now })).toBe(false);
     expect(renewalReminderDue({ renewalAt, lastSentAt: null, now })).toBe(true);
     expect(renewalReminderDue({ renewalAt, lastSentAt: new Date(now.getTime() - DAY), now })).toBe(false);
-    expect(renewalReminderDue({ renewalAt, lastSentAt: new Date(now.getTime() - 8 * DAY), now })).toBe(true);
-    expect(renewalReminderDue({ renewalAt: new Date(now.getTime() + 40 * DAY), lastSentAt: null, now })).toBe(false);
+    expect(renewalReminderDue({ renewalAt, lastSentAt: new Date(now.getTime() - 10 * DAY), now })).toBe(true);
+    expect(renewalReminderDue({ renewalAt: new Date(now.getTime() + 10 * DAY), lastSentAt: null, now })).toBe(false);
     expect(renewalReminderDue({ renewalAt: new Date(now.getTime() - DAY), lastSentAt: null, now })).toBe(false);
   });
 });

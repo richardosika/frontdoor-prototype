@@ -1,4 +1,4 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-26-draft-1
 
 # Private Floor Club - Privacy Policy
 
@@ -105,7 +105,7 @@ We use personal information to:
 - moderate content, investigate reports, enforce our Terms and Policies, and prevent fraud, abuse, spam, duplicate accounts, and security incidents;
 - communicate with you about your application, account, and the Platform (during testing, system emails go only to our internal test mailbox; see Section 12);
 - understand how the Platform is used and improve it, including improving our verification checks;
-- bill annual dues for paid member categories [PLACEHOLDER — not during testing; billing not yet built];
+- bill monthly dues for paid member categories through Stripe test mode or a labelled simulated payment. No live card is charged, and we do not store a card number;
 - comply with law, respond to lawful requests, and protect the rights, property, and safety of members, us, and others; and
 - for any other purpose we describe when we collect the information, or with your consent.
 

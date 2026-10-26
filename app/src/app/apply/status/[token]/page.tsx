@@ -6,7 +6,7 @@ import { btn } from "@/components/ui";
 import { applicationReceivedMessage } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
-import { DUES_ANNUAL_NOTE, DUES_WAIVED, duesLabel } from "@/lib/dues";
+import { DUES_BILLING_NOTE, DUES_WAIVED, currentMonthlyCents, duesLabel, offerLabel } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
               <p className="mt-1">Verification in progress.</p>
             ) : null}
             <p className="mt-1">
-              {duesLabel(application.duesCents)}. {application.duesCents > 0 ? DUES_ANNUAL_NOTE : ""} {application.duesWaived ? DUES_WAIVED : ""}
+              {application.duesCents > 0 ? offerLabel(currentMonthlyCents(application.role, application.duesCents)) : duesLabel(0)}. {application.duesCents > 0 ? DUES_BILLING_NOTE : ""} {application.duesWaived ? DUES_WAIVED : ""}
             </p>
           </div>
           {showNote ? (

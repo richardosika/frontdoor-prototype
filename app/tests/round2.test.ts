@@ -4,7 +4,7 @@ import { dropEmptyLabelLines, renderTemplate, SIGN_OFF } from "@/lib/email-templ
 import { formatEtDate } from "@/lib/format";
 import { cleanHelpText } from "@/lib/help/answer";
 import { memberFacingLegal, signupConsentCopy } from "@/lib/legal";
-import { eligibleForDirectory, renewalInOneYear } from "@/lib/payments";
+import { eligibleForDirectory, renewalInOneMonth } from "@/lib/payments";
 import { inactiveAccountPath, loggedInPublicRedirect } from "@/lib/session-gate";
 import { appendMemberReply, splitMemberReply } from "@/lib/statement";
 import { websiteNamesMatch } from "@/lib/verify/checks";
@@ -99,19 +99,20 @@ describe("mail subjects and renewal dates", () => {
     expect(dropEmptyLabelLines("The decision is here: \n")).not.toContain("decision");
   });
 
-  it("uses the New York calendar date for a renewal one year later", () => {
+  it("uses the New York calendar date for a charge one month later", () => {
     const paid = new Date("2026-10-25T00:11:00.000Z");
     expect(formatEtDate(paid)).toBe("2026-10-24");
-    expect(formatEtDate(renewalInOneYear(paid))).toBe("2027-10-24");
+    expect(formatEtDate(renewalInOneMonth(paid))).toBe("2026-11-24");
   });
 });
 
 describe("member-facing copy", () => {
   it("shows real dues on signup and strips draft markers from member legal text", () => {
     const html = signupConsentCopy().beforeHtml;
-    expect(html).toContain("$2,400");
-    expect(html).toContain("$1,800");
-    expect(html).toContain("$1,200");
+    expect(html).toContain("$149");
+    expect(html).toContain("$74.50");
+    expect(html).toContain("$129");
+    expect(html).toContain("$64.50");
     expect(html).not.toContain("[amounts");
     expect(html).not.toContain("[DATE]");
     const shown = memberFacingLegal(

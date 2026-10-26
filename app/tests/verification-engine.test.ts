@@ -112,11 +112,11 @@ describe("dues and notices", () => {
   it("shows the published dues and waives them in copy", () => {
     expect(annualDuesCents("DEVELOPER")).toBe(0);
     expect(annualDuesCents("INVESTOR_PE")).toBe(0);
-    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(240000);
-    expect(annualDuesCents("BROKER")).toBe(180000);
-    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(180000);
-    expect(annualDuesCents("RE_ATTORNEY")).toBe(120000);
-    expect(DUES_WAIVED).toBe("Founding member: dues waived during testing");
+    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(14900);
+    expect(annualDuesCents("BROKER")).toBe(12900);
+    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(12900);
+    expect(annualDuesCents("RE_ATTORNEY")).toBe(12900);
+    expect(DUES_WAIVED).toBe("Dues waived by an administrator.");
   });
 
   it("defaults outbound notices to the test recipient", () => {

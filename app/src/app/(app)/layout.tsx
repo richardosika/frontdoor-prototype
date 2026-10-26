@@ -6,6 +6,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  if (user.paymentStatus === "PAID" && user.renewalAt && !user.cancelRequestedAt) {
+    const { maybeSendFullPriceReminder } = await import("@/lib/payment-record");
+    await maybeSendFullPriceReminder(user.id).catch(() => {
+      console.error("Could not send the full-price reminder");
+    });
+  }
   const [unread, alerts] = await Promise.all([
     prisma.message.count({
       where: {

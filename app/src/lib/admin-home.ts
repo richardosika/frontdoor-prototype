@@ -1,4 +1,4 @@
-import { annualDuesCents, duesLabel } from "@/lib/dues";
+import { monthlyDuesCents, duesLabel, offerLabel } from "@/lib/dues";
 
 export type AttentionCounts = {
   awaitingDecision: number;
@@ -113,8 +113,8 @@ const DUES_ROWS: { role: string; label: string }[] = [
 
 export function duesSchedule(): { role: string; label: string; cents: number; text: string }[] {
   return DUES_ROWS.map((row) => {
-    const cents = annualDuesCents(row.role);
-    return { role: row.role, label: row.label, cents, text: duesLabel(cents) };
+    const cents = monthlyDuesCents(row.role);
+    return { role: row.role, label: row.label, cents, text: cents > 0 ? offerLabel(cents) : duesLabel(cents) };
   });
 }
 

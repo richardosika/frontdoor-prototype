@@ -75,7 +75,7 @@ export default async function TestConsolePage({
         <section className={`${card} mt-4 p-4 text-sm text-ink`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Payment due sample</h2>
           <p className="mt-2">
-            Adds Gina Paytest, an is_test general contractor already approved with payment due (test.gc.pay@example.com, password cornicio-demo, $2,400). Sign-in stops on the Pay dues page. The button does not charge a card. Delete all test data removes her.
+            Adds Gina Paytest, an is_test general contractor already approved with payment due (test.gc.pay@example.com, password cornicio-demo, first month $74.50, then $149 per month). Sign-in stops on the Pay dues page. The button does not charge a card. Delete all test data removes her.
           </p>
           <form action={seedPaymentDueMember} className="mt-3">
             <button className={btn} type="submit">

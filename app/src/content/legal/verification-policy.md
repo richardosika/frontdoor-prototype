@@ -1,4 +1,4 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-26-draft-1
 
 # Private Floor Club - Verification Policy
 

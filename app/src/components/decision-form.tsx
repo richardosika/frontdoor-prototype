@@ -26,7 +26,7 @@ export function DecisionForm({
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
         if (decision === "APPROVED") {
           const dues = paying
-            ? "Approve this person? The annual-dues link goes out only after you approve."
+            ? "Approve this person? The membership-dues link goes out only after you approve."
             : "Approve this person? This role can sign in right away.";
           const warning = notLegit ? ` ${confirmLabel}` : "";
           const confirmed = window.confirm(`${dues}${warning}`);

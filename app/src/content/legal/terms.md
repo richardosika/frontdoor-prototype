@@ -1,4 +1,4 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-26-draft-1
 
 # Private Floor Club - Terms of Use and Membership Agreement
 
@@ -9,7 +9,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 
 **The key points (plain-English summary, not a substitute for the full Terms)**
 - Private Floor is a private network where every member is personally reviewed. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
-- Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Dues are a flat annual fee, billed once a year, and due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
+- Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
 - A Verified badge is a limited, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
@@ -138,27 +138,27 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 ## 8. Membership dues and payments
 
-8.0 **Dues terms.** Our Membership Dues and Refund Terms give more detail and are part of these Terms. **During our testing period, no dues are charged to anyone and no payment details are collected.** We will tell you before any charge begins.
+8.0 **Dues terms.** Our Membership Dues and Refund Terms give more detail and are part of these Terms. Checkout is Stripe test mode or a labelled simulated payment. No live card is charged. We will tell you before any live charge begins.
 
 8.1 **Free memberships.** Membership is free for members approved in these categories: developers, investors and limited partners, family offices, and lenders.
 
-8.2 **Annual dues.** Members approved in these categories pay a flat annual fee, billed once a year and due only after approval [subject to change]:
+8.2 **Monthly dues.** Members approved in these categories pay a flat monthly fee, due only after approval:
 
-- General contractors: $2,400 per year
-- Brokers: $1,800 per year
-- Attorneys and advisors: $1,200 per year
+- General contractors: $149 per month. The first month is $74.50.
+- Brokers: $129 per month. The first month is $64.50.
+- Attorneys and advisors: $129 per month. The first month is $64.50.
 
-We decide which category applies based on the professional role you are approved under.
+We decide which category applies based on the professional role you are approved under. The first charge is half the monthly price. Every charge after that is the full monthly price. We send a reminder before the first full-price charge.
 
-8.3 **Founding members.** [PLACEHOLDER: Members approved before [DATE] in a paid category will receive [12] months of membership free of charge (the "founding-member period"). We will tell you before the founding-member period ends, and dues will start only if you then choose to continue [and provide payment details] /.]
+8.3 **Month to month.** Dues are month to month. There is no long-term contract and no annual term. You can cancel anytime. Cancellation stops the next charge. If you have already paid for the current month, access continues until that month ends.
 
-8.4 **Billing and automatic renewal.** [PLACEHOLDER: Dues are billed annually in advance. Your membership renews automatically for additional one-year terms at the then-current dues unless you cancel before the renewal date. We will send you a reminder at least [30] days before each renewal with the amount and the date, and how to cancel. We will give you at least [30] days' notice of any change to the dues amount before it applies to a renewal.]
+8.4 **Billing.** The first month is 50% off the monthly price shown above. The following months are the full monthly price. A reminder email goes out before the first full-price charge, with the amount, the date, and how to cancel.
 
-8.5 **Cancellation.** [PLACEHOLDER: You may cancel at any time in your account settings or by emailing connect@privatefloorclub.com. Cancellation stops future renewals, and your paid membership continues until the end of the current annual term.]
+8.5 **Cancellation.** You can cancel on the payment page or in Settings, or by emailing connect@privatefloorclub.com. Cancellation stops future charges.
 
-8.6 **Refunds.** [PLACEHOLDER: Dues are non-refundable except [within [14] days after the initial charge / within [14] days after an automatic renewal charge if you have not used the Platform since renewal] or as required by law. If we terminate your membership without cause, we will refund the unused portion of your prepaid dues on a pro rata basis.]
+8.6 **Refunds.** Cancellation stops the next monthly charge. A charge already recorded for the current month is not returned automatically. A Private Floor administrator can note a refund. Private Floor does not store a card number.
 
-8.7 **Payments are handled by a third-party processor.** [PLACEHOLDER — billing is not yet built: Dues will be charged through a third-party payment processor [e.g., Stripe]. Your card or bank details are entered into and stored by the processor, not by us; we do not store full card numbers. We receive only limited information such as the card type, last four digits, expiration date, and billing ZIP code, and the processor's own terms and privacy policy apply to its handling of your payment information.] Applicable taxes may be added to dues.
+8.7 **Payments.** Dues run through Stripe test mode when test keys are set, or through a labelled simulated payment when they are not. No live card is charged. Card details, when Stripe test mode is used, are entered into Stripe. Private Floor does not store full card numbers. Applicable taxes may be added to dues.
 
 8.8 **Flat fees only — never tied to any deal.** Our dues are flat fees for access to the Platform. They are never based on, and never change because of, whether any deal, investment, capital raise, loan, sale, lease, or other transaction happens between members, or its size or terms. We do not charge or accept referral fees, finder's fees, commissions, success fees, carried interest, or any other transaction-based compensation from anyone. We never hold, receive, transfer, or move members' money or securities, and we do not process payments between members.
 

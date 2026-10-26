@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PayDues } from "@/components/pay-dues";
 import { btn } from "@/components/ui";
 import { currentUser } from "@/lib/current-user";
-import { annualDuesCents } from "@/lib/dues";
+import { currentMonthlyCents } from "@/lib/dues";
 import { checkoutModeForRole } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 
@@ -35,12 +35,13 @@ export default async function PayTokenPage({
     <PayDues
       name={member.name}
       role={member.role}
-      cents={member.duesCents || annualDuesCents(member.role)}
+      cents={currentMonthlyCents(member.role, member.duesCents)}
       token={token}
       mode={checkoutModeForRole(member.role)}
       status={member.paymentStatus}
       renewalAt={member.renewalAt}
       signedIn={Boolean(viewer)}
+      cancelled={Boolean(member.cancelRequestedAt)}
       error={query.error}
       notice={query.notice}
     />

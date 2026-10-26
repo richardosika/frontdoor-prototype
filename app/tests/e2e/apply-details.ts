@@ -124,8 +124,8 @@ async function run(width: number, height: number) {
     await page.getByText("Step 4 of 5").waitFor();
     await page.getByRole("heading", { name: "Before you submit" }).waitFor();
     await page.getByText("How we review").waitFor();
-    await page.getByText("$2,400 per year").waitFor();
-    await page.getByText("Billed once a year. Due only after approval. Flat, never based on a deal.").waitFor();
+    await page.getByText("$74.50", { exact: false }).first().waitFor();
+    await page.getByText("Month to month. No long-term contract. Cancel anytime.", { exact: false }).first().waitFor();
     await page.getByRole("link", { name: "Terms" }).waitFor();
     await page.getByRole("link", { name: "Applicant consent" }).waitFor();
     assert.equal(failures.length, 0, failures.join("\n"));

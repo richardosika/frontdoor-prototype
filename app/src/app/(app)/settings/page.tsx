@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { openBillingPortal } from "@/actions/payments";
+import { cancelMembership, openBillingPortal } from "@/actions/payments";
 import { changePassword, requestAccountDeletion, saveNotificationPrefs } from "@/actions/profile";
 import { Banner } from "@/components/banner";
+import { DuesLanguages } from "@/components/dues-languages";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { DUES_ANNUAL_NOTE, duesLabel } from "@/lib/dues";
+import { DUES_BILLING_NOTE, currentMonthlyCents, firstMonthCents, formatMoney } from "@/lib/dues";
 import { formatAuditTime, formatEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 
@@ -27,18 +28,24 @@ export default async function SettingsPage({
       <section className={`${card} mt-4 p-4 text-sm`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Billing</h2>
         {user.paymentStatus === "NOT_REQUIRED" ? (
-          <p className="mt-2 text-ink">No annual dues are due on this membership. {DUES_ANNUAL_NOTE}</p>
+          <p className="mt-2 text-ink">No monthly dues are due on this membership. {DUES_BILLING_NOTE}</p>
         ) : (
           <div className="mt-2 space-y-1 text-ink">
-            <p>
-              <b>Annual dues.</b> {paymentStatusLabel(user.paymentStatus)} · {duesLabel(user.duesCents)}. {DUES_ANNUAL_NOTE}
-            </p>
-            <p>{receiptLine(user.paymentMode)}</p>
-            <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>
-            <p>Renewal date {user.renewalAt ? formatEtDate(user.renewalAt) : "not set"}.</p>
+            <Receipt user={user} />
             {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}
             {user.refundNote ? <p>Refund note: {user.refundNote}</p> : null}
             <p>No card on file. Private Floor does not store a card number.</p>
+            <DuesLanguages />
+            {user.cancelRequestedAt ? (
+              <p>Cancellation recorded {formatAuditTime(user.cancelRequestedAt)}. No further charge is scheduled.</p>
+            ) : (
+              <form action={cancelMembership} className="pt-2">
+                <button className={btnOutline} type="submit">
+                  Cancel anytime
+                </button>
+                <p className="mt-2 text-ink">Month to month. No long-term contract. Cancellation stops the next charge.</p>
+              </form>
+            )}
           </div>
         )}
         <p className="mt-3">
@@ -115,6 +122,33 @@ export default async function SettingsPage({
         </form>
       </section>
     </div>
+  );
+}
+
+function Receipt({
+  user,
+}: {
+  user: {
+    paymentStatus: string;
+    paymentMode: string;
+    duesCents: number;
+    role: string;
+    paidAt: Date | null;
+    renewalAt: Date | null;
+  };
+}) {
+  const monthly = currentMonthlyCents(user.role, user.duesCents);
+  const first = formatMoney(firstMonthCents(monthly));
+  const full = formatMoney(monthly);
+  return (
+    <>
+      <p>
+        <b>Membership dues.</b> {paymentStatusLabel(user.paymentStatus)}. First month {first}. Full price {full} per month. {DUES_BILLING_NOTE}
+      </p>
+      <p>{receiptLine(user.paymentMode)}</p>
+      <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>
+      <p>Next full-price charge {user.renewalAt ? formatEtDate(user.renewalAt) : "not set"}. A reminder goes out before that charge.</p>
+    </>
   );
 }
 

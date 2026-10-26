@@ -24,7 +24,7 @@ export async function ensureHelpArticles() {
       );
       if (
         (article.slug === "dues" || article.slug === "gc-dues") &&
-        existing.body.includes("$2,400 a year")
+        (existing.body.includes("$2,400") || existing.body.includes("per year") || existing.body.includes("founding"))
       ) {
         next = article.body;
       }
@@ -39,15 +39,20 @@ export async function ensureHelpArticles() {
   }
 }
 
-/** Replaces the older “a year” dues phrase when an article has not already been rewritten. */
+/** Rewrites an older yearly dues phrase to the monthly schedule. */
 export function clarifyAnnualDues(body: string): string {
-  if (!body.includes("a year") || body.includes("per year")) return body;
+  if (body.includes("$149 per month")) return body;
+  if (!/(\$2,400|\$1,800|\$1,200|once a year|per year|a year)/.test(body)) return body;
   let next = body
-    .replaceAll("$2,400 a year", "$2,400 per year")
-    .replaceAll("$1,800 a year", "$1,800 per year")
-    .replaceAll("$1,200 a year", "$1,200 per year");
+    .replaceAll("$2,400 per year", "$149 per month, first month $74.50")
+    .replaceAll("$2,400 a year", "$149 per month, first month $74.50")
+    .replaceAll("$1,800 per year", "$129 per month, first month $64.50")
+    .replaceAll("$1,800 a year", "$129 per month, first month $64.50")
+    .replaceAll("$1,200 per year", "$129 per month, first month $64.50")
+    .replaceAll("$1,200 a year", "$129 per month, first month $64.50")
+    .replaceAll("billed once a year", "billed month to month");
   if (next === body) return body;
-  if (!next.includes("once a year")) next = `${next} Annual dues are billed once a year.`;
+  if (!next.includes("per month") && !next.includes("month to month")) next = `${next} Membership is month to month.`;
   return next;
 }
 

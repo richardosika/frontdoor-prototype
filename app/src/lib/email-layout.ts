@@ -44,7 +44,7 @@ export function emailLogoUrl(env: AssetEnv = process.env as AssetEnv): string {
 function buttonLabel(raw: string): string {
   const text = raw.replace(/&amp;/g, "&").replace(/[:.\s]+$/g, "").trim();
   const rules: [RegExp, string][] = [
-    [/pay here|try again/i, "Pay annual dues"],
+    [/pay here|try again|pay membership/i, "Pay membership dues"],
     [/check your status|follow it here|see the status|status here/i, "Check your status"],
     [/decision/i, "View the decision"],
     [/reply/i, "Reply"],

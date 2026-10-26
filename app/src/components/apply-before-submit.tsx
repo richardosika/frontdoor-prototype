@@ -74,14 +74,14 @@ export function BeforeSubmit({
 function DuesTable() {
   return (
     <table className="mt-3 w-full border-collapse text-left text-sm">
-      <caption className="sr-only">Annual dues by role</caption>
+      <caption className="sr-only">Monthly dues by role</caption>
       <thead>
         <tr className="border-b border-line text-[11px] uppercase tracking-[0.14em] text-mut">
           <th className="py-2 pr-3 font-semibold" scope="col">
             Role
           </th>
           <th className="py-2 text-right font-semibold" scope="col">
-            Annual dues
+            Monthly dues
           </th>
         </tr>
       </thead>

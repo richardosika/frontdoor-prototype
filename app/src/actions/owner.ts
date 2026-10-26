@@ -572,7 +572,7 @@ export async function seedPaymentDueMember() {
       role: "GENERAL_CONTRACTOR",
       org: "TEST Pay Builders",
       location: "Newark, NJ",
-      bio: "Sample member waiting on annual dues. Contact details stay inside Private Floor.",
+      bio: "Sample member waiting on monthly dues. Contact details stay inside Private Floor.",
       isTest: true,
       status: "ACTIVE",
       tier: "INVITED",

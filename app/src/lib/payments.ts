@@ -1,11 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { annualDuesCents } from "@/lib/dues";
+import { monthlyDuesCents } from "@/lib/dues";
 import { formatEtDate } from "@/lib/format";
 
 export type DuesGroup = "free" | "gc" | "broker" | "advisor";
 
 export function duesGroup(role: string): DuesGroup {
-  if (annualDuesCents(role) === 0) return "free";
+  if (monthlyDuesCents(role) === 0) return "free";
   if (role === "GENERAL_CONTRACTOR") return "gc";
   if (role === "BROKER" || role === "MORTGAGE_BROKER") return "broker";
   return "advisor";
@@ -42,9 +42,14 @@ export type CheckoutEnv = {
   priceId?: string | null;
 };
 
-/** Stripe is used only when the test secret, webhook secret, and a price for the role are all set. */
+/** A live secret never starts checkout. Test keys start with sk_test. */
+export function isStripeTestSecret(secret: string | null | undefined): boolean {
+  return Boolean(secret && secret.startsWith("sk_test"));
+}
+
+/** Stripe is used only when a test secret, the webhook secret, and a price for the role are all set. */
 export function checkoutMode(env: CheckoutEnv): "stripe" | "simulated" {
-  if (env.secretKey && env.webhookSecret && env.priceId) return "stripe";
+  if (isStripeTestSecret(env.secretKey) && env.webhookSecret && env.priceId) return "stripe";
   return "simulated";
 }
 
@@ -64,20 +69,25 @@ export function checkoutModeForRole(role: string, env: NodeJS.ProcessEnv = proce
   });
 }
 
-/** One year after the America/New_York calendar date, stored so that same date still displays in New York. */
-export function renewalInOneYear(from = new Date()): Date {
+/** One calendar month after the America/New_York date, stored so that date still displays in New York. */
+export function renewalInOneMonth(from = new Date()): Date {
   const [year, month, day] = formatEtDate(from).split("-").map(Number);
-  return new Date(Date.UTC(year + 1, month - 1, day, 16, 0, 0));
+  const nextMonthIndex = month;
+  const lastDay = new Date(Date.UTC(year, nextMonthIndex + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, nextMonthIndex, Math.min(day, lastDay), 16, 0, 0));
 }
 
-/** True in the 30 days before renewal, and not more often than weekly. */
+/** Days before the first full-price charge when the reminder may go out. Once per cycle. */
+export const FULL_PRICE_REMINDER_DAYS = 7;
+
 export function renewalReminderDue(input: { renewalAt: Date | null; lastSentAt: Date | null; now?: Date }): boolean {
   if (!input.renewalAt) return false;
   const now = input.now ?? new Date();
   const days = (input.renewalAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000);
-  if (days < 0 || days > 30) return false;
+  if (days < 0 || days > FULL_PRICE_REMINDER_DAYS) return false;
   if (!input.lastSentAt) return true;
-  return now.getTime() - input.lastSentAt.getTime() > 7 * 24 * 60 * 60 * 1000;
+  const windowStart = input.renewalAt.getTime() - FULL_PRICE_REMINDER_DAYS * 24 * 60 * 60 * 1000;
+  return input.lastSentAt.getTime() < windowStart;
 }
 
 export function checkoutIsPaid(session: { mode?: string; status?: string; payment_status?: string }): boolean {
@@ -107,10 +117,10 @@ export function verifyStripeSignature(payload: string, header: string | null, se
 }
 
 export const DUES_COVERS =
-  "One year of access to the Private Floor Club. Annual dues are a flat fee, billed once a year, and due only after approval. The amount does not change because a deal happens, and Private Floor does not charge a success fee or hold member funds.";
+  "One month of access to the Private Floor Club. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off. The next charge is the full monthly price. A reminder goes out before that charge. The amount does not change because a deal happens, and Private Floor does not charge a success fee or hold member funds.";
 
-/** Date shown on the payment page and in the payment-link email. */
+/** Date of the next charge, shown on the payment page and in the payment-link email. */
 export function paymentRenewalLabel(renewalAt: Date | null, now = new Date()): string {
-  const date = formatEtDate(renewalAt ?? renewalInOneYear(now));
+  const date = formatEtDate(renewalAt ?? renewalInOneMonth(now));
   return renewalAt ? date : `${date} if recorded today`;
 }
