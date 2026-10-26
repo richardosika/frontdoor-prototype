@@ -93,16 +93,25 @@ function wordsOf(value: string): string[] {
  * Person plus the company search term. A word already in the person's name is not repeated,
  * so "Ronald Tutor" is not searched as "tutor" "tutor".
  */
+function bareToken(word: string): string {
+  return word.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export function personCompanyQuery(person: string, companyTerm: string): string | null {
   const cleanedPerson = person.trim();
-  if (!cleanedPerson || !companyTerm.trim()) return null;
+  const phrase = companyTerm.trim();
+  if (!cleanedPerson || !phrase) return null;
   const seen = new Set(wordsOf(cleanedPerson));
-  const kept = companyTerm.split(/\s+/).filter((word) => {
-    const token = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const kept = phrase.split(/\s+/).filter((word) => {
+    const token = bareToken(word);
     return token.length >= 2 && !seen.has(token);
   });
-  if (!kept.length) return null;
-  return `"${cleanedPerson}" "${kept.join(" ")}"`;
+  const distinctive = kept.filter((word) => isDistinctiveCompanyToken(bareToken(word)));
+  if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
+  const words = phrase.split(/\s+/).filter(Boolean);
+  const phraseHasDistinctive = words.some((word) => isDistinctiveCompanyToken(bareToken(word)));
+  if (!phraseHasDistinctive && words.length < 2) return null;
+  return `"${cleanedPerson}" "${phrase}"`;
 }
 
 /** Quoted person-and-company query used by news, YouTube, and the other public searches. */

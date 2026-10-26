@@ -7,13 +7,13 @@ import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/v
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, dedupeSourceLines, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -1673,7 +1673,7 @@ describe("batch 4 company search terms", () => {
 
   it("searches a firm word that is not the applicant's surname", async () => {
     expect(companySearchTerm("Tutor Perini Corporation", "Ronald Tutor")).toBe("perini");
-    expect(companySearchTerm("Belkin Burden Goldman LLP", "Sherwin Belkin")).toBe("burden");
+    expect(companySearchTerm("Belkin Burden Goldman LLP", "Sherwin Belkin")).toBe("burden goldman");
     expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("organization");
     expect(companySearchTerm("Related Companies", "Stephen Ross")).toBe("related companies");
 
@@ -1696,7 +1696,7 @@ describe("batch 4 company search terms", () => {
       location: "New York, NY",
     });
     expect(newsSearchQueries(tutor)[0]).toBe(`"Ronald Tutor" "perini"`);
-    expect(newsSearchQueries(belkin)[0]).toBe(`"Sherwin Belkin" "burden"`);
+    expect(newsSearchQueries(belkin)[0]).toBe(`"Sherwin Belkin" "burden goldman"`);
     expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "organization"`);
     expect(newsSearchQueries(facts({ name: "Stephen Ross", applicantName: "Stephen Ross", org: "Related Companies" }))[0]).toBe(
       `"Stephen Ross" "related companies"`,
@@ -1713,6 +1713,68 @@ describe("batch 4 company search terms", () => {
     expect(decodeURIComponent(instagram?.url || "").toLowerCase()).not.toContain("/tags/tutor");
     expect(youtube?.finding).toContain(`"Ronald Tutor" "perini"`);
     expect(youtube?.finding.toLowerCase()).not.toContain(`"tutor" "tutor"`);
+  });
+
+  it("searches the full company phrase instead of one generic word", () => {
+    expect(companySearchTerm("QA TestM Group", "QA TestM")).toBe("qa testm group");
+    const queries = newsSearchQueries(
+      facts({ name: "QA TestM", applicantName: "QA TestM", org: "QA TestM Group", location: "Austin, TX" }),
+    );
+    expect(queries.join(" ")).not.toMatch(/"group"/i);
+    expect(queries[0]).toContain("qa testm group");
+    const unrelated = scorePublicText("AI Test Group announces a product", {
+      name: "QA TestM",
+      org: "QA TestM Group",
+      location: "Austin, TX",
+    });
+    expect(unrelated.name).toBe(false);
+    expect(unrelated.company).toBe(false);
+    expect(unrelated.city).toBe(false);
+  });
+});
+
+describe("PaidK2 source wording", () => {
+  it("names each source once and says no match found when nothing matched", () => {
+    const score = "Name: no. Company: no. City: no. Confidence: none.";
+    const graded = gradeChecks(
+      [
+        row({
+          key: "screen-news",
+          status: "INCONCLUSIVE",
+          source: "Google News",
+          finding: `News returned a public result. ${score}`,
+        }),
+        row({
+          key: "news",
+          status: "INCONCLUSIVE",
+          source: "Google News, Bing News",
+          finding: "The news search came back without a usable match.",
+        }),
+        row({
+          key: "screen-youtube",
+          status: "INCONCLUSIVE",
+          source: "YouTube",
+          finding: `YouTube returned a public result. ${score}`,
+        }),
+        row({
+          key: "screen-tiktok",
+          status: "INCONCLUSIVE",
+          source: "TikTok",
+          finding: `TikTok returned a public result. ${score}`,
+        }),
+      ],
+      facts({ name: "Paid Kay", applicantName: "Paid Kay", org: "PaidK2 Holdings" }),
+    );
+    const text = graded.summary.couldNotCheck;
+    expect(text).not.toContain("returned a public result");
+    expect(text).not.toContain("came back without a usable match");
+    expect(text.match(/News search/g)?.length).toBe(1);
+    expect(text.match(/YouTube/g)?.length).toBe(1);
+    expect(text.match(/TikTok/g)?.length).toBe(1);
+    expect(text).toContain("no match found");
+    expect(dedupeSourceLines(["News search: no match found. Name: no. Company: no. City: no. Confidence: none.", "News search came back without a usable match (Google News, Bing News)."])).toEqual([
+      "News search: no match found. Name: no. Company: no. City: no. Confidence: none.",
+    ]);
   });
 });
 

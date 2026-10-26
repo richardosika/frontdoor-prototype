@@ -352,16 +352,28 @@ function isConflict(check: CheckOutput): boolean {
   return true;
 }
 
-function joinSentences(lines: string[]): string {
-  const unique = lines.map((line) => line.trim()).filter(Boolean);
+/** One sentence per source. News is kept once, preferring the line that states the name, company, and city. */
+export function dedupeSourceLines(lines: string[]): string[] {
+  const cleaned = lines.map((line) => line.trim()).filter(Boolean);
+  const news = cleaned.filter((line) => /^News search\b/.test(line));
+  const preferredNews = news.find((line) => /Name:/.test(line)) || news.find((line) => /no match found/.test(line)) || news[0];
   const seen = new Set<string>();
   const kept: string[] = [];
-  for (const line of unique) {
+  let newsKept = false;
+  for (const line of cleaned) {
+    if (/^News search\b/.test(line)) {
+      if (newsKept || line !== preferredNews) continue;
+      newsKept = true;
+    }
     if (seen.has(line)) continue;
     seen.add(line);
     kept.push(line);
   }
-  return kept.join(" ");
+  return kept;
+}
+
+function joinSentences(lines: string[]): string {
+  return dedupeSourceLines(lines).join(" ");
 }
 
 function passSentence(check: CheckOutput): string | null {
@@ -508,16 +520,15 @@ function uncheckedSentence(check: CheckOutput): string | null {
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
   }
-  if (check.key === "screen-youtube" || check.key === "screen-tiktok" || check.key === "screen-news") {
+  if (check.key.startsWith("screen-") || check.key === "news") {
     const score = scoreClause(check);
+    const nothingMatched = !score || (/Name: no\./.test(score) && /Company: no\./.test(score) && /City: no\./.test(score));
     if (score && socialScoreQualified(score)) {
       return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
     }
-    return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
-  }
-  if (check.key.startsWith("screen-")) {
-    const score = scoreClause(check);
-    if (score) return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
+    if (nothingMatched || check.key.startsWith("screen-") || check.key === "news") {
+      return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
+    }
   }
   if (check.status === "NOT_RUN") {
     return `${labelFor(check.key)} was not run. ${check.finding}`.replace(/\s+/g, " ").trim();

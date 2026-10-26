@@ -678,7 +678,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       let text = job.read(response.text);
       let url = job.url;
-      const needsNameAndPlace = job.platform === "YouTube" || job.platform === "TikTok";
+      const needsNameAndPlace = job.platform === "YouTube" || job.platform === "TikTok" || job.platform === "X" || job.platform === "Facebook" || job.platform === "Instagram";
       if (job.platform === "YouTube" && !job.fromSite && !socialMatch(scorePublicText(text, queryFacts))) {
         const altName = alternatePersonNames(person).find((item) => item.toLowerCase() !== person.trim().toLowerCase());
         if (altName) {
@@ -704,7 +704,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           url,
           outcome: "not-found" as const,
           score,
-          detail: needsNameAndPlace ? "no match found" : `${job.platform} responded`,
+          detail: needsNameAndPlace || score.confidence === "none" ? "no match found" : `${job.platform} responded`,
         };
       }
       const ranked = text
@@ -723,7 +723,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url,
         outcome: "found" as const,
         score,
-        detail: detail || `${job.platform} returned a public result`,
+        detail: detail || (socialMatch(score) ? `${job.platform} returned a public result` : "no match found"),
       };
     }),
   );
