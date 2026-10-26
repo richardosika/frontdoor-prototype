@@ -45,11 +45,16 @@ export function clearFetchCache(): void {
  */
 export function fetchLimits(url: string): { timeoutMs: number; maxChars: number } {
   let host = "";
+  let path = "";
   try {
-    host = new URL(url).host;
+    const parsed = new URL(url);
+    host = parsed.host;
+    path = parsed.pathname;
   } catch {
     return { timeoutMs: 8000, maxChars: 180_000 };
   }
+  // sitemap.xml is a URL list, not an HTML page. The 180KB HTML cap cuts it off before the team URLs.
+  if (/\/sitemap[^/]*\.xml$/i.test(path)) return { timeoutMs: 15_000, maxChars: 1_500_000 };
   if (host.endsWith("sec.gov")) {
     const tickers = url.includes("company_tickers");
     return { timeoutMs: tickers ? 20_000 : 15_000, maxChars: tickers ? 2_000_000 : 1_500_000 };
