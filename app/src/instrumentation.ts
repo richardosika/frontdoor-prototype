@@ -19,6 +19,12 @@ export async function register() {
     return "failed";
   });
   console.log(`ADMIN_PASSWORD result=${passwordResult}`);
+  const { sessionCutoffReport } = await import("@/lib/session-gate");
+  console.log(sessionCutoffReport(process.env.SESSION_ISSUED_AFTER));
+  const { logAdminLoginProbe } = await import("@/lib/admin-account");
+  await logAdminLoginProbe().catch(() => {
+    console.error("Could not probe administrator sign-in");
+  });
   const { logApplicantCensus } = await import("@/lib/live-census");
   await logApplicantCensus().catch(() => {
     console.error("Could not count applicants");

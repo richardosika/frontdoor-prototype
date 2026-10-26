@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
+import { adminPasswordAction, adminPasswordShape, normalizeAdminPassword } from "@/lib/admin-password";
 import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 import { initialsFromName } from "@/lib/domain";
 import { isDemoRecord } from "@/lib/person-standing";
 import { prisma } from "@/lib/prisma";
+import { adminSignInAllowed } from "@/lib/sign-in";
 
 /** Seeded member password. A demo account that was an administrator returns to this. */
 export const DEMO_MEMBER_PASSWORD = "cornicio-demo";
@@ -87,4 +89,35 @@ export async function prepareAdministratorAccounts(): Promise<{ revoked: number;
   }
 
   return { revoked: revokeIds.length, owner: ownerAction };
+}
+
+/** Confirms the owner row and whether the env password matches its hash. The password is not logged. */
+export async function logAdminLoginProbe(): Promise<void> {
+  const raw = process.env.ADMIN_PASSWORD;
+  const normalized = normalizeAdminPassword(raw);
+  const shape = adminPasswordShape(raw);
+  const owner = await prisma.user.findUnique({
+    where: { email: KEEP_ADMIN_EMAIL },
+    select: { isAdmin: true, isTest: true, email: true, status: true, passwordHash: true },
+  });
+  const rawMatch = Boolean(owner && raw && (await bcrypt.compare(raw, owner.passwordHash).catch(() => false)));
+  const normMatch = Boolean(
+    owner && normalized && (await bcrypt.compare(normalized, owner.passwordHash).catch(() => false)),
+  );
+  const line = [
+    "ADMIN_LOGIN_PROBE",
+    `action=${adminPasswordAction(raw)}`,
+    `chars=${shape.chars}`,
+    `normalized=${shape.normalized}`,
+    `trim=${shape.trimmed}`,
+    `owner=${owner ? 1 : 0}`,
+    `admin=${owner?.isAdmin ? 1 : 0}`,
+    `active=${owner?.status === "ACTIVE" ? 1 : 0}`,
+    `demo=${owner && isDemoRecord(owner) ? 1 : 0}`,
+    `allowed=${adminSignInAllowed(owner) ? 1 : 0}`,
+    `raw_match=${rawMatch ? 1 : 0}`,
+    `norm_match=${normMatch ? 1 : 0}`,
+  ].join(" ");
+  if (line.includes("@")) throw new Error("Login probe contained an address");
+  console.log(line);
 }

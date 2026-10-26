@@ -4,6 +4,7 @@ import {
   isSignedInJoinEntry,
   loggedInPublicRedirect,
   memberLoginHref,
+  sessionCutoffReport,
   sessionIssuedAtAccepted,
 } from "@/lib/session-gate";
 
@@ -41,5 +42,10 @@ describe("signed-in request to join", () => {
     expect(sessionIssuedAtAccepted(200, "200", false)).toBe(false);
     expect(sessionIssuedAtAccepted(undefined, "200", true)).toBe(true);
     expect(sessionIssuedAtAccepted("nope", "200", false)).toBe(false);
+    expect(sessionIssuedAtAccepted(1760000001, "1760000000000", false, 1760000002)).toBe(true);
+    expect(sessionIssuedAtAccepted(1760000000, "1760000000000", false, 1760000002)).toBe(false);
+    expect(sessionIssuedAtAccepted(1000, "5000", false, 1000)).toBe(true);
+    expect(sessionCutoffReport(undefined, 1000)).toBe("SESSION_CUTOFF present=0");
+    expect(sessionCutoffReport("1760000000000", 1760000002)).toBe("SESSION_CUTOFF present=1 digits=13 accepts_now=1");
   });
 });

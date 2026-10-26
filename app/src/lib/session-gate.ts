@@ -32,13 +32,33 @@ export function alreadySignedInNotice(name: string): string {
 
 /**
  * Old JWTs die when SESSION_ISSUED_AFTER is a unix timestamp in seconds.
- * A fresh sign-in (the user object is present) is allowed through so the new token can be issued.
+ * A 13-digit value is milliseconds. A cutoff still in the future would reject the sign-in that just happened.
  */
-export function sessionIssuedAtAccepted(issuedAt: unknown, cutoffRaw: string | undefined, freshSignIn: boolean): boolean {
+export function sessionCutoffSeconds(cutoffRaw: string | undefined, nowSeconds: number): number | null {
+  if (cutoffRaw == null || cutoffRaw.trim() === "") return null;
+  let cutoff = Number(cutoffRaw.trim());
+  if (!Number.isFinite(cutoff) || cutoff <= 0) return null;
+  if (cutoff > 1e12) cutoff = Math.floor(cutoff / 1000);
+  if (cutoff >= nowSeconds) return nowSeconds - 1;
+  return cutoff;
+}
+
+export function sessionCutoffReport(cutoffRaw: string | undefined, nowSeconds = Math.floor(Date.now() / 1000)): string {
+  const cutoff = sessionCutoffSeconds(cutoffRaw, nowSeconds);
+  if (cutoff == null) return "SESSION_CUTOFF present=0";
+  const digits = cutoffRaw?.trim().length ?? 0;
+  return `SESSION_CUTOFF present=1 digits=${digits} accepts_now=${nowSeconds > cutoff ? 1 : 0}`;
+}
+
+export function sessionIssuedAtAccepted(
+  issuedAt: unknown,
+  cutoffRaw: string | undefined,
+  freshSignIn: boolean,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): boolean {
   if (freshSignIn) return true;
-  if (cutoffRaw == null || cutoffRaw === "") return true;
-  const cutoff = Number(cutoffRaw);
-  if (!Number.isFinite(cutoff) || cutoff <= 0) return true;
+  const cutoff = sessionCutoffSeconds(cutoffRaw, nowSeconds);
+  if (cutoff == null) return true;
   const issued = typeof issuedAt === "number" ? issuedAt : Number(issuedAt);
   if (!Number.isFinite(issued)) return false;
   return issued > cutoff;

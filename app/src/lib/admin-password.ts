@@ -12,10 +12,34 @@ export type AdminPasswordAccount = {
   passwordHash: string;
 };
 
+/**
+ * Render values are often pasted with a trailing newline or wrapping quotes.
+ * Those characters are not part of the password a person types.
+ */
+export function normalizeAdminPassword(value: string | undefined): string | undefined {
+  if (value == null) return undefined;
+  let next = value.replace(/^\uFEFF/, "").trim();
+  const wrapped =
+    (next.startsWith('"') && next.endsWith('"') && next.length >= 2) ||
+    (next.startsWith("'") && next.endsWith("'") && next.length >= 2);
+  if (wrapped) next = next.slice(1, -1).trim();
+  return next;
+}
+
+export function adminPasswordShape(value: string | undefined): { chars: number; normalized: number; trimmed: 0 | 1 } {
+  const normalized = normalizeAdminPassword(value);
+  return {
+    chars: value?.length ?? 0,
+    normalized: normalized?.length ?? 0,
+    trimmed: value != null && normalized != null && value !== normalized ? 1 : 0,
+  };
+}
+
 /** Unset stays as seeded. A short value is refused. The password itself is never included in the result. */
 export function adminPasswordAction(value: string | undefined): "unset" | "too-short" | "apply" {
-  if (value == null || value.length === 0) return "unset";
-  if (value.length < ADMIN_PASSWORD_MIN_LENGTH) return "too-short";
+  const normalized = normalizeAdminPassword(value);
+  if (normalized == null || normalized.length === 0) return "unset";
+  if (normalized.length < ADMIN_PASSWORD_MIN_LENGTH) return "too-short";
   return "apply";
 }
 
@@ -37,7 +61,7 @@ export async function syncAdminPasswordsFromEnv(
     warn(ADMIN_PASSWORD_TOO_SHORT);
     return "too-short";
   }
-  const password = raw ?? "";
+  const password = normalizeAdminPassword(raw) ?? "";
   const admins = (await db.listAdmins()).filter((account) => account.isAdmin);
   let updated = 0;
   for (const account of admins) {

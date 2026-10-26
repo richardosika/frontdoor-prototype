@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ADMIN_PASSWORD_TOO_SHORT,
   adminPasswordAction,
+  adminPasswordShape,
+  normalizeAdminPassword,
   syncAdminPasswordsFromEnv,
   type AdminPasswordAccount,
 } from "@/lib/admin-password";
 import { adminEntryRedirect } from "@/lib/session-gate";
-import { adminSignInAllowed, credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
 import { demoAdministratorIds, ownerAccountNeedsRepair, ownerAdminIdentity } from "@/lib/admin-account";
 import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 
@@ -22,6 +24,11 @@ describe("ADMIN_PASSWORD", () => {
     expect(adminPasswordAction("")).toBe("unset");
     expect(adminPasswordAction(secret)).toBe("too-short");
     expect(adminPasswordAction(LONG)).toBe("apply");
+    expect(adminPasswordAction(`  ${LONG}\n`)).toBe("apply");
+    expect(adminPasswordAction(`"${LONG}"`)).toBe("apply");
+    expect(normalizeAdminPassword(`  "${LONG}"\n`)).toBe(LONG);
+    expect(adminPasswordShape(`  ${LONG}\n`)).toEqual({ chars: LONG.length + 3, normalized: LONG.length, trimmed: 1 });
+    expect(JSON.stringify(adminPasswordShape(LONG))).not.toContain(LONG);
     expect(ADMIN_PASSWORD_TOO_SHORT).not.toContain(secret);
   });
 
@@ -127,6 +134,19 @@ describe("separate administrator sign-in", () => {
     });
     expect(identity).not.toHaveProperty("passwordHash");
     expect(JSON.stringify(identity)).not.toMatch(/cornicio|password/i);
+    expect(adminLoginDecision({ user: marcus, passwordMatches: true })).toBe("rejected");
+    expect(adminLoginDecision({ user: owner, passwordMatches: true })).toBe("ok");
+    expect(adminLoginDecision({ user: owner, passwordMatches: false })).toBe("rejected");
+    const trace = adminLoginTrace({
+      found: true,
+      active: true,
+      admin: true,
+      allowed: true,
+      passwordMatches: false,
+      passwordChars: 16,
+    });
+    expect(trace).toContain("compare=0");
+    expect(trace).not.toContain("@");
   });
 
   it("sends a signed-in administrator home and a signed-in member back to the floor", () => {

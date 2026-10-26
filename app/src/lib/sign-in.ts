@@ -14,6 +14,38 @@ export function adminSignInAllowed(
   if (!user?.isAdmin) return false;
   return !isDemoRecord({ isTest: user.isTest, email: user.email });
 }
+
+export function adminLoginDecision(input: {
+  user: { isAdmin: boolean; isTest?: boolean | null; email?: string | null; status?: string } | null;
+  passwordMatches: boolean;
+}): "ok" | "rejected" {
+  if (!input.user || input.user.status !== "ACTIVE" || !input.passwordMatches) return "rejected";
+  if (!adminSignInAllowed(input.user)) return "rejected";
+  return "ok";
+}
+
+/** Safe to log. No address and no password. */
+export function adminLoginTrace(input: {
+  found: boolean;
+  active: boolean;
+  admin: boolean;
+  allowed: boolean;
+  passwordMatches: boolean;
+  passwordChars: number;
+}): string {
+  const line = [
+    "ADMIN_LOGIN",
+    "result=rejected",
+    `found=${input.found ? 1 : 0}`,
+    `active=${input.active ? 1 : 0}`,
+    `admin=${input.admin ? 1 : 0}`,
+    `allowed=${input.allowed ? 1 : 0}`,
+    `compare=${input.passwordMatches ? 1 : 0}`,
+    `pw_chars=${input.passwordChars}`,
+  ].join(" ");
+  if (line.includes("@")) throw new Error("Login trace contained an address");
+  return line;
+}
 export const PENDING_APPROVAL_ERROR = "Your application is under review. You can sign in after Richard Osika approves it.";
 export const DECLINED_APPLICATION_ERROR = "This application was not approved.";
 export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact connect@privatefloorclub.com if you need help.";
