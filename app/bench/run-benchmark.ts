@@ -339,6 +339,7 @@ async function main() {
           hardFlag: Boolean(x.hardFlag),
           reviewFlag: Boolean(x.reviewFlag),
           corroborates: Boolean(x.corroborates),
+          companyOnly: Boolean(x.companyOnly),
           finding: x.finding,
           source: x.source,
           url: x.url,

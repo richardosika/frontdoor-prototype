@@ -918,6 +918,10 @@ describe("QA follow-up scoring", () => {
     expect(mentionsCompany("Turner Construction Company builds in New York.", stripped.org)).toBe(true);
     expect(mentionsCompany("A page-turner for every e-reader tester", stripped.org)).toBe(false);
     expect(mentionsPerson("e-reader tester", "QA Tester")).toBe(false);
+    expect(mentionsPerson("Marisol Quentin-Vale leads the firm.", "Marisol Quentin-Vale")).toBe(true);
+    expect(mentionsPerson("Marisol Quentin Vale leads the firm.", "Marisol Quentin-Vale")).toBe(true);
+    expect(mentionsPerson("A page-turner for Jane.", "Jane Turner")).toBe(false);
+    expect(mentionsCompany("page-turner construction company", "Turner Construction Company")).toBe(false);
     expect(
       factsForSearch(facts({ email: "person@gmail.com", org: "QA-TEST Turner Construction Company" }), () => {
         throw new Error("production email must not be normalised");

@@ -93,6 +93,25 @@ export function wordHit(text: string, token: string): boolean {
   return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "i").test(text);
 }
 
+/** Keep a hyphenated surname together. "Quentin-Vale" is one name part; "turner" still does not match "page-turner". */
+function personNameParts(name: string): string[] {
+  return name
+    .replace(/\b[A-Za-z]\.\s*/g, " ")
+    .split(/\s+/)
+    .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
+    .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 3);
+}
+
+function personPartHits(text: string, part: string): boolean {
+  const pieces = part.split("-").filter(Boolean);
+  if (pieces.length > 1) {
+    if (wordHit(text, part)) return true;
+    return pieces.filter((piece) => piece.length >= 3).every((piece) => wordHit(text, piece));
+  }
+  const key = part.toLowerCase();
+  return (NICKNAMES[key] || [key]).some((alt) => wordHit(text, alt));
+}
+
 /**
  * Whole-word hit, including a 4-letter brand such as "cbre" or "toll".
  * Those tokens are not discarded for length. A split-word guess is only for a longer token.
@@ -142,9 +161,9 @@ export function distinctiveCompanyTokens(org: string): string[] {
 }
 
 export function mentionsPerson(text: string, name: string): boolean {
-  const parts = tokens(name).filter((token) => token.length >= 3);
+  const parts = personNameParts(name);
   if (parts.length < 2) return false;
-  return parts.every((part) => (NICKNAMES[part] || [part]).some((alt) => wordHit(text, alt)));
+  return parts.every((part) => personPartHits(text, part));
 }
 
 function looksLikeGivenName(word: string): boolean {
