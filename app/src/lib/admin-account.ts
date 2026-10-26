@@ -117,6 +117,7 @@ export async function logAdminLoginProbe(): Promise<void> {
     `allowed=${adminSignInAllowed(owner) ? 1 : 0}`,
     `raw_match=${rawMatch ? 1 : 0}`,
     `norm_match=${normMatch ? 1 : 0}`,
+    `gate_chars=${process.env.SITE_GATE_PASSWORD?.length ?? 0}`,
   ].join(" ");
   if (line.includes("@")) throw new Error("Login probe contained an address");
   console.log(line);
