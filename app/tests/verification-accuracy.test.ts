@@ -13,7 +13,7 @@ import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registr
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, surnamePageUrls } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -723,6 +723,48 @@ describe("team pages and the NY company list", () => {
     expect(fetched.some((url) => url.endsWith("/assets-sitemap.xml"))).toBe(false);
   });
 
+  it("reads an attorney bio from a sitemap surname URL and from a nested our-people link", async () => {
+    const bio = "<html><body><p>Stephen Meister is a co-founder of Meister Seelig & Schuster in New York.</p></body></html>";
+    const xml = `<urlset><url><loc>https://meisterseelig.example/associated_attorney/stephen-b-meister/</loc></url><url><loc>https://meisterseelig.example/our-people/partners/stephen-b-meister/</loc></url></urlset>`;
+    expect(sitemapPersonUrls(xml, "https://meisterseelig.example", "Meister")).toEqual([
+      "https://meisterseelig.example/associated_attorney/stephen-b-meister/",
+      "https://meisterseelig.example/our-people/partners/stephen-b-meister/",
+    ]);
+    const directory = `<html><body><a href="/our-people/partners/stephen-b-meister/">Stephen B. Meister</a></html>`;
+    expect(surnamePageUrls(directory, "https://meisterseelig.example/our-people/", "Meister")).toEqual([
+      "https://meisterseelig.example/our-people/partners/stephen-b-meister/",
+    ]);
+    const home = `<html><body><p>Meister Seelig & Schuster is a New York law firm.</p></body></html>`;
+    const checks = await runPublicScreen(
+      facts({
+        name: "Stephen Meister",
+        applicantName: "Stephen Meister",
+        org: "Meister Seelig & Schuster PLLC",
+        website: "https://meisterseelig.example",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url === "https://meisterseelig.example/sitemap.xml") {
+          return {
+            ok: true,
+            status: 200,
+            text: `<sitemapindex><sitemap><loc>https://meisterseelig.example/page-sitemap.xml</loc></sitemap></sitemapindex>`,
+          };
+        }
+        if (url.endsWith("/page-sitemap.xml")) return { ok: true, status: 200, text: xml };
+        if (url.includes("/associated_attorney/stephen-b-meister")) return { ok: true, status: 200, text: bio };
+        if (url === "https://meisterseelig.example" || url === "https://meisterseelig.example/") return { ok: true, status: 200, text: home };
+        if (url.includes("/our-people") && !url.includes("stephen-b-meister")) return { ok: true, status: 200, text: directory };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.url).toMatch(/stephen-b-meister/);
+    expect(website?.corroborates).toBe(false);
+  });
+
   it("treats an NY exact name as company-exists and ignores a similar name and the officer field", () => {
     expect(normalizeRegistryName("Cole Schotz P.C.")).toBe("cole schotz");
     const hit = assessNyRegistry("Cole Schotz", {
@@ -843,6 +885,10 @@ describe("website text survives the size cap", () => {
     expect(fallbackTeamUrls("https://firm.example/", [])).toEqual([
       "https://firm.example/professionals",
       "https://firm.example/attorneys",
+      "https://firm.example/attorney",
+      "https://firm.example/lawyers",
+      "https://firm.example/our-people",
+      "https://firm.example/associated_attorney",
       "https://firm.example/people",
       "https://firm.example/leadership",
       "https://firm.example/our-team",
@@ -1489,11 +1535,163 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
   });
 
-  it("accepts an ampersand or a percent-encoded LinkedIn company slug", () => {
+  it("does not cap a company-only civil docket or an ordinary results headline, and still flags fraud and sanctions", () => {
+    const providers = [{ name: "Google News", state: "responded" as const }];
+    const sciame = classifyNews(
+      facts({ name: "Frank Sciame", applicantName: "Frank Sciame", org: "Sciame Construction", location: "New York, NY" }),
+      [
+        {
+          title: "Marco Antonio Zumba v. Sciame Construction, LLC",
+          snippet: "A law.com Radar civil docket names the company.",
+          url: "https://www.law.com/radar/zumba",
+          source: "Law.com",
+          publishedAt: "2025-08-04T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(sciame[0].status).not.toBe("FAIL");
+    expect(sciame[0].reviewFlag).toBeUndefined();
+    expect(sciame[0].finding).toContain("Company-level litigation");
+    expect(sciame[1].finding).toContain("Company litigation");
+    const sciameGrade = gradeChecks(
+      [
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "website", status: "PASS", corroborates: true }),
+        row({ key: "edgar", status: "PASS", corroborates: true }),
+        row({ key: "web-footprint", status: "PASS", corroborates: true }),
+        ...sciame,
+      ],
+      facts({ name: "Frank Sciame", applicantName: "Frank Sciame", org: "Sciame Construction", location: "New York, NY" }),
+    );
+    expect(sciameGrade.caps.some((line) => /doubtful hit/i.test(line))).toBe(false);
+    expect(sciameGrade.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+
+    const arbor = classifyNews(
+      facts({ name: "Ivan Kaufman", applicantName: "Ivan Kaufman", org: "Arbor Realty Trust", location: "Uniondale, NY" }),
+      [
+        {
+          title: "Arbor Realty Trust targets $250M-$300M REO by end of 2026 as it resets quarterly dividend to $0.17",
+          snippet: "The lender reset its dividend and discussed REO, a loss, and a downgrade.",
+          url: "https://seekingalpha.com/news/4590064",
+          source: "Seeking Alpha",
+          publishedAt: "2026-05-08T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(arbor[0].status).not.toBe("FAIL");
+    expect(arbor[0].reviewFlag).toBeUndefined();
+    expect(arbor[0].finding).not.toContain("Negative coverage");
+    expect(arbor[0].finding).not.toContain("Company-level litigation");
+    const arborGrade = gradeChecks(
+      [
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "website", status: "PASS", corroborates: true }),
+        row({ key: "news", status: "PASS", corroborates: true }),
+        ...arbor,
+      ],
+      facts({ name: "Ivan Kaufman", applicantName: "Ivan Kaufman", org: "Arbor Realty Trust", location: "Uniondale, NY" }),
+    );
+    expect(arborGrade.caps.some((line) => /doubtful hit/i.test(line))).toBe(false);
+
+    const named = classifyNews(
+      facts({ name: "Frank Sciame", applicantName: "Frank Sciame", org: "Sciame Construction", location: "New York, NY" }),
+      [
+        {
+          title: "Frank Sciame sued over a Sciame Construction job site",
+          snippet: "The civil complaint names Frank Sciame.",
+          url: "https://example.com/sciame-named",
+          source: "Law.com",
+          publishedAt: "2026-05-08T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(named[0].status).toBe("FAIL");
+    expect(named[0].reviewFlag).toBe(true);
+    const namedGrade = gradeChecks(
+      [
+        row({ key: "email-syntax", status: "PASS" }),
+        row({ key: "disposable-email", status: "PASS" }),
+        row({ key: "role-address", status: "PASS" }),
+        row({ key: "phone-state", status: "PASS" }),
+        row({ key: "linkedin-format", status: "PASS" }),
+        row({ key: "linkedin-fetch", status: "PASS", corroborates: true }),
+        row({ key: "website", status: "PASS", corroborates: true }),
+        row({ key: "edgar", status: "PASS", corroborates: true }),
+        row({ key: "web-footprint", status: "PASS", corroborates: true }),
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "text-risk", status: "PASS" }),
+        row({ key: "velocity", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "invite-source", status: "PASS" }),
+        ...named,
+      ],
+      facts({
+        name: "Frank Sciame",
+        applicantName: "Frank Sciame",
+        org: "Sciame Construction",
+        location: "New York, NY",
+        phone: "212-555-0148",
+        website: "https://sciame.com",
+        linkedinUrl: "https://www.linkedin.com/company/f.j.-sciame-construction-inc./",
+      }),
+    );
+    expect(namedGrade.score).toBeGreaterThanOrEqual(60);
+    expect(namedGrade.letter).toBe("D");
+    expect(namedGrade.caps.some((line) => /doubtful hit/i.test(line))).toBe(true);
+
+    const fraud = classifyNews(
+      facts({ name: "Ivan Kaufman", applicantName: "Ivan Kaufman", org: "Arbor Realty Trust", location: "Uniondale, NY" }),
+      [
+        {
+          title: "SEC charges Ivan Kaufman and Arbor Realty Trust",
+          snippet: "A criminal charge was described with the fraud allegation.",
+          url: "https://example.com/arbor-fraud",
+          source: "Court Desk",
+          publishedAt: "2026-05-09T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(fraud[0].status).toBe("FAIL");
+    expect(fraud[0].reviewFlag).toBe(true);
+    expect(fraud[0].finding).toContain("fraud, sanctions, or a criminal charge");
+
+    const ofac = gradeChecks(
+      [
+        row({
+          key: "sanctions",
+          status: "FAIL",
+          hardFlag: true,
+          finding: "Watchlist name match on Ivan Kaufman and the application location lines up with New York.",
+        }),
+      ],
+      facts({ name: "Ivan Kaufman", org: "Arbor Realty Trust", location: "Uniondale, NY" }),
+    );
+    expect(ofac.letter).toBe("F");
+    expect(ofac.caps.some((line) => line.startsWith("Capped at F"))).toBe(true);
+  });
+
+  it("accepts an ampersand, a percent-encoded slug, or a dot in a LinkedIn company slug", () => {
     const ampersand = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/cushman-&-wakefield/" }));
     const encoded = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/cushman-%26-wakefield/" }));
+    const dotted = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/f.j.-sciame-construction-inc./" }));
     expect(ampersand.status).toBe("PASS");
     expect(encoded.status).toBe("PASS");
+    expect(dotted.status).toBe("PASS");
+    expect(dotted.reviewFlag).not.toBe(true);
+    expect(dotted.finding).toContain("public profile shape");
     expect(ampersand.reviewFlag).not.toBe(true);
   });
 
