@@ -93,6 +93,8 @@ type Classified = NewsItem & {
   location: boolean;
   departed: boolean;
   suffixMismatch: boolean;
+  /** A foreclosure headline is company-level review. It does not cap the grade. */
+  foreclosureOnly: boolean;
 };
 
 export function cityPhrase(location: string): string {
@@ -125,6 +127,7 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
   const words = phrase.split(/\s+/).filter(Boolean);
   const phraseHasDistinctive = words.some((word) => isDistinctiveCompanyToken(bareToken(word)));
+  // "estate" alone is a generic leftover, not a firm. A full name that still contains the brand is kept.
   if (!phraseHasDistinctive && words.length < 2) return null;
   return `"${cleanedPerson}" "${phrase}"`;
 }
@@ -304,25 +307,14 @@ export function classifyNews(
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
         const blob = `${item.title} ${item.snippet}`;
-        const hit = personName ? personHit(blob, personName, companyName) : "none";
-        const person = hit === "match";
-        const suffixMismatch = hit === "suffix-mismatch";
-        const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);
-        if (!person && !company && !suffixMismatch) return [];
-        const kind = negativeKind(blob);
-        const departed = person && company && leftTheCompany(blob, companyName);
-        return [
-          {
-            ...item,
-            tone: kind === "none" ? ("neutral" as const) : ("negative" as const),
-            kind,
-            person,
-            company,
-            location: textHasLocation(blob, facts.location),
-            departed,
-            suffixMismatch,
-          },
-        ];
+        const judged = judgeHeadline(blob, {
+          name: personName,
+          applicantName: personName,
+          org: companyName,
+          location: facts.location,
+        });
+        if (!judged.person && !judged.company && !judged.suffixMismatch) return [];
+        return [{ ...item, ...judged }];
       }),
   ).sort(byImportance);
   const shown = spreadStories(kept);
@@ -372,7 +364,24 @@ function newsSummary(
   const responded = providers.filter((provider) => provider.state === "responded").map((provider) => provider.name);
   const blocked = providers.filter((provider) => provider.state === "unavailable").map((provider) => provider.name);
   const feeds = feedSentence(responded, blocked);
-  const evidenceUrl = items.find((item) => item.person && item.company)?.url || items[0]?.url || "";
+  const personHardItem = items.find((item) => item.kind === "hard" && item.person && (item.company || item.location));
+  const companyHardItem = items.find((item) => item.kind === "hard" && !item.person && item.company);
+  const personNamedCivilItem = items.find(
+    (item) => item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly,
+  );
+  const ambiguousItem = items.find((item) => item.tone === "negative" && item.person && !item.company && !item.location);
+  const foreclosureItem = items.find((item) => item.foreclosureOnly && item.company);
+  const companyLitigationItem = items.find((item) => item.kind === "civil" && !item.person && item.company);
+  const deciding =
+    personHardItem ||
+    companyHardItem ||
+    personNamedCivilItem ||
+    ambiguousItem ||
+    foreclosureItem ||
+    companyLitigationItem ||
+    items.find((item) => item.person && item.company) ||
+    items[0];
+  const evidenceUrl = deciding?.url || "";
   const base = { key: "news", weight: 8, source: responded.join(", ") || blocked.join(", ") || "News", url: evidenceUrl, ranAt };
   if (!responded.length) {
     return {
@@ -381,11 +390,11 @@ function newsSummary(
       finding: `News could not be checked. ${feeds}`.trim(),
     };
   }
-  const personHard = items.some((item) => item.kind === "hard" && item.person && (item.company || item.location));
-  const companyHard = items.some((item) => item.kind === "hard" && !item.person && item.company);
-  const personNamedCivil = items.some((item) => item.kind === "civil" && item.person && (item.company || item.location));
-  const ambiguousNegative = items.some((item) => item.tone === "negative" && item.person && !item.company && !item.location);
-  const companyLitigation = items.some((item) => item.kind === "civil" && !item.person && item.company);
+  const personHard = Boolean(personHardItem);
+  const companyHard = Boolean(companyHardItem);
+  const personNamedCivil = Boolean(personNamedCivilItem);
+  const ambiguousNegative = Boolean(ambiguousItem);
+  const companyLitigation = Boolean(foreclosureItem || companyLitigationItem);
   const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
   const departure = items.some((item) => item.departed && item.person);
   const suffixMismatch = items.find((item) => item.suffixMismatch);
@@ -467,10 +476,10 @@ function newsSummary(
 }
 
 function newsStory(item: Classified, ranAt: string): CheckOutput {
-  const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location;
+  const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location && !item.foreclosureOnly;
   const personHard = item.kind === "hard" && item.person && (item.company || item.location);
-  const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location);
-  const companyCivil = item.kind === "civil" && !item.person;
+  const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly;
+  const companyCivil = (item.kind === "civil" && !item.person) || item.foreclosureOnly;
   const status: EvidenceStatus = personHard || personNamedCivil ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
   const label = item.suffixMismatch
@@ -508,6 +517,40 @@ function negativeKind(text: string): "hard" | "civil" | "none" {
   if (civilDocket(text)) return "civil";
   if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
   return "none";
+}
+
+/** Foreclosure without a fraud term, a docket, or another civil charge. Review, not a grade cap. */
+export function foreclosureOnly(text: string): boolean {
+  if (!/\bforeclosures?\b/i.test(text)) return false;
+  if (NEWS_PERSON_HARD.test(text)) return false;
+  if (civilDocket(text)) return false;
+  return !/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text);
+}
+
+/**
+ * The same headline judgement used by the news check and by screen-news.
+ * "trust" is not enough to make a company hit. A foreclosure is company-level review.
+ */
+export function judgeHeadline(
+  text: string,
+  facts: { name: string; applicantName?: string; org: string; location: string },
+): Omit<Classified, keyof NewsItem> {
+  const personName = (facts.applicantName || facts.name).trim();
+  const companyName = facts.org.trim();
+  const hit = personName ? personHit(text, personName, companyName) : "none";
+  const person = hit === "match";
+  const company = Boolean(companyName) && textHasCompany(text, companyName, personName);
+  const kind = negativeKind(text);
+  return {
+    tone: kind === "none" ? "neutral" : "negative",
+    kind,
+    person,
+    company,
+    location: textHasLocation(text, facts.location),
+    departed: person && company && leftTheCompany(text, companyName),
+    suffixMismatch: hit === "suffix-mismatch",
+    foreclosureOnly: kind === "civil" && foreclosureOnly(text),
+  };
 }
 
 function feedSentence(responded: string[], blocked: string[]): string {
