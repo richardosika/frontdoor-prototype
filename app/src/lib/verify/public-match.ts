@@ -74,6 +74,10 @@ const GENERIC = new Set([
   "financial",
   "international",
   "united",
+  "real",
+  "estate",
+  "trust",
+  "usa",
 ]);
 
 function tokens(value: string): string[] {
@@ -198,7 +202,11 @@ export function distinctiveCompanyTokens(org: string): string[] {
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 
-/** Distinctive firm words that are not the applicant's own name. Otherwise the full phrase, never one generic leftover. */
+/**
+ * Distinctive firm words that are not the applicant's own name.
+ * When the only distinctive token is that short brand ("mack" in "Mack Real Estate Group"),
+ * keep the whole firm name. Do not drop the brand and search a generic leftover such as "estate".
+ */
 export function companySearchTerm(org: string, person = ""): string {
   const phrase = companyPhraseTokens(org);
   if (!phrase.length) return "";
@@ -208,7 +216,8 @@ export function companySearchTerm(org: string, person = ""): string {
       .map((part) => part.toLowerCase())
       .filter(Boolean),
   );
-  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token) && !names.has(token));
+  const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  const distinctive = brand.filter((token) => !names.has(token));
   if (distinctive.length) return distinctive.join(" ");
   return phrase.join(" ");
 }
@@ -244,7 +253,9 @@ type NameSpan = { surnameStart: number; surnameEnd: number };
 
 /**
  * Given name (or nickname), then up to two initials or capitalized words, then the surname.
- * Commas, ampersands, "and", and "ft." cannot sit between them. "Surname, Given" also counts.
+ * Commas, ampersands, "and", and "ft." cannot sit between one given name and the surname.
+ * A list of given names that shares one surname still counts: "William, Richard and Stephen Mack".
+ * "Surname, Given" also counts.
  */
 function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
   const surname = surnamePattern(parsed.surname);
@@ -254,21 +265,30 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
   const forward = new RegExp(`${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
   const reverse = new RegExp(`${surname}\\s*,?\\s+(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
   const spans: NameSpan[] = [];
-  for (const match of text.matchAll(forward)) {
-    const start = match.index ?? 0;
+  const pushSurname = (start: number, whole: string) => {
     const local = new RegExp(surname, "g");
     let surnameMatch: RegExpExecArray | null = null;
-    for (const hit of match[0].matchAll(local)) surnameMatch = hit;
+    for (const hit of whole.matchAll(local)) surnameMatch = hit;
+    if (!surnameMatch) return;
+    const surnameStart = start + (surnameMatch.index ?? 0);
+    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
+  };
+  for (const match of text.matchAll(forward)) pushSurname(match.index ?? 0, match[0]);
+  for (const match of text.matchAll(reverse)) {
+    const start = match.index ?? 0;
+    const surnameMatch = new RegExp(surname).exec(match[0]);
     if (!surnameMatch) continue;
     const surnameStart = start + (surnameMatch.index ?? 0);
     spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
   }
-  for (const match of text.matchAll(reverse)) {
-    const start = match.index ?? 0;
-    const surnameMatch = new RegExp(surname, "i").exec(match[0]);
-    if (!surnameMatch) continue;
-    const surnameStart = start + (surnameMatch.index ?? 0);
-    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
+  const separator = String.raw`(?:\s*,\s*|\s+[Aa]nd\s+|\s+&\s+)`;
+  const list = new RegExp(`(?<![A-Za-z0-9-])((?:[A-Z][a-z]{1,24}${separator})+[A-Z][a-z]{1,24})\\s+${surname}`, "g");
+  const wanted = new RegExp(`(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`);
+  for (const match of text.matchAll(list)) {
+    const names = match[1] || "";
+    if (/\bft\.?\b/.test(names)) continue;
+    if (!wanted.test(names)) continue;
+    pushSurname(match.index ?? 0, match[0]);
   }
   return spans;
 }
@@ -352,8 +372,13 @@ function looksLikeGivenName(word: string): boolean {
   return !roles.has(word.toLowerCase());
 }
 
-/** True when every hit is "Givenname Token", as in a different person who shares the surname. */
-function surnameOnly(text: string, token: string): boolean {
+/**
+ * True when every hit is "Givenname Token", as in a different person who shares the surname.
+ * A hit inside the firm's own name is the company. "Mack Real Estate" is not surname-only.
+ */
+function surnameOnly(text: string, token: string, org = ""): boolean {
+  const phrase = companyPhraseTokens(org);
+  if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase)) return false;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const all = text.match(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "gi")) || [];
   if (!all.length) return false;
@@ -404,7 +429,7 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   if (phrase.length === 1) {
     if (!distinctive.length) return false;
     if (!companyTokenHit(text, phrase[0])) return false;
-    if (surnameOnly(text, phrase[0])) return false;
+    if (surnameOnly(text, phrase[0], org)) return false;
     void person;
     return true;
   }
