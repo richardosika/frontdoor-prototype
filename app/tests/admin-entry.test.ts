@@ -9,7 +9,7 @@ import {
 } from "@/lib/admin-password";
 import { adminEntryRedirect } from "@/lib/session-gate";
 import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
-import { demoAdministratorIds, ownerAccountNeedsRepair, ownerAdminIdentity } from "@/lib/admin-account";
+import { adminHttpLocationKind, demoAdministratorIds, ownerAccountNeedsRepair, ownerAdminIdentity } from "@/lib/admin-account";
 import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 
 const MEMBER: AdminPasswordAccount = { id: "member", isAdmin: false, passwordHash: "member-hash" };
@@ -147,6 +147,9 @@ describe("separate administrator sign-in", () => {
     });
     expect(trace).toContain("compare=0");
     expect(trace).not.toContain("@");
+    expect(adminHttpLocationKind("")).toBe("none");
+    expect(adminHttpLocationKind("https://cornicio-mvp.onrender.com/login?error=CredentialsSignin")).toBe("error");
+    expect(adminHttpLocationKind("https://cornicio-mvp.onrender.com/admin")).toBe("admin");
   });
 
   it("sends a signed-in administrator home and a signed-in member back to the floor", () => {

@@ -25,6 +25,10 @@ export async function register() {
   await logAdminLoginProbe().catch(() => {
     console.error("Could not probe administrator sign-in");
   });
+  const { rehearseAdminHttpLogin } = await import("@/lib/admin-account");
+  rehearseAdminHttpLogin().catch(() => {
+    console.error("Could not rehearse administrator sign-in");
+  });
   const { logApplicantCensus } = await import("@/lib/live-census");
   await logApplicantCensus().catch(() => {
     console.error("Could not count applicants");
