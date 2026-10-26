@@ -98,7 +98,7 @@ async function writeSuggestions(input: {
     });
     updated += wrote.count;
   }
-  if (input.grade) {
+  if (input.grade && (updated > 0 || input.mode === "refresh")) {
     await prisma.verificationCase.update({
       where: { id: record.id },
       data: { gradeSnapshot: input.grade as unknown as Prisma.InputJsonValue },
@@ -187,9 +187,9 @@ export async function factsForCase(caseId: string): Promise<{ facts: PrefillFact
   });
   if (!record) return null;
   const application = record.application
-    || (record.user
+    || (record.userId
       ? await prisma.application.findFirst({
-          where: { OR: [{ userId: record.user.id }, { email: record.user.email }] },
+          where: { userId: record.userId },
           orderBy: { createdAt: "desc" },
           include: { businessCard: true, inviteCode: true },
         })
@@ -268,7 +268,9 @@ export async function prepareGuidedCase(caseId: string): Promise<void> {
   if (!loaded) return;
   const stored = await storedEvidence(caseId);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
-  const grade = stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject));
+  const grade = stored.evidence.length
+    ? stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject))
+    : await gradeFor([], loaded.facts, loaded.subject);
   await writeSuggestions({
     caseId,
     suggestions,
