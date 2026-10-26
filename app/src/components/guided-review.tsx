@@ -17,6 +17,7 @@ export function GuidedReview({
   notLegit,
   confirmLabel,
   mode = "application",
+  unverified = [],
 }: {
   applicationId: string;
   caseId: string;
@@ -27,6 +28,7 @@ export function GuidedReview({
   notLegit: boolean;
   confirmLabel: string;
   mode?: MemberReviewMode;
+  unverified?: string[];
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -71,6 +73,7 @@ export function GuidedReview({
           mode={mode}
           skipped={skipped}
           previous={previous}
+          unverified={unverified}
         />
       ) : (
         <article className="mt-4">
@@ -154,6 +157,7 @@ function DecisionStep({
   mode,
   skipped,
   previous,
+  unverified,
 }: {
   applicationId: string;
   caseId: string;
@@ -164,6 +168,7 @@ function DecisionStep({
   mode: MemberReviewMode;
   skipped: BuiltStep[];
   previous: ReviewStepId;
+  unverified: string[];
 }) {
   return (
     <div className="mt-4" id="decision-step">
@@ -188,11 +193,31 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">No steps were skipped.</p>
       )}
+      {unverified.length ? (
+        <div className="mt-3 rounded border border-[#7A2E2E] bg-cream p-3 text-sm" role="status">
+          <p className="font-semibold text-[#7A2E2E]">Unverified</p>
+          <ul className="mt-2 space-y-1">
+            {unverified.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-ink">A company that exists is not the same as this applicant being connected to it.</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-ink">Nothing on the unverified list. A source corroborated this person.</p>
+      )}
       {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
-        <DecisionForm applicationId={applicationId} caseId={caseId} notLegit={notLegit} confirmLabel={confirmLabel} paying={paying} />
+        <DecisionForm
+          applicationId={applicationId}
+          caseId={caseId}
+          notLegit={notLegit}
+          confirmLabel={confirmLabel}
+          paying={paying}
+          unverified={unverified}
+        />
       ) : null}
-      {mode === "invite" ? <InviteDecisionForm caseId={caseId} /> : null}
+      {mode === "invite" ? <InviteDecisionForm caseId={caseId} unverified={unverified} /> : null}
       {mode === "closed" ? (
         <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>
       ) : null}

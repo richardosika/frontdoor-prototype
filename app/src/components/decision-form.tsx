@@ -3,6 +3,7 @@
 import { reviewApplication } from "@/actions/admin";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+import { approveConfirmMessage } from "@/lib/review-steps";
 
 export function DecisionForm({
   applicationId,
@@ -10,12 +11,14 @@ export function DecisionForm({
   notLegit,
   confirmLabel = "The recommendation is NOT LEGIT.",
   paying = false,
+  unverified = [],
 }: {
   applicationId: string;
   caseId?: string;
   notLegit: boolean;
   confirmLabel?: string;
   paying?: boolean;
+  unverified?: string[];
 }) {
   return (
     <form
@@ -28,8 +31,7 @@ export function DecisionForm({
           const dues = paying
             ? "Approve this person? The membership-dues link goes out only after you approve."
             : "Approve this person? This role can sign in right away.";
-          const warning = notLegit ? ` ${confirmLabel}` : "";
-          const confirmed = window.confirm(`${dues}${warning}`);
+          const confirmed = window.confirm(approveConfirmMessage({ dues, extra: notLegit ? confirmLabel : "", unverified }));
           if (!confirmed) {
             event.preventDefault();
             return;
@@ -69,7 +71,7 @@ export function DecisionForm({
   );
 }
 
-export function InviteDecisionForm({ caseId }: { caseId: string }) {
+export function InviteDecisionForm({ caseId, unverified = [] }: { caseId: string; unverified?: string[] }) {
   return (
     <form
       action={decideInviteReview}
@@ -78,7 +80,12 @@ export function InviteDecisionForm({ caseId }: { caseId: string }) {
         const submitter = (event.nativeEvent as SubmitEvent).submitter;
         const decision = submitter instanceof HTMLButtonElement ? submitter.value : "";
         if (decision === "APPROVED") {
-          const confirmed = window.confirm("Approve this request to join? An invite code goes out, and this file is marked Verified.");
+          const confirmed = window.confirm(
+            approveConfirmMessage({
+              dues: "Approve this request to join? An invite code goes out, and this file is marked Verified.",
+              unverified,
+            }),
+          );
           if (!confirmed) event.preventDefault();
         }
         if (decision === "DECLINED") {

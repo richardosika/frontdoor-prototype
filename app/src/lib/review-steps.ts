@@ -31,7 +31,25 @@ export type StepEvidence = {
   finding: string;
   source: string;
   url: string;
+  corroborates?: boolean;
 };
+
+/**
+ * Items that were not corroborated about the person.
+ * A company-name SEC hit can auto-pass the company step and still leave this unverified.
+ */
+export function unverifiedPersonItems(evidence: { checkKey: string; status: string; corroborates?: boolean }[]): string[] {
+  const personTied = evidence.some((row) => row.status === "PASS" && row.corroborates === true);
+  return personTied ? [] : ["person-to-company link"];
+}
+
+export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[] }): string {
+  const extra = input.extra ? ` ${input.extra}` : "";
+  const unverified = input.unverified.length
+    ? ` Unverified: ${input.unverified.join(", ")}. A company that exists is not the same as this applicant being connected to it.`
+    : "";
+  return `${input.dues}${extra}${unverified}`;
+}
 
 export type BuiltStep = {
   id: ReviewStepId;

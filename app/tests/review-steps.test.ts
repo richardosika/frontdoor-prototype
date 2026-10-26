@@ -9,6 +9,8 @@ import {
   publicFinding,
   reviewStepFromQuery,
   stepCountsAsPass,
+  approveConfirmMessage,
+  unverifiedPersonItems,
 } from "@/lib/review-steps";
 
 function report(confidence: GradeReport["confidence"]): GradeReport {
@@ -97,5 +99,31 @@ describe("guided review steps", () => {
     expect(displayCheckStatus("NOT_PROVIDED", "Skipped: no card on file")).toBe("Skipped");
     expect(displayCheckStatus("PASS", "Looked fine")).toBe("Pass");
     expect(displayCheckStatus("PENDING", "")).toBe("Not checked");
+  });
+
+  it("keeps the person-to-company link unverified when a company-name SEC match auto-passes the step", () => {
+    const evidence = [
+      {
+        checkKey: "edgar",
+        status: "PASS",
+        finding: "EDGAR lists CBRE GROUP, INC. That shows a company by this name exists. It does not tie the person to the firm.",
+        source: "SEC EDGAR",
+        url: "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=1138118",
+        corroborates: false,
+      },
+    ];
+    const steps = buildReviewSteps({
+      evidence,
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+      facts: { name: "QA Tester", org: "CBRE Group", location: "Dallas, TX", website: "https://www.cbre.com" },
+    });
+    expect(steps.find((step) => step.id === "company")?.status).toBe("PASS");
+    expect(unverifiedPersonItems(evidence)).toEqual(["person-to-company link"]);
+    expect(approveConfirmMessage({ dues: "Approve this person?", unverified: unverifiedPersonItems(evidence) })).toContain(
+      "Unverified: person-to-company link",
+    );
+    expect(unverifiedPersonItems([...evidence, { checkKey: "news", status: "PASS", corroborates: true }])).toEqual([]);
   });
 });

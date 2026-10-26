@@ -6,6 +6,7 @@ import {
   parseReviewProgress,
   reviewStepFromQuery,
   skippedFrom,
+  unverifiedPersonItems,
   type BuiltStep,
   type ReviewStepId,
   type StepEvidence,
@@ -24,6 +25,7 @@ export type MemberReview = {
   applicationId: string | null;
   inviteRequestId: string | null;
   mode: MemberReviewMode;
+  unverified: string[];
 };
 
 function rowsFromSnapshot(value: unknown): StepEvidence[] {
@@ -39,6 +41,7 @@ function rowsFromSnapshot(value: unknown): StepEvidence[] {
       finding: typeof row.finding === "string" ? row.finding : "",
       source: typeof row.source === "string" ? row.source : "",
       url: typeof row.url === "string" ? row.url : "",
+      corroborates: row.corroborates === true,
     });
   }
   return out;
@@ -83,6 +86,7 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
         finding: item.finding,
         source: item.source,
         url: item.url,
+        corroborates: item.corroborates,
       }));
     }
   }
@@ -136,5 +140,6 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
     applicationId,
     inviteRequestId: invite?.id || null,
     mode: open ? "application" : invitePending ? "invite" : "closed",
+    unverified: unverifiedPersonItems(evidence),
   };
 }
