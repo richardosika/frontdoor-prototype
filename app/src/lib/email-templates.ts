@@ -488,12 +488,22 @@ export function dropEmptyLabelLines(source: string): string {
     .join("\n");
 }
 
+/**
+ * "CBRE Group, Inc." already ends a sentence. A following period would read "Inc..".
+ * An ellipsis ("...") is left as written.
+ */
+export function repairDoubledTerminalPeriod(text: string): string {
+  return text.replace(/(\p{L})\.\.(?!\.)/gu, "$1.");
+}
+
 /** Replaces {tokens}. Unknown tokens stay so a typo is visible. The founder sign-off is for bodies, not subjects. */
 export function renderTemplate(source: string, vars: Record<string, string>, options?: { signOff?: boolean }): string {
-  const rendered = source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
-    const value = vars[key.toLowerCase()];
-    return value === undefined ? match : value;
-  });
+  const rendered = repairDoubledTerminalPeriod(
+    source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
+      const value = vars[key.toLowerCase()];
+      return value === undefined ? match : value;
+    }),
+  );
   const trimmed = dropEmptyLabelLines(rendered).trim();
   if (options?.signOff === false) return trimmed;
   if (trimmed.includes(SIGN_OFF)) return trimmed;

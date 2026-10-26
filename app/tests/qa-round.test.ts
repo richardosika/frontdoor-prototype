@@ -4,7 +4,7 @@ import { needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalIt
 import { applicantDuesSentence, FREE_MEMBERSHIP_LINE } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
-import { templateDef } from "@/lib/email-templates";
+import { renderTemplate, repairDoubledTerminalPeriod, templateDef } from "@/lib/email-templates";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { reviewCopy } from "@/lib/review-copy";
 import { isSignedInJoinEntry } from "@/lib/session-gate";
@@ -64,6 +64,20 @@ describe("QA fixes that stay outside grading", () => {
     expect(inviteRequestAddress({ street: "1 Main", city: "New York", state: "ny", zip: "10001" })).not.toContain(" ny ");
     expect(isSignedInJoinEntry("/", "#request-to-join")).toBe(true);
     expect(isSignedInJoinEntry("/", "#request-invite")).toBe(true);
+  });
+
+  it("skips a second period when the company name already ends with one", () => {
+    const org = "CBRE Group, Inc.";
+    const thanks = renderTemplate("Your request is for the {role} role at {org}.", { role: "Mortgage Broker", org }, { signOff: false });
+    expect(thanks).toBe("Your request is for the Mortgage Broker role at CBRE Group, Inc.");
+    const legacy = renderTemplate("It is for {role} at {org}.", { role: "Mortgage Broker", org }, { signOff: false });
+    expect(legacy).toBe("It is for Mortgage Broker at CBRE Group, Inc.");
+    const admin = repairDoubledTerminalPeriod(`Open the state search and look up ${org}.`);
+    expect(admin).toBe("Open the state search and look up CBRE Group, Inc.");
+    expect(renderTemplate("Your request is for the {role} role at {org}.", { role: "Mortgage Broker", org: "Northline Builders" }, { signOff: false })).toBe(
+      "Your request is for the Mortgage Broker role at Northline Builders.",
+    );
+    expect(repairDoubledTerminalPeriod("Three headlines were saved for review...")).toBe("Three headlines were saved for review...");
   });
 
   it("uses a human date and a grammatical thank-you line", () => {
