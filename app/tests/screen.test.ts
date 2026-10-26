@@ -56,6 +56,7 @@ describe("public screening", () => {
     expect(matchEdgarCompany(rows, "Blackstone")?.ticker).toBe("BX");
     expect(matchEdgarCompany(rows, "JPMorgan Chase & Co.")?.ticker).toBe("JPM");
     expect(matchEdgarCompany(rows, "BuildPro Construction Services LLC")).toBeNull();
+    expect(matchEdgarCompany([...rows, { title: "CAPTIVA VERDE WELLNESS CORP.", ticker: "CPIVF", cik: "1712294" }], "Captiva Development")).toBeNull();
     const judged = assessEdgarMatch({
       org: "Blackstone",
       person: "Stephen A. Schwarzman",
@@ -146,6 +147,15 @@ describe("public screening", () => {
       confidence: "high",
     });
     expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(true);
+    expect(scorePublicText("Captiva Island's record home sale", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(false);
+    expect(scorePublicText("Richard Osika leads Captiva Development from Saddle Brook", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(true);
+    expect(
+      scorePublicText("Persistence and Agility with Rich Osika\nBuild Pro Construction Service's core area of business", {
+        name: "Richard Osika",
+        org: "BuildPro Construction Services LLC",
+        location: "Saddle Brook, NJ",
+      }),
+    ).toMatchObject({ name: true, company: true, confidence: "high" });
     expect(distinctiveCompanyTokens(facts.org)).toEqual(["buildpro"]);
     expect(scorePublicText("Shankara Buildpro shares rose", facts)).toMatchObject({ name: false, company: false, confidence: "none" });
   });

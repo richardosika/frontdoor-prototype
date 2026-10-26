@@ -60,9 +60,39 @@ function tokens(value: string): string[] {
     .filter((token) => token.length >= 2);
 }
 
+const PLACE_AFTER = "island|beach|drive|dr|lane|blvd|boulevard|road|rd|street|st|avenue|ave";
+
 export function wordHit(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+}
+
+/** "Captiva Island" and "Captiva Dr" are places, not Captiva Development. */
+function companyTokenHit(text: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = text.replace(new RegExp(`\\b${escaped}\\s+(?:${PLACE_AFTER})\\b`, "gi"), " ");
+  if (wordHit(stripped, token)) return true;
+  if (token.length < 8) return false;
+  for (let index = 4; index <= token.length - 3; index += 1) {
+    const left = token.slice(0, index);
+    const right = token.slice(index);
+    if (new RegExp(`\\b${left}\\s+${right}\\b`, "i").test(stripped)) return true;
+  }
+  return false;
+}
+
+export function alternatePersonNames(name: string): string[] {
+  const cleaned = name.replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
+  const parts = tokens(cleaned).filter((token) => token.length >= 3);
+  if (parts.length < 2) return cleaned ? [cleaned] : [];
+  const last = parts[parts.length - 1];
+  const lastLabel = last.charAt(0).toUpperCase() + last.slice(1);
+  const names = new Set<string>([cleaned]);
+  for (const nick of NICKNAMES[parts[0]] || []) {
+    if (nick === parts[0]) continue;
+    names.add(`${nick.charAt(0).toUpperCase()}${nick.slice(1)} ${lastLabel}`);
+  }
+  return [...names];
 }
 
 /** Words that distinguish this firm. A common word such as "related" is kept only together with the rest of the name. */
@@ -113,11 +143,11 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   const companyTokens = distinctive.length ? distinctive : kept;
   if (!companyTokens.length) return false;
   if (distinctive.length) {
-    if (!distinctive.every((token) => wordHit(text, token))) return false;
+    if (!distinctive.every((token) => companyTokenHit(text, token))) return false;
     if (distinctive.length === 1 && surnameOnly(text, distinctive[0])) return false;
     return true;
   }
-  if (companyTokens.every((token) => wordHit(text, token))) return true;
+  if (companyTokens.every((token) => companyTokenHit(text, token))) return true;
   if (!person || !mentionsPerson(text, person)) return false;
   return companyTokens.some((token) => token.length >= 7 && looseToken(text, token));
 }

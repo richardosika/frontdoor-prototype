@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -29,12 +29,20 @@ export function parseCompanyTickers(payload: string): EdgarCompany[] | null {
   }
 }
 
+/** A shared first word is not enough when the SEC title names a different firm. */
+export function edgarTitleFits(title: string, org: string): boolean {
+  if (!mentionsCompany(title, org)) return false;
+  const orgTokens = new Set(distinctiveCompanyTokens(org));
+  const extras = distinctiveCompanyTokens(title).filter((token) => !orgTokens.has(token));
+  return !(orgTokens.size === 1 && extras.length > 0);
+}
+
 /** The shortest SEC company title that contains this firm's distinguishing words. */
 export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompany | null {
   let best: EdgarCompany | null = null;
   let bestWords = Number.POSITIVE_INFINITY;
   for (const row of rows) {
-    if (!mentionsCompany(row.title, org)) continue;
+    if (!edgarTitleFits(row.title, org)) continue;
     const words = row.title.split(/\s+/).filter(Boolean).length;
     if (words < bestWords) {
       best = row;
@@ -62,7 +70,7 @@ export function filingNames(payload: string): string[] | null {
 }
 
 export function personOnFiling(names: string[], person: string, org: string): string {
-  const companyNamed = names.some((name) => mentionsCompany(name, org));
+  const companyNamed = names.some((name) => edgarTitleFits(name, org));
   if (!companyNamed) return "";
   return names.find((name) => mentionsPerson(name, person)) || "";
 }

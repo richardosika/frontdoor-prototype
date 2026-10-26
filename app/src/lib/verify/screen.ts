@@ -1,6 +1,6 @@
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
-import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { alternatePersonNames, distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 
@@ -77,11 +77,22 @@ export function linkedinBlocked(
   return scorePublicText(text, facts).confidence === "none";
 }
 
+function decodeYoutubeText(value: string): string {
+  return value.replace(/\\u0026/g, "&").replace(/\\"/g, '"');
+}
+
 export function youtubeTitles(html: string): string[] {
-  const titles = [...html.matchAll(/"title":\{"runs":\[\{"text":"([^"]{3,180})"/g)].map((match) =>
-    match[1].replace(/\\u0026/g, "&").replace(/\\"/g, '"'),
-  );
+  const titles = [...html.matchAll(/"title":\{"runs":\[\{"text":"([^"]{3,180})"/g)].map((match) => decodeYoutubeText(match[1]));
   return titles.filter((title) => !YOUTUBE_CHROME.has(title.toLowerCase()));
+}
+
+export function youtubeSnippets(html: string): string[] {
+  const snippets: string[] = [];
+  for (const match of html.matchAll(/"snippetText":\{"runs":\[([\s\S]*?)\]\}/g)) {
+    const text = [...match[1].matchAll(/"text":"([^"]*)"/g)].map((item) => decodeYoutubeText(item[1])).join("").trim();
+    if (text) snippets.push(text);
+  }
+  return snippets;
 }
 
 export function tiktokProfileText(html: string): string {
@@ -388,8 +399,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       searched: `${shortQuery} on YouTube`,
       fromSite: socials.some((item) => item.platform === "YouTube"),
       read: (text) => {
-        const titles = youtubeTitles(text);
-        return titles.length ? titles.join(" \n ") : visible(text).slice(0, 2000);
+        const lines = [...youtubeTitles(text), ...youtubeSnippets(text)];
+        return lines.length ? lines.join("\n") : visible(text).slice(0, 2000);
       },
     },
     {
@@ -415,8 +426,21 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           : `${job.platform} blocked automated access.`;
         return blockedAttempt(job.key, job.platform, job.searched, job.url, detail);
       }
-      const text = job.read(response.text);
-      if (job.platform === "YouTube" && !job.fromSite && youtubeTitles(response.text).length === 0) {
+      let text = job.read(response.text);
+      let url = job.url;
+      if (job.platform === "YouTube" && !job.fromSite && !scorePublicText(text, queryFacts).name) {
+        const altName = alternatePersonNames(person).find((item) => item.toLowerCase() !== person.trim().toLowerCase());
+        if (altName) {
+          const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`"${altName}" ${distinctiveCompanyTokens(facts.org)[0] || facts.org}`)}`;
+          const second = await pull(fetchText, altUrl);
+          const extra = [...youtubeTitles(second.text), ...youtubeSnippets(second.text)];
+          if (!accessBlocked(second.status, second.text, altUrl) && extra.length && scorePublicText(extra.join("\n"), queryFacts).name) {
+            text = [text, ...extra].filter(Boolean).join("\n");
+            url = altUrl;
+          }
+        }
+      }
+      if (job.platform === "YouTube" && !job.fromSite && url === job.url && youtubeTitles(response.text).length === 0 && youtubeSnippets(response.text).length === 0) {
         return blockedAttempt(job.key, job.platform, job.searched, job.url, "YouTube did not include readable video titles.");
       }
       const score = scorePublicText(text, queryFacts);
@@ -425,24 +449,29 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           key: job.key,
           platform: job.platform,
           searched: job.searched,
-          url: job.url,
+          url,
           outcome: "not-found" as const,
           score,
           detail: `${job.platform} responded`,
         };
       }
-      const matchedLine = text
+      const ranked = text
         .split("\n")
         .map((line) => line.trim())
-        .find((line) => line && scorePublicText(line, queryFacts).confidence !== "none");
+        .filter(Boolean)
+        .map((line) => ({ line, score: scorePublicText(line, queryFacts) }))
+        .sort((left, right) => rank(right.score) - rank(left.score));
+      const matched = ranked.find((item) => item.score.name) || ranked.find((item) => item.score.confidence !== "none");
+      const companyLine = matched && score.company && !matched.score.company ? ranked.find((item) => item.score.company) : undefined;
+      const detail = [matched?.line, companyLine?.line].filter(Boolean).join(" — ").slice(0, 220);
       return {
         key: job.key,
         platform: job.platform,
         searched: job.searched,
-        url: job.url,
+        url,
         outcome: "found" as const,
         score,
-        detail: matchedLine ? matchedLine.slice(0, 180) : `${job.platform} returned a public result`,
+        detail: detail || `${job.platform} returned a public result`,
       };
     }),
   );
@@ -456,8 +485,13 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   for (const query of newsQueries) {
     const newsUrl = googleNewsUrl(query);
     const news = await pull(fetchText, newsUrl);
-    if (accessBlocked(news.status, news.text, newsUrl) || !/<item\b/i.test(news.text)) {
+    const newsFeed = /<(rss|feed|channel)\b/i.test(news.text);
+    if (accessBlocked(news.status, news.text, newsUrl) || !newsFeed) {
       newsBlocked += 1;
+      continue;
+    }
+    if (!/<item\b/i.test(news.text)) {
+      newsResponded += 1;
       continue;
     }
     newsResponded += 1;

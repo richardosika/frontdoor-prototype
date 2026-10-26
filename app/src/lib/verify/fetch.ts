@@ -102,7 +102,9 @@ async function fetchOnce(
         ...(wiki ? { "api-user-agent": USER_AGENT } : {}),
       },
     });
-    const cap = options?.maxChars ?? (host.endsWith("youtube.com") ? 1_200_000 : host.endsWith("tiktok.com") ? 500_000 : 180_000);
+    const cap =
+      options?.maxChars ??
+      (host.endsWith("youtube.com") ? 1_200_000 : host.endsWith("linkedin.com") ? 450_000 : host.endsWith("tiktok.com") ? 500_000 : 180_000);
     const text = limitText(await response.text(), cap);
     return { ok: response.ok, status: response.status, text };
   } catch {
