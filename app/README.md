@@ -47,7 +47,7 @@ Seeded members use the password `cornicio-demo`. Administrators sign in only at 
 
 | Email | Role |
 | --- | --- |
-| rich@privatefloorclub.com | Administrator. Password is `ADMIN_PASSWORD`, not the demo member password. |
+| rich@privatefloorclub.com | Richard Osika, Founder. Administrator. Password is `ADMIN_PASSWORD`, not the demo member password. |
 | marcus.hale@halerow.example | Developer, Confirmed demo member. Not an administrator. |
 | jordan.ellis@ellisarch.example | Pending application (cannot sign in yet) |
 

@@ -7,7 +7,7 @@ import {
 } from "@/lib/admin-password";
 import { adminEntryRedirect } from "@/lib/session-gate";
 import { adminSignInAllowed, credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
-import { demoAdministratorIds, ownerAccountNeedsRepair } from "@/lib/admin-account";
+import { demoAdministratorIds, ownerAccountNeedsRepair, ownerAdminIdentity } from "@/lib/admin-account";
 import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 
 const MEMBER: AdminPasswordAccount = { id: "member", isAdmin: false, passwordHash: "member-hash" };
@@ -115,6 +115,18 @@ describe("separate administrator sign-in", () => {
     expect(ownerAccountNeedsRepair(null)).toBe("create");
     expect(ownerAccountNeedsRepair(owner)).toBe("ready");
     expect(ownerAccountNeedsRepair({ ...owner, isAdmin: false })).toBe("repair");
+    const identity = ownerAdminIdentity();
+    expect(identity).toMatchObject({
+      email: KEEP_ADMIN_EMAIL,
+      name: "Richard Osika",
+      initials: "RO",
+      credentialNote: "Founder",
+      isAdmin: true,
+      isTest: false,
+      status: "ACTIVE",
+    });
+    expect(identity).not.toHaveProperty("passwordHash");
+    expect(JSON.stringify(identity)).not.toMatch(/cornicio|password/i);
   });
 
   it("sends a signed-in administrator home and a signed-in member back to the floor", () => {

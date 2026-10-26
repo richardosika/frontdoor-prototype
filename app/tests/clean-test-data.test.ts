@@ -423,6 +423,8 @@ describe("CLEAN_TEST_DATA", () => {
     const owner = { id: "user_owner", email: KEEP_ADMIN_EMAIL, isAdmin: true };
     const sample = { id: "user_sample", email: "rich@buildpro-cs.com", isTest: false };
     expect(keptUser(owner)).toBe(true);
+    expect(keptUser({ id: "user_owner", email: KEEP_ADMIN_EMAIL, isAdmin: false })).toBe(true);
+    expect(keptUser({ id: "user_mh", email: "marcus.hale@halerow.example", isAdmin: false })).toBe(true);
     expect(keptUser({ id: "user_flag_only", isAdmin: true })).toBe(true);
     expect(keptUser(sample)).toBe(false);
     expect(keptUser({ id: "user_mh" })).toBe(true);

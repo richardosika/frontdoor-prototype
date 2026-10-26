@@ -8,6 +8,20 @@ import { prisma } from "@/lib/prisma";
 export const DEMO_MEMBER_PASSWORD = "cornicio-demo";
 
 export const OWNER_ADMIN_NAME = "Richard Osika";
+export const OWNER_ADMIN_TITLE = "Founder";
+
+/** Identity written on every startup. The password is never part of this object. */
+export function ownerAdminIdentity() {
+  return {
+    email: KEEP_ADMIN_EMAIL,
+    name: OWNER_ADMIN_NAME,
+    initials: initialsFromName(OWNER_ADMIN_NAME),
+    credentialNote: OWNER_ADMIN_TITLE,
+    isAdmin: true,
+    isTest: false,
+    status: "ACTIVE" as const,
+  };
+}
 
 export type AdminFlagUser = {
   id: string;
@@ -51,28 +65,24 @@ export async function prepareAdministratorAccounts(): Promise<{ revoked: number;
 
   const owner = users.find((user) => user.email.trim().toLowerCase() === KEEP_ADMIN_EMAIL) ?? null;
   const ownerAction = ownerAccountNeedsRepair(owner);
+  const identity = ownerAdminIdentity();
   if (ownerAction === "create") {
     const passwordHash = await bcrypt.hash(`${crypto.randomUUID()}${crypto.randomUUID()}`, 10);
     await prisma.user.create({
       data: {
-        email: KEEP_ADMIN_EMAIL,
+        ...identity,
         passwordHash,
-        name: OWNER_ADMIN_NAME,
-        initials: initialsFromName(OWNER_ADMIN_NAME),
         role: "DEVELOPER",
         org: "Private Floor Club",
         location: "New York, NY",
-        isAdmin: true,
-        isTest: false,
-        status: "ACTIVE",
         tier: "CONFIRMED",
         paymentStatus: "NOT_REQUIRED",
       },
     });
-  } else if (ownerAction === "repair" && owner) {
+  } else if (owner) {
     await prisma.user.update({
       where: { id: owner.id },
-      data: { isAdmin: true, isTest: false, status: "ACTIVE" },
+      data: identity,
     });
   }
 

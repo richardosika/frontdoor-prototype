@@ -1,6 +1,6 @@
 # Test guide
 
-Use this on the deployed site or on a local server. Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` (also linked as **Admin**, with a brass shield, from the home page, the member sign-in page, apply, and the legal pages). The administrator is `rich@privatefloorclub.com`. The password is the server’s `ADMIN_PASSWORD`. It is not written in this guide. Marcus Hale (`marcus.hale@halerow.example`) is a demo member. A demo account cannot open the administrator pages.
+Use this on the deployed site or on a local server. Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` (also linked as **Admin**, with a brass shield, from the home page, the member sign-in page, apply, and the legal pages). The administrator is Richard Osika, Founder, `rich@privatefloorclub.com`. The password is the server’s `ADMIN_PASSWORD`. It is not written in this guide. Marcus Hale (`marcus.hale@halerow.example`) is a demo member. A demo account cannot open the administrator pages.
 
 When `ADMIN_PASSWORD` is set to at least 12 characters, the server replaces the administrator password with that value at startup. `cornicio-demo` works for members and does not sign in an administrator. A shorter value is ignored. If `ADMIN_PASSWORD` is unset, the administrator password is left as it already is.
 
