@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, isGenericFirmToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -79,24 +79,48 @@ function preferTicker(left: [number, number, number], right: [number, number, nu
   return false;
 }
 
-/** The SEC row whose normalized name is this firm. A shorter plain ticker wins ties, so Sachem Capital resolves to SACH. */
+function firmTokens(value: string): string[] {
+  return normalizeFirmName(value).split(/\s+/).filter(Boolean);
+}
+
+function pickByTicker(rows: EdgarCompany[], org: string): EdgarCompany {
+  return rows.reduce((best, row) => (preferTicker(tickerPreference(row.ticker, org), tickerPreference(best.ticker, org)) ? row : best));
+}
+
+/**
+ * Exact normalized title first, so "SL Green Realty Corp" is SL GREEN REALTY CORP and not GREEN DOT.
+ * Otherwise every non-generic token of 2 or more characters has to be in the title.
+ * A title word of 3 or more characters that is not generic and not in the applicant's name is an extra, and that row is not a match.
+ * Ties keep the most applicant tokens, then the fewest extras, then the plainer ticker. The shortest title does not win.
+ */
 export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompany | null {
-  let best: EdgarCompany | null = null;
-  let bestWords = Number.POSITIVE_INFINITY;
-  let bestTicker: [number, number, number] = [1, 1, 99];
+  const normalized = normalizeFirmName(org);
+  if (!normalized) return null;
+  const orgTokens = firmTokens(org);
+  const required = orgTokens.filter((token) => !isGenericFirmToken(token));
+  if (!required.length) return null;
+  const exact = rows.filter((row) => normalizeFirmName(row.title) === normalized);
+  if (exact.length) return pickByTicker(exact, org);
+  const orgSet = new Set(orgTokens);
+  const ranked: { row: EdgarCompany; matched: number; extras: number }[] = [];
   for (const row of rows) {
-    if (!edgarCompanyMatches(row.title, org, row.ticker)) continue;
-    const words = normalizeFirmName(row.title).split(/\s+/).filter(Boolean).length;
-    const preference = tickerPreference(row.ticker, org);
-    const betterName = words < bestWords;
-    const betterTicker = words === bestWords && preferTicker(preference, bestTicker);
-    if (!best || betterName || betterTicker) {
-      best = row;
-      bestWords = words;
-      bestTicker = preference;
-    }
+    const titleTokens = firmTokens(row.title);
+    const titleSet = new Set(titleTokens);
+    if (!required.every((token) => titleSet.has(token))) continue;
+    const distinctiveExtra = titleTokens.some((token) => token.length >= 3 && !orgSet.has(token) && !isGenericFirmToken(token));
+    if (distinctiveExtra) continue;
+    const matched = orgTokens.filter((token) => titleSet.has(token)).length;
+    const extras = titleTokens.filter((token) => token.length >= 3 && !orgSet.has(token)).length;
+    ranked.push({ row, matched, extras });
   }
-  return best;
+  if (!ranked.length) return null;
+  const bestMatched = Math.max(...ranked.map((item) => item.matched));
+  const matched = ranked.filter((item) => item.matched === bestMatched);
+  const fewestExtras = Math.min(...matched.map((item) => item.extras));
+  return pickByTicker(
+    matched.filter((item) => item.extras === fewestExtras).map((item) => item.row),
+    org,
+  );
 }
 
 /** Quoted company-name search. Generic-only names such as "Group" or "Holdings" are not searched. */

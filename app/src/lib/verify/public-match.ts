@@ -187,6 +187,11 @@ export function isDistinctiveCompanyToken(token: string): boolean {
   return token.length >= 4 && !GENERIC.has(token) && !SHORT_GENERIC.has(token) && !LEGAL.has(token);
 }
 
+/** Generic firm words, including short ones such as "bank" and "fund". "sl" is not generic. */
+export function isGenericFirmToken(token: string): boolean {
+  return GENERIC.has(token) || SHORT_GENERIC.has(token) || LEGAL.has(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -335,7 +340,7 @@ export function leftTheCompany(text: string, org: string): boolean {
     if (mentionsCompany(destination, org)) return false;
     if (mentionsCompany(origin, org)) return true;
   }
-  return /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b/i.test(text);
+  return /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(text);
 }
 
 function looksLikeGivenName(word: string): boolean {
