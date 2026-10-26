@@ -7,7 +7,7 @@ import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/gr
 import { classifyNews } from "@/lib/verify/news";
 import { distinctiveCompanyTokens, mentionsCompany } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
-import { serpUnusable } from "@/lib/verify/screen";
+import { runPublicScreen, serpUnusable } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -361,6 +361,22 @@ describe("low-risk check fixes", () => {
     const filings = fetchLimits("https://efts.sec.gov/LATEST/search-index?q=%22Yearley%22%20%22toll%22");
     expect(filings.maxChars).toBeGreaterThanOrEqual(1_500_000);
     expect(fetchLimits("https://example.com/page").maxChars).toBe(180_000);
+  });
+
+  it("does not treat a name-and-city video as person-to-company corroboration", async () => {
+    const title = "Larry Silverstein signed a lease in New York";
+    const html = `{"title":{"runs":[{"text":"${title}"}]}}`;
+    const checks = await runPublicScreen(
+      facts({ name: "Larry Silverstein", applicantName: "Larry Silverstein", org: "Toll Brothers, Inc.", location: "New York, NY", website: "" }),
+      async (url) => (url.includes("youtube.com") ? { ok: true, status: 200, text: html } : { ok: false, status: 403, text: "" }),
+    );
+    const youtube = checks.find((check) => check.key === "screen-youtube");
+    expect(youtube?.status).toBe("INCONCLUSIVE");
+    expect(youtube?.corroborates).toBe(false);
+    expect(youtube?.finding).toContain("Company: no");
+    const graded = gradeChecks(checks, facts({ name: "Larry Silverstein", org: "Toll Brothers, Inc.", location: "New York, NY" }));
+    const footprint = graded.categories.find((category) => category.id === "footprint");
+    expect(footprint?.reason).toContain("0 of 8");
   });
 
   it("uses an identifying user agent for social hosts", () => {

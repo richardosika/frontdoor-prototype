@@ -188,7 +188,8 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       finding: `Searched: ${attempt.searched}. No result found that names this person and this company. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
-  const tied = strong(attempt.score);
+  // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.
+  const tied = attempt.score.name && attempt.score.company && strong(attempt.score);
   const companyOnOwnSite = attempt.key === "website" && attempt.score.company && !tied;
   if (companyOnOwnSite) {
     return {
