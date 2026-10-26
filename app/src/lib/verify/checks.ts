@@ -5,7 +5,7 @@ import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
 import { isReservedDomain, registrableHost } from "@/lib/verify/host";
-import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { companyPhraseTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
@@ -613,11 +613,31 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+/** A made-up token. Real firm words such as Keystone, Brambleton, and Construction stay readable. */
+export function tokenLooksGibberish(token: string): boolean {
+  const word = token.toLowerCase();
+  if (word.length < 4) return false;
+  if (!/[aeiouy]/.test(word)) return true;
+  if (/q(?!u)/.test(word)) return true;
+  if (/(.)\1\1/.test(word)) return true;
+  if (/[^aeiouy]{5,}/.test(word)) return true;
+  if (word.length <= 9) {
+    const clusters = word.match(/[^aeiouy]{3,}/g) || [];
+    if (clusters.some((cluster) => /[qxzj]/.test(cluster))) return true;
+  }
+  return false;
+}
+
+export function companyNameLooksReal(org: string): boolean {
+  if (org.trim().length < 2 || /asdf|qwerty|testtest/i.test(org)) return false;
+  return !companyPhraseTokens(org).some((token) => tokenLooksGibberish(token));
+}
+
 export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
   const nameOk = facts.name.trim().split(/\s+/).length >= 2 && facts.name.trim().length >= 5;
-  const orgOk = facts.org.trim().length >= 2 && !/asdf|qwerty|testtest/i.test(facts.org);
+  const orgReal = companyNameLooksReal(facts.org);
   const roleKnown = annualDuesCents(facts.role) >= 0;
-  if (nameOk && orgOk && roleKnown) {
+  if (nameOk && orgReal && roleKnown) {
     return check({
       key: "plausibility",
       status: "PASS",
@@ -627,12 +647,15 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
+  const gibberish = !orgReal && facts.org.trim().length >= 2;
   return check({
     key: "plausibility",
     status: "FAIL",
     weight: 4,
     reviewFlag: true,
-    finding: "The name or company looks incomplete. Read the application before you decide.",
+    finding: gibberish
+      ? "The company name does not look like real words."
+      : "The name or company looks incomplete. Read the application before you decide.",
     source: "Local plausibility heuristic",
     url: "",
   });

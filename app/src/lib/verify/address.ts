@@ -75,6 +75,17 @@ const ZIP_RANGES: Record<string, [number, number][]> = {
 export const US_POSTAL_CODES = new Set(Object.keys(ZIP_RANGES));
 
 const ZIP5 = /^\d{5}(?:-\d{4})?$/;
+const STREET_SUFFIX = /\b(?:lane|ln|street|st|avenue|ave|road|rd|drive|dr|boulevard|blvd|way|court|ct|place|pl|terrace|ter)\b/i;
+
+/** A leading zero is not a street number. "10" is fine. "01" is not treated as zero. */
+function numberBelowOne(value: string): boolean {
+  return /^0+\b/.test(value.trim());
+}
+
+function rejectedStreetNumber(parsed: ParsedAddress): boolean {
+  if (parsed.street && numberBelowOne(parsed.street)) return true;
+  return !parsed.street && STREET_SUFFIX.test(parsed.city) && numberBelowOne(parsed.city);
+}
 
 export function parseApplicationLocation(location: string): ParsedAddress | null {
   const text = location.trim().replace(/\s+/g, " ");
@@ -133,6 +144,12 @@ export function assessLocalAddress(location: string): LocalAddress {
     return {
       kind: "invalid",
       finding: `The address did not check out. ZIP ${parsed.zip.slice(0, 5)} is not in the ${parsed.state} ZIP range.`,
+    };
+  }
+  if (rejectedStreetNumber(parsed)) {
+    return {
+      kind: "invalid",
+      finding: "The address did not check out. The street number has to be 1 or higher.",
     };
   }
   const geocode = Boolean(parsed.street && parsed.city && parsed.state && parsed.zip);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessLocalAddress, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, inviteCheck, linkedinFormatCheck, phoneStateCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
@@ -386,6 +386,9 @@ describe("low-risk check fixes", () => {
     expect(charleston.status).toBe("PASS");
     const nashville = phoneStateCheck(facts({ phone: "615-555-0100", location: "Nashville, TN" }));
     expect(nashville.status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "818-555-0100", location: "Los Angeles, CA" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "310-555-0199", location: "Los Angeles, CA" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "512-555-0199", location: "Austin, TX" })).status).toBe("PASS");
     const tollFree = phoneStateCheck(facts({ phone: "800-555-0100", location: "Newark, NJ" }));
     expect(tollFree.status).toBe("INCONCLUSIVE");
     expect(tollFree.reviewFlag).toBeUndefined();
@@ -1692,5 +1695,61 @@ describe("batch 4 LinkedIn directory pages", () => {
     });
     expect(direct.status).not.toBe("PASS");
     expect(direct.corroborates).not.toBe(true);
+  });
+});
+
+describe("batch 4 address and company-name plausibility", () => {
+  it("rejects street number 0 and a gibberish company name", async () => {
+    const zero = assessLocalAddress("0 Nowhere Lane, NY 10001");
+    expect(zero.kind).toBe("invalid");
+    if (zero.kind === "invalid") expect(zero.finding).toContain("street number has to be 1 or higher");
+    const realStreet = assessLocalAddress("1 Main Street, NY 10001");
+    expect(realStreet.kind).not.toBe("invalid");
+    const address = await resolveAddressCheck({
+      facts: facts({ location: "0 Nowhere Lane, NY 10001" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(address?.status).toBe("FAIL");
+    const graded = gradeChecks(address ? [address] : [], facts({ location: "0 Nowhere Lane, NY 10001" }));
+    expect(graded.categories.find((category) => category.id === "completeness")?.reason).toContain("address did not check out (0 of 2)");
+
+    expect(companyNameLooksReal("Brambleton Keystone Capital Group")).toBe(true);
+    expect(companyNameLooksReal("Keystone Construction")).toBe(true);
+    expect(companyNameLooksReal("Blorptex Qwvzn Builders LLC")).toBe(false);
+    const gibberish = plausibilityCheck(
+      facts({ name: "Corvin Ashleigh", applicantName: "Corvin Ashleigh", org: "Blorptex Qwvzn Builders LLC" }),
+    );
+    expect(gibberish.status).toBe("FAIL");
+    expect(gibberish.finding).toContain("does not look like real words");
+    const readable = plausibilityCheck(
+      facts({ name: "Corvin Ashleigh", applicantName: "Corvin Ashleigh", org: "Brambleton Keystone Capital Group" }),
+    );
+    expect(readable.status).toBe("PASS");
+
+    const deadSite = {
+      key: "website",
+      status: "FAIL" as const,
+      weight: 8,
+      finding: "Searched: https://blorptex.example. domain does not resolve.",
+      source: "Company website",
+      url: "https://blorptex.example",
+      ranAt: NOW.toISOString(),
+    };
+    const deadDomain = {
+      key: "rdap",
+      status: "FAIL" as const,
+      weight: 2,
+      finding: "domain does not resolve",
+      source: "RDAP",
+      url: "",
+      ranAt: NOW.toISOString(),
+    };
+    const report = gradeChecks([gibberish, deadSite, deadDomain], facts({ org: "Blorptex Qwvzn Builders LLC" }));
+    expect(report.summary.didNotCheckOut).not.toContain("Nothing in the checks that ran showed a direct conflict");
+    expect(report.summary.didNotCheckOut.toLowerCase()).toContain("does not look like real words");
+    expect(report.summary.didNotCheckOut.toLowerCase()).toContain("domain does not resolve");
+    const role = report.categories.find((category) => category.id === "role");
+    expect(role?.reason).not.toContain("8 of 8");
   });
 });

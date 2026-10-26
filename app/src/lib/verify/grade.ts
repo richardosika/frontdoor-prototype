@@ -475,6 +475,7 @@ function failSentence(check: CheckOutput): string | null {
     return `The email looks like a shared inbox (${source}).`;
   }
   if (check.key === "plausibility" && check.status === "FAIL") {
+    if (/does not look like real words/i.test(check.finding)) return `The company name does not look like real words (${source}).`;
     return `The name or company looks incomplete (${source}).`;
   }
   if (check.key === "velocity" && check.status === "FAIL") {
