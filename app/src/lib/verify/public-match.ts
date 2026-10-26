@@ -260,8 +260,8 @@ function companySpanRanges(text: string, org: string): { start: number; end: num
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
     const body = prefix
-      .map((token) => `(?<![A-Za-z0-9-])${caseFold(token)}(?:'s)?(?![A-Za-z0-9-])`)
-      .join(`[\\s,.'’:-]+`);
+      .map((token) => tokenInPhrase(token))
+      .join(PHRASE_GAP);
     for (const match of text.matchAll(new RegExp(body, "g"))) {
       const start = match.index ?? 0;
       ranges.push({ start, end: start + match[0].length });
@@ -354,18 +354,47 @@ export function companyPhraseTokens(org: string): string[] {
   return tokens(org).filter((token) => !LEGAL.has(token) && !STOP.has(token));
 }
 
+const PHRASE_GAP = `[\\s,.'’:"&/+-]+`;
+
+function tokenInPhrase(token: string): string {
+  const whole = `(?<![A-Za-z0-9-])${caseFold(token)}(?:'s)?(?![A-Za-z0-9-])`;
+  if (token.length < 8) return whole;
+  const splits = [whole];
+  for (let index = 4; index <= token.length - 3; index += 1) {
+    const left = caseFold(token.slice(0, index));
+    const right = caseFold(token.slice(index));
+    splits.push(`(?<![A-Za-z0-9-])${left}\\s+${right}(?:'s)?(?![A-Za-z0-9-])`);
+  }
+  return `(?:${splits.join("|")})`;
+}
+
+function consecutivePhrase(text: string, prefix: string[]): boolean {
+  if (prefix.length < 2) return false;
+  return new RegExp(prefix.map(tokenInPhrase).join(PHRASE_GAP)).test(text);
+}
+
+/**
+ * Two or more words have to appear in order, next to each other.
+ * "Starwood Property" matches Starwood Property Trust. "Starwood Capital" does not.
+ * A single-token firm keeps a whole-word match.
+ */
 export function mentionsCompany(text: string, org: string, person = ""): boolean {
   const phrase = companyPhraseTokens(org);
   if (!phrase.length) return false;
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
-  // "group" or "realty" alone is not a company. Two generic words still have to appear together.
-  if (!distinctive.length) {
-    if (phrase.length < 2) return false;
-    return phrase.every((token) => companyTokenHit(text, token));
+  if (phrase.length === 1) {
+    if (!distinctive.length) return false;
+    if (!companyTokenHit(text, phrase[0])) return false;
+    if (surnameOnly(text, phrase[0])) return false;
+    void person;
+    return true;
   }
-  // "CBRE" counts. "CBRE Group" does not match Unum Group, and "Madison Realty Capital" does not match Madison Air Solutions.
-  if (!phrase.every((token) => companyTokenHit(text, token))) return false;
-  if (distinctive.length === 1 && surnameOnly(text, distinctive[0])) return false;
+  const firstDistinctive = distinctive[0] || phrase[0];
+  for (let length = phrase.length; length >= 2; length -= 1) {
+    const prefix = phrase.slice(0, length);
+    if (!prefix.includes(firstDistinctive)) continue;
+    if (consecutivePhrase(text, prefix)) return true;
+  }
   void person;
-  return true;
+  return false;
 }

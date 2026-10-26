@@ -1500,3 +1500,16 @@ describe("batch 4 ordered person names", () => {
     expect(row?.status).not.toBe("PASS");
   });
 });
+
+describe("batch 4 ordered company names", () => {
+  it("keeps a sibling firm from matching and still accepts the real phrase", () => {
+    const sreit = "Billionaire investor Barry Sternlicht's Starwood Capital halts redemptions from Starwood Real Estate Income Trust";
+    expect(mentionsCompany(sreit, "Starwood Property Trust")).toBe(false);
+    expect(mentionsCompany("Inside Starwood's SREIT", "Starwood Property Trust")).toBe(false);
+    expect(mentionsCompany("Starwood Property: Invest With The Best, Barry Sternlicht", "Starwood Property Trust")).toBe(true);
+    expect(mentionsCompany("Douglas Durst leads the Durst Organization", "The Durst Organization")).toBe(true);
+    expect(mentionsCompany("Ronald Tutor stays on at Tutor Perini's", "Tutor Perini Corporation")).toBe(true);
+    expect(mentionsCompany("CBRE Group closed a Dallas sale", "CBRE Group")).toBe(true);
+    expect(mentionsCompany("Unum Group raised its dividend", "CBRE Group")).toBe(false);
+  });
+});
