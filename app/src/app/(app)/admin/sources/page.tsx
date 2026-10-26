@@ -6,6 +6,7 @@ import { btn, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { reviewCopy } from "@/lib/review-copy";
 import { VERIFICATION_SOURCES } from "@/lib/verify/sources";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export default async function VerificationSettingsPage({
           <ul className="mt-2 divide-y divide-line text-sm">
             {VERIFICATION_SOURCES.map((source) => (
               <li key={source.name} className="py-2">
-                <b>{source.name}</b>
+                <b>{reviewCopy(source.name)}</b>
                 <span className="block text-xs text-mut">{source.kind}</span>
               </li>
             ))}

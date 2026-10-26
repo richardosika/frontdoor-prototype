@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { initialsFromName, orderedPair } from "@/lib/domain";
 import { applicantRemovalList, cleanupWindowHours } from "@/lib/demo-cleanup";
 import { annualDuesCents } from "@/lib/dues";
-import { deleteMemberAccount } from "@/lib/remove-member";
+import { deleteMemberAccount, deleteOutboxTied } from "@/lib/remove-member";
 import { prisma } from "@/lib/prisma";
 import { acceptanceVersions } from "@/lib/legal";
 import { queueApplicationVerification } from "@/lib/verify/queue";
@@ -215,9 +215,7 @@ export async function deleteApplicantRecords(ids: string[], actorId: string): Pr
   });
   const foundIds = applications.map((row) => row.id);
   const emails = applications.map((row) => row.email);
-  await prisma.outboxNotice.deleteMany({
-    where: { OR: [{ applicationId: { in: foundIds } }, { intendedTo: { in: emails } }] },
-  });
+  await deleteOutboxTied(prisma, emails, { applicationIds: foundIds });
   await prisma.emailChallenge.deleteMany({ where: { email: { in: emails } } });
   const counts = new Map<string, number>();
   for (const row of applications) {

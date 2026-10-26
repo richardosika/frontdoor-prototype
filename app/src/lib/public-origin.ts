@@ -68,3 +68,10 @@ export function publicAbsoluteUrl(path: string, headerList: HeaderSource, env: P
   const suffix = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${suffix}`;
 }
+
+/** Keeps ?notice= and the rest of the query when a token route redirects to its view page. */
+export function withRequestSearch(path: string, requestUrl: string): string {
+  const search = new URL(requestUrl).search;
+  if (!search || path.includes("?")) return path;
+  return `${path}${search}`;
+}

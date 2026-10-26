@@ -267,7 +267,7 @@ export async function decideInviteReview(formData: FormData) {
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
-    redirect(`${back}&notice=${encodeURIComponent(`Invite code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`)}`);
+    redirect(`${back}&notice=${encodeURIComponent(`Referral code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`)}`);
   }
   if (decision === "DECLINED") {
     await prisma.inviteRequest.update({ where: { id: record.inviteRequest.id }, data: { status: "DECLINED" } });

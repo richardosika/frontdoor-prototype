@@ -100,7 +100,7 @@ export function GuidedReview({
             {current.findings.length === 0 ? <li className="text-sm text-mut">No automated result for this step.</li> : null}
             {current.findings.map((finding, index) => (
               <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{finding.source}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
                 <p className="mt-1 leading-relaxed text-ink">{reviewCopy(finding.text)}</p>
                 {finding.url ? (
                   <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">

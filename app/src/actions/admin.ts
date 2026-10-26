@@ -19,6 +19,7 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
 import { sendNotice } from "@/lib/notices";
 import { notifyAdmins } from "@/lib/notify";
+import { deleteOutboxTied } from "@/lib/remove-member";
 import { reviewCopy } from "@/lib/review-copy";
 import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import { needsStrongApprovalWarning } from "@/lib/approval-warning";
@@ -611,13 +612,8 @@ export async function deleteInviteRequest(formData: FormData) {
   if (!request) redirect("/admin?error=That+request+was+not+found");
   await prisma.$transaction(async (tx) => {
     await tx.verificationCase.deleteMany({ where: { inviteRequestId: request.id } });
-    await tx.outboxNotice.deleteMany({
-      where: {
-        OR: [
-          { intendedTo: request.email, applicationId: null },
-          { body: { contains: `/request-status/${request.statusToken}` } },
-        ],
-      },
+    await deleteOutboxTied(tx, [request.email], {
+      tokens: [request.statusToken, `/request-status/${request.statusToken}`],
     });
     await tx.crmPerson.deleteMany({
       where: {

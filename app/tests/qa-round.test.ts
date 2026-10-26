@@ -10,11 +10,12 @@ import { renderTemplate, repairDoubledTerminalPeriod, templateDef } from "@/lib/
 import { paymentReceiptText } from "@/lib/payment-record";
 import { noticeHtml } from "@/lib/resend-mail";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
-import { publicAbsoluteUrl } from "@/lib/public-origin";
+import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
+import { outboxTiedToEmails } from "@/lib/remove-member";
+import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
 import { payPageState } from "@/lib/dues";
 import { guidedGradeApplicant } from "@/lib/guided-prefill-db";
 import { emptyPrefillFacts } from "@/lib/guided-prefill";
-import { reviewCopy } from "@/lib/review-copy";
 import { isSignedInJoinEntry } from "@/lib/session-gate";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -23,17 +24,27 @@ const ROOT = path.resolve(__dirname, "../src");
 
 describe("QA fixes that stay outside grading", () => {
   it("keeps an internal note off the applicant-facing strings and rewords referral copy", () => {
-    const source = "No invite code was stored on this file. An invite code is on the file (PF-1). Invite source came back without a usable match (none). They came in through invite ABC. No invite source was confirmed (0 of 4). Ada applied as a Developer at Build Co.";
+    const source = "No invite code was stored on this file. An invite code is on the file (PF-1). Invite source came back without a usable match (Invite code). They came in through invite ABC. No invite source was confirmed (0 of 4). invite-source No invite note was stored, so the sponsoring member is not named here. Ada applied as a Developer at Build Co.";
     const shown = reviewCopy(source, "GENERAL_CONTRACTOR");
     expect(shown).toContain("No referral code was stored on this request.");
     expect(shown).toContain("A referral code is on the file");
     expect(shown).not.toContain("An invite code is on the file");
-    expect(shown).toContain("The request source came back without a usable match");
+    expect(shown).toContain("The request source came back without a usable match (Referral code).");
+    expect(shown).not.toContain("(Invite code)");
     expect(shown).toContain("They came in through referral ABC.");
-    expect(shown).toContain("No invite source was confirmed (0 of 4).");
+    expect(shown).toContain("No referral source was confirmed (0 of 4).");
+    expect(shown).not.toContain("No invite source was confirmed");
+    expect(shown).toContain("referral No referral note was stored, so the sponsoring member is not named here.");
+    expect(shown).not.toContain("invite-source");
+    expect(shown).not.toContain("invite note");
+    expect(reviewCheckKey("invite-source")).toBe("referral");
     expect(shown).toContain("applied as a General Contractor");
     expect(shown).not.toContain("applied as a Developer");
     expect(reviewCopy("Ada applied as a Developer at Build Co.", "DEVELOPER")).toContain("applied as a Developer");
+    const decision = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
+    expect(decision).toContain("Internal note");
+    expect(decision).toContain("Never emailed and never shown to the applicant.");
+    expect(decision).toContain('name="applicantMessage"');
   });
 
   it("builds status and pay redirects from the public origin", () => {
@@ -45,18 +56,30 @@ describe("QA fixes that stay outside grading", () => {
     const location = publicAbsoluteUrl("/pay/view/token", forwarded, {});
     expect(location).toBe("https://cornicio-mvp.onrender.com/pay/view/token");
     expect(location).not.toContain("0.0.0.0");
+    const noticed = publicAbsoluteUrl(
+      withRequestSearch("/pay/view/token", "http://0.0.0.0:10000/pay/token?notice=Test+payment+recorded.+Sign+in+to+open+the+floor"),
+      forwarded,
+      {},
+    );
+    expect(noticed).toBe(
+      "https://cornicio-mvp.onrender.com/pay/view/token?notice=Test+payment+recorded.+Sign+in+to+open+the+floor",
+    );
+    expect(noticed).not.toContain("0.0.0.0");
     expect(publicAbsoluteUrl("/apply/status/view/abc", new Headers({ host: "0.0.0.0:10000" }), { APP_URL: "https://cornicio-mvp.onrender.com" })).toBe(
       "https://cornicio-mvp.onrender.com/apply/status/view/abc",
     );
     expect(
       publicAbsoluteUrl("/request-status/view/abc", new Headers({ host: "0.0.0.0:10000" }), { NEXTAUTH_URL: "https://cornicio-mvp.onrender.com/" }),
     ).toBe("https://cornicio-mvp.onrender.com/request-status/view/abc");
-    for (const file of ["app/pay/[token]/route.ts", "app/apply/status/[token]/route.ts", "app/request-status/[token]/route.ts", "middleware.ts"]) {
+    for (const file of ["app/pay/[token]/route.ts", "app/apply/status/[token]/route.ts", "app/request-status/[token]/route.ts"]) {
       const route = readFileSync(path.join(ROOT, file), "utf8");
       expect(route).toContain("publicAbsoluteUrl");
-      expect(route).not.toContain("request.url");
-      expect(route).not.toMatch(/new URL\([^)]*(?:request\.url|req\.nextUrl)/);
+      expect(route).toContain("withRequestSearch");
+      expect(route).not.toMatch(/NextResponse\.redirect\(\s*(?:request\.url|new URL\(request\.url\))/);
     }
+    const middleware = readFileSync(path.join(ROOT, "middleware.ts"), "utf8");
+    expect(middleware).toContain("publicAbsoluteUrl");
+    expect(middleware).not.toMatch(/NextResponse\.redirect\(\s*(?:request\.url|new URL\(request\.url\))/);
   });
 
   it("shows only the active membership after payment and keeps the real role on a request", () => {
@@ -72,6 +95,18 @@ describe("QA fixes that stay outside grading", () => {
     expect(decision).not.toContain("window.confirm");
     expect(decision).toContain("Approval was not recorded. Nothing was sent.");
     expect(decision).toContain('role="dialog"');
+    const confirm = readFileSync(path.join(ROOT, "components/run-and-reload.tsx"), "utf8");
+    expect(confirm).not.toContain("window.confirm");
+    expect(confirm).toContain('role="dialog"');
+    expect(confirm).toContain("Cancelled. Nothing was changed.");
+    const member = readFileSync(path.join(ROOT, "app/(app)/admin/members/[id]/page.tsx"), "utf8");
+    expect(member).toContain("ConfirmSubmitButton");
+    expect(member).toContain("Remove member");
+    const where = outboxTiedToEmails(["Ada@Example.com"], { applicationIds: ["app_1"], tokens: ["status-token"] });
+    expect(JSON.stringify(where)).toContain("insensitive");
+    expect(JSON.stringify(where)).toContain("Intended recipient: Ada@Example.com");
+    expect(JSON.stringify(where)).toContain("status-token");
+    expect(JSON.stringify(where)).not.toContain('"applicationId":null');
     const applicant = guidedGradeApplicant(emptyPrefillFacts({ name: "Ada", org: "Build Co" }), { role: "GENERAL_CONTRACTOR" });
     expect(applicant.role).toBe("GENERAL_CONTRACTOR");
     const removal = readFileSync(path.join(ROOT, "lib/remove-member.ts"), "utf8");
@@ -79,8 +114,9 @@ describe("QA fixes that stay outside grading", () => {
     expect(removal).toContain("crmPerson.deleteMany");
     const requestDelete = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
     expect(requestDelete).toContain("verificationCase.deleteMany");
-    expect(requestDelete).toContain("outboxNotice.deleteMany");
+    expect(requestDelete).toContain("deleteOutboxTied");
     expect(requestDelete).toContain("crmPerson.deleteMany");
+    expect(removal).toContain("deleteOutboxTied");
   });
 
   it("opens CourtListener on the public search page", () => {

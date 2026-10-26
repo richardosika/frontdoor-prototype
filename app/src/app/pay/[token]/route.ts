@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { expiredDocument } from "@/lib/http-document";
 import { prisma } from "@/lib/prisma";
-import { publicAbsoluteUrl } from "@/lib/public-origin";
+import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +14,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       headers: { "content-type": "text/html; charset=utf-8" },
     });
   }
-  return NextResponse.redirect(publicAbsoluteUrl(`/pay/view/${encodeURIComponent(token)}`, request.headers));
+  const path = withRequestSearch(`/pay/view/${encodeURIComponent(token)}`, request.url);
+  return NextResponse.redirect(publicAbsoluteUrl(path, request.headers));
 }

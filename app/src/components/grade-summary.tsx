@@ -2,7 +2,7 @@ import { EvidenceChip } from "@/components/evidence-chip";
 import { newsStoryChipLabel } from "@/lib/verify/news";
 import { rubricSections, type GradeReport, type Recommendation } from "@/lib/verify/grade";
 import { publicEvidenceHref } from "@/lib/evidence-link";
-import { reviewCopy } from "@/lib/review-copy";
+import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
 
@@ -154,7 +154,7 @@ export function CheckTable({
           <tbody>
             {evidence.map((row) => (
               <tr key={row.id} className="border-b border-line align-top">
-                <td className="py-2 pr-2">{row.checkKey}</td>
+                <td className="py-2 pr-2">{reviewCheckKey(row.checkKey)}</td>
                 <td className="py-2 pr-2">
                   <EvidenceLabel row={row} />
                 </td>
@@ -169,7 +169,7 @@ export function CheckTable({
                     </>
                   ) : null}
                 </td>
-                <td className="py-2 pr-2">{row.source}</td>
+                <td className="py-2 pr-2">{reviewCopy(row.source)}</td>
                 <td className="py-2">{formatAuditTime(row.ranAt)}</td>
               </tr>
             ))}
