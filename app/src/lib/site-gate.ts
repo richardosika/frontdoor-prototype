@@ -57,7 +57,7 @@ export async function basicAuthorizationMatches(header: string | null, expectedP
 
 export function siteGateChallengeHeaders(): Record<string, string> {
   return {
-    "WWW-Authenticate": 'Basic realm="Private Floor", charset="UTF-8"',
+    "WWW-Authenticate": 'Basic realm="Site gate, username privatefloor", charset="UTF-8"',
     "content-type": "text/plain; charset=utf-8",
     "cache-control": "no-store",
     "X-Robots-Tag": ROBOTS_TAG,

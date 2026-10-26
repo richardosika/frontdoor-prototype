@@ -56,7 +56,7 @@ describe("site gate", () => {
 
   it("does not put the password in the challenge", () => {
     const headers = siteGateChallengeHeaders();
-    expect(headers["WWW-Authenticate"]).toContain('Basic realm="Private Floor"');
+    expect(headers["WWW-Authenticate"]).toContain('Basic realm="Site gate, username privatefloor"');
     expect(headers["X-Robots-Tag"]).toBe(ROBOTS_TAG);
     expect(JSON.stringify(headers)).not.toContain(PASSWORD);
     expect(parseBasicAuthorization(basic(SITE_GATE_USERNAME, PASSWORD))?.password).toBe(PASSWORD);
