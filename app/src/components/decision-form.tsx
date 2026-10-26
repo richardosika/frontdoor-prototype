@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -10,6 +10,7 @@ function ConfirmModal({
   body,
   confirmLabel,
   error,
+  extra,
   onConfirm,
   onCancel,
 }: {
@@ -17,6 +18,7 @@ function ConfirmModal({
   body: string;
   confirmLabel: string;
   error: string;
+  extra?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -27,6 +29,7 @@ function ConfirmModal({
           {title}
         </h2>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">{body}</p>
+        {extra}
         {error ? (
           <p className="mt-3 text-sm text-brass" role="alert">
             {error}
@@ -155,10 +158,7 @@ export function DecisionForm({
         <div className="rounded border border-[#7A2E2E] bg-cream p-3 text-sm text-[#7A2E2E]" role="alert">
           <p className="font-semibold">This file is not a clean approval.</p>
           <p className="mt-1 whitespace-pre-wrap">{warningText}</p>
-          <label className="mt-2 flex items-start gap-2 text-ink">
-            <input name="acknowledgeGrade" type="checkbox" className="mt-1" />
-            <span>I confirm this approval despite the grade and the unverified items.</span>
-          </label>
+          <p className="mt-2">The confirmation box is in the approval dialog.</p>
         </div>
       ) : null}
       <label className={labelCls}>Internal note</label>
@@ -194,6 +194,14 @@ export function DecisionForm({
           }
           confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
           error={modalError}
+          extra={
+            pending === "APPROVED" && strongWarning ? (
+              <label className="mt-3 flex items-start gap-2 text-sm text-ink">
+                <input name="acknowledgeGrade" type="checkbox" className="mt-1" />
+                <span>I confirm this approval despite the grade and the unverified items.</span>
+              </label>
+            ) : null
+          }
           onConfirm={confirmPending}
           onCancel={cancelPending}
         />

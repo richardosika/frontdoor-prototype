@@ -60,6 +60,25 @@ export const DUES_WAIVED = "Dues waived by an administrator.";
 
 export const FREE_MEMBERSHIP_LINE = "Free membership. No dues.";
 
+/**
+ * Applicant status page. Declined shows no money. A paid membership shows that it is active
+ * and, when known, the next charge date. Everyone else sees the offer.
+ */
+export function statusMembershipLine(input: {
+  status: string;
+  monthlyCents: number;
+  waived: boolean;
+  paymentStatus?: string | null;
+  renewalLabel?: string | null;
+}): string | null {
+  if (input.status === "DECLINED" || input.status === "REJECTED") return null;
+  if (input.paymentStatus === "PAID" || input.paymentStatus === "WAIVED") {
+    const when = input.paymentStatus === "PAID" && input.renewalLabel ? ` Next charge date ${input.renewalLabel}.` : "";
+    return `This membership is active.${when}`;
+  }
+  return applicantDuesSentence(input.monthlyCents, input.waived);
+}
+
 /** Status-page dues line. A free role does not also say an administrator waived dues. */
 export function applicantDuesSentence(monthlyCents: number, waived: boolean): string {
   if (monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;

@@ -1,4 +1,5 @@
 import { BRAND, noticeTestRecipient } from "@/lib/brand";
+import { reviewNotice } from "@/lib/review-copy";
 import { recordCrmEvent } from "@/lib/crm";
 import { deliveryTarget, repairDoubledTerminalPeriod } from "@/lib/email-templates";
 import { prisma } from "@/lib/prisma";
@@ -18,8 +19,8 @@ export type NoticeInput = {
  * A do-not-contact flag suppresses the send and keeps the reason. A Resend failure is recorded and does not throw.
  */
 export async function sendNotice(input: NoticeInput): Promise<{ id: string; deliveredTo: string; suppressed?: boolean; reason?: string }> {
-  const subject = repairDoubledTerminalPeriod(input.subject);
-  const text = repairDoubledTerminalPeriod(input.text);
+  const subject = reviewNotice(repairDoubledTerminalPeriod(input.subject));
+  const text = reviewNotice(repairDoubledTerminalPeriod(input.text));
   const settings = await prisma.mailSettings.findUnique({ where: { id: "default" } });
   const mode = settings?.delivery === "live" ? "live" : "outbox";
   const target = deliveryTarget(mode, noticeTestRecipient());

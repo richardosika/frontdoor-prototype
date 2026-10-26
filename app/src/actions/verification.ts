@@ -14,6 +14,8 @@ import {
 } from "@/lib/verification-db";
 import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
 import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
+import { parseGradeSnapshot } from "@/lib/verify/grade";
+import type { Prisma } from "@prisma/client";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
 export async function updateVerificationCase(formData: FormData) {
@@ -228,15 +230,56 @@ export async function startGuidedReview(formData: FormData) {
 }
 
 export async function rerunGuidedChecks(formData: FormData) {
-  await requireVerificationAdmin();
+  const admin = await requireVerificationAdmin();
   const caseId = String(formData.get("caseId") || "");
   const back = `/admin/verification/${caseId}`;
-  const existing = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } });
+  const existing = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    select: { id: true, status: true, applicationId: true, projectId: true },
+  });
   if (!existing) notFound();
   await runLivePrefill(caseId);
+  const saved = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { gradeSnapshot: true, status: true } });
+  const grade = parseGradeSnapshot(saved?.gradeSnapshot);
+  if (grade) {
+    const data = {
+      gradeLetter: grade.letter,
+      gradeScore: grade.score,
+      gradeConfidence: grade.confidence,
+      recommendation: grade.recommendation,
+      gradeSnapshot: grade as unknown as Prisma.InputJsonValue,
+    };
+    if (existing.applicationId) {
+      await prisma.verificationRun.updateMany({
+        where: { applicationId: existing.applicationId, subject: "APPLICATION" },
+        data,
+      });
+      revalidatePath(`/admin/applications/${existing.applicationId}`);
+    }
+    if (existing.projectId) {
+      await prisma.verificationRun.updateMany({
+        where: { projectId: existing.projectId },
+        data,
+      });
+    }
+  }
+  const status = saved?.status || existing.status;
+  const summary = grade
+    ? `Checks finished. Grade ${grade.letter} (${grade.score}). The same grade is on this file and on the application.`
+    : "Checks finished. No new grade was stored.";
+  await prisma.verificationEvent.create({
+    data: {
+      caseId,
+      actorId: admin.id,
+      fromStatus: status,
+      toStatus: status,
+      summary,
+    },
+  });
   revalidatePath(back);
   revalidatePath("/admin/verification");
-  redirect(`${back}?step=identity&notice=${encodeURIComponent("Free-source checks finished. Marks stay Auto-suggested until you confirm them.")}`);
+  revalidatePath("/admin/applications");
+  redirect(`${back}?step=decision&notice=${encodeURIComponent(summary)}`);
 }
 
 export async function decideInviteReview(formData: FormData) {

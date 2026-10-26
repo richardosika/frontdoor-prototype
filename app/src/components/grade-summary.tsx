@@ -73,7 +73,7 @@ export function ExecutiveSummary({ report, title = "Executive summary", role }: 
         <SummaryBlock title="What could not be checked for free" body={reviewCopy(report.summary.couldNotCheck)} />
         <SummaryBlock title="Recommendation" body={reviewCopy(`${report.recommendation}. ${report.summary.reasoning} Next step: ${report.summary.nextStep}`)} />
       </div>
-      {report.changeNote ? <p className="mt-4 text-xs leading-relaxed text-mut">Re-run note: {report.changeNote}</p> : null}
+      {report.changeNote ? <p className="mt-4 text-xs leading-relaxed text-mut">Re-run note: {reviewCopy(report.changeNote)}</p> : null}
       <div className="mt-6 border-t border-line pt-4">
         <h3 className={sectionLabel}>Needs your attention</h3>
         {report.attention.length === 0 ? <p className="mt-2 text-sm text-ink">Nothing doubtful is on this file.</p> : null}
@@ -97,7 +97,7 @@ export function ExecutiveSummary({ report, title = "Executive summary", role }: 
           {report.categories.map((category) => (
             <li key={category.id} className="border-t border-line pt-3">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="font-serif text-base text-forest">{category.label}</span>
+                <span className="font-serif text-base text-forest">{reviewCopy(category.label)}</span>
                 <span className="shrink-0 text-sm text-ink">
                   {category.earned} / {category.possible}
                 </span>
@@ -112,10 +112,10 @@ export function ExecutiveSummary({ report, title = "Executive summary", role }: 
             {rubric.map((section) => (
               <div key={section.title}>
                 <h4 className="font-serif text-base text-forest">{section.title}</h4>
-                <p className="mt-1 text-sm leading-relaxed text-ink">{section.body}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(section.body)}</p>
               </div>
             ))}
-            {report.caps.length ? <p className="text-sm text-ink">Caps on this file: {report.caps.join(" ")}</p> : null}
+            {report.caps.length ? <p className="text-sm text-ink">Caps on this file: {reviewCopy(report.caps.join(" "))}</p> : null}
           </div>
         </details>
       </div>

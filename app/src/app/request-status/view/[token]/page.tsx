@@ -5,7 +5,7 @@ import { btn } from "@/components/ui";
 import { applicationReceivedMessage, INVITE_STATUS_COPY } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
-import { applicantDuesSentence, monthlyDuesCents } from "@/lib/dues";
+import { monthlyDuesCents, statusMembershipLine } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
 
@@ -23,6 +23,11 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
   const copy = pending ? memberStatusCopy("IN_REVIEW") : INVITE_STATUS_COPY[request.status];
   const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(request.name) : copy.body;
   const monthly = monthlyDuesCents(request.role);
+  const membershipLine = statusMembershipLine({
+    status,
+    monthlyCents: monthly,
+    waived: false,
+  });
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
@@ -40,7 +45,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
               <b>Membership status.</b> {applicationStatusLabel(status)}
             </p>
             {status === "IN_REVIEW" ? <p className="mt-1">Verification in progress.</p> : null}
-            <p className="mt-1">{applicantDuesSentence(monthly, false)}</p>
+            {membershipLine ? <p className="mt-1">{membershipLine}</p> : null}
           </div>
           <Link href="/apply" className={`${btn} mt-4 w-full`}>
             Back to apply

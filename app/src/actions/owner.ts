@@ -215,6 +215,7 @@ export async function deleteApplicantRecords(ids: string[], actorId: string): Pr
   });
   const foundIds = applications.map((row) => row.id);
   const emails = applications.map((row) => row.email);
+  await prisma.verificationCase.deleteMany({ where: { applicationId: { in: foundIds } } });
   await deleteOutboxTied(prisma, emails, { applicationIds: foundIds });
   await prisma.emailChallenge.deleteMany({ where: { email: { in: emails } } });
   const counts = new Map<string, number>();

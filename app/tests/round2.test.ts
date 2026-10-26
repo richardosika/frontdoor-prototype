@@ -153,6 +153,7 @@ describe("directory, replies, and cleanup", () => {
   it("lists what delete applicant removes and caps the recent-hours window", () => {
     expect(applicantRemovalList({ member: true, crm: true })).toEqual([
       "the application",
+      "the verification case",
       "verification runs",
       "outbox notices for that email",
       "the business card",

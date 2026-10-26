@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { noticeHtml } from "@/lib/resend-mail";
+import { reviewNotice, reviewTemplateKey } from "@/lib/review-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -21,28 +22,33 @@ export default async function OutboxPage() {
         </p>
         {notices.length === 0 ? <p className="mt-6 text-sm text-mut">No notices yet.</p> : null}
         <ul className="mt-4 space-y-3">
-          {notices.map((notice) => (
+          {notices.map((notice) => {
+            const subject = reviewNotice(notice.subject);
+            const body = reviewNotice(notice.body);
+            const templateKey = reviewTemplateKey(notice.templateKey);
+            return (
             <li key={notice.id} className={`${card} min-w-0 overflow-hidden p-4 text-sm`}>
               <p className="text-xs text-mut">{formatAuditTime(notice.createdAt)}</p>
               <p>
-                <b>{notice.subject}</b>
+                <b>{subject}</b>
               </p>
               <p className="text-xs text-ink">
                 Intended: {notice.intendedTo} · Delivered only to: {notice.deliveredTo}
-                {notice.templateKey ? ` · ${notice.templateKey}` : ""}
+                {templateKey ? ` · ${templateKey}` : ""}
                 {notice.suppressed ? ` · Not sent: ${notice.suppressedReason}` : ""}
                 {notice.sendStatus === "sent" ? " · Emailed to the test recipient" : ""}
                 {notice.sendStatus === "failed" ? ` · Email failed: ${notice.sendError}` : ""}
               </p>
               <iframe
-                title={`Email preview: ${notice.subject}`}
+                title={`Email preview: ${subject}`}
                 sandbox=""
-                srcDoc={noticeHtml(notice.body, { headline: notice.subject })}
+                srcDoc={noticeHtml(body, { headline: subject })}
                 className="mt-3 h-[520px] w-full rounded border border-line bg-cream"
               />
-              <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{notice.body}</pre>
+              <pre className="mt-2 whitespace-pre-wrap break-all font-sans text-sm text-ink">{body}</pre>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </div>

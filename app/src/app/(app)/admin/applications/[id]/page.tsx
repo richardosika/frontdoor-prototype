@@ -276,14 +276,14 @@ export default async function ApplicationDetailPage({
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete applicant</h2>
           <p className="mt-2 text-sm text-ink">
-            Removes this application, its business card, outbox notices, and verification runs. It also removes the linked member account and the CRM person when those exist. An administrator account is left in place.
+            Removes this application, its verification case, business card, outbox notices, and verification runs. It also removes the linked member account and the CRM person when those exist. An administrator account is left in place.
           </p>
           <div className="mt-3">
             <RunAndReload
               className={btnOutline}
               label="Delete this applicant and all their data"
               pendingLabel="Deleting…"
-              confirmMessage={`Delete ${application.name}? This removes the application, verification runs, outbox notices, business card, linked member account, and CRM person. This cannot be undone.`}
+              confirmMessage={`Delete ${application.name}? This removes the application, the verification case, verification runs, outbox notices, business card, linked member account, and CRM person. This cannot be undone.`}
               run={deleteOneApplication.bind(null, application.id)}
             />
           </div>

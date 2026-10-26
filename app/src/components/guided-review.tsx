@@ -234,7 +234,7 @@ function DecisionStep({
           confirmLabel={confirmLabel}
           paying={paying}
           strongWarning={strongWarning}
-          warningText={warningText}
+          warningText={reviewCopy(warningText)}
         />
       ) : null}
       {mode === "invite" ? <InviteDecisionForm caseId={caseId} /> : null}

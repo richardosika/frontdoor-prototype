@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
-import { applicantDuesSentence, FREE_MEMBERSHIP_LINE } from "@/lib/dues";
+import { applicantDuesSentence, FREE_MEMBERSHIP_LINE, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
 import { DUES_LOCALES } from "@/lib/dues";
@@ -13,7 +13,8 @@ import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
 import { verificationCaseIsDeletableOrphan } from "@/lib/orphan-case";
 import { outboxTiedToEmails } from "@/lib/remove-member";
-import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
+import { reviewCheckKey, reviewCopy, reviewNotice, reviewTemplateKey } from "@/lib/review-copy";
+import { rubricSections } from "@/lib/verify/grade";
 import { payPageState } from "@/lib/dues";
 import { guidedGradeApplicant } from "@/lib/guided-prefill-db";
 import { emptyPrefillFacts } from "@/lib/guided-prefill";
@@ -276,5 +277,66 @@ describe("QA fixes that stay outside grading", () => {
     expect(missingPageDocument(true)).toContain("Back to the feed");
     expect(expiredDocument("status")).toContain("<h1>Status link</h1>");
     expect(expiredDocument("payment")).toContain("<h1>Payment link</h1>");
+  });
+
+  it("keeps one grade, the approval checkbox, and the status money line in the display layer", () => {
+    const rubric = rubricSections().map((section) => reviewCopy(section.body)).join(" ");
+    expect(rubric).toContain("Referral source 4");
+    expect(rubric).not.toMatch(/invite/i);
+    expect(reviewCopy("No invite source was confirmed (0 of 4). (Invite code)")).toBe(
+      "No referral source was confirmed (0 of 4). (Referral code)",
+    );
+    expect(reviewCopy("No invite note was stored, so the sponsoring member is not named here.")).not.toMatch(/invite/i);
+
+    const letter = reviewNotice("You're invited.\nInvite code: PF-1\nhttps://cornicio-mvp.onrender.com/invite-status/abc");
+    expect(letter).toContain("You're invited.");
+    expect(letter).toContain("Referral code: PF-1");
+    expect(letter).toContain("/request-status/abc");
+    expect(letter).not.toContain("Invite code");
+    expect(letter).not.toContain("/invite-status");
+    expect(reviewTemplateKey("invite_received")).toBe("request_received");
+    expect(reviewTemplateKey("welcome")).toBe("welcome");
+
+    expect(statusMembershipLine({ status: "DECLINED", monthlyCents: 12_900, waived: false })).toBeNull();
+    expect(statusMembershipLine({ status: "REJECTED", monthlyCents: 12_900, waived: false })).toBeNull();
+    const paid = statusMembershipLine({
+      status: "APPROVED",
+      monthlyCents: 12_900,
+      waived: false,
+      paymentStatus: "PAID",
+      renewalLabel: "2026-11-26",
+    });
+    expect(paid).toBe("This membership is active. Next charge date 2026-11-26.");
+    expect(paid).not.toContain("Due only after approval");
+    expect(paid).not.toContain("$");
+    expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 12_900, waived: false })).toContain("Due only after approval");
+
+    const decision = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
+    expect(decision.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(decision.indexOf('role="dialog"'));
+    expect(decision).toContain("The confirmation box is in the approval dialog.");
+    const owner = readFileSync(path.join(ROOT, "actions/owner.ts"), "utf8");
+    const cleanup = owner.slice(owner.indexOf("export async function deleteApplicantRecords"));
+    expect(cleanup).toContain("verificationCase.deleteMany");
+    expect(cleanup.indexOf("verificationCase.deleteMany")).toBeLessThan(cleanup.indexOf("application.deleteMany"));
+    const verification = readFileSync(path.join(ROOT, "actions/verification.ts"), "utf8");
+    expect(verification).toContain("Checks finished. Grade");
+    expect(verification).toContain("verificationRun.updateMany");
+    expect(verification).toContain("verificationEvent.create");
+    const applyStatus = readFileSync(path.join(ROOT, "app/apply/status/view/[token]/page.tsx"), "utf8");
+    const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");
+    expect(applyStatus).toContain("statusMembershipLine");
+    expect(applyStatus).not.toContain("applicantDuesSentence");
+    expect(requestStatus).toContain("statusMembershipLine");
+    const outbox = readFileSync(path.join(ROOT, "app/(app)/admin/outbox/page.tsx"), "utf8");
+    expect(outbox).toContain("reviewNotice");
+    expect(outbox).toContain("reviewTemplateKey");
+    expect(readFileSync(path.join(ROOT, "lib/notices.ts"), "utf8")).toContain("reviewNotice(");
+    const gradeSummary = readFileSync(path.join(ROOT, "components/grade-summary.tsx"), "utf8");
+    expect(gradeSummary).toContain("reviewCopy(section.body)");
+    expect(gradeSummary).toContain("reviewCopy(row.finding)");
+    expect(gradeSummary).toContain("reviewCopy(row.source)");
+    const inviteStatus = readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8");
+    expect(inviteStatus).toContain("/request-status/");
+    expect(inviteStatus).toContain("publicAbsoluteUrl");
   });
 });
