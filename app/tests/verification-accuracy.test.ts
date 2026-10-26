@@ -1138,6 +1138,12 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(registryLinkCheck(facts({ location: "Newark, NJ", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
     expect(registryLinkCheck(facts({ location: "Seattle, WA", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
     expect(registryLinkCheck(facts({ location: "Des Moines, IA", org: "Osika Construction" })).finding).toContain("Couldn't check for free");
+    const northCarolina = registryLinkCheck(facts({ location: "Charlotte, NC", org: "Brambleton Keystone Capital Group LLC" }));
+    expect(northCarolina.url).toBe("https://www.sosnc.gov/online_services/search/by_title/_Business_Registration");
+    expect(northCarolina.status).toBe("NOT_RUN");
+    const tennessee = registryLinkCheck(facts({ location: "Nashville, TN", org: "Captiva Development" }));
+    expect(tennessee.url).toContain("sos.tn.gov");
+    expect(tennessee.status).toBe("NOT_RUN");
 
     const colorado = registryPortal("CO");
     expect(colorado).toBeTruthy();

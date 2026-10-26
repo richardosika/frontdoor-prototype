@@ -969,8 +969,8 @@ export function gradeChecks(
   if (!usStateKnown(facts.location)) {
     pushAttention({
       severity: "Low",
-      title: "Location is outside the free US registry list",
-      detail: "Phone area codes and the manual registry links cover a few US states only. A location elsewhere was not searched, and that is not a clean result.",
+      title: "No manual registry link for this state",
+      detail: "No manual registry link is on file for this location. It was not searched, and that is not a clean result.",
     });
   }
   if ((facts.referenceCount || 0) === 0) {

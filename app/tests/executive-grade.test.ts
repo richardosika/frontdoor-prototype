@@ -422,7 +422,7 @@ describe("executive grade profiles", () => {
       ],
       { ...fullFacts, location: "London, United Kingdom", phone: "+44 20 7946 0991" },
     );
-    expect(report.attention.some((item) => item.title === "Location is outside the free US registry list")).toBe(true);
+    expect(report.attention.some((item) => item.title === "No manual registry link for this state")).toBe(true);
     expect(report.summary.couldNotCheck.toLowerCase()).toContain("not run");
     const identity = report.categories.find((category) => category.id === "identity");
     expect(identity?.reason).toContain("0 of 3");

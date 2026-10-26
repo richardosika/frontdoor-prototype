@@ -695,7 +695,7 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA)\b/)?.[1];
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN)\b/)?.[1];
   const portal = state ? registryPortal(state) : undefined;
   if (portal) {
     return check({
@@ -726,6 +726,8 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     VA: "https://cis.scc.virginia.gov/",
     OR: "https://sos.oregon.gov/business/Pages/find.aspx",
     IA: "https://sos.iowa.gov/search/business/search.aspx",
+    NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
+    TN: "https://sos.tn.gov/business-services/business-search",
   };
   if (!state || !links[state]) {
     return check({
