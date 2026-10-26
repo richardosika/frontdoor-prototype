@@ -274,9 +274,7 @@ function companySpanRanges(text: string, org: string): { start: number; end: num
   const ranges: { start: number; end: number }[] = [];
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
-    const body = prefix
-      .map((token) => tokenInPhrase(token))
-      .join(PHRASE_GAP);
+    const body = `(?<![A-Za-z0-9-])${prefix.map((token) => tokenBody(token)).join(PHRASE_GAP)}(?![A-Za-z0-9-])`;
     for (const match of text.matchAll(new RegExp(body, "g"))) {
       const start = match.index ?? 0;
       ranges.push({ start, end: start + match[0].length });
@@ -371,22 +369,22 @@ export function companyPhraseTokens(org: string): string[] {
 
 const PHRASE_GAP = `[\\s,.'’:"&/+-]+`;
 
-function tokenInPhrase(token: string): string {
-  // A hyphen may separate the firm's own words ("Kennedy-Wilson"). A hyphen glued to a different word still fails the gap.
-  const whole = `(?<![A-Za-z0-9])${caseFold(token)}(?:'s)?(?![A-Za-z0-9])`;
-  if (token.length < 8) return whole;
-  const splits = [whole];
+function tokenBody(token: string): string {
+  const folded = `${caseFold(token)}(?:'s)?`;
+  if (token.length < 8) return folded;
+  const splits = [folded];
   for (let index = 4; index <= token.length - 3; index += 1) {
     const left = caseFold(token.slice(0, index));
     const right = caseFold(token.slice(index));
-    splits.push(`(?<![A-Za-z0-9])${left}\\s+${right}(?:'s)?(?![A-Za-z0-9])`);
+    splits.push(`${left}\\s+${right}(?:'s)?`);
   }
   return `(?:${splits.join("|")})`;
 }
 
 function consecutivePhrase(text: string, prefix: string[]): boolean {
   if (prefix.length < 2) return false;
-  return new RegExp(prefix.map(tokenInPhrase).join(PHRASE_GAP)).test(text);
+  // The hyphen in "Kennedy-Wilson" may separate this firm's words. The hyphen in "page-turner" still blocks a different word.
+  return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(PHRASE_GAP)}(?![A-Za-z0-9-])`).test(text);
 }
 
 /**
