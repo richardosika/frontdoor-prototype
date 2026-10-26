@@ -6,7 +6,7 @@ import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { failedGrade, gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot } from "@/lib/verify/grade";
 import { scoreReport, summaryTail } from "@/lib/verify/score";
 import type { ApplicantFacts } from "@/lib/verify/types";
-import { politeFetch } from "@/lib/verify/fetch";
+import { fetchForChecks } from "@/lib/verify/fetch";
 import { readCardImage } from "@/lib/verify/ocr";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
@@ -47,7 +47,7 @@ export async function executeVerificationRun(runId: string, options?: { network?
       facts,
       watchlist: watch.entries,
       network,
-      fetchText: politeFetch,
+      fetchText: fetchForChecks,
     };
     const report = scoreReport(await collectChecks(ctx));
     const finishedAt = new Date();

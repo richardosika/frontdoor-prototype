@@ -6,12 +6,12 @@ import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { BROWSER_UA, classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
-import { classifyNews } from "@/lib/verify/news";
+import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -1199,5 +1199,194 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(rerunChecksHref("ckcase1", "failed")).toContain("error=");
     expect(rerunChecksHref("", "done")).toContain("/admin/verification?error=");
     expect(rerunChecksHref("../admin", "done")).toContain("/admin/verification?error=");
+  });
+});
+
+describe("batch 3 name suffixes, departures, and company pages", () => {
+  const gilbane = facts({
+    name: "Thomas Gilbane Jr.",
+    applicantName: "Thomas Gilbane Jr.",
+    org: "Gilbane Building Company",
+    location: "Providence, RI",
+    website: "https://gilbane.example",
+  });
+
+  it("does not pass a different generational suffix, and searches the surname", async () => {
+    expect(personHit("Thomas F. Gilbane III leads Gilbane Building Company", "Thomas Gilbane Jr.")).toBe("suffix-mismatch");
+    expect(mentionsPerson("Thomas F. Gilbane III leads Gilbane Building Company", "Thomas Gilbane Jr.")).toBe(false);
+    expect(mentionsPerson("Thomas Gilbane, Jr. chairs Gilbane Building Company", "Thomas Gilbane Jr.")).toBe(true);
+    expect(surnameForSearch("Thomas Gilbane Jr.")).toBe("Gilbane");
+    expect(newsSearchQueries(gilbane).join(" ")).not.toContain("Jr");
+    expect(newsSearchQueries(gilbane)[1]).toContain("Gilbane");
+    const checks = await runPublicScreen(gilbane, async (url) => {
+      if (url.includes("gilbane.example")) {
+        return { ok: true, status: 200, text: "<html><p>Thomas F. Gilbane III leads Gilbane Building Company from Providence.</p></html>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.reviewFlag).toBe(true);
+    expect(website?.finding.toLowerCase()).toContain("different generational suffix");
+    expect(website?.corroborates).not.toBe(true);
+  });
+
+  it("does not pass a departure headline and does not cap a company-only lawsuit", () => {
+    const harmon = facts({
+      name: "Doug Harmon",
+      applicantName: "Doug Harmon",
+      org: "Cushman & Wakefield",
+      location: "New York, NY",
+    });
+    const departure = classifyNews(
+      harmon,
+      [
+        {
+          title: "Harmon and Spies jump to Newmark from Cushman",
+          snippet: "Doug Harmon and Adam Spies jump to Newmark from Cushman & Wakefield.",
+          url: "https://example.com/harmon",
+          source: "Trade Desk",
+          publishedAt: "2026-06-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(departure[0].status).toBe("INCONCLUSIVE");
+    expect(departure[0].status).not.toBe("PASS");
+    expect(departure[0].corroborates).not.toBe(true);
+    expect(departure[0].reviewFlag).toBe(true);
+    expect(departure[0].finding.toLowerCase()).toContain("may no longer be at");
+    const joined = classifyNews(
+      facts({ name: "Doug Harmon", applicantName: "Doug Harmon", org: "Newmark", location: "New York, NY" }),
+      [
+        {
+          title: "Doug Harmon joins Newmark from Cushman",
+          snippet: "Doug Harmon joins Newmark from Cushman & Wakefield.",
+          url: "https://example.com/newmark",
+          source: "Trade Desk",
+          publishedAt: "2026-06-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(joined[0].status).toBe("PASS");
+    const lawsuit = classifyNews(
+      facts({ name: "Jonathan Gray", applicantName: "Jonathan Gray", org: "Blackstone", location: "New York, NY" }),
+      [
+        {
+          title: "Lawsuit names Blackstone over rent charges",
+          snippet: "The complaint names the landlord company only.",
+          url: "https://example.com/suit",
+          source: "Court Desk",
+          publishedAt: "2026-09-11T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    const graded = gradeChecks(
+      [
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "website", status: "PASS", corroborates: true }),
+        row({ key: "edgar", status: "PASS", corroborates: true }),
+        row({ key: "web-footprint", status: "PASS", corroborates: true }),
+        ...departure,
+        ...lawsuit,
+      ],
+      harmon,
+    );
+    expect(graded.caps.some((line) => line.startsWith("Capped at D"))).toBe(false);
+    expect(graded.attention.some((item) => item.title === "Headline may be a departure")).toBe(true);
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+  });
+
+  it("accepts an ampersand or a percent-encoded LinkedIn company slug", () => {
+    const ampersand = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/cushman-&-wakefield/" }));
+    const encoded = linkedinFormatCheck(facts({ linkedinUrl: "https://www.linkedin.com/company/cushman-%26-wakefield/" }));
+    expect(ampersand.status).toBe("PASS");
+    expect(encoded.status).toBe("PASS");
+    expect(ampersand.reviewFlag).not.toBe(true);
+  });
+
+  it("retries one company-website 403 with the browser user agent", async () => {
+    const agents: string[] = [];
+    const checks = await runPublicScreen(
+      facts({
+        name: "Dana Pellam",
+        applicantName: "Dana Pellam",
+        org: "Bramblewick Group",
+        website: "https://bramblewick-group.example",
+        location: "Hackensack, NJ",
+      }),
+      async (url, init) => {
+        agents.push(init?.userAgent || "default");
+        if (url.startsWith("https://bramblewick-group.example") && init?.userAgent === BROWSER_UA) {
+          return { ok: true, status: 200, text: "<html><p>Dana Pellam leads Bramblewick Group in Hackensack.</p></html>" };
+        }
+        if (url.startsWith("https://bramblewick-group.example")) return { ok: false, status: 403, text: "" };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    expect(agents.filter((agent) => agent === BROWSER_UA)).toHaveLength(1);
+    expect(userAgentFor("bramblewick-group.example")).toBe(USER_AGENT);
+    expect(userAgentFor("www.linkedin.com").toLowerCase()).not.toContain("chrome");
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.finding).toContain("Name: yes");
+  });
+
+  it("keeps CBRE off Unum and keeps fake B2F01 and B3F01 off C", async () => {
+    const rows = [
+      { title: "Unum Group", ticker: "UNM", cik: "5513" },
+      { title: "CBRE Group, Inc.", ticker: "CBRE", cik: "1138118" },
+    ];
+    expect(matchEdgarCompany(rows, "CBRE Group")?.ticker).toBe("CBRE");
+    expect(matchEdgarCompany(rows, "CBRE Group")?.title).not.toMatch(/unum/i);
+    clearEdgarTickerCache();
+    const origin = "https://quellhaven.example";
+    const checks = await collectChecks({
+      network: true,
+      watchlist: [{ name: "Unrelated Person", location: "Nowhere" }],
+      facts: facts({
+        name: "Nia Quell",
+        applicantName: "Nia Quell",
+        email: "pf.bench.b3f01@gmail.com",
+        org: "Quellhaven Holdings",
+        location: "Nowhere, ZZ",
+        phone: "",
+        website: origin,
+        linkedinUrl: "",
+        statement: "",
+        inviteNote: "PF-BENCH-B3F01",
+      }),
+      fetchText: async (url) => {
+        if (url.startsWith(origin)) return { ok: true, status: 200, text: "<html><p>Quellhaven Holdings lists no people.</p></html>" };
+        if (url.includes("company_tickers")) {
+          return { ok: true, status: 200, text: JSON.stringify({ "0": { title: "Unum Group", ticker: "UNM", cik_str: 5513 } }) };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    });
+    expect(checks.find((check) => check.key === "edgar")?.status).not.toBe("PASS");
+    expect(checks.some((check) => check.status === "NOT_RUN" && check.corroborates)).toBe(false);
+    const graded = gradeChecks(
+      checks,
+      facts({
+        name: "Nia Quell",
+        org: "Quellhaven Holdings",
+        location: "Nowhere, ZZ",
+        website: origin,
+        statement: "",
+      }),
+    );
+    expect(graded.letter).toBe("F");
+    expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
   });
 });

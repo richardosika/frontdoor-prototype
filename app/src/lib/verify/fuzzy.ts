@@ -1,3 +1,5 @@
+import { parsePersonName } from "@/lib/verify/public-match";
+
 export function normalizeName(value: string): string {
   return value
     .normalize("NFKD")
@@ -14,10 +16,13 @@ export function nameTokens(value: string): string[] {
     .filter((token) => token.length > 1 && !["llc", "inc", "corp", "ltd", "co", "the"].includes(token));
 }
 
-/** Conservative name match. Exact token overlap scores highest. Extra tokens lower the score. */
+/** Conservative name match. Exact token overlap scores highest. Extra tokens lower the score. A conflicting Jr/Sr/II/III/IV scores 0. */
 export function nameMatchScore(left: string, right: string): number {
-  const a = [...new Set(nameTokens(left))];
-  const b = [...new Set(nameTokens(right))];
+  const leftName = parsePersonName(left);
+  const rightName = parsePersonName(right);
+  if (leftName?.suffix && rightName?.suffix && leftName.suffix !== rightName.suffix) return 0;
+  const a = [...new Set(nameTokens(leftName ? `${leftName.given.join(" ")} ${leftName.surname}` : left))];
+  const b = [...new Set(nameTokens(rightName ? `${rightName.given.join(" ")} ${rightName.surname}` : right))];
   if (a.length < 2 || b.length < 2) return 0;
   const sb = new Set(b);
   const inter = a.filter((token) => sb.has(token)).length;

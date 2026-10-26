@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { companyPhraseTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { companyPhraseTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -76,6 +76,8 @@ type Classified = NewsItem & {
   person: boolean;
   company: boolean;
   location: boolean;
+  departed: boolean;
+  suffixMismatch: boolean;
 };
 
 export function cityPhrase(location: string): string {
@@ -84,11 +86,11 @@ export function cityPhrase(location: string): string {
 }
 
 export function newsSearchQueries(facts: ApplicantFacts): string[] {
-  const person = stripQuotes(facts.applicantName).replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
+  const person = personWithoutSuffix(stripQuotes(facts.applicantName));
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
   const companyPhrase = companyPhraseTokens(company).join(" ") || company;
-  const last = person.split(" ").filter((part) => part.length >= 3).slice(-1)[0] || "";
+  const last = surnameForSearch(person);
   const queries: string[] = [];
   if (person && companyPhrase && normalizeName(person) !== normalizeName(company)) {
     queries.push(`"${person}" "${companyPhrase}"`);
@@ -99,7 +101,7 @@ export function newsSearchQueries(facts: ApplicantFacts): string[] {
 }
 
 export function gdeltQuery(facts: ApplicantFacts): string {
-  const person = quote(facts.applicantName);
+  const person = quote(personWithoutSuffix(facts.applicantName));
   const company = quote(facts.org || facts.name);
   const city = quote(cityPhrase(facts.location));
   const parts: string[] = [];
@@ -235,10 +237,13 @@ export function classifyNews(
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
         const blob = `${item.title} ${item.snippet}`;
-        const person = Boolean(personName) && textHasName(blob, personName);
+        const hit = personName ? personHit(blob, personName) : "none";
+        const person = hit === "match";
+        const suffixMismatch = hit === "suffix-mismatch";
         const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);
-        if (!person && !company) return [];
+        if (!person && !company && !suffixMismatch) return [];
         const kind = negativeKind(blob);
+        const departed = person && company && leftTheCompany(blob, companyName);
         return [
           {
             ...item,
@@ -247,12 +252,14 @@ export function classifyNews(
             person,
             company,
             location: textHasLocation(blob, facts.location),
+            departed,
+            suffixMismatch,
           },
         ];
       }),
   ).sort(byImportance);
   const shown = spreadStories(kept);
-  const summary = newsSummary(shown, providers, ranAt);
+  const summary = newsSummary(shown, providers, ranAt, companyName);
   return [summary, ...shown.map((item) => newsStory(item, ranAt))];
 }
 
@@ -289,7 +296,12 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
   return classifyNews(facts, collected, providers, now);
 }
 
-function newsSummary(items: Classified[], providers: { name: string; state: "responded" | "unavailable" }[], ranAt: string): CheckOutput {
+function newsSummary(
+  items: Classified[],
+  providers: { name: string; state: "responded" | "unavailable" }[],
+  ranAt: string,
+  companyName: string,
+): CheckOutput {
   const responded = providers.filter((provider) => provider.state === "responded").map((provider) => provider.name);
   const blocked = providers.filter((provider) => provider.state === "unavailable").map((provider) => provider.name);
   const feeds = feedSentence(responded, blocked);
@@ -307,7 +319,9 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
   const companyLitigation = items.some(
     (item) => item.tone === "negative" && (item.company || (item.person && item.location)) && !(item.kind === "hard" && item.person),
   );
-  const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company);
+  const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
+  const departure = items.some((item) => item.departed && item.person);
+  const suffixMismatch = items.find((item) => item.suffixMismatch);
   if (personHard) {
     return {
       ...base,
@@ -329,6 +343,22 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
       ...base,
       status: "INCONCLUSIVE",
       finding: `Company-level litigation headline. A lawsuit or similar civil term names the company. This is an attention item for Richard, not an automatic review flag, and it does not tie fraud or a criminal charge to the person. ${feeds}`.trim(),
+    };
+  }
+  if (suffixMismatch && !aligned) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      finding: `A different generational suffix is in this headline, so the name did not match. Needs review. ${feeds}`.trim(),
+    };
+  }
+  if (departure && !aligned) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      finding: `This may no longer be at ${companyName || "the company on the application"}. The headline reads as a departure, not current employment. ${feeds}`.trim(),
     };
   }
   if (aligned) {
@@ -359,13 +389,23 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
   const companyCivil = item.tone === "negative" && !personHard;
   const status: EvidenceStatus = personHard ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
-  const label = ambiguous ? "Possible match, review" : personHard ? "Negative" : companyCivil ? "Company litigation" : "Neutral";
+  const label = item.suffixMismatch
+    ? "Different suffix"
+    : item.departed
+      ? "Departure"
+      : ambiguous
+        ? "Possible match, review"
+        : personHard
+          ? "Negative"
+          : companyCivil
+            ? "Company litigation"
+            : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
     status,
     weight: 0,
-    reviewFlag: ambiguous || undefined,
+    reviewFlag: ambiguous || item.departed || item.suffixMismatch || undefined,
     finding: `${label} · ${date} · ${item.title.slice(0, 180)}`,
     source: outlet ? `${outlet} via ${item.provider}` : item.provider,
     url: item.url,

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { MEMBER_CHECKS, PROJECT_CHECKS } from "@/lib/verification";
 import { ensureVerificationCase } from "@/lib/verification-db";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
-import { politeFetch } from "@/lib/verify/fetch";
+import { fetchForChecks } from "@/lib/verify/fetch";
 import { gradeChecks, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { loadWatchlist } from "@/lib/verify/watchlist";
@@ -338,7 +338,7 @@ export async function runLivePrefill(caseId: string): Promise<void> {
     facts: loaded.applicant,
     watchlist: watch.entries,
     network: !loaded.applicant.testProfile,
-    fetchText: politeFetch,
+    fetchText: fetchForChecks,
   };
   const checks = await collectChecks(ctx);
   const evidence = asEvidence(checks);

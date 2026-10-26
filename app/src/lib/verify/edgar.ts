@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsPerson } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -205,7 +205,7 @@ export async function lookupEdgar(
   }
   const fetchImpl = fetchText ?? defaultFetch;
   const companies = await loadTickers(fetchImpl).catch(() => null);
-  const last = person.split(/\s+/).filter((part) => part.length >= 3).slice(-1)[0] || "";
+  const last = surnameForSearch(person);
   const distinctive = distinctiveCompanyTokens(org)[0] || org;
   const searchUrl = last
     ? `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${last}" "${distinctive}"`)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`

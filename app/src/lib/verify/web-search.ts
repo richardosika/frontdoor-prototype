@@ -1,4 +1,5 @@
 import { nameTokens, normalizeName } from "@/lib/verify/fuzzy";
+import { leftTheCompany } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const NEGATIVE = /\b(fraud|lawsuit|indicted|scam|ponzi)\b/i;
@@ -117,7 +118,7 @@ export function providerAttemptState(status: number, snippetCount: number): "una
 
 type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
 
-type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative"; sample: string; url: string };
+type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative" | "departed"; sample: string; url: string };
 
 export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput> {
   const query = `"${facts.name}" "${facts.org}"`;
@@ -176,9 +177,14 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
-    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org));
+    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && !leftTheCompany(text, facts.org));
+    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && leftTheCompany(text, facts.org));
     if (hit) {
       attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
+      break;
+    }
+    if (departed) {
+      attempts.push({ provider: provider.provider, state: "departed", sample: departed.slice(0, 180), url: provider.url });
       break;
     }
     attempts.push({ provider: provider.provider, state: "no-data", sample: "", url: provider.url });
@@ -186,7 +192,8 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
 
   const hit = attempts.find((item) => item.state === "hit");
   const negative = attempts.find((item) => item.state === "negative");
-  const responded = attempts.filter((item) => item.state === "no-data" || item.state === "hit" || item.state === "negative");
+  const departed = attempts.find((item) => item.state === "departed");
+  const responded = attempts.filter((item) => item.state === "no-data" || item.state === "hit" || item.state === "negative" || item.state === "departed");
   const blocked = attempts.filter((item) => item.state === "unavailable").map((item) => item.provider);
   const ranAt = new Date().toISOString();
   if (negative) {
@@ -198,6 +205,18 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       finding: `Possible match, needs review. ${negative.provider} returned a result that names this person and company near a negative term. This is not a failure.`,
       source: negative.provider,
       url: negative.url,
+      ranAt,
+    };
+  }
+  if (departed) {
+    return {
+      key: "web-footprint",
+      status: "INCONCLUSIVE",
+      weight: 12,
+      reviewFlag: true,
+      finding: `This may no longer be at ${facts.org}. ${departed.provider} returned a departure headline, not current employment.`,
+      source: departed.provider,
+      url: departed.url,
       ranAt,
     };
   }

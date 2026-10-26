@@ -93,14 +93,54 @@ export function wordHit(text: string, token: string): boolean {
   return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "i").test(text);
 }
 
-/** Keep a hyphenated surname together. "Quentin-Vale" is one name part; "turner" still does not match "page-turner". */
-function personNameParts(name: string): string[] {
-  return name
+const GENERATIONAL = new Set(["jr", "sr", "ii", "iii", "iv"]);
+
+/** Jr, Sr, II, III, and IV. "Junior" and "Senior" fold to jr and sr. */
+export function normalizeGenerationalSuffix(token: string): string | null {
+  const cleaned = token.toLowerCase().replace(/\./g, "").replace(/[^a-z]/g, "");
+  if (cleaned === "junior") return "jr";
+  if (cleaned === "senior") return "sr";
+  return GENERATIONAL.has(cleaned) ? cleaned : null;
+}
+
+export type ParsedPersonName = { given: string[]; surname: string; suffix: string | null };
+
+/**
+ * Given name, surname, and a generational suffix.
+ * The suffix is kept for matching. It is not the surname, so a query can drop Jr without dropping Gilbane.
+ */
+export function parsePersonName(name: string): ParsedPersonName | null {
+  const parts = name
     .replace(/\b[A-Za-z]\.\s*/g, " ")
     .split(/\s+/)
     .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
-    .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 3);
+    .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 2);
+  if (!parts.length) return null;
+  let suffix: string | null = null;
+  const tail = normalizeGenerationalSuffix(parts[parts.length - 1]);
+  if (tail) {
+    suffix = tail;
+    parts.pop();
+  }
+  if (!parts.length) return null;
+  const surname = parts[parts.length - 1];
+  const given = parts.slice(0, -1).filter((part) => part.includes("-") || part.replace(/[^A-Za-z0-9]/g, "").length >= 3);
+  return { given, surname, suffix };
 }
+
+/** Name used in a search query. The suffix token is removed. The surname stays. */
+export function personWithoutSuffix(name: string): string {
+  const parsed = parsePersonName(name);
+  if (!parsed) return name.replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
+  return [...parsed.given, parsed.surname].join(" ");
+}
+
+/** Surname for a query or a sitemap path. A suffix is never returned in place of the surname. */
+export function surnameForSearch(name: string): string {
+  return parsePersonName(name)?.surname || "";
+}
+
+export type PersonHit = "match" | "suffix-mismatch" | "none";
 
 function personPartHits(text: string, part: string): boolean {
   const pieces = part.split("-").filter(Boolean);
@@ -131,15 +171,18 @@ function companyTokenHit(text: string, token: string): boolean {
 }
 
 export function alternatePersonNames(name: string): string[] {
-  const cleaned = name.replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
-  const parts = tokens(cleaned).filter((token) => token.length >= 3);
-  if (parts.length < 2) return cleaned ? [cleaned] : [];
-  const last = parts[parts.length - 1];
-  const lastLabel = last.charAt(0).toUpperCase() + last.slice(1);
-  const names = new Set<string>([cleaned]);
-  for (const nick of NICKNAMES[parts[0]] || []) {
-    if (nick === parts[0]) continue;
-    names.add(`${nick.charAt(0).toUpperCase()}${nick.slice(1)} ${lastLabel}`);
+  const parsed = parsePersonName(name);
+  if (!parsed || parsed.given.length < 1) {
+    const cleaned = personWithoutSuffix(name);
+    return cleaned ? [cleaned] : [];
+  }
+  const first = parsed.given[0].toLowerCase();
+  const surname = parsed.surname.charAt(0).toUpperCase() + parsed.surname.slice(1);
+  const full = personWithoutSuffix(name);
+  const names = new Set<string>([full]);
+  for (const nick of NICKNAMES[first] || []) {
+    if (nick === first) continue;
+    names.add(`${nick.charAt(0).toUpperCase()}${nick.slice(1)} ${surname}`);
   }
   return [...names];
 }
@@ -160,10 +203,64 @@ export function distinctiveCompanyTokens(org: string): string[] {
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 
+function suffixesBesideSurname(text: string, parsed: ParsedPersonName): string[] {
+  const re = new RegExp(`(?<![A-Za-z0-9-])${parsed.surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9-])`, "gi");
+  const found: string[] = [];
+  for (const match of text.matchAll(re)) {
+    const start = match.index ?? 0;
+    const before = text.slice(Math.max(0, start - 80), start);
+    if (!parsed.given.some((part) => personPartHits(before, part))) continue;
+    const after = text.slice(start + match[0].length, start + match[0].length + 16);
+    const next = (after.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z.]+/) || [])[0] || "";
+    const suffix = normalizeGenerationalSuffix(next);
+    if (suffix) found.push(suffix);
+  }
+  return found;
+}
+
+/**
+ * Given name plus surname. When both the application and the page carry a suffix, they have to agree.
+ * Jr against III is a mismatch. A page that omits the suffix does not contradict one.
+ */
+export function personHit(text: string, name: string): PersonHit {
+  const parsed = parsePersonName(name);
+  if (!parsed || parsed.given.length < 1) return "none";
+  if (!parsed.given.every((part) => personPartHits(text, part))) return "none";
+  if (!personPartHits(text, parsed.surname)) return "none";
+  if (!parsed.suffix) return "match";
+  const pageSuffixes = suffixesBesideSurname(text, parsed);
+  if (pageSuffixes.includes(parsed.suffix)) return "match";
+  if (pageSuffixes.length) return "suffix-mismatch";
+  return "match";
+}
+
 export function mentionsPerson(text: string, name: string): boolean {
-  const parts = personNameParts(name);
-  if (parts.length < 2) return false;
-  return parts.every((part) => personPartHits(text, part));
+  return personHit(text, name) === "match";
+}
+
+function formerOrEx(text: string, org: string): boolean {
+  const phrase = companyPhraseTokens(org);
+  const token = phrase.find((part) => isDistinctiveCompanyToken(part)) || phrase[0];
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b(?:former|ex-)(?:[\\s\\S]{0,48})\\b${escaped}\\b`, "i").test(text);
+}
+
+/**
+ * A headline that places the person in a past role at this company.
+ * "jump to Newmark from Cushman" is a departure from Cushman and a join at Newmark.
+ */
+export function leftTheCompany(text: string, org: string): boolean {
+  if (!org.trim() || !mentionsCompany(text, org)) return false;
+  if (formerOrEx(text, org)) return true;
+  const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(text);
+  if (move) {
+    const destination = move[1];
+    const origin = move[2].split(/[.]/)[0];
+    if (mentionsCompany(destination, org)) return false;
+    if (mentionsCompany(origin, org)) return true;
+  }
+  return /\b(?:leaves|left|leaving|departs|departed|departing)\b/i.test(text);
 }
 
 function looksLikeGivenName(word: string): boolean {

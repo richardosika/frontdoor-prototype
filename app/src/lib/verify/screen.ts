@@ -1,7 +1,7 @@
-import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
+import { BROWSER_UA, classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
-import { alternatePersonNames, distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -24,9 +24,11 @@ export type MatchScore = {
   company: boolean;
   city: boolean;
   confidence: MatchConfidence;
+  suffixMismatch?: boolean;
+  departure?: boolean;
 };
 
-type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
+type FetchText = (url: string, init?: { userAgent?: string }) => Promise<{ ok: boolean; status: number; text: string }>;
 
 type Attempt = {
   key: string;
@@ -44,15 +46,19 @@ const COMPANY_ONLY = "company confirmed, person NOT confirmed";
 
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
   const hay = text.toLowerCase();
-  const name = mentionsPerson(text, facts.name);
+  const hit = personHit(text, facts.name);
+  const suffixMismatch = hit === "suffix-mismatch";
+  const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
+  const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org);
+  const currentName = name && !departure;
   const city = cityPhrase(facts.location).toLowerCase();
   const cityHit = city.length >= 4 && hay.includes(city);
   let confidence: MatchConfidence = "none";
-  if (name && company) confidence = "high";
-  else if ((name && cityHit) || (company && cityHit)) confidence = "medium";
-  else if (name || company) confidence = "low";
-  return { name, company, city: cityHit, confidence };
+  if (currentName && company) confidence = "high";
+  else if ((currentName && cityHit) || (company && cityHit)) confidence = "medium";
+  else if (currentName || company || suffixMismatch) confidence = "low";
+  return { name: currentName, company, city: cityHit, confidence, suffixMismatch, departure };
 }
 
 export function emptyScore(): MatchScore {
@@ -238,7 +244,7 @@ export function applicantHost(website: string): string {
 
 export function socialLinksFrom(html: string): { platform: string; url: string }[] {
   const patterns: { platform: string; re: RegExp }[] = [
-    { platform: "LinkedIn", re: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[a-z0-9\-_%]+\/?/gi },
+    { platform: "LinkedIn", re: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[a-z0-9\-_%&]+\/?/gi },
     { platform: "X", re: /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[a-z0-9_]+\/?/gi },
     { platform: "Facebook", re: /https?:\/\/(?:www\.)?facebook\.com\/[a-z0-9.\-]+\/?/gi },
     { platform: "Instagram", re: /https?:\/\/(?:www\.)?instagram\.com\/[a-z0-9._]+\/?/gi },
@@ -270,7 +276,7 @@ function strong(score: MatchScore): boolean {
   return score.confidence === "high" || (score.confidence === "medium" && score.name);
 }
 
-function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean } {
+function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean; reviewFlag?: boolean } {
   const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${attempt.score.company ? "yes" : "no"}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
   if (attempt.outcome === "dead") {
     return {
@@ -298,6 +304,22 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       status: "INCONCLUSIVE",
       corroborates: false,
       finding: `Searched: ${attempt.searched}. No result found that names this person and this company. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (attempt.score.suffixMismatch) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      finding: `Searched: ${attempt.searched}. A different generational suffix is on this page, so the name did not match. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (attempt.score.departure) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      finding: `Searched: ${attempt.searched}. This may no longer be at the company on the application. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.
@@ -334,6 +356,7 @@ function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
     source: attempt.platform,
     url: attempt.url,
     ranAt: new Date().toISOString(),
+    reviewFlag: judged.reviewFlag || undefined,
     corroborates: judged.corroborates && !ownSite && !judged.companyOnly,
     selfReported: ownSite ? true : undefined,
     companyOnly: judged.companyOnly || undefined,
@@ -347,9 +370,10 @@ function blockedAttempt(key: string, platform: string, searched: string, url: st
 async function pull(
   fetchText: FetchText,
   url: string,
+  init?: { userAgent?: string },
 ): Promise<{ ok: boolean; status: number; text: string; failure?: "nxdomain" | "timeout" | "network" }> {
   try {
-    return await fetchText(url);
+    return await fetchText(url, init);
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
   }
@@ -412,6 +436,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         homeUrl = alt;
       }
     }
+    if (home.status === 403) {
+      const retried = await pull(fetchText, homeUrl, { userAgent: BROWSER_UA });
+      if (retried.ok) {
+        home = retried;
+      }
+    }
     if (home.failure === "nxdomain") {
       attempts.push({
         key: "website",
@@ -441,7 +471,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       let fromSitemap: string[] = [];
       try {
         const origin = new URL(homeUrl).origin;
-        const lastName = person.split(/\s+/).filter((part) => /[A-Za-z]/.test(part)).slice(-1)[0] || "";
+        const lastName = surnameForSearch(person);
         fromSitemap = await sitemapLastNameUrls(fetchText, origin, lastName);
       } catch {
         fromSitemap = [];

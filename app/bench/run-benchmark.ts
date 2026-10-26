@@ -15,7 +15,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { collectChecks, type CheckContext, type WatchlistEntry } from "@/lib/verify/checks";
-import { clearFetchCache, politeFetch } from "@/lib/verify/fetch";
+import { clearFetchCache, fetchForChecks } from "@/lib/verify/fetch";
 import { gradeChecks, RUBRIC_VERSION } from "@/lib/verify/grade";
 import { scoreReport } from "@/lib/verify/score";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -356,7 +356,7 @@ async function main() {
     console.log(`[case] ${c.id} ${c.label}`);
     let record: Record<string, unknown>;
     try {
-      const ctx: CheckContext = { facts, watchlist, network: true, fetchText: politeFetch };
+      const ctx: CheckContext = { facts, watchlist, network: true, fetchText: fetchForChecks };
       const report = scoreReport(await withTimeout(collectChecks(ctx), CASE_TIMEOUT_MS));
       const grade = gradeChecks(report.checks, facts, { gradedAt: new Date().toISOString(), subject: "APPLICATION" });
       const ev = evaluate({ ...c, watchlist: c.watchlist }, grade, report.checks);

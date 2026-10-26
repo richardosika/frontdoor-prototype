@@ -324,9 +324,18 @@ function isDeclinedDuplicate(check: CheckOutput): boolean {
   return isDuplicate(check) && /declined|banned/i.test(check.finding);
 }
 
+function isCompanyLawsuitOnly(check: CheckOutput): boolean {
+  return /company-level litigation|^Company litigation ·/i.test(check.finding);
+}
+
+function isDepartureOrSuffix(check: CheckOutput): boolean {
+  return /may no longer be at|different generational suffix|^Departure ·|^Different suffix ·/i.test(check.finding);
+}
+
 function isAmbiguousNews(check: CheckOutput): boolean {
   if (check.key !== "news" && check.key !== "news-story") return false;
   if (check.status === "FAIL") return false;
+  if (isCompanyLawsuitOnly(check) || isDepartureOrSuffix(check)) return false;
   return Boolean(check.reviewFlag) || /possible match/i.test(check.finding);
 }
 
@@ -889,6 +898,20 @@ export function gradeChecks(
       pushAttention({
         severity: "Medium",
         title: "Company litigation headline",
+        detail: check.finding,
+      });
+    }
+    if ((check.key === "news" || check.key === "website" || check.key === "web-footprint") && /may no longer be at/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Headline may be a departure",
+        detail: check.finding,
+      });
+    }
+    if (/different generational suffix/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Different generational suffix",
         detail: check.finding,
       });
     }
