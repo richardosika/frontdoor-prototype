@@ -65,6 +65,65 @@ export function limitText(text: string, maxChars: number): string {
   return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
 
+/** HTML pages only. RSS, sitemap XML, and JSON stay byte-for-byte so their parsers still see the markup. */
+export function looksLikeHtml(text: string): boolean {
+  const head = text.slice(0, 1200).trimStart().toLowerCase();
+  if (!head.startsWith("<")) return false;
+  if (
+    head.startsWith("<?xml") ||
+    head.startsWith("<rss") ||
+    head.startsWith("<feed") ||
+    head.startsWith("<urlset") ||
+    head.startsWith("<sitemapindex")
+  ) {
+    return false;
+  }
+  return /<!doctype html\b|<html\b|<head\b|<body\b|<script\b|<style\b/.test(head);
+}
+
+export function stripScriptsAndStyles(html: string): string {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ");
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  ndash: "-",
+  mdash: "-",
+};
+
+function entityChar(code: number): string {
+  if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return " ";
+  return String.fromCodePoint(code);
+}
+
+/** Decode the entities that split names (&nbsp;, &amp;, numeric). Unknown entities stay as written. */
+export function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]+);/gi, (entity, raw: string) => {
+    const name = raw.toLowerCase();
+    if (NAMED_ENTITIES[name]) return NAMED_ENTITIES[name];
+    if (name.startsWith("#x")) return entityChar(Number.parseInt(name.slice(2), 16));
+    if (name.startsWith("#")) return entityChar(Number.parseInt(name.slice(1), 10));
+    return entity;
+  });
+}
+
+/**
+ * Strip style and script, then decode entities, then apply the size cap.
+ * A 180KB stylesheet must not cut off the team-page text that follows it.
+ */
+export function prepareFetchedText(text: string, maxChars: number): string {
+  if (!looksLikeHtml(text)) return limitText(text, maxChars);
+  return limitText(decodeHtmlEntities(stripScriptsAndStyles(text)), maxChars);
+}
+
 /** Retry network failures, rate limits, and server errors once. A normal 4xx is final. */
 export function shouldRetryStatus(status: number): boolean {
   return status === 0 || status === 429 || status >= 500;
@@ -125,7 +184,7 @@ async function fetchOnce(
       },
     });
     const cap = options?.maxChars ?? fetchLimits(url).maxChars;
-    const text = limitText(await response.text(), cap);
+    const text = prepareFetchedText(await response.text(), cap);
     return { ok: response.ok, status: response.status, text };
   } catch {
     return { ok: false, status: 0, text: "" };

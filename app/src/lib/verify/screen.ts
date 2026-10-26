@@ -1,3 +1,4 @@
+import { decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
@@ -104,7 +105,28 @@ export function tiktokProfileText(html: string): string {
   return [nickname, uniqueId, signature].filter(Boolean).join(" ");
 }
 
-const TEAM_PAGE = /about|contact|team|leader|people|executive|management|our-company|our-firm|our-story|who-we|professional|attorney|lawyer|staff|\bbio\b/i;
+const TEAM_PAGE = /about|contact|team|leader|leadership|people|executive|management|our-company|our-firm|our-story|our-team|who-we|professionals?|attorneys?|lawyers?|staff|\bbio\b/i;
+
+/** Probed when the nav did not already link them. A JavaScript menu still leaves these paths. */
+export const TEAM_FALLBACK_PATHS = ["/professionals", "/attorneys", "/people", "/leadership", "/our-team", "/team", "/about"];
+
+export function fallbackTeamUrls(base: string, already: string[]): string[] {
+  let origin = "";
+  try {
+    origin = new URL(base).origin;
+  } catch {
+    return [];
+  }
+  const seen = new Set(already.map((url) => url.replace(/\/$/, "").toLowerCase()));
+  const found: string[] = [];
+  for (const path of TEAM_FALLBACK_PATHS) {
+    const href = `${origin}${path}`;
+    if (seen.has(href.toLowerCase())) continue;
+    seen.add(href.toLowerCase());
+    found.push(href);
+  }
+  return found;
+}
 
 export function sameOriginPages(html: string, base: string): string[] {
   let origin = "";
@@ -188,7 +210,7 @@ export async function sitemapLastNameUrls(
       try {
         const url = new URL(loc, base.origin);
         if (url.origin !== base.origin) return false;
-        return /team|people|leader|professional|attorney|staff|bio|about/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
+        return /team|people|leader|leadership|professional|attorney|staff|bio|about|our-team/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
       } catch {
         return false;
       }
@@ -323,10 +345,12 @@ function snippetFrom(html: string): { text: string; hrefs: string[] } {
 }
 
 function visible(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+  return decodeHtmlEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -377,6 +401,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     } else {
       pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
       const linked = sameOriginPages(home.text, homeUrl);
+      const fallback = fallbackTeamUrls(homeUrl, linked);
       let fromSitemap: string[] = [];
       try {
         const origin = new URL(homeUrl).origin;
@@ -385,7 +410,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       } catch {
         fromSitemap = [];
       }
-      const extra = [...new Set([...linked, ...fromSitemap])];
+      const extra = [...new Set([...linked, ...fallback, ...fromSitemap])];
       const more = await Promise.all(extra.map(async (url) => ({ url, response: await pull(fetchText, url) })));
       for (const page of more) {
         if (page.response.status >= 200 && page.response.status < 400) {

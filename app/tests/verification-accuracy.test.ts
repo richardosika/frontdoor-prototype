@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { cardConsistencyCheck, collectChecks, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { fetchLimits, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { distinctiveCompanyTokens, mentionsCompany } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
-import { runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -623,5 +623,92 @@ describe("team pages and the NY company list", () => {
       facts({ org: "Cole Schotz", location: "New York, NY" }),
     );
     expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(2);
+  });
+});
+
+describe("website text survives the size cap", () => {
+  it("strips style and script before the 180k cap and decodes names", () => {
+    const filler = `<style>${"x".repeat(200_000)}</style>`;
+    const html = `<!doctype html><html><head>${filler}</head><body><p>Richard&nbsp;Abramson of Cole&amp;Schotz</p></body></html>`;
+    const prepared = prepareFetchedText(html, 180_000);
+    expect(prepared.length).toBeLessThanOrEqual(180_000);
+    expect(prepared).toContain("Richard Abramson");
+    expect(prepared).toContain("Cole&Schotz");
+    expect(prepared).not.toContain("<style");
+    const rss = `<?xml version="1.0"?><rss><channel><title>A&amp;B</title></channel></rss>`;
+    expect(prepareFetchedText(rss, 180_000)).toContain("A&amp;B");
+    expect(looksLikeHtml(rss)).toBe(false);
+    expect(looksLikeHtml(`{"title":"CBRE Group"}`)).toBe(false);
+    expect(prepareFetchedText(`{"title":"CBRE Group","pad":"${"y".repeat(80)}"}`, 40)).toHaveLength(40);
+  });
+
+  it("follows professionals, leadership, and our-team when the nav is empty", async () => {
+    const samples = [
+      {
+        org: "Cole Schotz",
+        person: "Richard Abramson",
+        host: "https://coleschotz.example",
+        path: "/professionals",
+        page: "<html><body><p>Richard&nbsp;Abramson is a member at Cole&nbsp;Schotz.</p></body></html>",
+      },
+      {
+        org: "Lincoln Equities",
+        person: "Jordan Hale",
+        host: "https://lincolnequities.example",
+        path: "/leadership",
+        page: "<!doctype html><html><body><p>Jordan Hale leads Lincoln Equities.</p></body></html>",
+      },
+      {
+        org: "Vigavi",
+        person: "Mina Ortiz",
+        host: "https://vigavi.example",
+        path: "/our-team",
+        page: "<html><body><p>Mina Ortiz works at Vigavi.</p></body></html>",
+      },
+    ];
+    expect(fallbackTeamUrls("https://firm.example/", ["https://firm.example/team"])).not.toContain("https://firm.example/team");
+    expect(fallbackTeamUrls("https://firm.example/", [])).toEqual([
+      "https://firm.example/professionals",
+      "https://firm.example/attorneys",
+      "https://firm.example/people",
+      "https://firm.example/leadership",
+      "https://firm.example/our-team",
+      "https://firm.example/team",
+      "https://firm.example/about",
+    ]);
+    for (const sample of samples) {
+      const home = `<!doctype html><html><head><style>${"z".repeat(4000)}</style></head><body><div id="app"></div></body></html>`;
+      const checks = await runPublicScreen(
+        facts({
+          name: sample.person,
+          applicantName: sample.person,
+          org: sample.org,
+          website: sample.host,
+          location: "Hackensack, NJ",
+        }),
+        async (url) => {
+          if (url === sample.host || url === `${sample.host}/`) return { ok: true, status: 200, text: home };
+          if (url === `${sample.host}${sample.path}`) return { ok: true, status: 200, text: sample.page };
+          return { ok: false, status: 404, text: "" };
+        },
+      );
+      const website = checks.find((check) => check.key === "website");
+      expect(website?.status).toBe("PASS");
+      expect(website?.url).toBe(`${sample.host}${sample.path}`);
+      expect(website?.selfReported).toBe(true);
+      expect(website?.corroborates).toBe(false);
+      expect(website?.finding).toContain("Name: yes");
+      const graded = gradeChecks(
+        checks,
+        facts({
+          name: sample.person,
+          applicantName: sample.person,
+          org: sample.org,
+          website: sample.host,
+          location: "Hackensack, NJ",
+        }),
+      );
+      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(8);
+    }
   });
 });
