@@ -5,6 +5,7 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
+import { runPublicScreen } from "@/lib/verify/screen";
 import { webFootprintCheck } from "@/lib/verify/web-search";
 
 const DISPOSABLE = new Set([
@@ -560,7 +561,7 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
       key: "business-registry",
       status: "NOT_RUN",
       weight: 8,
-      finding: "Not run: no stable free registry API for this state. Search the secretary of state manually.",
+      finding: "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.",
       source: "State registry",
       url: "",
     });
@@ -569,7 +570,7 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     key: "business-registry",
     status: "NOT_RUN",
     weight: 8,
-    finding: `Not run: manual link provided. Open the ${state} registry search and look up ${facts.org}.`,
+    finding: `Couldn't check for free. No free ${state} registry API. Open the state search and look up ${facts.org}.`,
     source: "State registry",
     url: links[state],
   });
@@ -646,10 +647,10 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       }),
     );
   }
-  const website = ctx.facts.website.trim() || (domain && !FREE_PROVIDERS.has(domain) && !DISPOSABLE.has(domain) ? `https://${domain}` : "");
+  const statedSite = ctx.facts.website.trim();
   let host = "";
   try {
-    host = website ? new URL(website.startsWith("http") ? website : `https://${website}`).host : "";
+    host = statedSite ? new URL(statedSite.startsWith("http") ? statedSite : `https://${statedSite}`).host : "";
   } catch {
     host = "";
   }
@@ -672,43 +673,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       }),
     );
   }
-  if (website && host) {
-    const base = website.startsWith("http") ? website : `https://${website}`;
-    const home = await pageText(fetchText, base);
-    const about = await pageText(fetchText, new URL("/about", base).toString());
-    const team = await pageText(fetchText, new URL("/team", base).toString());
-    const blob = `${home.text} ${about.text} ${team.text}`;
-    const unreachable = home.status === 0 || home.status >= 500;
-    const reachable = !unreachable && (home.ok || home.status > 0);
-    const matched = websiteNamesMatch(blob, ctx.facts.applicantName || ctx.facts.name, ctx.facts.org);
-    out.push(
-      check({
-        key: "website",
-        status: unreachable ? "UNAVAILABLE" : matched ? "PASS" : reachable ? "FAIL" : "INCONCLUSIVE",
-        weight: 14,
-        reviewFlag: reachable && !matched,
-        finding: unreachable
-          ? "The website timed out or did not respond. This source could not be checked."
-          : matched
-            ? "The site responded. Homepage, /about, or /team text includes the person or company name."
-            : "The site responded, but the person and company names were not on the homepage, /about, or /team. No data found on those pages.",
-        source: "Public website fetch",
-        url: base,
-        corroborates: matched,
-      }),
-    );
-  } else {
-    out.push(
-      check({
-        key: "website",
-        status: "INCONCLUSIVE",
-        weight: 14,
-        finding: "No company website was given, and the email domain is not a company domain. A private email is allowed.",
-        source: "Public website fetch",
-        url: "",
-      }),
-    );
-  }
+  out.push(...(await runPublicScreen(ctx.facts, fetchText)));
   const edgarUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${ctx.facts.org}"`)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01&forms=D`;
   const edgar = await fetchText(edgarUrl);
   let edgarHits = 0;
@@ -746,30 +711,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     ? await fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
-  out.push(await webFootprintCheck(ctx.facts, fetchText));
+  if (!out.some((item) => item.key === "web-footprint")) out.push(await webFootprintCheck(ctx.facts, fetchText));
   out.push(...(await newsChecks(ctx.facts, fetchText)));
-  if (ctx.facts.linkedinUrl) {
-    const linked = await fetchText(ctx.facts.linkedinUrl);
-    const linkedText = stripHtml(linked.text);
-    const blockedLinked = linked.status === 999 || linked.status === 403 || linked.status === 401 || linked.status === 0 || !linked.ok;
-    const firstName = (ctx.facts.name.split(" ")[0] || "").toLowerCase();
-    const titleHit = firstName.length > 2 && linkedText.includes(firstName);
-    out.push(
-      check({
-        key: "linkedin-fetch",
-        status: blockedLinked ? "UNAVAILABLE" : titleHit ? "PASS" : "INCONCLUSIVE",
-        weight: 8,
-        finding: blockedLinked
-          ? "LinkedIn blocked or did not return a public page. This source could not be checked. Logged-in pages are not scraped."
-          : titleHit
-            ? "A public fetch of the LinkedIn URL returned a page that includes the person's name."
-            : "LinkedIn responded, but the name was not in the page. No data found.",
-        source: "LinkedIn public page",
-        url: ctx.facts.linkedinUrl,
-        corroborates: Boolean(titleHit) && !blockedLinked,
-      }),
-    );
-  }
   return out;
 }
 

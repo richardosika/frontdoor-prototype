@@ -1,4 +1,12 @@
 const USER_AGENT = "PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)";
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+function userAgentFor(host: string): string {
+  if (/(^|\.)linkedin\.com$|(^|\.)tiktok\.com$|(^|\.)youtube\.com$|(^|\.)facebook\.com$|(^|\.)instagram\.com$|(^|\.)x\.com$|(^|\.)twitter\.com$/.test(host)) {
+    return BROWSER_UA;
+  }
+  return USER_AGENT;
+}
 const lastByHost = new Map<string, number>();
 const responseCache = new Map<string, { at: number; value: { ok: boolean; status: number; text: string } }>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -85,7 +93,7 @@ async function fetchOnce(
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "user-agent": USER_AGENT,
+        "user-agent": userAgentFor(host),
         accept: wiki
           ? "application/json"
           : news
@@ -94,7 +102,8 @@ async function fetchOnce(
         ...(wiki ? { "api-user-agent": USER_AGENT } : {}),
       },
     });
-    const text = limitText(await response.text(), options?.maxChars ?? 180_000);
+    const cap = options?.maxChars ?? (host.endsWith("youtube.com") ? 1_200_000 : host.endsWith("tiktok.com") ? 500_000 : 180_000);
+    const text = limitText(await response.text(), cap);
     return { ok: response.ok, status: response.status, text };
   } catch {
     return { ok: false, status: 0, text: "" };

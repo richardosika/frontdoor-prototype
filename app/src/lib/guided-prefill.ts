@@ -128,9 +128,12 @@ function pack(key: string, mark: SuggestedMark, urls: string[], found: string[],
   if (next === "COULDNT_VERIFY" && !missing.join(" ").toLowerCase().includes(COULD_NOT_VERIFY) && !found.join(" ").toLowerCase().includes(COULD_NOT_VERIFY)) {
     missing.push(`This ${COULD_NOT_VERIFY}.`);
   }
+  const blockedLines = missing.filter((line) => /couldn't check for free|couldn't verify for free|could not be checked|blocked automated access/i.test(line));
+  const gapLines = missing.filter((line) => !blockedLines.includes(line));
   const foundText = found.length ? `Found: ${found.join(" ")}` : "Found: nothing a free source could tie to this file.";
-  const missingText = missing.length ? `Not found: ${missing.join(" ")}` : "Not found: no extra gap was recorded.";
-  let body = `${foundText} ${missingText}`;
+  const missingText = gapLines.length ? `Not found: ${gapLines.join(" ")}` : "Not found: no extra gap was recorded.";
+  const blockedText = blockedLines.length ? ` Blocked sources: ${blockedLines.join(" ")}` : "";
+  let body = `${foundText} ${missingText}${blockedText}`;
   if (next === "COULDNT_VERIFY" && !body.toLowerCase().includes(COULD_NOT_VERIFY)) body = `${body} ${COULD_NOT_VERIFY}.`;
   if (next === "PASS") body = body.replace(/couldn't verify for free/gi, "was not treated as proof");
   const linkText = links.length ? ` Links: ${links.join(" ")}` : "";
@@ -147,47 +150,43 @@ function pack(key: string, mark: SuggestedMark, urls: string[], found: string[],
 }
 
 function suggestIdentity(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggestion {
-  const linkedin = row(evidence, "linkedin-fetch");
-  const web = row(evidence, "web-footprint");
   const found: string[] = [];
   const missing: string[] = ["Email domain was not used as proof."];
   const urls: string[] = [];
   let mark: SuggestedMark = "COULDNT_VERIFY";
-
-  if (linkedin?.status === "PASS" && sourced(linkedin)) {
-    mark = "PASS";
-    found.push("A public LinkedIn page included the person's name.");
-    urls.push(linkedin.url);
-  } else if (linkedin?.status === "INCONCLUSIVE" && sourced(linkedin)) {
-    mark = "CONCERN";
-    found.push("LinkedIn responded, but the name was not on the public page.");
-    urls.push(linkedin.url);
-  } else if (!facts.linkedinUrl.trim()) {
+  const publicKeys = [
+    "web-footprint",
+    "linkedin-fetch",
+    "website",
+    "screen-web",
+    "screen-news",
+    "screen-x",
+    "screen-facebook",
+    "screen-instagram",
+    "screen-youtube",
+    "screen-tiktok",
+  ];
+  for (const key of publicKeys) {
+    const item = row(evidence, key);
+    if (!item) continue;
+    if (item.status === "PASS" && sourced(item)) {
+      mark = "PASS";
+      found.push(item.finding);
+      urls.push(item.url);
+    } else if (item.status === "UNAVAILABLE" || item.status === "NOT_RUN") {
+      missing.push(item.finding || `This source ${COULD_NOT_VERIFY}.`);
+      if (isHttpUrl(item.url)) urls.push(item.url);
+    } else if (item.status === "INCONCLUSIVE" && item.finding) {
+      found.push(item.finding);
+      if (isHttpUrl(item.url)) urls.push(item.url);
+    }
+  }
+  if (!facts.linkedinUrl.trim() && !row(evidence, "linkedin-fetch")) {
     missing.push(`No LinkedIn URL was on the file. A public profile ${COULD_NOT_VERIFY}.`);
-  } else {
-    missing.push(linkedin?.finding || `The LinkedIn public page ${COULD_NOT_VERIFY}. Logged-in pages are not scraped.`);
   }
-
-  if (web?.status === "PASS" && sourced(web)) {
-    found.push(`${web.source} named the person and the company.`);
-    urls.push(web.url);
-  } else if (web?.reviewFlag && sourced(web)) {
-    mark = stricterMark(mark, "CONCERN");
-    found.push(web.finding);
-    urls.push(web.url);
-  } else if (web && blocked(web)) {
+  if (!row(evidence, "web-footprint") && !row(evidence, "website")) {
     missing.push(`Public web search ${COULD_NOT_VERIFY}.`);
-    if (isHttpUrl(web.url)) urls.push(web.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
-  } else if (web?.status === "INCONCLUSIVE" && sourced(web)) {
-    found.push(web.finding);
-    urls.push(web.url);
-  } else if (!web) {
-    missing.push(`Public web search ${COULD_NOT_VERIFY}.`);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
   }
-
-  if (mark === "PASS" && !facts.linkedinUrl.trim()) mark = "COULDNT_VERIFY";
   return pack("identity", mark, urls, found, missing);
 }
 
@@ -230,12 +229,10 @@ function suggestLicense(facts: PrefillFacts, evidence: EvidenceRow[]): StepSugge
   if (!registry || blocked(registry)) {
     missing.push(registry?.finding || `OpenCorporates ${COULD_NOT_VERIFY}.`);
     if (registry && isHttpUrl(registry.url)) urls.push(registry.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
   }
   if (!stateRegistry || stateRegistry.status === "NOT_RUN" || stateRegistry.status === "UNAVAILABLE") {
     missing.push(stateRegistry?.finding || `The state registry ${COULD_NOT_VERIFY}.`);
     if (stateRegistry && isHttpUrl(stateRegistry.url)) urls.push(stateRegistry.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
   }
   return pack("license", mark, urls, found, missing);
 }
@@ -329,6 +326,18 @@ function suggestTrack(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggest
     missing.push("A long note with no fraud-pattern phrasing is not a public source and is not a pass.");
   }
 
+  const screens = evidence.filter((item) => item.checkKey.startsWith("screen-"));
+  for (const item of screens) {
+    if (item.status === "UNAVAILABLE" || item.status === "NOT_RUN") {
+      missing.push(item.finding || `${item.source || "A social source"} ${COULD_NOT_VERIFY}.`);
+      if (isHttpUrl(item.url)) urls.push(item.url);
+    } else if (item.finding) {
+      found.push(item.finding);
+      if (isHttpUrl(item.url)) urls.push(item.url);
+    }
+  }
+  const strongScreen = screens.some((item) => item.status === "PASS" && sourced(item));
+
   const negative = stories.find((item) => item.status === "FAIL" || /negative/i.test(item.finding));
   const positive = stories.find((item) => item.status === "PASS");
   if (negative) {
@@ -348,10 +357,12 @@ function suggestTrack(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggest
     mark = stricterMark(mark, "CONCERN");
     found.push(news.finding);
     urls.push(news.url);
-  } else if (web?.status === "PASS" && sourced(web) && claim && mark !== "FAIL" && mark !== "CONCERN") {
+  } else if (((web?.status === "PASS" && sourced(web)) || strongScreen) && claim && mark !== "FAIL" && mark !== "CONCERN") {
     mark = "PASS";
-    found.push(web.finding);
-    urls.push(web.url);
+    if (web?.status === "PASS" && sourced(web)) {
+      found.push(web.finding);
+      urls.push(web.url);
+    }
   } else if ((!news || blocked(news)) && (!web || blocked(web)) && !positive) {
     missing.push(`News and public web search ${COULD_NOT_VERIFY}.`);
     if (news && isHttpUrl(news.url)) urls.push(news.url);
@@ -389,13 +400,11 @@ export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): St
     if (item && blocked(item)) {
       missing.push(item.finding || `A company source ${COULD_NOT_VERIFY}.`);
       if (isHttpUrl(item.url)) urls.push(item.url);
-      if (mark === "PASS") mark = "COULDNT_VERIFY";
     }
   }
   if (stateRegistry && (stateRegistry.status === "NOT_RUN" || stateRegistry.status === "UNAVAILABLE" || !sourced(stateRegistry))) {
     missing.push(stateRegistry.finding || `The state registry ${COULD_NOT_VERIFY}.`);
     if (isHttpUrl(stateRegistry.url)) urls.push(stateRegistry.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
   } else if (!hit) {
     missing.push(`Company registries and the public site ${COULD_NOT_VERIFY}.`);
   }

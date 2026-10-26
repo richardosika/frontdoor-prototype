@@ -324,8 +324,16 @@ function passSentence(check: CheckOutput): string | null {
     case "news":
       return `A headline names both the person and the company and does not tie them to a problem (${source}).`;
     default:
+      if (check.key.startsWith("screen-")) {
+        return `${labelFor(check.key)} returned a public result that names this person and this company (${source}). ${scoreClause(check)}`.trim();
+      }
       return null;
   }
+}
+
+function scoreClause(check: CheckOutput): string {
+  const score = check.finding.match(/Name: [^.]+\. Company: [^.]+\. City: [^.]+\. Confidence: [^.]+\./);
+  return score?.[0] || "";
 }
 
 function failSentence(check: CheckOutput): string | null {
@@ -388,7 +396,11 @@ function uncheckedSentence(check: CheckOutput): string | null {
   if (check.status !== "INCONCLUSIVE" && check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE") return null;
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
-    return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer.`;
+    return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
+  }
+  if (check.key.startsWith("screen-")) {
+    const score = scoreClause(check);
+    if (score) return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
   }
   if (check.status === "NOT_RUN") {
     return `${labelFor(check.key)} was not run. ${check.finding}`.replace(/\s+/g, " ").trim();
@@ -417,6 +429,13 @@ function labelFor(key: string): string {
     "business-card": "Business card",
     "business-registry": "State business registry",
     "web-footprint": "Public web search",
+    "screen-web": "Public web search",
+    "screen-news": "News search",
+    "screen-x": "X",
+    "screen-facebook": "Facebook",
+    "screen-instagram": "Instagram",
+    "screen-youtube": "YouTube",
+    "screen-tiktok": "TikTok",
     news: "News search",
     courts: "Court search",
   };
@@ -497,7 +516,7 @@ export function gradeChecks(
   const weights = GRADE_WEIGHTS;
   const websitePass = passedKey(checks, "website", "fixture-website");
   const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
-  const webPass = passedKey(checks, "web-footprint", "fixture-web");
+  const webPass = passedKey(checks, "web-footprint", "fixture-web") || checks.some((item) => item.key.startsWith("screen-") && item.status === "PASS" && item.corroborates);
   const card = findCheck(checks, "business-card");
   const linkedin = findCheck(checks, "linkedin-fetch");
 

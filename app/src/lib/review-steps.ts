@@ -47,8 +47,24 @@ export type BuiltStep = {
 const STEP_META: Record<Exclude<ReviewStepId, "decision">, { title: string; about: string; keys: string[] }> = {
   identity: {
     title: "Identity and LinkedIn",
-    about: "Name, email, phone, and the LinkedIn link the applicant typed. A matching format is not proof it is their account.",
-    keys: ["email-syntax", "disposable-email", "role-address", "phone-state", "linkedin-format", "linkedin-fetch"],
+    about: "Name, company, and city searched on the open web, LinkedIn, and the major social platforms. A blocked site is not a not-found result, and it is not a pass.",
+    keys: [
+      "email-syntax",
+      "disposable-email",
+      "role-address",
+      "phone-state",
+      "linkedin-format",
+      "linkedin-fetch",
+      "web-footprint",
+      "screen-web",
+      "website",
+      "screen-news",
+      "screen-x",
+      "screen-facebook",
+      "screen-instagram",
+      "screen-youtube",
+      "screen-tiktok",
+    ],
   },
   card: {
     title: "Business card",
@@ -72,8 +88,8 @@ const STEP_META: Record<Exclude<ReviewStepId, "decision">, { title: string; abou
   },
   news: {
     title: "News and public footprint",
-    about: "Headlines, court names, and other public mentions. A headline that only shares a name is a possible match. Verify it before you treat it as this person.",
-    keys: ["news", "social-links", "courts", "web-footprint"],
+    about: "Headlines and public social pages. Each platform shows the link, whether the name, company, and city matched, and a confidence. A blocked platform was not checked.",
+    keys: ["news", "news-story", "social-links", "courts", "web-footprint", "screen-web", "screen-news", "screen-x", "screen-facebook", "screen-instagram", "screen-youtube", "screen-tiktok"],
   },
   risk: {
     title: "Sanctions and risk",
@@ -166,7 +182,12 @@ export function publicFinding(status: string, finding: string): string {
   const text = finding.trim();
   if (status === "PASS") return text || "This check passed.";
   if (status === "FAIL") return text || "This check did not pass.";
+  if (status === "UNAVAILABLE") {
+    if (/couldn't check for free|could not be checked|could not be verified for free|couldn't verify for free/i.test(text)) return text;
+    return text ? `${text} Couldn't check for free.` : "Couldn't check for free.";
+  }
   if (!text) return "Not confirmed. This check did not return a result.";
+  if (/^not confirmed\./i.test(text)) return text;
   return `Not confirmed. ${text}`;
 }
 

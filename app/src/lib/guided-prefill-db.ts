@@ -289,7 +289,8 @@ export async function prepareGuidedCase(caseId: string): Promise<void> {
       ? "Free-source checks prefilled the guided review. Each mark is Auto-suggested until it is confirmed."
       : "Free-source checks prefilled the guided review. Each mark is Auto-suggested until it is confirmed. Live sources run in the background.",
   });
-  if (!stored.evidence.length) enqueueLivePrefill(caseId);
+  const hasSocialScreen = stored.evidence.some((row) => row.checkKey.startsWith("screen-"));
+  if (!stored.evidence.length || !hasSocialScreen) enqueueLivePrefill(caseId);
 }
 
 /** Replace auto-suggested marks from the latest saved run. Confirmed marks and skips stay. */
@@ -334,7 +335,7 @@ export async function runLivePrefill(caseId: string): Promise<void> {
   const ctx: CheckContext = {
     facts: loaded.applicant,
     watchlist: watch.entries,
-    network: !loaded.test && !loaded.applicant.testProfile,
+    network: !loaded.applicant.testProfile,
     fetchText: politeFetch,
   };
   const checks = await collectChecks(ctx);
