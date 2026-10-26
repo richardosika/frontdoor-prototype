@@ -320,9 +320,12 @@ describe("QA fixes that stay outside grading", () => {
     expect(cleanup).toContain("verificationCase.deleteMany");
     expect(cleanup.indexOf("verificationCase.deleteMany")).toBeLessThan(cleanup.indexOf("application.deleteMany"));
     const verification = readFileSync(path.join(ROOT, "actions/verification.ts"), "utf8");
-    expect(verification).toContain("Checks finished. Grade");
+    expect(verification).toContain("rerunFinishedSummary");
+    expect(verification).toContain("rerunGradeFields");
     expect(verification).toContain("verificationRun.updateMany");
-    expect(verification).toContain("verificationEvent.create");
+    expect(verification).toContain("moderationEvent.create");
+    expect(verification).toContain('action: "RERUN_CHECKS"');
+    expect(readFileSync(path.join(ROOT, "app/(app)/admin/audit/page.tsx"), "utf8")).toContain("auditRunScore");
     const applyStatus = readFileSync(path.join(ROOT, "components/application-status.tsx"), "utf8");
     const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");
     expect(applyStatus).toContain("statusMembershipLine");
