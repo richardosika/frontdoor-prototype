@@ -2,7 +2,7 @@
 export const VERIFICATION_SOURCES = [
   { name: "Email syntax, disposable domains, free-provider flag, role address", kind: "Local list" },
   { name: "MX lookup", kind: "DNS" },
-  { name: "Website fetch, including team, people, leadership, about, professionals, attorneys, lawyers, our-people, and associated_attorney pages, plus up to eight sitemap.xml paths that contain the last name", kind: "Public HTTP via the same polite fetch. A sitemap index is followed for people-page and page sitemaps. A directory page is followed one step when the link contains the surname. Pages on the applicant's own site are one self-reported source." },
+  { name: "Website fetch, including team, people, leadership, about, about/leadership, about/executive-management, professionals, attorneys, lawyers, our-people, and associated_attorney pages, plus up to eight sitemap.xml paths that contain the last name", kind: "Public HTTP via the same polite fetch. Script, style, and head are removed before the 180KB cap. A sitemap index is followed for people-page and page sitemaps. A directory page is followed one step when the link contains the surname. A cross-domain redirect keeps the final URL. Pages on the applicant's own site are one self-reported source." },
   { name: "RDAP domain record", kind: "rdap.org. Reserved names (example.com, .example, .test, .invalid, localhost) do not earn points." },
   { name: "OFAC SDN CSV and alternate names", kind: "treasury.gov, full file cached" },
   { name: "OpenSanctions public search", kind: "Not checkable for free. opensanctions.org returns 401 without a paid key. A blocked response is not a clear result." },

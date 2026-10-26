@@ -6,7 +6,7 @@ export function userAgentFor(host: string): string {
   return USER_AGENT;
 }
 const lastByHost = new Map<string, number>();
-const responseCache = new Map<string, { at: number; value: { ok: boolean; status: number; text: string } }>();
+const responseCache = new Map<string, { at: number; value: { ok: boolean; status: number; text: string; url?: string } }>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export function minHostGapMs(host: string): number {
@@ -85,7 +85,8 @@ export function stripScriptsAndStyles(html: string): string {
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ");
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, " ");
 }
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -116,8 +117,8 @@ export function decodeHtmlEntities(text: string): string {
 }
 
 /**
- * Strip style and script, then decode entities, then apply the size cap.
- * A 180KB stylesheet must not cut off the team-page text that follows it.
+ * Strip style, script, and head, then decode entities, then apply the size cap.
+ * A 180KB head or stylesheet must not cut off the team-page text that follows it.
  */
 export function prepareFetchedText(text: string, maxChars: number): string {
   if (!looksLikeHtml(text)) return limitText(text, maxChars);
@@ -152,7 +153,7 @@ export async function politeFetch(
   url: string,
   timeoutMs = 8000,
   options?: { maxChars?: number },
-): Promise<{ ok: boolean; status: number; text: string }> {
+): Promise<{ ok: boolean; status: number; text: string; url?: string }> {
   const timeout = Math.max(timeoutMs, fetchLimits(url).timeoutMs);
   if (cacheable(url)) {
     const cached = responseCache.get(url);
@@ -168,7 +169,7 @@ export async function politeFetch(
 }
 
 /** Check pipeline fetch. A caller cannot substitute a browser user agent. */
-export function fetchForChecks(url: string): Promise<{ ok: boolean; status: number; text: string }> {
+export function fetchForChecks(url: string): Promise<{ ok: boolean; status: number; text: string; url?: string }> {
   return politeFetch(url, 8000);
 }
 
@@ -181,7 +182,7 @@ async function fetchOnce(
   url: string,
   timeoutMs: number,
   options?: { maxChars?: number },
-): Promise<{ ok: boolean; status: number; text: string; failure?: FetchFailure }> {
+): Promise<{ ok: boolean; status: number; text: string; url?: string; failure?: FetchFailure }> {
   let host = "";
   try {
     host = new URL(url).host;
@@ -212,7 +213,7 @@ async function fetchOnce(
     });
     const cap = options?.maxChars ?? fetchLimits(url).maxChars;
     const text = prepareFetchedText(await response.text(), cap);
-    return { ok: response.ok, status: response.status, text };
+    return { ok: response.ok, status: response.status, text, url: response.url || url };
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
   } finally {

@@ -1,4 +1,5 @@
 import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
+import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
@@ -28,7 +29,10 @@ export type MatchScore = {
   departure?: boolean;
 };
 
-type FetchText = (url: string, init?: { userAgent?: string }) => Promise<{ ok: boolean; status: number; text: string }>;
+type FetchText = (
+  url: string,
+  init?: { userAgent?: string },
+) => Promise<{ ok: boolean; status: number; text: string; url?: string; failure?: "nxdomain" | "timeout" | "network" }>;
 
 type Attempt = {
   key: string;
@@ -40,6 +44,10 @@ type Attempt = {
   detail: string;
   selfReported?: boolean;
   linkedUrl?: string;
+  /** Final URL after a redirect onto a different registrable host. www and the bare host are the same. */
+  redirectedTo?: string;
+  /** The landed brand is not the company on the application. Review only. It does not corroborate. */
+  aliasOnly?: boolean;
 };
 
 const COMPANY_ONLY = "company confirmed, person NOT confirmed";
@@ -166,6 +174,8 @@ export const TEAM_FALLBACK_PATHS = [
   "/our-team",
   "/team",
   "/about",
+  "/about/leadership",
+  "/about/executive-management",
 ];
 
 export function fallbackTeamUrls(base: string, already: string[]): string[] {
@@ -380,12 +390,13 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       finding: `Searched: ${attempt.searched}. ${attempt.detail} ${COULD_NOT_CHECK} Not checkable for free.`.replace(/\s+/g, " ").trim(),
     };
   }
+  const redirectNote = attempt.redirectedTo ? `The site redirected to ${attempt.redirectedTo}.` : "";
   if (attempt.outcome === "not-found") {
     const lead = attempt.detail === "no match found" ? "no match found" : "No result found that names this person and this company.";
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
-      finding: `Searched: ${attempt.searched}. ${lead} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${redirectNote} ${lead} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   if (attempt.score.suffixMismatch) {
@@ -401,7 +412,15 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       status: "INCONCLUSIVE",
       corroborates: false,
       reviewFlag: true,
-      finding: `Searched: ${attempt.searched}. This may no longer be at the company on the application. The page reads as an announced departure. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${redirectNote} This may no longer be at the company on the application. The page reads as an announced departure. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (attempt.aliasOnly) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      finding: `Searched: ${attempt.searched}. ${redirectNote} The new brand is a review-only alias and does not corroborate the company on the application. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.
@@ -413,7 +432,15 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       status: "PASS",
       corroborates: false,
       companyOnly: true,
-      finding: `Searched: ${attempt.searched}. Found: ${attempt.detail} ${COMPANY_ONLY}. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${redirectNote} Found: ${attempt.detail} ${COMPANY_ONLY}. That is company-exists evidence, not a person-to-company link. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (attempt.score.name && !attempt.score.company && attempt.score.city) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      finding: `Searched: ${attempt.searched}. ${redirectNote} name found, company not named. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   const selfReportedNote = attempt.selfReported
@@ -422,7 +449,7 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   return {
     status: tied ? "PASS" : "INCONCLUSIVE",
     corroborates: tied && !attempt.selfReported,
-    finding: `Searched: ${attempt.searched}. Found: ${attempt.detail}${selfReportedNote} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+    finding: `Searched: ${attempt.searched}. ${redirectNote} Found: ${attempt.detail}${selfReportedNote} ${scoreLine}`.replace(/\s+/g, " ").trim(),
   };
 }
 
@@ -453,11 +480,33 @@ async function pull(
   fetchText: FetchText,
   url: string,
   init?: { userAgent?: string },
-): Promise<{ ok: boolean; status: number; text: string; failure?: "nxdomain" | "timeout" | "network" }> {
+): Promise<{ ok: boolean; status: number; text: string; url?: string; failure?: "nxdomain" | "timeout" | "network" }> {
   try {
     return await fetchText(url, init);
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
+  }
+}
+
+/** A redirect onto a different registrable host. www and the bare host are the same site. */
+function crossDomainLanding(requested: string, response: { url?: string }): string {
+  const landed = response.url?.trim() || "";
+  if (!landed) return "";
+  try {
+    const from = registrableHost(new URL(requested).host);
+    const to = registrableHost(new URL(landed).host);
+    if (!from || !to || from === to) return "";
+    return landed;
+  } catch {
+    return "";
+  }
+}
+
+function hostLabel(url: string): string {
+  try {
+    return registrableHost(new URL(url).host).split(".")[0].replace(/[^a-z0-9]/g, "");
+  } catch {
+    return "";
   }
 }
 
@@ -539,6 +588,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
             : "The company website did not respond.";
       attempts.push(blockedAttempt("website", "Company website", website, homeUrl, detail));
     } else {
+      const redirectedTo = crossDomainLanding(homeUrl, home);
+      if (redirectedTo) homeUrl = redirectedTo;
       const homeChallenge = isBotChallenge(home.text);
       if (!homeChallenge) pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
       const linked = sameOriginPages(home.text, homeUrl);
@@ -595,6 +646,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const best = pages
         .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
+      const label = redirectedTo ? hostLabel(redirectedTo) : "";
+      const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
+      const compact = pages.map((page) => page.text).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const aliasOnly = Boolean(redirectedTo && !mentionsOriginal && label.length >= 4 && compact.includes(label));
       if (!pages.length && homeChallenge) {
         attempts.push(
           blockedAttempt(
@@ -615,6 +670,19 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
             "site is script-rendered; nothing readable",
           ),
         );
+      } else if (aliasOnly) {
+        attempts.push({
+          key: "website",
+          platform: "Company website",
+          searched: website,
+          url: redirectedTo || homeUrl,
+          outcome: "found",
+          score: best?.score || emptyScore(),
+          detail: "a page on the company site",
+          selfReported: true,
+          redirectedTo,
+          aliasOnly: true,
+        });
       } else if (best && best.score.confidence !== "none") {
         attempts.push({
           key: "website",
@@ -625,6 +693,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           score: best.score,
           detail: "a page on the company site",
           selfReported: true,
+          redirectedTo,
         });
       } else {
         attempts.push({
@@ -636,6 +705,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           score: best?.score || emptyScore(),
           detail: "the company site responded",
           selfReported: true,
+          redirectedTo,
         });
       }
     }
