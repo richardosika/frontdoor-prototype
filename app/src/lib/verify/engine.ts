@@ -97,6 +97,18 @@ export async function executeVerificationRun(runId: string, options?: { network?
         data: { status: "IN_REVIEW" },
       });
     }
+    if (run.applicationId) {
+      const { prefillFromApplication } = await import("@/lib/guided-prefill-db");
+      await prefillFromApplication(run.applicationId).catch((prefillError) => {
+        console.error("guided prefill failed", prefillError instanceof Error ? prefillError.message : "error");
+      });
+    }
+    if (run.subject === "PROJECT" && run.projectId) {
+      const { prefillFromProject } = await import("@/lib/guided-prefill-db");
+      await prefillFromProject(run.projectId).catch((prefillError) => {
+        console.error("guided prefill failed", prefillError instanceof Error ? prefillError.message : "error");
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Verification failed.";
     const graded = failedGrade(message);

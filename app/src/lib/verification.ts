@@ -10,11 +10,11 @@ export const VERIFICATION_STATUSES = [
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number]["id"];
 
 export const CHECK_RESULTS = [
-  { id: "PENDING", label: "Not reviewed" },
   { id: "PASS", label: "Pass" },
+  { id: "NEEDS_INFO", label: "Concern" },
   { id: "FAIL", label: "Fail" },
-  { id: "NEEDS_INFO", label: "Needs info" },
-  { id: "NOT_PROVIDED", label: "Not provided" },
+  { id: "NOT_PROVIDED", label: "Couldn't verify" },
+  { id: "PENDING", label: "Not reviewed" },
 ] as const;
 
 export type CheckResult = (typeof CHECK_RESULTS)[number]["id"];
@@ -122,14 +122,29 @@ export function effectiveVerificationStatus(
   return input.status;
 }
 
-export function checklistComplete(checks: { result: string }[]): boolean {
-  return checks.length > 0 && checks.every((item) => item.result === "PASS");
+export function isAutoSuggestedNote(note: string | null | undefined): boolean {
+  return (note || "").trim().toLowerCase().startsWith("auto-suggested");
 }
 
-export function canMarkCaseVerified(checks: { result: string }[]): { ok: true } | { ok: false; reason: string } {
+/** A pass counts only after a person confirms it. An auto-suggested pass does not. */
+export function confirmedPass(check: { result: string; note?: string | null; autoSuggested?: boolean }): boolean {
+  if (check.result !== "PASS") return false;
+  if (check.autoSuggested) return false;
+  if (isAutoSuggestedNote(check.note)) return false;
+  return true;
+}
+
+export function checklistComplete(checks: { result: string; note?: string | null; autoSuggested?: boolean }[]): boolean {
+  return checks.length > 0 && checks.every((item) => confirmedPass(item));
+}
+
+export function canMarkCaseVerified(checks: { result: string; note?: string | null; autoSuggested?: boolean }[]): { ok: true } | { ok: false; reason: string } {
   if (!checks.length) return { ok: false, reason: "The checklist is empty." };
+  if (checks.some((item) => item.autoSuggested || isAutoSuggestedNote(item.note))) {
+    return { ok: false, reason: "Confirm each auto-suggested item before this file can be marked Verified. A suggestion is not a pass." };
+  }
   if (!checklistComplete(checks)) {
-    return { ok: false, reason: "Every checklist item must pass before the case can be marked Verified." };
+    return { ok: false, reason: "Every checklist item must pass before the case can be marked Verified. Couldn't verify is not a pass." };
   }
   return { ok: true };
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { startGuidedReview } from "@/actions/verification";
 import { deleteSelectedApplications, rerunVerification } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton, RunAndReload } from "@/components/run-and-reload";
 import { GradeMark } from "@/components/grade-summary";
 import { DemoChip, StatusChip } from "@/components/status-chip";
-import { btnOutline, card } from "@/components/ui";
+import { btn, btnOutline, card } from "@/components/ui";
 import { applicantQueue, standingForInvite } from "@/lib/applicant-queue";
 import {
   APPLICATION_FILTERS,
@@ -156,6 +157,12 @@ export default async function ApplicationsPage({
               const personId = invite.crmPeople[0]?.id;
               return (
                 <li key={invite.id}>
+                  <form action={startGuidedReview} className="mb-2">
+                    <input type="hidden" name="inviteRequestId" value={invite.id} />
+                    <button className={btn} type="submit">
+                      Start review
+                    </button>
+                  </form>
                   <Link href={personId ? `/admin/crm/${personId}` : "/admin"} className={`${card} block p-4`}>
                     <h2 className="font-serif text-xl font-normal">{invite.name}</h2>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -186,6 +193,12 @@ export default async function ApplicationsPage({
             <li key={application.id} className="flex items-start gap-2">
               <input form="bulk-delete" className="mt-5 h-4 w-4 shrink-0" type="checkbox" name="applicationId" value={application.id} aria-label={`Select ${application.name}`} />
               <div className="min-w-0 flex-1">
+              <form action={startGuidedReview} className="mb-2">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <button className={btn} type="submit">
+                  Start review
+                </button>
+              </form>
               <Link href={`/admin/applications/${application.id}`} className={`${card} block p-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -211,16 +224,14 @@ export default async function ApplicationsPage({
                   />
                 </div>
               </Link>
-              {!application.runs[0] || application.runs[0].status !== "DONE" ? (
-                <div className="mt-2">
-                  <RunAndReload
-                    className={btnOutline}
-                    label={application.runs[0] ? "Re-run verification" : "Run verification"}
-                    pendingLabel="Running verification…"
-                    run={rerunVerification.bind(null, application.id)}
-                  />
-                </div>
-              ) : null}
+              <div className="mt-2">
+                <RunAndReload
+                  className={btnOutline}
+                  label="Re-run checks"
+                  pendingLabel="Running checks…"
+                  run={rerunVerification.bind(null, application.id)}
+                />
+              </div>
               </div>
             </li>
             );

@@ -282,6 +282,7 @@ model InviteRequest {
   inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
   createdAt    DateTime            @default(now())
   crmPeople    CrmPerson[]
+  verificationCase VerificationCase?
 
   @@index([status, createdAt])
   @@index([email])
@@ -325,6 +326,7 @@ model Application {
   notices         OutboxNotice[]
   legalAcceptances LegalAcceptance[]
   crmPeople       CrmPerson[]
+  verificationCase VerificationCase?
   createdAt       DateTime          @default(now())
 
   @@index([status, createdAt])
@@ -561,13 +563,18 @@ model VerificationCase {
   user         User?                  @relation("MemberVerification", fields: [userId], references: [id], onDelete: Cascade)
   projectId    String?                @unique
   project      TrackProject?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  internalNote String                 @default("")
-  verifiedAt   DateTime?
-  expiresAt    DateTime?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  checks       VerificationCheck[]
-  events       VerificationEvent[]
+  internalNote     String                 @default("")
+  applicationId    String?                @unique
+  application      Application?           @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  inviteRequestId  String?                @unique
+  inviteRequest    InviteRequest?         @relation(fields: [inviteRequestId], references: [id], onDelete: SetNull)
+  gradeSnapshot    Json?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  checks           VerificationCheck[]
+  events           VerificationEvent[]
 
   @@index([status, subject])
 }
@@ -580,8 +587,9 @@ model VerificationCheck {
   label       String
   result      VerificationCheckResult @default(PENDING)
   note        String                  @default("")
-  evidenceUrl String                  @default("")
-  reviewerId  String?
+  evidenceUrl   String                  @default("")
+  autoSuggested Boolean                 @default(false)
+  reviewerId    String?
   reviewer    User?                   @relation("CheckReviewer", fields: [reviewerId], references: [id])
   reviewedAt  DateTime?
 

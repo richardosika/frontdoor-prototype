@@ -74,7 +74,8 @@ export function GuidedReview({
           <p className="mt-3 text-sm">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Status</span>
             <span className="ml-2">{stepStatusLabel(current.status)}</span>
-            {current.status === "SKIPPED" ? <span className="ml-2 text-[#7A2E2E]">Not a pass.</span> : null}
+            {!current.saved ? <span className="ml-2">Auto-suggested</span> : null}
+            {current.status === "SKIPPED" || current.status === "COULDNT_VERIFY" ? <span className="ml-2 text-[#7A2E2E]">Not a pass.</span> : null}
           </p>
           <ul className="mt-3 space-y-3">
             {current.findings.length === 0 ? <li className="text-sm text-mut">No automated result for this step.</li> : null}
@@ -97,19 +98,21 @@ export function GuidedReview({
             <input type="hidden" name="intent" value="save" />
             <label className="block">
               <span className={labelCls}>Your mark</span>
-              <select name="status" className={field} defaultValue={current.status === "SKIPPED" ? "NOT_CHECKED" : current.status}>
+              <select name="status" className={field} defaultValue={current.saved ? (current.status === "SKIPPED" ? "COULDNT_VERIFY" : current.status) : current.status}>
                 <option value="PASS">Pass</option>
                 <option value="CONCERN">Concern</option>
+                <option value="FAIL">Fail</option>
+                <option value="COULDNT_VERIFY">Couldn't verify</option>
                 <option value="NOT_CHECKED">Not checked</option>
               </select>
             </label>
             <label className="block">
               <span className={labelCls}>Evidence link</span>
-              <input name="evidenceUrl" className={field} defaultValue={current.saved?.evidenceUrl || ""} placeholder="https://" />
+              <input name="evidenceUrl" className={field} defaultValue={current.saved?.evidenceUrl || current.prefill?.evidenceUrl || ""} placeholder="https://" />
             </label>
             <label className="block">
               <span className={labelCls}>Note</span>
-              <textarea name="note" className={field} rows={3} defaultValue={current.saved?.note || ""} placeholder="What you looked at" />
+              <textarea name="note" className={field} rows={6} defaultValue={current.saved?.note || current.prefill?.note || ""} placeholder="What was found, and what was not" />
             </label>
             <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
               Save & next

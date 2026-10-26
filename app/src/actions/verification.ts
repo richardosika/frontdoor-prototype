@@ -6,9 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import {
   assertChecklistAllowsVerified,
+  ensureVerificationCase,
   parseCheckResult,
   writeStatusEvent,
 } from "@/lib/verification-db";
+import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
+import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
 export async function updateVerificationCase(formData: FormData) {
@@ -78,15 +81,21 @@ export async function updateVerificationCheck(formData: FormData) {
   if (evidenceUrl && !/^https?:\/\//i.test(evidenceUrl)) {
     redirect(`${back}?error=Evidence+links+must+start+with+http`);
   }
+  if (result === "PASS" && !/^https?:\/\//i.test(evidenceUrl)) {
+    redirect(`${back}?error=${encodeURIComponent("A pass needs an evidence link. Couldn't verify is not a pass.")}`);
+  }
 
   const record = await prisma.verificationCase.findUnique({ where: { id: check.caseId } });
   if (!record) notFound();
+  const savedNote = confirmedNote(note).slice(0, 2000);
+  const wasSuggested = check.autoSuggested || isAutoSuggestedNote(check.note);
   await prisma.verificationCheck.update({
     where: { id: check.id },
     data: {
       result,
-      note,
+      note: savedNote,
       evidenceUrl,
+      autoSuggested: false,
       reviewerId: admin.id,
       reviewedAt: new Date(),
     },
@@ -97,7 +106,9 @@ export async function updateVerificationCheck(formData: FormData) {
       actorId: admin.id,
       fromStatus: record.status,
       toStatus: record.status,
-      summary: `${admin.name} set “${check.label}” to ${checkResultLabel(result)}.`,
+      summary: wasSuggested
+        ? `${admin.name} confirmed “${check.label}” as ${checkResultLabel(result)}.`
+        : `${admin.name} set “${check.label}” to ${checkResultLabel(result)}.`,
     },
   });
 
@@ -121,7 +132,7 @@ export async function skipVerificationCheck(formData: FormData) {
   const note = `Skipped: ${reason}`.slice(0, 2000);
   await prisma.verificationCheck.update({
     where: { id: check.id },
-    data: { result: "NOT_PROVIDED", note, reviewerId: admin.id, reviewedAt: new Date() },
+    data: { result: "NOT_PROVIDED", note, autoSuggested: false, reviewerId: admin.id, reviewedAt: new Date() },
   });
   await prisma.verificationEvent.create({
     data: {
@@ -170,4 +181,55 @@ export async function deleteBusinessCard(formData: FormData) {
   });
   revalidatePath(back);
   redirect(`${back}?notice=${encodeURIComponent("Business card deleted.")}`);
+}
+
+export async function startGuidedReview(formData: FormData) {
+  await requireVerificationAdmin();
+  const applicationId = String(formData.get("applicationId") || "");
+  const inviteRequestId = String(formData.get("inviteRequestId") || "");
+  const personId = String(formData.get("personId") || "");
+  const userIdRaw = String(formData.get("userId") || "");
+  const person = personId
+    ? await prisma.crmPerson.findUnique({
+        where: { id: personId },
+        select: { userId: true, applicationId: true, inviteRequestId: true },
+      })
+    : null;
+  const application = applicationId
+    ? await prisma.application.findUnique({ where: { id: applicationId }, select: { id: true, userId: true } })
+    : null;
+  let userId = userIdRaw || application?.userId || person?.userId || "";
+  const appId = application?.id || person?.applicationId || "";
+  const inviteId = inviteRequestId || person?.inviteRequestId || "";
+  if (!userId && inviteId) {
+    const invite = await prisma.inviteRequest.findUnique({ where: { id: inviteId }, select: { email: true } });
+    const member = invite ? await prisma.user.findUnique({ where: { email: invite.email }, select: { id: true } }) : null;
+    if (member) userId = member.id;
+  }
+  if (!userId && !appId && !inviteId) {
+    const back = personId ? `/admin/crm/${personId}` : "/admin/applications";
+    redirect(`${back}?error=${encodeURIComponent("This person has no application to review yet.")}`);
+  }
+  const record = await ensureVerificationCase({
+    subject: "MEMBER",
+    userId: userId || undefined,
+    applicationId: appId || undefined,
+    inviteRequestId: inviteId || undefined,
+  });
+  await prepareGuidedCase(record.id);
+  revalidatePath(`/admin/verification/${record.id}`);
+  revalidatePath("/admin/verification");
+  redirect(`/admin/verification/${record.id}?step=1`);
+}
+
+export async function rerunGuidedChecks(formData: FormData) {
+  await requireVerificationAdmin();
+  const caseId = String(formData.get("caseId") || "");
+  const back = `/admin/verification/${caseId}`;
+  const existing = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } });
+  if (!existing) notFound();
+  await runLivePrefill(caseId);
+  revalidatePath(back);
+  revalidatePath("/admin/verification");
+  redirect(`${back}?step=1&notice=${encodeURIComponent("Free-source checks finished. Marks stay Auto-suggested until you confirm them.")}`);
 }

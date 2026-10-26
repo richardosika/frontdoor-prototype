@@ -1,17 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteBusinessCard, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { deleteBusinessCard, rerunGuidedChecks, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
 import { Banner } from "@/components/banner";
+import { ExecutiveSummary } from "@/components/grade-summary";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
+import { httpUrls } from "@/lib/guided-prefill";
+import { prepareGuidedCase } from "@/lib/guided-prefill-db";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
 import { displayCheckStatus } from "@/lib/review-steps";
 import { CHECK_RESULTS, VERIFICATION_STATUSES, checkResultLabel, verificationCaseHeading, verificationStatusLabel } from "@/lib/verification";
+import { applyReviewSkips, parseGradeSnapshot } from "@/lib/verify/grade";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
+function evidenceLinks(evidenceUrl: string, note: string): string[] {
+  return httpUrls([evidenceUrl, ...(note.match(/https?:\/\/[^\s)]+/g) || [])]);
+}
 
 export default async function VerificationCasePage({
   params,
@@ -23,6 +32,7 @@ export default async function VerificationCasePage({
   await requireVerificationAdmin();
   const { id } = await params;
   const query = await searchParams;
+  await prepareGuidedCase(id);
   const record = await prisma.verificationCase.findUnique({
     where: { id },
     include: {
@@ -37,6 +47,15 @@ export default async function VerificationCasePage({
   const stepIndex = Number.isFinite(requestedStep) ? Math.min(record.checks.length, Math.max(1, requestedStep)) : 1;
   const currentCheck = record.checks[stepIndex - 1];
   const heading = verificationCaseHeading(record);
+  const grade = parseGradeSnapshot(record.gradeSnapshot);
+  const shownGrade = grade
+    ? applyReviewSkips(
+        grade,
+        record.checks
+          .filter((check) => check.note.trim().toLowerCase().startsWith("skipped:"))
+          .map((check) => ({ title: check.label, reason: check.note.replace(/^skipped:\s*/i, "") })),
+      )
+    : null;
   const expiresValue = record.expiresAt ? record.expiresAt.toISOString().slice(0, 10) : "";
   const businessCard = record.userId
     ? await prisma.businessCard.findUnique({
@@ -127,8 +146,25 @@ export default async function VerificationCasePage({
         </section>
       ) : null}
 
+      {shownGrade ? (
+        <div>
+          <p className="mt-4 text-sm text-ink">Suggested grade from the rubric. Auto-suggested. Confirm the steps, then make the decision on this file. A suggestion is not a pass.</p>
+          <ExecutiveSummary report={shownGrade} title="Suggested grade" />
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-ink">No suggested grade yet. Re-run checks writes one from the rubric.</p>
+      )}
+
       <section className={`${card} mt-4 p-4`}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
+          <form action={rerunGuidedChecks}>
+            <input type="hidden" name="caseId" value={record.id} />
+            <button className={btnOutline} type="submit">
+              Re-run checks
+            </button>
+          </form>
+        </div>
         {currentCheck ? (
           <>
             <h2 className="mt-1 font-serif text-2xl font-normal">
@@ -137,9 +173,21 @@ export default async function VerificationCasePage({
             <p className="mt-1 font-semibold">{currentCheck.label}</p>
             <p className="mt-1 text-sm text-ink">
               {displayCheckStatus(currentCheck.result, currentCheck.note)}
+              {currentCheck.autoSuggested ? " · Auto-suggested" : ""}
               {currentCheck.reviewer ? ` · ${currentCheck.reviewer.name}` : ""}
               {currentCheck.reviewedAt ? ` · ${formatAuditTime(currentCheck.reviewedAt)}` : ""}
             </p>
+            {evidenceLinks(currentCheck.evidenceUrl, currentCheck.note).length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {evidenceLinks(currentCheck.evidenceUrl, currentCheck.note).map((url) => (
+                  <li key={url}>
+                    <a className="break-all text-forest underline" href={url} target="_blank" rel="noreferrer">
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {record.checks.map((check, index) => (
                 <a
@@ -165,7 +213,7 @@ export default async function VerificationCasePage({
                 ))}
               </select>
               <input name="evidenceUrl" className={field} defaultValue={currentCheck.evidenceUrl} placeholder="https:// evidence link" />
-              <textarea name="note" className={field} rows={3} defaultValue={currentCheck.note} placeholder="What you checked and what the evidence shows" />
+              <textarea name="note" className={field} rows={6} defaultValue={currentCheck.note} placeholder="What you checked and what the evidence shows" />
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button className={`${btn} min-h-11`} type="submit">
                   Save & next
@@ -200,6 +248,7 @@ export default async function VerificationCasePage({
               <p className="font-semibold">{check.label}</p>
               <p className="mt-1 text-xs text-mut">
                 {displayCheckStatus(check.result, check.note)} · {checkResultLabel(check.result)}
+                {check.autoSuggested ? " · Auto-suggested" : ""}
                 {check.reviewer ? ` · ${check.reviewer.name}` : ""}
                 {check.reviewedAt ? ` · ${formatAuditTime(check.reviewedAt)}` : ""}
               </p>

@@ -104,7 +104,7 @@ export function providerAttemptState(status: number, snippetCount: number): "una
 
 type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
 
-type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative"; sample: string };
+type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative"; sample: string; url: string };
 
 export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput> {
   const query = `"${facts.name}" "${facts.org}"`;
@@ -149,26 +149,26 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       : [];
     const state = providerAttemptState(response.status, snippets.length);
     if (state === "unavailable") {
-      attempts.push({ provider: provider.provider, state: "unavailable", sample: "" });
+      attempts.push({ provider: provider.provider, state: "unavailable", sample: "", url: provider.url });
       continue;
     }
     if (state === "no-data") {
-      attempts.push({ provider: provider.provider, state: "no-data", sample: "" });
+      attempts.push({ provider: provider.provider, state: "no-data", sample: "", url: provider.url });
       continue;
     }
     const negative = snippets.find(
       (text) => mentionsPersonAndCompany(text, facts.name, facts.org) && NEGATIVE.test(text),
     );
     if (negative) {
-      attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180) });
+      attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
     const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org));
     if (hit) {
-      attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180) });
+      attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
       break;
     }
-    attempts.push({ provider: provider.provider, state: "no-data", sample: "" });
+    attempts.push({ provider: provider.provider, state: "no-data", sample: "", url: provider.url });
   }
 
   const hit = attempts.find((item) => item.state === "hit");
@@ -184,7 +184,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       reviewFlag: true,
       finding: `Possible match, needs review. ${negative.provider} returned a result that names this person and company near a negative term. This is not a failure.`,
       source: negative.provider,
-      url: "",
+      url: negative.url,
       ranAt,
     };
   }
@@ -196,7 +196,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       corroborates: true,
       finding: `${hit.provider} returned a result that names both the person and the company. Query-echo titles were ignored.`,
       source: hit.provider,
-      url: "",
+      url: hit.url,
       ranAt,
     };
   }
@@ -207,7 +207,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       weight: 12,
       finding: `Web search could not be checked. ${blocked.join(", ") || "Every provider"} was blocked, empty, or timed out.`,
       source: blocked.join(", ") || "Web search",
-      url: "",
+      url: attempts[0]?.url || "",
       ranAt,
     };
   }
@@ -219,7 +219,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
     weight: 12,
     finding: `No data found. ${empty} responded, and none of the result text named both the person and the company.${blockedNote}`,
     source: empty,
-    url: "",
+    url: responded[0]?.url || "",
     ranAt,
   };
 }

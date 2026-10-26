@@ -17,18 +17,46 @@ const TEMPLATES = {
   PROJECT: PROJECT_CHECKS,
 } as const;
 
-export async function ensureVerificationCase(input: { subject: VerificationSubject; userId?: string; projectId?: string; actorId?: string }) {
-  const existing = input.userId
-    ? await prisma.verificationCase.findUnique({ where: { userId: input.userId } })
-    : input.projectId
-      ? await prisma.verificationCase.findUnique({ where: { projectId: input.projectId } })
-      : null;
-  if (existing) return existing;
+export async function ensureVerificationCase(input: {
+  subject: VerificationSubject;
+  userId?: string;
+  projectId?: string;
+  applicationId?: string;
+  inviteRequestId?: string;
+  actorId?: string;
+}) {
+  const byUser = input.userId ? await prisma.verificationCase.findUnique({ where: { userId: input.userId } }) : null;
+  if (byUser) {
+    if (input.applicationId && !byUser.applicationId) {
+      const taken = await prisma.verificationCase.findUnique({ where: { applicationId: input.applicationId }, select: { id: true } });
+      if (!taken) {
+        return prisma.verificationCase.update({ where: { id: byUser.id }, data: { applicationId: input.applicationId } });
+      }
+    }
+    return byUser;
+  }
+  const byApplication = input.applicationId
+    ? await prisma.verificationCase.findUnique({ where: { applicationId: input.applicationId } })
+    : null;
+  if (byApplication) {
+    if (input.userId && !byApplication.userId) {
+      return prisma.verificationCase.update({ where: { id: byApplication.id }, data: { userId: input.userId } });
+    }
+    return byApplication;
+  }
+  const byInvite = input.inviteRequestId
+    ? await prisma.verificationCase.findUnique({ where: { inviteRequestId: input.inviteRequestId } })
+    : null;
+  if (byInvite) return byInvite;
+  const byProject = input.projectId ? await prisma.verificationCase.findUnique({ where: { projectId: input.projectId } }) : null;
+  if (byProject) return byProject;
   return prisma.verificationCase.create({
     data: {
       subject: input.subject,
       userId: input.userId,
       projectId: input.projectId,
+      applicationId: input.applicationId,
+      inviteRequestId: input.inviteRequestId,
       status: "NOT_STARTED",
       checks: {
         create: TEMPLATES[input.subject].map((item) => ({ key: item.key, label: item.label })),
@@ -46,11 +74,17 @@ export async function ensureVerificationCase(input: { subject: VerificationSubje
 
 export async function noteApplicationReferences(input: {
   userId: string;
+  applicationId?: string;
   actorId: string;
   referenceEmails: string[];
   speaker?: string;
 }) {
-  const record = await ensureVerificationCase({ subject: "MEMBER", userId: input.userId, actorId: input.actorId });
+  const record = await ensureVerificationCase({
+    subject: "MEMBER",
+    userId: input.userId,
+    applicationId: input.applicationId,
+    actorId: input.actorId,
+  });
   const check = referenceCheckForApplication(input);
   await prisma.verificationCheck.update({
     where: { caseId_key: { caseId: record.id, key: VOUCH_CHECK_KEY } },

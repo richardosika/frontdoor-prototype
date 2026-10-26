@@ -3,6 +3,7 @@ import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
+import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
 import { webFootprintCheck } from "@/lib/verify/web-search";
 
@@ -735,6 +736,16 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
   const court = await fetchText(courtUrl);
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
+  const companyQuery = ctx.facts.org.trim();
+  const registryHttp = companyQuery
+    ? await fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    : { ok: false, status: 0, text: "" };
+  out.push(check(assessOpenCorporates(companyQuery, registryHttp)));
+  const sanctionsQuery = ctx.facts.name.trim() || companyQuery;
+  const sanctionsHttp = sanctionsQuery
+    ? await fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    : { ok: false, status: 0, text: "" };
+  out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
   out.push(await webFootprintCheck(ctx.facts, fetchText));
   out.push(...(await newsChecks(ctx.facts, fetchText)));
   if (ctx.facts.linkedinUrl) {

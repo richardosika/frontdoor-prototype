@@ -1,3 +1,5 @@
+import { emptyPrefillFacts, suggestCompany, suggestOne, type PrefillFacts, type StepSuggestion } from "@/lib/guided-prefill";
+
 /**
  * Guided review on an application file. A saved skip is not a pass.
  * Automated findings are shown with their source. A check that did not pass is not described as confirmed.
@@ -6,7 +8,7 @@
 export const REVIEW_STEP_IDS = ["identity", "card", "card-match", "references", "company", "news", "risk", "decision"] as const;
 export type ReviewStepId = (typeof REVIEW_STEP_IDS)[number];
 
-export const STEP_STATUSES = ["PASS", "CONCERN", "NOT_CHECKED", "SKIPPED"] as const;
+export const STEP_STATUSES = ["PASS", "CONCERN", "FAIL", "COULDNT_VERIFY", "NOT_CHECKED", "SKIPPED"] as const;
 export type StepStatus = (typeof STEP_STATUSES)[number];
 
 export type StepMark = {
@@ -38,6 +40,7 @@ export type BuiltStep = {
   index: number;
   status: StepStatus;
   saved: StepMark | null;
+  prefill: StepSuggestion | null;
   findings: { source: string; status: string; text: string; url: string }[];
 };
 
@@ -116,6 +119,8 @@ export function parseReviewProgress(value: unknown): ReviewProgress {
 export function stepStatusLabel(status: StepStatus): string {
   if (status === "PASS") return "Pass";
   if (status === "CONCERN") return "Concern";
+  if (status === "FAIL") return "Fail";
+  if (status === "COULDNT_VERIFY") return "Couldn't verify";
   if (status === "SKIPPED") return "Skipped";
   return "Not checked";
 }
@@ -126,10 +131,12 @@ export function stepCountsAsPass(status: StepStatus): boolean {
 }
 
 /** Checklist rows on a member file. A note that starts with "Skipped:" is a skip, not a pass. */
-export function displayCheckStatus(result: string, note: string): "Pass" | "Concern" | "Not checked" | "Skipped" {
+export function displayCheckStatus(result: string, note: string): "Pass" | "Concern" | "Fail" | "Couldn't verify" | "Not checked" | "Skipped" {
   if (note.trim().toLowerCase().startsWith("skipped:")) return "Skipped";
   if (result === "PASS") return "Pass";
-  if (result === "FAIL" || result === "NEEDS_INFO") return "Concern";
+  if (result === "FAIL") return "Fail";
+  if (result === "NEEDS_INFO") return "Concern";
+  if (result === "NOT_PROVIDED") return "Couldn't verify";
   return "Not checked";
 }
 
@@ -147,11 +154,33 @@ function matchesKey(checkKey: string, keys: string[]): boolean {
   return false;
 }
 
-function derivedStatus(rows: StepEvidence[]): StepStatus {
-  if (!rows.length) return "NOT_CHECKED";
-  if (rows.some((row) => row.status === "FAIL")) return "CONCERN";
-  if (rows.some((row) => row.status === "PASS")) return "PASS";
-  return "NOT_CHECKED";
+function reviewSuggestion(id: Exclude<ReviewStepId, "decision">, facts: PrefillFacts, evidence: StepEvidence[]): StepSuggestion {
+  const rows = evidence.map((row) => ({
+    checkKey: row.checkKey,
+    status: row.status,
+    finding: row.finding,
+    source: row.source,
+    url: row.url,
+  }));
+  if (id === "card") return suggestOne("license", { ...facts, cardOnFile: facts.cardOnFile }, rows);
+  if (id === "card-match") return suggestOne("license", facts, rows);
+  if (id === "company") return suggestCompany(facts, rows);
+  if (id === "news") return suggestOne("track", facts, rows);
+  if (id === "risk") {
+    const sanctions = suggestOne("sanctions", facts, rows);
+    const track = suggestOne("track", facts, rows);
+    return sanctions.mark === "FAIL" || sanctions.mark === "CONCERN" ? sanctions : track.mark === "FAIL" || track.mark === "CONCERN" ? track : sanctions;
+  }
+  if (id === "identity") return suggestOne("identity", facts, rows);
+  if (id === "references") return suggestOne("references", facts, rows);
+  return suggestOne(id, facts, rows);
+}
+
+function statusFromSuggestion(mark: StepSuggestion["mark"]): StepStatus {
+  if (mark === "PASS") return "PASS";
+  if (mark === "CONCERN") return "CONCERN";
+  if (mark === "FAIL") return "FAIL";
+  return "COULDNT_VERIFY";
 }
 
 export function buildReviewSteps(input: {
@@ -159,14 +188,15 @@ export function buildReviewSteps(input: {
   saved: ReviewProgress;
   references: string[];
   cardOnFile: boolean;
+  facts?: Partial<PrefillFacts>;
 }): BuiltStep[] {
+  const facts = emptyPrefillFacts({ ...input.facts, referenceEmails: input.facts?.referenceEmails || input.references, cardOnFile: input.cardOnFile });
   const work = REVIEW_STEP_IDS.filter((id) => id !== "decision") as Exclude<ReviewStepId, "decision">[];
   const built: BuiltStep[] = work.map((id, index) => {
     const meta = STEP_META[id];
     const rows = input.evidence.filter((row) => matchesKey(row.checkKey, meta.keys));
-    let status = derivedStatus(rows);
-    if (id === "references" && input.references.length === 0) status = "NOT_CHECKED";
-    if (id === "card" && !input.cardOnFile && !rows.some((row) => row.status === "PASS")) status = "NOT_CHECKED";
+    const prefill = reviewSuggestion(id, facts, input.evidence);
+    let status = statusFromSuggestion(prefill.mark);
     const saved = input.saved.steps[id] || null;
     if (saved) status = saved.status;
     const findings = rows.map((row) => ({
@@ -193,7 +223,7 @@ export function buildReviewSteps(input: {
         url: "",
       });
     }
-    return { id, title: meta.title, about: meta.about, index: index + 1, status, saved, findings };
+    return { id, title: meta.title, about: meta.about, index: index + 1, status, saved, prefill, findings };
   });
   built.push({
     id: "decision",
@@ -202,6 +232,7 @@ export function buildReviewSteps(input: {
     index: built.length + 1,
     status: "NOT_CHECKED",
     saved: null,
+    prefill: null,
     findings: [],
   });
   return built;

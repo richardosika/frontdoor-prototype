@@ -170,9 +170,14 @@ export async function reviewApplication(formData: FormData) {
 
   await noteApplicationReferences({
     userId: user.id,
+    applicationId: application.id,
     actorId: admin.id,
     referenceEmails: application.referenceEmails,
     speaker: application.statement,
+  });
+  const { prefillFromApplication } = await import("@/lib/guided-prefill-db");
+  await prefillFromApplication(application.id).catch((error) => {
+    console.error("guided prefill failed", error instanceof Error ? error.message : "error");
   });
 
   await prisma.application.update({

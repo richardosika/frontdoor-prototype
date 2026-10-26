@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addCrmNote, deleteCrmPerson, saveCrmPerson, sendPersonInfo } from "@/actions/crm";
+import { startGuidedReview } from "@/actions/verification";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
@@ -52,6 +53,12 @@ export default async function CrmPersonPage({
           {person.inviteCode ? <p>Invite code {person.inviteCode}</p> : null}
           {person.doNotContact ? <p className="text-brass">Do not contact. {person.doNotContactReason}</p> : null}
           {followUpDue(person.followUpAt) ? <p className="text-brass">Follow-up due {person.followUpAt?.toISOString().slice(0, 10)}</p> : null}
+          <form action={startGuidedReview} className="pt-2">
+            <input type="hidden" name="personId" value={person.id} />
+            <button className={btn} type="submit">
+              Start review
+            </button>
+          </form>
           <p className="flex flex-wrap gap-3 pt-1">
             {person.applicationId ? (
               <Link href={`/admin/applications/${person.applicationId}`} className="underline decoration-brass">

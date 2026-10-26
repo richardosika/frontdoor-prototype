@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { confirmedNote } from "@/lib/guided-prefill";
 import {
   isReviewStepId,
   isStepStatus,
@@ -58,15 +59,18 @@ export async function saveReviewStep(formData: FormData) {
   } else {
     const status = String(formData.get("status") || "");
     if (!isStepStatus(status) || status === "SKIPPED") {
-      redirect(backTo(applicationId, stepId, undefined, "Choose Pass, Concern, or Not checked. Use Skip for an override."));
+      redirect(backTo(applicationId, stepId, undefined, "Choose Pass, Concern, Fail, or Couldn't verify. Use Skip for an override."));
     }
     const evidenceUrl = String(formData.get("evidenceUrl") || "").trim().slice(0, 500);
     if (evidenceUrl && !/^https?:\/\//i.test(evidenceUrl)) {
       redirect(backTo(applicationId, stepId, undefined, "Evidence links must start with http."));
     }
+    if (status === "PASS" && !/^https?:\/\//i.test(evidenceUrl)) {
+      redirect(backTo(applicationId, stepId, undefined, "A pass needs an evidence link. Couldn't verify is not a pass."));
+    }
     const mark: StepMark = {
       status,
-      note: String(formData.get("note") || "").trim().slice(0, 2000),
+      note: confirmedNote(String(formData.get("note") || "")).slice(0, 2000),
       evidenceUrl,
       skipReason: "",
       updatedAt: now,

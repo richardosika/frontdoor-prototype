@@ -5,6 +5,8 @@ export const VERIFICATION_SOURCES = [
   { name: "Website fetch, HTTPS, title text, /about, /team", kind: "Public HTTP" },
   { name: "RDAP domain record", kind: "rdap.org" },
   { name: "OFAC SDN CSV and alternate names", kind: "treasury.gov, full file cached" },
+  { name: "OpenSanctions public search", kind: "opensanctions.org. No paid key. A blocked response is not a clear result." },
+  { name: "OpenCorporates public company search", kind: "opencorporates.com. No paid token. A blocked response is not a clear result." },
   { name: "SEC EDGAR full-text search", kind: "efts.sec.gov" },
   { name: "CourtListener public search", kind: "courtlistener.com" },
   { name: "Web search (DuckDuckGo, Wikipedia, Wikidata, GDELT, Bing)", kind: "Free HTML or API, no key" },

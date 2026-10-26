@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { addProspect } from "@/actions/crm";
+import { startGuidedReview } from "@/actions/verification";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DemoChip, StatusChip } from "@/components/status-chip";
@@ -125,6 +126,12 @@ export default async function CrmPage({
                   {rows.length === 0 ? <li className="text-xs text-mut">None</li> : null}
                   {rows.map(({ person, standing, demo }) => (
                     <li key={person.id}>
+                      <form action={startGuidedReview} className="mb-1">
+                        <input type="hidden" name="personId" value={person.id} />
+                        <button className={`${btn} w-full`} type="submit">
+                          Start review
+                        </button>
+                      </form>
                       <Link href={`/admin/crm/${person.id}`} className={`${card} block p-3 text-sm`}>
                         <p className="font-semibold">{person.name}</p>
                         <div className="mt-1 flex flex-wrap gap-1">

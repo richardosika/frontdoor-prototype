@@ -67,6 +67,16 @@ export default async function ApplicationDetailPage({
     saved: progress,
     references: application.referenceEmails,
     cardOnFile,
+    facts: {
+      name: application.name,
+      org: application.org,
+      location: application.location,
+      statement: application.statement,
+      linkedinUrl: application.linkedinUrl,
+      website: application.website,
+      referenceEmails: application.referenceEmails,
+      cardOnFile,
+    },
   });
   const shownGrade = grade
     ? applyReviewSkips(
