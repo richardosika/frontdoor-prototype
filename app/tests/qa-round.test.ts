@@ -11,6 +11,7 @@ import { paymentReceiptText } from "@/lib/payment-record";
 import { noticeHtml } from "@/lib/resend-mail";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
+import { publicStatusPath } from "@/lib/public-status";
 import { verificationCaseIsDeletableOrphan } from "@/lib/orphan-case";
 import { outboxTiedToEmails } from "@/lib/remove-member";
 import { reviewCheckKey, reviewCopy, reviewNotice, reviewTemplateKey } from "@/lib/review-copy";
@@ -322,11 +323,22 @@ describe("QA fixes that stay outside grading", () => {
     expect(verification).toContain("Checks finished. Grade");
     expect(verification).toContain("verificationRun.updateMany");
     expect(verification).toContain("verificationEvent.create");
-    const applyStatus = readFileSync(path.join(ROOT, "app/apply/status/view/[token]/page.tsx"), "utf8");
+    const applyStatus = readFileSync(path.join(ROOT, "components/application-status.tsx"), "utf8");
     const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");
     expect(applyStatus).toContain("statusMembershipLine");
     expect(applyStatus).not.toContain("applicantDuesSentence");
     expect(requestStatus).toContain("statusMembershipLine");
+    expect(requestStatus).toContain("ApplicationStatus");
+    expect(publicStatusPath("abc")).toBe("/request-status/abc");
+    const oldLetter = reviewNotice("https://cornicio-mvp.onrender.com/apply/status/abc");
+    expect(oldLetter).toContain("/request-status/abc");
+    expect(oldLetter).not.toContain("/apply/status");
+    for (const file of ["actions/apply.ts", "actions/admin.ts", "lib/join-request-post.ts", "components/apply-wizard.tsx"]) {
+      const source = readFileSync(path.join(ROOT, file), "utf8");
+      expect(source).toContain("publicStatusPath");
+      expect(source).not.toContain("/apply/status/");
+    }
+    expect(readFileSync(path.join(ROOT, "app/apply/status/[token]/route.ts"), "utf8")).toContain("publicStatusPath");
     const outbox = readFileSync(path.join(ROOT, "app/(app)/admin/outbox/page.tsx"), "utf8");
     expect(outbox).toContain("reviewNotice");
     expect(outbox).toContain("reviewTemplateKey");

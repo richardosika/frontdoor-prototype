@@ -13,6 +13,7 @@ import { BRAND } from "@/lib/brand";
 import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 import { DuesLanguages } from "@/components/dues-languages";
 import { DUES_BILLING_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, duesForRole, formatMoney } from "@/lib/dues";
+import { publicStatusPath } from "@/lib/public-status";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
 
@@ -280,7 +281,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <p className="mt-2 text-sm text-ink">{applicationReceivedMessage(firstName)}</p>
             <p className="mt-2 text-sm text-ink">Nothing was charged. Keep the status link. Messages about this application stay on that page.</p>
             {statusToken ? (
-              <Link href={`/apply/status/${statusToken}`} className={`${btn} mt-4 w-full`}>
+              <Link href={publicStatusPath(statusToken)} className={`${btn} mt-4 w-full`}>
                 View application status
               </Link>
             ) : null}

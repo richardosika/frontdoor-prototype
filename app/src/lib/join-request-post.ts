@@ -5,6 +5,7 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { withinRateLimit } from "@/lib/messaging";
 import { joinName } from "@/lib/person-fields";
 import { prisma } from "@/lib/prisma";
+import { publicStatusPath } from "@/lib/public-status";
 import { isRoleId, roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
@@ -92,7 +93,7 @@ export async function postJoinRequest(request: Request): Promise<Response> {
   await openInviteReview(created.id).catch((error) => {
     console.error("guided prefill failed", error instanceof Error ? error.message : "error");
   });
-  const statusPath = `/request-status/${statusToken}`;
+  const statusPath = publicStatusPath(statusToken);
   const statusUrl = `${await appBaseUrl()}${statusPath}`;
   try {
     await sendTemplate({

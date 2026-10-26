@@ -28,7 +28,8 @@ function scrubInviteWording(text: string): string {
     .replace(/invite codes?/gi, "referral code")
     .replace(/invite sources?/gi, "referral source")
     .replace(/invite notes?/gi, "referral note")
-    .replace(/\/invite-status\b/gi, "/request-status");
+    .replace(/\/invite-status\b/gi, "/request-status")
+    .replace(/\/apply\/status\b/gi, "/request-status");
 }
 
 /** Subject and body shown in the outbox and stored on a new notice. */

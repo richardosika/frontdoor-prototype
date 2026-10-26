@@ -1,19 +1,12 @@
 import { NextResponse } from "next/server";
-import { expiredDocument } from "@/lib/http-document";
-import { prisma } from "@/lib/prisma";
 import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
+import { publicStatusPath } from "@/lib/public-status";
 
 export const dynamic = "force-dynamic";
 
+/** Older letters used this path. The current letter uses /request-status. */
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const application = await prisma.application.findUnique({ where: { statusToken: token }, select: { id: true } });
-  if (!application) {
-    return new Response(expiredDocument("status"), {
-      status: 404,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
-  const path = withRequestSearch(`/apply/status/view/${encodeURIComponent(token)}`, request.url);
+  const path = withRequestSearch(publicStatusPath(token), request.url);
   return NextResponse.redirect(publicAbsoluteUrl(path, request.headers));
 }

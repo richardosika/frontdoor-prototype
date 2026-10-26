@@ -25,6 +25,7 @@ import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/
 import { needsStrongApprovalWarning } from "@/lib/approval-warning";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
+import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
 
 function storedInternalNote(existing: string, addition: string): string {
@@ -157,7 +158,7 @@ export async function reviewApplication(formData: FormData) {
         name: application.name,
         role: roleLabel(application.role),
         org: application.org,
-        statusLink: `${base}/apply/status/${application.statusToken}`,
+        statusLink: `${base}${publicStatusPath(application.statusToken)}`,
         note: "",
       }),
       person: { name: application.name, role: application.role, org: application.org, location: application.location },
@@ -189,7 +190,7 @@ export async function reviewApplication(formData: FormData) {
         name: application.name,
         role: roleLabel(application.role),
         org: application.org,
-        statusLink: `${base}/apply/status/${application.statusToken}`,
+        statusLink: `${base}${publicStatusPath(application.statusToken)}`,
         note: applicantMessage,
       }),
       person: { name: application.name, role: application.role, org: application.org, location: application.location },
@@ -276,7 +277,7 @@ export async function reviewApplication(formData: FormData) {
         name: application.name,
         role: roleLabel(application.role),
         org: application.org,
-        statusLink: `${base}/apply/status/${application.statusToken}`,
+        statusLink: `${base}${publicStatusPath(application.statusToken)}`,
         paymentLink: `${base}/pay/${paymentToken}`,
         loginLink: `${base}/login`,
         duesAmount: amounts.duesAmount,
@@ -295,7 +296,7 @@ export async function reviewApplication(formData: FormData) {
         name: application.name,
         role: roleLabel(application.role),
         org: application.org,
-        statusLink: `${base}/apply/status/${application.statusToken}`,
+        statusLink: `${base}${publicStatusPath(application.statusToken)}`,
         loginLink: `${base}/login`,
         note: applicantMessage,
       }),
@@ -403,7 +404,7 @@ export async function revokeApproval(formData: FormData) {
       name: application.name,
       role: roleLabel(application.role),
       org: application.org,
-      statusLink: `${base}/apply/status/${application.statusToken}`,
+      statusLink: `${base}${publicStatusPath(application.statusToken)}`,
       note: "",
     }),
     person: { name: application.name, role: application.role, org: application.org, location: application.location },

@@ -32,6 +32,7 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { sendNotice } from "@/lib/notices";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 import { appendMemberReply } from "@/lib/statement";
+import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
 
 const CODE_MINUTES = 15;
@@ -253,7 +254,7 @@ export async function submitApplication(
       name,
       role: roleLabel(role),
       org: input.org.trim(),
-      statusLink: `${base}/apply/status/${statusToken}`,
+      statusLink: `${base}${publicStatusPath(statusToken)}`,
     }),
     person: {
       name,

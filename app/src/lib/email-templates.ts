@@ -522,7 +522,7 @@ export function sampleTemplateVars(): Record<string, string> {
     full_name: "Alex Rivera",
     role: "General Contractor",
     org: "Northline Builders",
-    status_link: "https://cornicio-mvp.onrender.com/apply/status/preview",
+    status_link: "https://cornicio-mvp.onrender.com/request-status/preview",
     payment_link: "https://cornicio-mvp.onrender.com/pay/preview",
     login_link: "https://cornicio-mvp.onrender.com/login",
     billing_link: "https://cornicio-mvp.onrender.com/settings",
