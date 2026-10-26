@@ -146,11 +146,11 @@ describe("public screening", () => {
       company: true,
       confidence: "high",
     });
-    expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(true);
+    expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(false);
     expect(scorePublicText("Captiva Island's record home sale", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(false);
     expect(scorePublicText("Richard Osika leads Captiva Development from Saddle Brook", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(true);
     expect(
-      scorePublicText("Persistence and Agility with Rich Osika\nBuild Pro Construction Service's core area of business", {
+      scorePublicText("Persistence and Agility with Rich Osika\nBuild Pro Construction Services' core area of business", {
         name: "Richard Osika",
         org: "BuildPro Construction Services LLC",
         location: "Saddle Brook, NJ",

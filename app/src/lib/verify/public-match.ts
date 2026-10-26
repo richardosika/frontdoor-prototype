@@ -92,7 +92,11 @@ export function wordHit(text: string, token: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, "i").test(text);
 }
 
-/** "Captiva Island" and "Captiva Dr" are places, not Captiva Development. */
+/**
+ * Whole-word hit, including a 4-letter brand such as "cbre" or "toll".
+ * Those tokens are not discarded for length. A split-word guess is only for a longer token.
+ * "Captiva Island" and "Captiva Dr" are places, not Captiva Development.
+ */
 function companyTokenHit(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const stripped = text.replace(new RegExp(`\\b${escaped}\\s+(?:${PLACE_AFTER})\\b`, "gi"), " ");
@@ -164,25 +168,25 @@ function surnameOnly(text: string, token: string): boolean {
   return nameHits > 0 && nameHits >= all.length;
 }
 
-function looseToken(text: string, token: string): boolean {
-  if (!wordHit(text, token)) return false;
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const uses = text.match(new RegExp(`\\b${escaped}\\b`, "gi")) || [];
-  const english = text.match(new RegExp(`\\b${escaped}\\s+to\\b`, "gi")) || [];
-  return uses.length > english.length;
+const STOP = new Set(["the", "and", "of", "for", "at"]);
+
+/** Every non-legal word in the firm name, including a short brand and the generic words that complete it. */
+export function companyPhraseTokens(org: string): string[] {
+  return tokens(org).filter((token) => !LEGAL.has(token) && !STOP.has(token));
 }
 
 export function mentionsCompany(text: string, org: string, person = ""): boolean {
-  const named = distinctiveCompanyTokens(org);
-  const genericOnly = !named.length || named.every((token) => GENERIC.has(token));
-  if (!genericOnly) {
-    if (!named.every((token) => companyTokenHit(text, token))) return false;
-    if (named.length === 1 && surnameOnly(text, named[0])) return false;
-    return true;
+  const phrase = companyPhraseTokens(org);
+  if (!phrase.length) return false;
+  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  // "group" or "realty" alone is not a company. Two generic words still have to appear together.
+  if (!distinctive.length) {
+    if (phrase.length < 2) return false;
+    return phrase.every((token) => companyTokenHit(text, token));
   }
-  const companyTokens = tokens(org).filter((token) => !LEGAL.has(token) && token.length >= 5);
-  if (!companyTokens.length) return false;
-  if (companyTokens.every((token) => companyTokenHit(text, token))) return true;
-  if (!person || !mentionsPerson(text, person)) return false;
-  return companyTokens.some((token) => token.length >= 7 && looseToken(text, token));
+  // "CBRE" counts. "CBRE Group" does not match Unum Group, and "Madison Realty Capital" does not match Madison Air Solutions.
+  if (!phrase.every((token) => companyTokenHit(text, token))) return false;
+  if (distinctive.length === 1 && surnameOnly(text, distinctive[0])) return false;
+  void person;
+  return true;
 }

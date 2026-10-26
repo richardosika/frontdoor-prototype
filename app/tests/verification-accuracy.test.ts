@@ -6,7 +6,7 @@ import { fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGEN
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
-import { distinctiveCompanyTokens, mentionsCompany } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -491,6 +491,24 @@ describe("EDGAR exact company names", () => {
     expect(matchEdgarCompany(rows, "Toll Brothers, Inc.")?.ticker).toBe("TOL");
     expect(matchEdgarCompany(rows, "Toll")?.ticker).not.toBe("TOL");
     expect(matchEdgarCompany(rows, "Toll")?.title).toBe("TOLL INC");
+  });
+
+  it("keeps a 4-letter brand and does not match on a generic word", () => {
+    expect(isDistinctiveCompanyToken("cbre")).toBe(true);
+    expect(isDistinctiveCompanyToken("toll")).toBe(true);
+    for (const word of ["group", "capital", "realty", "holdings", "partners", "development", "properties"]) {
+      expect(isDistinctiveCompanyToken(word)).toBe(false);
+    }
+    expect(mentionsCompany("CBRE closed a Dallas sale", "CBRE")).toBe(true);
+    expect(mentionsCompany("CBRE Group closed a Dallas sale", "CBRE Group")).toBe(true);
+    expect(mentionsCompany("Unum Group raised its dividend", "CBRE Group")).toBe(false);
+    expect(mentionsCompany("Unum Group raised its dividend", "Group")).toBe(false);
+    expect(mentionsCompany("Madison Air Solutions won a contract", "Madison Realty Capital")).toBe(false);
+    expect(mentionsCompany("Madison Realty Capital closed a loan", "Madison Realty Capital")).toBe(true);
+    expect(mentionsCompany("Toll Brothers sold homes in Dallas", "Toll Brothers")).toBe(true);
+    expect(mentionsCompany("A toll road closed for repairs", "Toll")).toBe(false);
+    expect(mentionsCompany("Bristol council meets on Tuesday", "Bristol Development")).toBe(false);
+    expect(mentionsCompany("Bristol Development breaks ground", "Bristol Development")).toBe(true);
   });
 });
 
