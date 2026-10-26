@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cardConsistencyCheck, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { fetchLimits, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews } from "@/lib/verify/news";
 import { distinctiveCompanyTokens, mentionsCompany } from "@/lib/verify/public-match";
@@ -352,6 +352,15 @@ describe("low-risk check fixes", () => {
     expect(clean.finding).toContain("No record found in CourtListener federal data");
     expect(clean.finding.toLowerCase()).toContain("not a clearance of all litigation");
     expect(clean.finding.toLowerCase()).not.toContain("cleared of all");
+  });
+
+  it("keeps the SEC ticker file above the default body cap", () => {
+    const tickers = fetchLimits("https://www.sec.gov/files/company_tickers.json");
+    expect(tickers.maxChars).toBeGreaterThanOrEqual(2_000_000);
+    expect(tickers.timeoutMs).toBeGreaterThanOrEqual(20_000);
+    const filings = fetchLimits("https://efts.sec.gov/LATEST/search-index?q=%22Yearley%22%20%22toll%22");
+    expect(filings.maxChars).toBeGreaterThanOrEqual(1_500_000);
+    expect(fetchLimits("https://example.com/page").maxChars).toBe(180_000);
   });
 
   it("uses an identifying user agent for social hosts", () => {

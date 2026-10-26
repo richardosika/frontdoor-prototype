@@ -37,6 +37,29 @@ export function clearFetchCache(): void {
   lastByHost.clear();
 }
 
+/**
+ * Body and time limits for one URL.
+ * SEC ticker and filing JSON are larger than the 180KB default. lookupEdgar calls the
+ * shared fetch with only a URL, so those hosts have to opt into the larger cap here.
+ * A truncated company_tickers.json does not parse, and every EDGAR check then looks blocked.
+ */
+export function fetchLimits(url: string): { timeoutMs: number; maxChars: number } {
+  let host = "";
+  try {
+    host = new URL(url).host;
+  } catch {
+    return { timeoutMs: 8000, maxChars: 180_000 };
+  }
+  if (host.endsWith("sec.gov")) {
+    const tickers = url.includes("company_tickers");
+    return { timeoutMs: tickers ? 20_000 : 15_000, maxChars: tickers ? 2_000_000 : 1_500_000 };
+  }
+  if (host.endsWith("youtube.com")) return { timeoutMs: 8000, maxChars: 1_200_000 };
+  if (host.endsWith("linkedin.com")) return { timeoutMs: 8000, maxChars: 450_000 };
+  if (host.endsWith("tiktok.com")) return { timeoutMs: 8000, maxChars: 500_000 };
+  return { timeoutMs: 8000, maxChars: 180_000 };
+}
+
 export function limitText(text: string, maxChars: number): string {
   if (!Number.isFinite(maxChars) || maxChars < 0) return text;
   return text.length > maxChars ? text.slice(0, maxChars) : text;
@@ -52,17 +75,18 @@ export async function politeFetch(
   timeoutMs = 8000,
   options?: { maxChars?: number },
 ): Promise<{ ok: boolean; status: number; text: string }> {
+  const timeout = Math.max(timeoutMs, fetchLimits(url).timeoutMs);
   if (cacheable(url)) {
     const cached = responseCache.get(url);
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
   }
-  const first = await fetchOnce(url, timeoutMs, options);
+  const first = await fetchOnce(url, timeout, options);
   if (!shouldRetryStatus(first.status)) {
     if (cacheable(url) && first.status >= 200 && first.status < 300) responseCache.set(url, { at: Date.now(), value: first });
     return first;
   }
   await new Promise((resolve) => setTimeout(resolve, retryDelayMs(url)));
-  const second = await fetchOnce(url, timeoutMs, options);
+  const second = await fetchOnce(url, timeout, options);
   if (cacheable(url) && second.status >= 200 && second.status < 300) responseCache.set(url, { at: Date.now(), value: second });
   return second;
 }
@@ -100,9 +124,7 @@ async function fetchOnce(
         ...(wiki ? { "api-user-agent": USER_AGENT } : {}),
       },
     });
-    const cap =
-      options?.maxChars ??
-      (host.endsWith("youtube.com") ? 1_200_000 : host.endsWith("linkedin.com") ? 450_000 : host.endsWith("tiktok.com") ? 500_000 : 180_000);
+    const cap = options?.maxChars ?? fetchLimits(url).maxChars;
     const text = limitText(await response.text(), cap);
     return { ok: response.ok, status: response.status, text };
   } catch {
