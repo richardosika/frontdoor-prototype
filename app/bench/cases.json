@@ -730,6 +730,64 @@
       "location": "Charlotte, NC",
       "role": "FAMILY_OFFICE",
       "statement": "Family office managing a $250M bridge-lending fund for value-add multifamily and industrial real estate; seeking sponsors and co-lenders."
+    },
+    {
+      "id": "B8R01",
+      "kind": "real",
+      "label": "CBRE Group / Bob Sulentic (EDGAR exact name, not Unum)",
+      "companyOnly": true,
+      "personAssumption": "Bob Sulentic is assumed to be associated with CBRE Group. The person link is unverified. EDGAR must match CBRE GROUP, INC. CIK 1138118 and must not match Unum Group.",
+      "name": "Bob Sulentic",
+      "email": "pf.bench.b8r01@gmail.com",
+      "org": "CBRE Group",
+      "website": "https://www.cbre.com",
+      "linkedinUrl": "https://www.linkedin.com/company/cbre/",
+      "location": "Dallas, TX",
+      "role": "BROKER",
+      "statement": "I lead a commercial real estate services firm and would like to meet owners and investors."
+    },
+    {
+      "id": "B8R02",
+      "kind": "real",
+      "label": "Greenberg Traurig / Richard Rosenbaum",
+      "companyOnly": true,
+      "personAssumption": "Richard Rosenbaum is assumed to be associated with Greenberg Traurig. The person link is unverified. gtlaw.com and the LinkedIn company page are company-exists evidence.",
+      "name": "Richard Rosenbaum",
+      "email": "pf.bench.b8r02@gmail.com",
+      "org": "Greenberg Traurig",
+      "website": "https://www.gtlaw.com",
+      "linkedinUrl": "https://www.linkedin.com/company/greenberg-traurig-llp/",
+      "location": "Miami, FL",
+      "role": "RE_ATTORNEY",
+      "statement": "I practice with a law firm that represents owners, investors, and developers."
+    },
+    {
+      "id": "B8R03",
+      "kind": "real",
+      "label": "Kennedy-Wilson Holdings / William McMorrow",
+      "companyOnly": true,
+      "personAssumption": "William McMorrow is assumed to be associated with Kennedy-Wilson Holdings. The person link is unverified. EDGAR lists Kennedy-Wilson Holdings, Inc. CIK 1408100, which is not in company_tickers.json.",
+      "name": "William McMorrow",
+      "email": "pf.bench.b8r03@gmail.com",
+      "org": "Kennedy-Wilson Holdings",
+      "website": "https://www.kennedywilson.com",
+      "linkedinUrl": "https://www.linkedin.com/company/kennedy-wilson/",
+      "location": "Beverly Hills, CA",
+      "role": "DEVELOPER",
+      "statement": "I lead a real estate investment company and would like to meet other owners and operators."
+    },
+    {
+      "id": "B8F01",
+      "kind": "fake",
+      "label": "Fake control: Blorptex Qwvzn Builders LLC",
+      "name": "Nix Qwvzn",
+      "email": "pf.bench.b8f01@gmail.com",
+      "org": "Blorptex Qwvzn Builders LLC",
+      "website": "https://www.blorptexqwvzn.com",
+      "linkedinUrl": "https://www.linkedin.com/in/nix-qwvzn",
+      "location": "0 Nowhere Lane, NY 10001",
+      "role": "GENERAL_CONTRACTOR",
+      "statement": "I build projects and would like to meet other owners and operators."
     }
   ]
 }

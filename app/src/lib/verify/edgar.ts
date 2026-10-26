@@ -99,6 +99,33 @@ export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompa
   return best;
 }
 
+/** Quoted company-name search. Generic-only names such as "Group" or "Holdings" are not searched. */
+export function edgarCompanySearchPhrase(org: string): string {
+  const distinctive = distinctiveCompanyTokens(org).filter((token) => isDistinctiveCompanyToken(token));
+  if (!distinctive.length) return "";
+  return org
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[,.]/g, " ")
+    .split(/\s+/)
+    .filter((token) => {
+      const bare = token.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return bare.length >= 2 && !LEGAL_SUFFIX.has(bare);
+    })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** "Kennedy-Wilson Holdings, Inc.  (KW)  (CIK 0001408100)" keeps the title, ticker, and CIK. */
+export function companyFromDisplayName(name: string): EdgarCompany | null {
+  const cik = name.match(/\(\s*CIK\s*0*(\d+)\s*\)/i)?.[1] || "";
+  const withoutCik = name.replace(/\(\s*CIK\s*\d+\s*\)/gi, " ");
+  const ticker = withoutCik.match(/\(\s*([A-Z][A-Z0-9.-]{0,9})\s*\)/)?.[1] || "";
+  const title = withoutCik.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+  if (!title) return null;
+  return { title, ticker, cik };
+}
+
 export function filingNames(payload: string): string[] | null {
   try {
     const parsed = JSON.parse(payload) as { hits?: { hits?: { _source?: { display_names?: unknown } }[] } };
@@ -135,7 +162,7 @@ export function assessEdgarMatch(input: {
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
   const fromFiling = matchEdgarCompany(
-    input.filingNames.map((title) => ({ title, ticker: "", cik: "" })),
+    input.filingNames.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
     input.org,
   );
   const match = fromList || fromFiling;
@@ -207,13 +234,15 @@ export async function lookupEdgar(
   const companies = await loadTickers(fetchImpl).catch(() => null);
   const last = surnameForSearch(person);
   const distinctive = distinctiveCompanyTokens(org)[0] || org;
-  const searchUrl = last
-    ? `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${last}" "${distinctive}"`)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`
-    : "";
+  const phrase = edgarCompanySearchPhrase(org);
+  const personQuery = last ? `"${last}" "${distinctive}"` : "";
+  const companyQuery = phrase ? `"${phrase}"` : "";
+  const queries = [...new Set([personQuery, companyQuery].filter(Boolean))];
   let names: string[] = [];
-  if (searchUrl) {
+  for (const query of queries) {
+    const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(query)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`;
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    names = filing.ok ? filingNames(filing.text) || [] : [];
+    if (filing.ok) names.push(...(filingNames(filing.text) || []));
   }
   return assessEdgarMatch({
     org,

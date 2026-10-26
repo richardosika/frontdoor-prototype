@@ -5,7 +5,7 @@ import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, 
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
+import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
@@ -544,6 +544,53 @@ describe("EDGAR exact company names", () => {
     expect(matchEdgarCompany(rows, "Toll Brothers, Inc.")?.ticker).toBe("TOL");
     expect(matchEdgarCompany(rows, "Toll")?.ticker).not.toBe("TOL");
     expect(matchEdgarCompany(rows, "Toll")?.title).toBe("TOLL INC");
+  });
+
+  it("finds Kennedy-Wilson by company name when the ticker file has no row, and still refuses Unum for CBRE", async () => {
+    expect(companyFromDisplayName("Kennedy-Wilson Holdings, Inc.  (KW)  (CIK 0001408100)")).toEqual({
+      title: "Kennedy-Wilson Holdings, Inc.",
+      ticker: "KW",
+      cik: "1408100",
+    });
+    expect(edgarCompanySearchPhrase("Kennedy-Wilson Holdings")).toBe("Kennedy-Wilson Holdings");
+    expect(edgarCompanySearchPhrase("CBRE Group, Inc.")).toBe("CBRE Group");
+    expect(edgarCompanySearchPhrase("Group")).toBe("");
+    expect(edgarCompanySearchPhrase("Holdings")).toBe("");
+    clearEdgarTickerCache();
+    const filings = {
+      hits: {
+        hits: [
+          { _source: { display_names: ["Unum Group  (UNM)  (CIK 0000005513)"] } },
+          { _source: { display_names: ["Kennedy-Wilson Holdings, Inc.  (KW)  (CIK 0001408100)"] } },
+          { _source: { display_names: ["CBRE GROUP, INC.  (CBRE)  (CIK 0001138118)"] } },
+        ],
+      },
+    };
+    const fetchText = async (url: string) => {
+      if (url.includes("company_tickers")) {
+        return { ok: true, status: 200, text: JSON.stringify({ "0": { title: "Unum Group", ticker: "UNM", cik_str: 5513 } }) };
+      }
+      if (url.includes("efts.sec.gov")) return { ok: true, status: 200, text: JSON.stringify(filings) };
+      return { ok: false, status: 0, text: "" };
+    };
+    const kennedy = await lookupEdgar("Kennedy-Wilson Holdings", "William McMorrow", fetchText);
+    expect(kennedy.status).toBe("PASS");
+    expect(kennedy.corroborates).toBe(false);
+    expect(kennedy.finding).toContain("Kennedy-Wilson Holdings");
+    expect(kennedy.finding.toLowerCase()).not.toContain("unum");
+    expect(kennedy.finding).toContain("does not tie the person");
+    expect(kennedy.url).toContain("1408100");
+    clearEdgarTickerCache();
+    const cbre = await lookupEdgar("CBRE Group", "Bob Sulentic", fetchText);
+    expect(cbre.status).toBe("PASS");
+    expect(cbre.corroborates).toBe(false);
+    expect(cbre.finding).toContain("CBRE GROUP, INC.");
+    expect(cbre.finding.toLowerCase()).not.toContain("unum");
+    expect(cbre.url).toContain("1138118");
+    clearEdgarTickerCache();
+    const generic = await lookupEdgar("Holdings", "William McMorrow", fetchText);
+    expect(generic.status).not.toBe("PASS");
+    expect(generic.finding.toLowerCase()).not.toContain("kennedy");
   });
 
   it("keeps a 4-letter brand and does not match on a generic word", () => {
