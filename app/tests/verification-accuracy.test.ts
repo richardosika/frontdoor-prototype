@@ -1447,3 +1447,56 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
   });
 });
+
+describe("batch 4 ordered person names", () => {
+  it("requires the given name and surname in order and ignores a surname inside the company", () => {
+    expect(mentionsPerson("Jason & Ashleigh Crabb ft. Corvin Brown", "Corvin Ashleigh")).toBe(false);
+    expect(mentionsPerson("Ronald N. Tutor", "Ronald Tutor")).toBe(true);
+    expect(mentionsPerson("Transition with Thomas M. Laird, Jr. Appointed Interim CEO of Gilbane Building Company", "Thomas Gilbane Jr.", "Gilbane Building Company")).toBe(false);
+    expect(personHit("Thomas Gilbane Building Company announced a project", "Thomas Gilbane", "Gilbane Building Company")).toBe("none");
+    expect(mentionsPerson("Thomas Gilbane chairs Gilbane Building Company", "Thomas Gilbane", "Gilbane Building Company")).toBe(true);
+    expect(mentionsPerson("Gilbane, Thomas chairs the firm", "Thomas Gilbane")).toBe(true);
+  });
+
+  it("does not pass B3R02 news on the Laird headline or B4F01 on a split YouTube title", async () => {
+    const gilbane = facts({
+      name: "Thomas Gilbane Jr.",
+      applicantName: "Thomas Gilbane Jr.",
+      org: "Gilbane Building Company",
+      location: "Providence, RI",
+    });
+    const news = classifyNews(
+      gilbane,
+      [
+        {
+          title: "Gilbane Building Company Announces CEO Transition with Thomas M. Laird, Jr. Appointed Interim CEO",
+          snippet: "Gilbane Building Company named Thomas M. Laird, Jr. interim CEO.",
+          url: "https://www.streetinsider.com/laird",
+          source: "StreetInsider",
+          publishedAt: "2022-01-07T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(news.some((check) => check.status === "PASS")).toBe(false);
+    expect(news.some((check) => check.corroborates)).toBe(false);
+    const youtube = await runPublicScreen(
+      facts({
+        name: "Corvin Ashleigh",
+        applicantName: "Corvin Ashleigh",
+        org: "Brambleton Keystone Capital Group LLC",
+        location: "Charlotte, NC",
+        website: "",
+      }),
+      async (url) =>
+        url.includes("youtube.com")
+          ? { ok: true, status: 200, text: '{"title":{"runs":[{"text":"Jason & Ashleigh Crabb ft. Corvin Brown | Daystar"}]}}' }
+          : { ok: false, status: 404, text: "" },
+    );
+    const row = youtube.find((check) => check.key === "screen-youtube");
+    expect(row?.finding).toContain("Name: no");
+    expect(row?.status).not.toBe("PASS");
+  });
+});

@@ -142,16 +142,6 @@ export function surnameForSearch(name: string): string {
 
 export type PersonHit = "match" | "suffix-mismatch" | "none";
 
-function personPartHits(text: string, part: string): boolean {
-  const pieces = part.split("-").filter(Boolean);
-  if (pieces.length > 1) {
-    if (wordHit(text, part)) return true;
-    return pieces.filter((piece) => piece.length >= 3).every((piece) => wordHit(text, piece));
-  }
-  const key = part.toLowerCase();
-  return (NICKNAMES[key] || [key]).some((alt) => wordHit(text, alt));
-}
-
 /**
  * Whole-word hit, including a 4-letter brand such as "cbre" or "toll".
  * Those tokens are not discarded for length. A split-word guess is only for a longer token.
@@ -203,39 +193,111 @@ export function distinctiveCompanyTokens(org: string): string[] {
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 
-function suffixesBesideSurname(text: string, parsed: ParsedPersonName): string[] {
-  const re = new RegExp(`(?<![A-Za-z0-9-])${parsed.surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9-])`, "gi");
-  const found: string[] = [];
-  for (const match of text.matchAll(re)) {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Match either case without an /i flag, so a capitalized middle stays case-sensitive. */
+function caseFold(token: string): string {
+  return token
+    .split("")
+    .map((char) => (/[a-z]/i.test(char) ? `[${char.toUpperCase()}${char.toLowerCase()}]` : escapeRegExp(char)))
+    .join("");
+}
+
+function givenPattern(part: string): string {
+  const key = part.toLowerCase();
+  const alts = [...new Set((NICKNAMES[key] || [key]).map((item) => item.toLowerCase()))];
+  return `(?:${alts.map(caseFold).join("|")})`;
+}
+
+/** Hyphenated surnames also match with a space. A hyphen beside the word is still the same word. */
+function surnamePattern(surname: string): string {
+  const pieces = surname.split("-").filter(Boolean);
+  const body = pieces.length > 1 ? pieces.map(caseFold).join("[\\s-]+") : caseFold(surname);
+  return `(?<![A-Za-z0-9-])${body}(?![A-Za-z0-9-])`;
+}
+
+const NAME_MIDDLE = String.raw`(?:\s+(?:[A-Z]\.?|[A-Z][a-z][A-Za-z'-]{0,24})){0,2}`;
+
+type NameSpan = { surnameStart: number; surnameEnd: number };
+
+/**
+ * Given name (or nickname), then up to two initials or capitalized words, then the surname.
+ * Commas, ampersands, "and", and "ft." cannot sit between them. "Surname, Given" also counts.
+ */
+function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
+  const surname = surnamePattern(parsed.surname);
+  const givenSeq = parsed.given
+    .map((part, index) => (index === 0 ? `(?<![A-Za-z0-9-])${givenPattern(part)}` : `${NAME_MIDDLE}\\s+${givenPattern(part)}`))
+    .join("");
+  const forward = new RegExp(`${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
+  const reverse = new RegExp(`${surname}\\s*,?\\s+(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
+  const spans: NameSpan[] = [];
+  for (const match of text.matchAll(forward)) {
     const start = match.index ?? 0;
-    const before = text.slice(Math.max(0, start - 80), start);
-    if (!parsed.given.some((part) => personPartHits(before, part))) continue;
-    const after = text.slice(start + match[0].length, start + match[0].length + 16);
-    const next = (after.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z.]+/) || [])[0] || "";
-    const suffix = normalizeGenerationalSuffix(next);
-    if (suffix) found.push(suffix);
+    const local = new RegExp(surname, "g");
+    let surnameMatch: RegExpExecArray | null = null;
+    for (const hit of match[0].matchAll(local)) surnameMatch = hit;
+    if (!surnameMatch) continue;
+    const surnameStart = start + (surnameMatch.index ?? 0);
+    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
   }
-  return found;
+  for (const match of text.matchAll(reverse)) {
+    const start = match.index ?? 0;
+    const surnameMatch = new RegExp(surname, "i").exec(match[0]);
+    if (!surnameMatch) continue;
+    const surnameStart = start + (surnameMatch.index ?? 0);
+    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
+  }
+  return spans;
+}
+
+function companySpanRanges(text: string, org: string): { start: number; end: number }[] {
+  const phrase = companyPhraseTokens(org);
+  if (phrase.length < 2) return [];
+  const ranges: { start: number; end: number }[] = [];
+  for (let length = phrase.length; length >= 2; length -= 1) {
+    const prefix = phrase.slice(0, length);
+    const body = prefix
+      .map((token) => `(?<![A-Za-z0-9-])${caseFold(token)}(?:'s)?(?![A-Za-z0-9-])`)
+      .join(`[\\s,.'’:-]+`);
+    for (const match of text.matchAll(new RegExp(body, "g"))) {
+      const start = match.index ?? 0;
+      ranges.push({ start, end: start + match[0].length });
+    }
+  }
+  return ranges;
+}
+
+function suffixAfter(text: string, index: number): string | null {
+  const after = text.slice(index, index + 16);
+  const next = (after.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z.]+/) || [])[0] || "";
+  return normalizeGenerationalSuffix(next);
 }
 
 /**
- * Given name plus surname. When both the application and the page carry a suffix, they have to agree.
+ * Given name plus surname, in that order. When both the application and the page carry a suffix, they have to agree.
  * Jr against III is a mismatch. A page that omits the suffix does not contradict one.
+ * A surname that only occurs inside the company name does not count.
  */
-export function personHit(text: string, name: string): PersonHit {
+export function personHit(text: string, name: string, org = ""): PersonHit {
   const parsed = parsePersonName(name);
   if (!parsed || parsed.given.length < 1) return "none";
-  if (!parsed.given.every((part) => personPartHits(text, part))) return "none";
-  if (!personPartHits(text, parsed.surname)) return "none";
+  const companyRanges = org ? companySpanRanges(text, org) : [];
+  const spans = orderedNameSpans(text, parsed).filter(
+    (span) => !companyRanges.some((range) => span.surnameStart >= range.start && span.surnameStart < range.end),
+  );
+  if (!spans.length) return "none";
   if (!parsed.suffix) return "match";
-  const pageSuffixes = suffixesBesideSurname(text, parsed);
-  if (pageSuffixes.includes(parsed.suffix)) return "match";
-  if (pageSuffixes.length) return "suffix-mismatch";
+  const suffixes = spans.map((span) => suffixAfter(text, span.surnameEnd)).filter((item): item is string => Boolean(item));
+  if (suffixes.includes(parsed.suffix)) return "match";
+  if (suffixes.length) return "suffix-mismatch";
   return "match";
 }
 
-export function mentionsPerson(text: string, name: string): boolean {
-  return personHit(text, name) === "match";
+export function mentionsPerson(text: string, name: string, org = ""): boolean {
+  return personHit(text, name, org) === "match";
 }
 
 function formerOrEx(text: string, org: string): boolean {

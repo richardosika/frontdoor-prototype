@@ -237,7 +237,7 @@ export function classifyNews(
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
         const blob = `${item.title} ${item.snippet}`;
-        const hit = personName ? personHit(blob, personName) : "none";
+        const hit = personName ? personHit(blob, personName, companyName) : "none";
         const person = hit === "match";
         const suffixMismatch = hit === "suffix-mismatch";
         const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);

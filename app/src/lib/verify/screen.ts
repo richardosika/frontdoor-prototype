@@ -46,7 +46,7 @@ const COMPANY_ONLY = "company confirmed, person NOT confirmed";
 
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
   const hay = text.toLowerCase();
-  const hit = personHit(text, facts.name);
+  const hit = personHit(text, facts.name, facts.org);
   const suffixMismatch = hit === "suffix-mismatch";
   const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
