@@ -7,6 +7,7 @@ import {
 import bcrypt from "bcryptjs";
 import { BRAND } from "../src/lib/brand";
 import { duplicateExampleIds } from "../src/lib/demo-cleanup";
+import { ORPHAN_VERIFICATION_CASE_IDS, verificationCaseIsDeletableOrphan } from "../src/lib/orphan-case";
 import { deleteMemberAccount } from "../src/lib/remove-member";
 import { SEEDED_EXTRA_PROJECTS, SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES } from "../src/lib/seed-coherence";
 import { MEMBER_CHECKS, PROJECT_CHECKS, type VerificationStatus } from "../src/lib/verification";
@@ -249,10 +250,61 @@ const people: Person[] = [
   },
 ];
 
+async function deleteOrphanVerificationCases() {
+  const rows = await prisma.verificationCase.findMany({
+    where: { id: { in: [...ORPHAN_VERIFICATION_CASE_IDS] } },
+    select: {
+      id: true,
+      userId: true,
+      projectId: true,
+      user: { select: { email: true, name: true, org: true, isAdmin: true } },
+      application: { select: { email: true, name: true, org: true } },
+      inviteRequest: { select: { email: true, name: true, org: true, note: true } },
+      project: { select: { name: true } },
+    },
+  });
+  const found = new Set(rows.map((row) => row.id));
+  for (const id of ORPHAN_VERIFICATION_CASE_IDS) {
+    if (!found.has(id)) console.log(`Verification case ${id} was not present.`);
+  }
+  for (const row of rows) {
+    const text = [
+      row.user?.email,
+      row.user?.name,
+      row.user?.org,
+      row.application?.email,
+      row.application?.name,
+      row.application?.org,
+      row.inviteRequest?.email,
+      row.inviteRequest?.name,
+      row.inviteRequest?.org,
+      row.inviteRequest?.note,
+      row.project?.name,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (
+      !verificationCaseIsDeletableOrphan({
+        id: row.id,
+        userId: row.userId,
+        projectId: row.projectId,
+        userIsAdmin: row.user?.isAdmin,
+        text,
+      })
+    ) {
+      console.log(`Left verification case ${row.id} in place.`);
+      continue;
+    }
+    await prisma.verificationCase.delete({ where: { id: row.id } });
+    console.log(`Deleted orphan verification case ${row.id}.`);
+  }
+}
+
 async function main() {
   const reset = process.env.SEED === "reset";
   const members = await prisma.user.count();
   if (!reset && members > 0) {
+    await deleteOrphanVerificationCases();
     await alignSeededDemo();
     console.log("Database already has members. Aligned seeded verification, tiers, and access. Set SEED=reset to wipe and reseed.");
     await syncOwnerPassword();

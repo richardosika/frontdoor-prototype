@@ -11,6 +11,7 @@ import { paymentReceiptText } from "@/lib/payment-record";
 import { noticeHtml } from "@/lib/resend-mail";
 import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
+import { verificationCaseIsDeletableOrphan } from "@/lib/orphan-case";
 import { outboxTiedToEmails } from "@/lib/remove-member";
 import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
 import { payPageState } from "@/lib/dues";
@@ -113,6 +114,46 @@ describe("QA fixes that stay outside grading", () => {
     const owner = readFileSync(path.join(ROOT, "actions/owner.ts"), "utf8");
     expect(owner).toContain("deleteVerificationCase");
     expect(owner).toContain("verificationCase.delete");
+    expect(
+      verificationCaseIsDeletableOrphan({
+        id: "cmvpiu9dk00caim2b3ew4qavo",
+        userId: null,
+        projectId: null,
+        text: "QA Tester qa@example.com",
+      }),
+    ).toBe(true);
+    expect(
+      verificationCaseIsDeletableOrphan({
+        id: "cmvpj1zod0021ey2ajbbtte7f",
+        userId: "user_real",
+        projectId: null,
+        text: "A member",
+      }),
+    ).toBe(false);
+    expect(
+      verificationCaseIsDeletableOrphan({
+        id: "cmvpiu9dk00caim2b3ew4qavo",
+        userId: null,
+        projectId: null,
+        text: "Richard Osika Captiva Development",
+      }),
+    ).toBe(false);
+    expect(
+      verificationCaseIsDeletableOrphan({
+        id: "cmvpj1zod0021ey2ajbbtte7f",
+        userId: null,
+        projectId: null,
+        text: "BuildPro Construction Services",
+      }),
+    ).toBe(false);
+    expect(
+      verificationCaseIsDeletableOrphan({
+        id: "some-other-case",
+        userId: null,
+        projectId: null,
+        text: "QA Tester",
+      }),
+    ).toBe(false);
     const where = outboxTiedToEmails(["Ada@Example.com"], { applicationIds: ["app_1"], tokens: ["status-token"] });
     expect(JSON.stringify(where)).toContain("insensitive");
     expect(JSON.stringify(where)).toContain("Intended recipient: Ada@Example.com");
