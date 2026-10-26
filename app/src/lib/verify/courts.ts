@@ -34,9 +34,9 @@ function companyIn(text: string, org: string): boolean {
   return normalizeName(text).includes(phrase);
 }
 
-function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weight"> & { url?: string }): Omit<CheckOutput, "ranAt"> {
+function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weight" | "url"> & { url?: string }): Omit<CheckOutput, "ranAt"> {
   const finding = partial.finding.includes("Not checkable for free.") ? partial.finding : `${partial.finding} Not checkable for free.`;
-  return { key: "courts", weight: 0, source: "CourtListener", url: partial.url || "", ...partial, finding };
+  return { ...partial, key: "courts", weight: 0, source: "CourtListener", url: partial.url || "", finding };
 }
 
 export function assessCourts(
