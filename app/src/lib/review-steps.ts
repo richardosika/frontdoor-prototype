@@ -64,6 +64,7 @@ const STEP_META: Record<Exclude<ReviewStepId, "decision">, { title: string; abou
       "screen-instagram",
       "screen-youtube",
       "screen-tiktok",
+      "news",
     ],
   },
   card: {

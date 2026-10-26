@@ -1,49 +1,10 @@
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
-import { cityPhrase } from "@/lib/verify/news";
+import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
+import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 
-const NICKNAMES: Record<string, string[]> = {
-  richard: ["richard", "rich"],
-  robert: ["robert", "bob", "rob"],
-  william: ["william", "bill", "will"],
-  james: ["james", "jim"],
-  michael: ["michael", "mike"],
-  christopher: ["christopher", "chris"],
-  anthony: ["anthony", "tony"],
-  joseph: ["joseph", "joe"],
-  thomas: ["thomas", "tom"],
-  daniel: ["daniel", "dan"],
-  david: ["david", "dave"],
-};
-
-const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp"]);
-const GENERIC = new Set([
-  "construction",
-  "services",
-  "service",
-  "general",
-  "contracting",
-  "contractor",
-  "group",
-  "holdings",
-  "holding",
-  "company",
-  "companies",
-  "the",
-  "and",
-  "development",
-  "developers",
-  "realty",
-  "properties",
-  "property",
-  "management",
-  "partners",
-  "partner",
-  "associates",
-  "solutions",
-  "enterprises",
-]);
+export { distinctiveCompanyTokens };
 
 const YOUTUBE_CHROME = new Set([
   "search filters",
@@ -75,34 +36,10 @@ type Attempt = {
   detail: string;
 };
 
-function tokens(value: string): string[] {
-  return value
-    .toLowerCase()
-    .replace(/&amp;/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 2);
-}
-
-export function distinctiveCompanyTokens(org: string): string[] {
-  const kept = tokens(org).filter((token) => !LEGAL.has(token));
-  const distinctive = kept.filter((token) => token.length >= 5 && !GENERIC.has(token));
-  return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
-}
-
-function wordHit(text: string, token: string): boolean {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
-}
-
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
   const hay = text.toLowerCase();
-  const nameParts = tokens(facts.name).filter((token) => token.length >= 3);
-  const name =
-    nameParts.length >= 2 &&
-    nameParts.every((part) => (NICKNAMES[part] || [part]).some((alt) => wordHit(hay, alt)));
-  const companyTokens = distinctiveCompanyTokens(facts.org);
-  const company = companyTokens.length > 0 && companyTokens.every((token) => wordHit(hay, token));
+  const name = mentionsPerson(text, facts.name);
+  const company = mentionsCompany(text, facts.org, facts.name);
   const city = cityPhrase(facts.location).toLowerCase();
   const cityHit = city.length >= 4 && hay.includes(city);
   let confidence: MatchConfidence = "none";
@@ -171,7 +108,7 @@ export function sameOriginPages(html: string, base: string): string[] {
       continue;
     }
     if (url.origin !== origin) continue;
-    if (!/about|contact|team|leader|our-story|who-we/i.test(`${url.pathname} ${match[1]}`)) continue;
+    if (!/about|contact|team|leader|people|executive|management|our-company|our-firm|our-story|who-we/i.test(`${url.pathname} ${match[1]}`)) continue;
     url.hash = "";
     const href = url.toString();
     if (seen.has(href)) continue;
@@ -511,36 +448,59 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   );
   attempts.push(...platformResults);
 
-  const newsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(`"${person}" OR "${facts.org}" when:5y`)}&hl=en-US&gl=US&ceid=US:en`;
-  const news = await pull(fetchText, newsUrl);
-  if (accessBlocked(news.status, news.text, newsUrl) || !/<item\b/i.test(news.text)) {
-    attempts.push(blockedAttempt("screen-news", "Google News", newsUrl, newsUrl, "Google News did not return a headline feed."));
-  } else {
-    const titles = [...news.text.matchAll(/<title>([\s\S]*?)<\/title>/gi)].map((match) => match[1]).slice(1, 8);
-    const matched = titles
-      .map((title) => ({ title, score: scorePublicText(title, queryFacts) }))
-      .find((item) => item.score.name || (item.score.company && item.score.confidence !== "low"));
-    if (matched) {
-      attempts.push({
-        key: "screen-news",
-        platform: "Google News",
-        searched: `${person} ${facts.org}`,
-        url: newsUrl,
-        outcome: "found",
-        score: matched.score,
-        detail: matched.title.replace(/<!\[CDATA\[|\]\]>/g, "").slice(0, 180),
-      });
-    } else {
-      attempts.push({
-        key: "screen-news",
-        platform: "Google News",
-        searched: `${person} ${facts.org}`,
-        url: newsUrl,
-        outcome: "not-found",
-        score: emptyScore(),
-        detail: "Google News responded",
-      });
+  const newsQueries = newsSearchQueries(facts).slice(0, 2);
+  const searchedNews = newsQueries.join(" | ") || `${person} ${facts.org}`;
+  let newsBlocked = 0;
+  let newsResponded = 0;
+  let bestNews: { title: string; score: MatchScore; url: string } | null = null;
+  for (const query of newsQueries) {
+    const newsUrl = googleNewsUrl(query);
+    const news = await pull(fetchText, newsUrl);
+    if (accessBlocked(news.status, news.text, newsUrl) || !/<item\b/i.test(news.text)) {
+      newsBlocked += 1;
+      continue;
     }
+    newsResponded += 1;
+    const titles = [...news.text.matchAll(/<title>([\s\S]*?)<\/title>/gi)]
+      .map((match) => match[1].replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").trim())
+      .slice(1, 16);
+    for (const title of titles) {
+      const score = scorePublicText(title, queryFacts);
+      if (!score.name || !score.company) continue;
+      if (!bestNews || rank(score) > rank(bestNews.score)) bestNews = { title, score, url: newsUrl };
+    }
+    if (bestNews?.score.confidence === "high") break;
+  }
+  if (!bestNews && newsBlocked > 0 && newsResponded === 0) {
+    attempts.push(
+      blockedAttempt(
+        "screen-news",
+        "Google News",
+        searchedNews,
+        googleNewsUrl(newsQueries[0] || person),
+        "Google News did not return a headline feed.",
+      ),
+    );
+  } else if (bestNews) {
+    attempts.push({
+      key: "screen-news",
+      platform: "Google News",
+      searched: searchedNews,
+      url: bestNews.url,
+      outcome: "found",
+      score: bestNews.score,
+      detail: bestNews.title.slice(0, 180),
+    });
+  } else {
+    attempts.push({
+      key: "screen-news",
+      platform: "Google News",
+      searched: searchedNews,
+      url: googleNewsUrl(newsQueries[0] || person),
+      outcome: "not-found",
+      score: emptyScore(),
+      detail: "Google News responded",
+    });
   }
 
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;

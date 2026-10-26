@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { emptyPrefillFacts, suggestOne } from "@/lib/guided-prefill";
 import { buildReviewSteps, emptyProgress, publicFinding } from "@/lib/review-steps";
 import { gradeChecks } from "@/lib/verify/grade";
+import { assessEdgarMatch, matchEdgarCompany } from "@/lib/verify/edgar";
+import { registryLinkCheck } from "@/lib/verify/checks";
 import {
   accessBlocked,
   distinctiveCompanyTokens,
@@ -44,12 +46,108 @@ function applicant(): ApplicantFacts {
 }
 
 describe("public screening", () => {
+  it("matches an SEC company title and does not treat a mentioned word as that firm", () => {
+    const rows = [
+      { title: "Blackstone Inc.", ticker: "BX", cik: "1393818" },
+      { title: "Blackstone Secured Lending Fund", ticker: "BXSL", cik: "1736035" },
+      { title: "VEDANTA BIOSCIENCES, INC.", ticker: "", cik: "1677878" },
+      { title: "JPMORGAN CHASE & CO", ticker: "JPM", cik: "19617" },
+    ];
+    expect(matchEdgarCompany(rows, "Blackstone")?.ticker).toBe("BX");
+    expect(matchEdgarCompany(rows, "JPMorgan Chase & Co.")?.ticker).toBe("JPM");
+    expect(matchEdgarCompany(rows, "BuildPro Construction Services LLC")).toBeNull();
+    const judged = assessEdgarMatch({
+      org: "Blackstone",
+      person: "Stephen A. Schwarzman",
+      tickersOk: true,
+      companies: rows,
+      filingNames: ["Blackstone Inc  (BX)", "SCHWARZMAN STEPHEN A"],
+    });
+    expect(judged.status).toBe("PASS");
+    expect(judged.finding).toContain("Blackstone Inc.");
+    expect(judged.finding).toContain("SCHWARZMAN");
+    expect(judged.url).toContain("CIK=1393818");
+    const missed = assessEdgarMatch({
+      org: "Vellixor Hollow Holdings LLC",
+      person: "Zorp Qindle",
+      tickersOk: true,
+      companies: rows,
+      filingNames: ["VEDANTA BIOSCIENCES, INC."],
+    });
+    expect(missed.status).toBe("INCONCLUSIVE");
+    expect(missed.finding.toLowerCase()).not.toContain("not found");
+    const blocked = assessEdgarMatch({
+      org: "Blackstone",
+      person: "Stephen A. Schwarzman",
+      tickersOk: false,
+      companies: [],
+      filingNames: [],
+    });
+    expect(blocked.status).toBe("UNAVAILABLE");
+    expect(blocked.finding.toLowerCase()).toContain("could not be checked");
+    const dc = registryLinkCheck({ ...applicant(), location: "Washington, DC" });
+    expect(dc.url).toContain("os.dc.gov");
+    expect(dc.finding).toContain("Couldn't check for free");
+  });
+
+  it("does not invent a personal LinkedIn slug when the application has none", async () => {
+    const seen: string[] = [];
+    await runPublicScreen({ ...applicant(), linkedinUrl: "", website: "https://www.buildpro-cs.com" }, async (url) => {
+      seen.push(url);
+      if (url.includes("buildpro-cs.com")) return { ok: true, status: 200, text: "BuildPro Construction Services in Saddle Brook" };
+      return { ok: false, status: 403, text: "" };
+    });
+    expect(seen.some((url) => url.includes("/in/"))).toBe(false);
+  });
+
+  it("keeps a headline that names the person and the firm, and skips a different person who shares the surname", async () => {
+    const schwarzman: ApplicantFacts = {
+      ...applicant(),
+      name: "Stephen A. Schwarzman",
+      applicantName: "Stephen A. Schwarzman",
+      org: "Blackstone",
+      location: "New York, NY",
+      website: "",
+      linkedinUrl: "",
+    };
+    const checks = await runPublicScreen(schwarzman, async (url) => {
+      if (!url.includes("news.google.com")) return { ok: false, status: 403, text: "" };
+      const query = decodeURIComponent(url);
+      const title = query.includes("Schwarzman")
+        ? "Blackstone CEO Steve Schwarzman backs a fund - Axios"
+        : "Women's Running Pioneer Lynn Blackstone - New York Road Runners";
+      return { ok: true, status: 200, text: `<rss><channel><title>News</title><item><title>${title}</title></item></channel></rss>` };
+    });
+    const news = checks.find((item) => item.key === "screen-news");
+    expect(news?.status).toBe("PASS");
+    expect(news?.finding).toContain("Steve Schwarzman");
+    expect(news?.finding).not.toContain("Lynn Blackstone");
+    expect(news?.url).toContain("Schwarzman");
+  });
+
   it("scores a page that names the person and the company, including a short first name", () => {
     const about = "Leadership Richard Osika. Richard Osika leads BuildPro Construction Services and is Principal at Captiva Development.";
     expect(scorePublicText(about, facts)).toMatchObject({ name: true, company: true, confidence: "high" });
     expect(scorePublicText("Persistence and Agility with Rich Osika", facts)).toMatchObject({ name: true, company: false, confidence: "low" });
+    expect(scorePublicText("Blackstone CEO Steve Schwarzman backs a fund", { name: "Stephen A. Schwarzman", org: "Blackstone", location: "New York, NY" })).toMatchObject({
+      name: true,
+      company: true,
+      confidence: "high",
+    });
+    expect(scorePublicText("Related Companies chairman Stephen Ross", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(true);
+    expect(scorePublicText("The issue is related to rates", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(false);
+    expect(scorePublicText("Women's Running Pioneer Lynn Blackstone in New York", { name: "Stephen A. Schwarzman", org: "Blackstone", location: "New York, NY" })).toMatchObject({
+      name: false,
+      company: false,
+    });
+    expect(scorePublicText("David M. Rubenstein, Co-Founder of The Carlyle Group", { name: "David M. Rubenstein", org: "The Carlyle Group", location: "Washington, DC" })).toMatchObject({
+      name: true,
+      company: true,
+      confidence: "high",
+    });
+    expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(true);
     expect(distinctiveCompanyTokens(facts.org)).toEqual(["buildpro"]);
-    expect(scorePublicText("Shankara Buildpro shares rose", facts).confidence).toBe("low");
+    expect(scorePublicText("Shankara Buildpro shares rose", facts)).toMatchObject({ name: false, company: false, confidence: "none" });
   });
 
   it("treats a LinkedIn auth wall and a search challenge as blocked, not as a miss", () => {

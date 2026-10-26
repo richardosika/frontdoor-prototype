@@ -5,6 +5,7 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
+import { lookupEdgar } from "@/lib/verify/edgar";
 import { runPublicScreen } from "@/lib/verify/screen";
 import { webFootprintCheck } from "@/lib/verify/web-search";
 
@@ -548,13 +549,24 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX)\b/)?.[1];
+  const state = facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA)\b/)?.[1];
   const links: Record<string, string> = {
     NJ: "https://www.njportal.com/DOR/BusinessNameSearch/",
     NY: "https://apps.dos.ny.gov/publicInquiry/",
     DE: "https://icis.corp.delaware.gov/Ecorp/EntitySearch/NameSearch.aspx",
     FL: "https://search.sunbiz.org/Inquiry/CorporationSearch/ByName",
     TX: "https://mycpa.cpa.state.tx.us/coa/",
+    DC: "https://os.dc.gov/service/corporate-registration-search",
+    CA: "https://bizfileonline.sos.ca.gov/search/business",
+    IL: "https://www.ilsos.gov/departments/business_services/corp.html",
+    MA: "https://corp.sec.state.ma.us/corpweb/CorpSearch/CorpSearch.aspx",
+    WA: "https://ccfs.sos.wa.gov/",
+    GA: "https://ecorp.sos.ga.gov/BusinessSearch",
+    PA: "https://www.corporations.pa.gov/search/corpsearch",
+    CT: "https://service.ct.gov/business/s/onlinebusinesssearch",
+    MD: "https://egov.maryland.gov/businessexpress/entitysearch",
+    CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
+    VA: "https://cis.scc.virginia.gov/",
   };
   if (!state || !links[state]) {
     return check({
@@ -674,28 +686,16 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     );
   }
   out.push(...(await runPublicScreen(ctx.facts, fetchText)));
-  const edgarUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${ctx.facts.org}"`)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01&forms=D`;
-  const edgar = await fetchText(edgarUrl);
-  let edgarHits = 0;
-  try {
-    const parsed = JSON.parse(edgar.text) as { hits?: { total?: { value?: number } } };
-    edgarHits = parsed.hits?.total?.value ?? 0;
-  } catch {
-    edgarHits = 0;
-  }
+  const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name);
   out.push(
     check({
       key: "edgar",
-      status: !edgar.ok ? "UNAVAILABLE" : edgarHits > 0 ? "PASS" : "INCONCLUSIVE",
+      status: edgar.status,
       weight: 12,
-      finding: !edgar.ok
-        ? "EDGAR was blocked, timed out, or did not respond. This source could not be checked."
-        : edgarHits > 0
-          ? `EDGAR full-text search returned ${edgarHits} hit(s) for the company name. Open the link and confirm it is the same firm.`
-          : "EDGAR responded. No data found for this company name.",
+      finding: edgar.finding,
       source: "SEC EDGAR",
-      url: edgarUrl,
-      corroborates: edgar.ok && edgarHits > 0,
+      url: edgar.url,
+      corroborates: edgar.corroborates,
     }),
   );
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;

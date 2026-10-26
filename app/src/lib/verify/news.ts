@@ -1,11 +1,23 @@
 import { formatEtDate } from "@/lib/format";
-import { nameTokens, normalizeName } from "@/lib/verify/fuzzy";
+import { normalizeName } from "@/lib/verify/fuzzy";
+import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
 /** Negative coverage terms. Plurals are included. "client" does not match "lien". */
 export const NEWS_NEGATIVE =
   /\b(frauds?|indicted|lawsuits?|sued|arrested|ponzi|scams?|bankruptc(?:y|ies)|sanctions?|investigations?|foreclosures?|liens?)\b|\bsec charges\b/i;
+
+const COMMENTARY_BEFORE_NEGATIVE =
+  /\b(says|said|plays down|played down|dismisses|dismissed|warns|warned|comments|commented|discusses|discussed|notes|noted)\b/i;
+
+/** A headline that quotes someone discussing bankruptcies or lawsuits is not an allegation against them. */
+export function allegedNegative(text: string): boolean {
+  const match = NEWS_NEGATIVE.exec(text);
+  if (!match || match.index === undefined) return false;
+  const before = text.slice(Math.max(0, match.index - 90), match.index);
+  return !COMMENTARY_BEFORE_NEGATIVE.test(before);
+}
 
 const STORY_LIMIT = 8;
 
@@ -33,14 +45,18 @@ export function cityPhrase(location: string): string {
 }
 
 export function newsSearchQueries(facts: ApplicantFacts): string[] {
-  const person = stripQuotes(facts.applicantName);
+  const person = stripQuotes(facts.applicantName).replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
+  const companyToken = distinctiveCompanyTokens(company)[0] || company;
+  const last = person.split(" ").filter((part) => part.length >= 3).slice(-1)[0] || "";
   const queries: string[] = [];
-  if (person && company && normalizeName(person) !== normalizeName(company)) queries.push(`"${person}" OR "${company}"`);
-  else if (person || company) queries.push(`"${person || company}"`);
+  if (person && companyToken && normalizeName(person) !== normalizeName(company)) {
+    queries.push(`"${person}" ${companyToken}`);
+    if (last && normalizeName(last) !== normalizeName(person)) queries.push(`"${last}" "${companyToken}"`);
+  } else if (person || company) queries.push(`"${person || company}"`);
   if (company && city && normalizeName(city) !== normalizeName(company)) queries.push(`"${company}" "${city}"`);
-  return queries;
+  return queries.slice(0, 3);
 }
 
 export function gdeltQuery(facts: ApplicantFacts): string {
@@ -168,12 +184,12 @@ export function classifyNews(
       .flatMap((item) => {
         const blob = `${item.title} ${item.snippet}`;
         const person = Boolean(personName) && textHasName(blob, personName);
-        const company = Boolean(companyName) && textHasCompany(blob, companyName);
+        const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);
         if (!person && !company) return [];
         return [
           {
             ...item,
-            tone: NEWS_NEGATIVE.test(blob) ? ("negative" as const) : ("neutral" as const),
+            tone: allegedNegative(blob) ? ("negative" as const) : ("neutral" as const),
             person,
             company,
             location: textHasLocation(blob, facts.location),
@@ -223,7 +239,8 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
   const responded = providers.filter((provider) => provider.state === "responded").map((provider) => provider.name);
   const blocked = providers.filter((provider) => provider.state === "unavailable").map((provider) => provider.name);
   const feeds = feedSentence(responded, blocked);
-  const base = { key: "news", weight: 8, source: responded.join(", ") || blocked.join(", ") || "News", url: "", ranAt };
+  const evidenceUrl = items.find((item) => item.person && item.company)?.url || items[0]?.url || "";
+  const base = { key: "news", weight: 8, source: responded.join(", ") || blocked.join(", ") || "News", url: evidenceUrl, ranAt };
   if (!responded.length) {
     return {
       ...base,
@@ -395,17 +412,11 @@ function safeHttpUrl(value: string): string {
 }
 
 function textHasName(text: string, name: string): boolean {
-  const tokens = nameTokens(name);
-  const hay = normalizeName(text);
-  if (tokens.length >= 2) return tokens.every((token) => new RegExp(`\\b${escapeRegExp(token)}\\b`).test(hay));
-  const phrase = normalizeName(name);
-  return phrase.length >= 5 && new RegExp(`\\b${escapeRegExp(phrase)}\\b`).test(hay);
+  return mentionsPerson(text, name);
 }
 
-function textHasCompany(text: string, org: string): boolean {
-  const phrase = normalizeName(org);
-  if (phrase.length < 5) return false;
-  return new RegExp(`\\b${escapeRegExp(phrase)}\\b`).test(normalizeName(text));
+function textHasCompany(text: string, org: string, person = ""): boolean {
+  return mentionsCompany(text, org, person);
 }
 
 function textHasLocation(text: string, location: string): boolean {

@@ -3,6 +3,7 @@ import { scoreReport } from "@/lib/verify/score";
 import type { ApplicantFacts } from "@/lib/verify/types";
 import {
   bingNewsUrl,
+  allegedNegative,
   classifyNews,
   feedBodyState,
   newsStoryChipLabel,
@@ -54,7 +55,8 @@ describe("news feeds", () => {
   it("builds quoted person, company, and company-plus-city queries", () => {
     const applicant = facts();
     expect(newsSearchQueries(applicant)).toEqual([
-      `"Stephen Ross" OR "Related Companies"`,
+      `"Stephen Ross" related`,
+      `"Ross" "related"`,
       `"Related Companies" "New York"`,
     ]);
     expect(googleNewsUrl(newsSearchQueries(applicant)[0])).toContain("https://news.google.com/rss/search?q=");
@@ -102,7 +104,7 @@ describe("news feeds", () => {
   });
 
   it("does not treat a query echo or a url-only name as coverage", () => {
-    const query = `"Stephen Ross" OR "Related Companies"`;
+    const query = newsSearchQueries(facts())[0];
     const checks = classifyNews(
       facts(),
       [
@@ -188,13 +190,36 @@ describe("news feeds", () => {
     expect(checks[0].reviewFlag).toBe(true);
     expect(checks[0].hardFlag).toBeUndefined();
     expect(checks[0].finding).toContain("not an automatic decline");
-    const negative = checks.find((check) => check.url === "https://example.com/charges");
+    const negative = checks.find((check) => check.key === "news-story" && check.url === "https://example.com/charges");
     expect(negative?.key).toBe("news-story");
     expect(negative?.status).toBe("FAIL");
     expect(negative?.finding).toContain("Negative");
     expect(negative?.finding).toContain("2026-03-04");
     expect(negative?.source).toBe("Court Desk via Bing News");
     expect(scoreReport(checks).verdict).toBe("NEEDS_OWNER_DECISION");
+  });
+
+  it("does not treat a comment about bankruptcies as an allegation", () => {
+    const headline = "Blackstone's Schwarzman plays down private credit concerns over bankruptcies";
+    expect(allegedNegative(headline)).toBe(false);
+    expect(allegedNegative("SEC charges Stephen Ross and Related Companies")).toBe(true);
+    const checks = classifyNews(
+      facts({ name: "Stephen A. Schwarzman", applicantName: "Stephen A. Schwarzman", org: "Blackstone" }),
+      [
+        {
+          title: headline,
+          snippet: "Stephen Schwarzman discussed private credit.",
+          url: "https://example.com/credit",
+          source: "Market Desk",
+          publishedAt: "2025-12-09T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }, { name: "Bing News", state: "responded" }, { name: "GDELT", state: "responded" }],
+      NOW,
+    );
+    expect(checks[0].status).toBe("PASS");
+    expect(checks[0].status).not.toBe("FAIL");
   });
 
   it("passes neutral coverage that names the person and the company", () => {

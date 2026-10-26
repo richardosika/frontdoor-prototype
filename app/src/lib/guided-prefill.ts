@@ -165,6 +165,7 @@ function suggestIdentity(facts: PrefillFacts, evidence: EvidenceRow[]): StepSugg
     "screen-instagram",
     "screen-youtube",
     "screen-tiktok",
+    "news",
   ];
   for (const key of publicKeys) {
     const item = row(evidence, key);
