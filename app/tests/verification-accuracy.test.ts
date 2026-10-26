@@ -936,9 +936,10 @@ describe("QA follow-up scoring", () => {
   it("treats a missing referral as not applicable under R2 and still fails an invalid code", () => {
     const empty = inviteCheck(facts({ inviteNote: "" }));
     expect(empty.status).toBe("NOT_RUN");
-    expect(empty.finding).toBe("no referral supplied");
+    expect(empty.finding).toBe("No referral or request code was stored");
     const valid = inviteCheck(facts({ inviteNote: "PF-BENCH-0000 · Benchmark invite code" }));
     expect(valid.status).toBe("PASS");
+    expect(valid.finding).toContain("Referral or request:");
     const invalid = inviteCheck(facts({ inviteNote: "NO", inviteValid: false }));
     expect(invalid.status).toBe("FAIL");
     expect(invalid.reviewFlag).toBe(true);
@@ -951,13 +952,22 @@ describe("QA follow-up scoring", () => {
     ];
     const standard = gradeChecks(local, facts({ inviteNote: "" }));
     const proposed = gradeChecks(local, facts({ inviteNote: "" }), { weightsMode: "r2" });
-    expect(standard.categories.find((category) => category.id === "role")?.reason).toContain("no referral supplied (0 of 4)");
-    expect(proposed.categories.find((category) => category.id === "role")?.reason).toContain("no referral supplied.");
+    expect(standard.categories.find((category) => category.id === "role")?.reason).toContain("No referral was supplied (0 of 4)");
+    expect(standard.summary.couldNotCheck).toContain("No referral was supplied.");
+    expect(standard.summary.couldNotCheck).not.toMatch(/invite/i);
+    expect(proposed.categories.find((category) => category.id === "role")?.reason).toContain("No referral was supplied.");
     expect(proposed.categories.find((category) => category.id === "role")?.reason).not.toContain("0 of 4");
     expect(proposed.summary.couldNotCheck).toContain("Coverage:");
     expect(standard.score).toBeLessThan(proposed.score);
     const flagged = gradeChecks([invalid], facts({ inviteNote: "NO" }));
-    expect(flagged.categories.find((category) => category.id === "role")?.reason).toContain("The invite code was supplied but is not valid (0 of 4)");
-    expect(flagged.summary.didNotCheckOut).toContain("The invite code was supplied but is not valid");
+    expect(flagged.categories.find((category) => category.id === "role")?.reason).toContain("The referral or request code was supplied but is not valid (0 of 4)");
+    expect(flagged.summary.didNotCheckOut).toContain("The referral or request code was supplied but is not valid");
+    const unmatched = gradeChecks(
+      [row({ key: "invite-source", status: "INCONCLUSIVE", finding: "Stored value did not match a member.", source: "Referral or request code" })],
+      facts({ inviteNote: "NO-MATCH" }),
+    );
+    expect(unmatched.categories.find((category) => category.id === "role")?.reason).toContain("The referral could not be matched (0 of 4)");
+    expect(unmatched.summary.couldNotCheck).toContain("The referral could not be matched.");
+    expect(unmatched.summary.couldNotCheck).not.toMatch(/invite/i);
   });
 });

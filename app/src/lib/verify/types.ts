@@ -42,7 +42,7 @@ export type ApplicantFacts = {
   socialLinks: string;
   statement: string;
   inviteNote: string;
-  /** False when a stored invite code is expired or used up. Absent when no code was supplied. */
+  /** False when a stored referral or request code is expired or used up. Absent when no code was supplied. */
   inviteValid?: boolean;
   testProfile: string;
   cardText: string;

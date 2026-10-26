@@ -573,8 +573,8 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
       key: "invite-source",
       status: "NOT_RUN",
       weight: 6,
-      finding: "no referral supplied",
-      source: "Invite code",
+      finding: "No referral or request code was stored",
+      source: "Referral or request code",
       url: "",
     });
   }
@@ -586,8 +586,8 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
       status: "FAIL",
       weight: 6,
       reviewFlag: true,
-      finding: "The invite code was supplied but is not valid.",
-      source: "Invite code",
+      finding: "The referral or request code was supplied but is not valid.",
+      source: "Referral or request code",
       url: "",
     });
   }
@@ -595,8 +595,8 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
     key: "invite-source",
     status: "PASS",
     weight: 6,
-    finding: `Invite source: ${facts.inviteNote}.`,
-    source: "Invite code",
+    finding: `Referral or request: ${facts.inviteNote}.`,
+    source: "Referral or request code",
     url: "",
   });
 }

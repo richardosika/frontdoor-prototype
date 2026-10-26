@@ -377,7 +377,7 @@ function passSentence(check: CheckOutput): string | null {
     case "plausibility":
       return `The name, company, and role are filled in and can be read (${source}).`;
     case "invite-source":
-      return `An invite code is on the file (${source}).`;
+      return `A referral or request code is on the file (${source}).`;
     case "social-links":
       return `The other social links are full web addresses (${source}). Those pages were not opened.`;
     case "website":
@@ -470,6 +470,10 @@ function failSentence(check: CheckOutput): string | null {
 function uncheckedSentence(check: CheckOutput): string | null {
   if (check.key === "news-story" || check.key === "email-provider" || check.key === "mx") return null;
   if (check.status !== "INCONCLUSIVE" && check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE") return null;
+  if (check.key === "invite-source") {
+    if (check.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(check.finding)) return "No referral was supplied.";
+    return "The referral could not be matched.";
+  }
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
@@ -497,7 +501,7 @@ function labelFor(key: string): string {
     "text-risk": "Write-up check",
     velocity: "Repeat-application check",
     plausibility: "Name and company check",
-    "invite-source": "Invite source",
+    "invite-source": "Referral",
     "social-links": "Social links",
     website: "Company website",
     edgar: "SEC EDGAR",
@@ -530,7 +534,7 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   const org = facts.org?.trim() || "a company they did not name";
   const role = roleLabel(facts.role);
   const location = facts.location?.trim() || "no location was given";
-  const invite = facts.inviteNote?.trim() ? `They came in through invite ${facts.inviteNote.trim()}.` : "no referral supplied.";
+  const invite = facts.inviteNote?.trim() ? `They came in through a referral or request: ${facts.inviteNote.trim()}.` : "No referral was supplied.";
   if (subject === "COMPANY") {
     return `This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`;
   }
@@ -624,11 +628,13 @@ function footprintAward(row: CheckOutput | undefined, earned: boolean, possible:
 }
 
 function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
-  if (row?.status === "FAIL") return portionLine(0, possible, "The invite code was supplied but is not valid");
-  const absent = !facts.inviteNote?.trim() || row?.status === "NOT_RUN" || /no referral supplied/i.test(row?.finding || "");
-  if (absent && mode === "r2") return { earned: 0, possible: 0, reason: "no referral supplied." };
-  if (absent) return portionLine(0, possible, "no referral supplied");
-  return award(row?.status === "PASS", possible, "An invite code is on the file", "No invite source was confirmed");
+  if (row?.status === "FAIL") return portionLine(0, possible, "The referral or request code was supplied but is not valid");
+  const absent = !facts.inviteNote?.trim() || row?.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(row?.finding || "");
+  if (absent && mode === "r2") return { earned: 0, possible: 0, reason: "No referral was supplied." };
+  if (absent) return portionLine(0, possible, "No referral was supplied");
+  if (row?.status === "INCONCLUSIVE") return portionLine(0, possible, "The referral could not be matched");
+  if (row?.status === "PASS") return award(true, possible, "A referral or request code is on the file", "No referral was supplied");
+  return { earned: 0, possible, reason: "No referral was supplied." };
 }
 
 export function gradeChecks(

@@ -15,5 +15,5 @@ export const VERIFICATION_SOURCES = [
   { name: "Social pages (LinkedIn, X, Facebook, Instagram, YouTube, TikTok)", kind: "Public HTTP only. A login wall is could not check, not a miss." },
   { name: "NY Active Corporations", kind: "data.ny.gov, keyless. Exact normalized name only. Company-exists evidence, not a person link. Other states stay a manual link and are not a pass." },
   { name: "Business card text compare", kind: "Local. OCR is installed (tesseract.js). If it returns no text, the image is marked could not be checked. A text match is self-reported." },
-  { name: "Duplicates, phone area code, invite source, velocity", kind: "Private Floor records" },
+  { name: "Duplicates, phone area code, referral or request, velocity", kind: "Private Floor records" },
 ] as const;
