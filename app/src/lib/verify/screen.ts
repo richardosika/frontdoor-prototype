@@ -357,7 +357,7 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       status: "INCONCLUSIVE",
       corroborates: false,
       reviewFlag: true,
-      finding: `Searched: ${attempt.searched}. This may no longer be at the company on the application. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. This may no longer be at the company on the application. The page reads as an announced departure. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.

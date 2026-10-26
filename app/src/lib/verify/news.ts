@@ -401,7 +401,7 @@ function newsSummary(
       ...base,
       status: "INCONCLUSIVE",
       reviewFlag: true,
-      finding: `This may no longer be at ${companyName || "the company on the application"}. The headline reads as a departure, not current employment. ${feeds}`.trim(),
+      finding: `This may no longer be at ${companyName || "the company on the application"}. The headline is an announced departure, not current employment. ${feeds}`.trim(),
     };
   }
   if (aligned) {

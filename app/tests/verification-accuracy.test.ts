@@ -1268,6 +1268,35 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     expect(departure[0].corroborates).not.toBe(true);
     expect(departure[0].reviewFlag).toBe(true);
     expect(departure[0].finding.toLowerCase()).toContain("may no longer be at");
+    expect(departure[0].finding.toLowerCase()).toContain("announced departure");
+    for (const headline of [
+      "Sherwin Belkin to retire from Belkin Burden Goldman",
+      "Barry Gosin to step down as CEO of Newmark Group",
+    ]) {
+      const org = headline.includes("Belkin") ? "Belkin Burden Goldman LLP" : "Newmark Group";
+      const name = headline.includes("Belkin") ? "Sherwin Belkin" : "Barry Gosin";
+      const retired = classifyNews(
+        facts({ name, applicantName: name, org, location: "New York, NY" }),
+        [
+          {
+            title: headline,
+            snippet: headline,
+            url: "https://example.com/departure",
+            source: "Trade Desk",
+            publishedAt: "2026-06-01T15:00:00.000Z",
+            provider: "Google News",
+          },
+        ],
+        [{ name: "Google News", state: "responded" }],
+        NOW,
+      );
+      expect(retired[0].status).toBe("INCONCLUSIVE");
+      expect(retired[0].status).not.toBe("FAIL");
+      expect(retired[0].status).not.toBe("PASS");
+      expect(retired[0].reviewFlag).toBe(true);
+      expect(retired[0].finding.toLowerCase()).toContain("announced departure");
+      expect(retired[0].finding.toLowerCase()).toContain("may no longer be at");
+    }
     const joined = classifyNews(
       facts({ name: "Doug Harmon", applicantName: "Doug Harmon", org: "Newmark", location: "New York, NY" }),
       [

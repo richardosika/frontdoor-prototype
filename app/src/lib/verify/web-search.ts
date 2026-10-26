@@ -229,7 +229,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       status: "INCONCLUSIVE",
       weight: 12,
       reviewFlag: true,
-      finding: `This may no longer be at ${facts.org}. ${departed.provider} returned a departure headline, not current employment.`,
+      finding: `This may no longer be at ${facts.org}. ${departed.provider} returned an announced departure, not current employment.`,
       source: departed.provider,
       url: departed.url,
       ranAt,

@@ -336,7 +336,7 @@ export function leftTheCompany(text: string, org: string): boolean {
     if (mentionsCompany(destination, org)) return false;
     if (mentionsCompany(origin, org)) return true;
   }
-  return /\b(?:leaves|left|leaving|departs|departed|departing)\b/i.test(text);
+  return /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b/i.test(text);
 }
 
 function looksLikeGivenName(word: string): boolean {
