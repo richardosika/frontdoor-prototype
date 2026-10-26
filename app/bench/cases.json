@@ -1,0 +1,316 @@
+{
+  "_meta": {
+    "title": "Private Floor Club verification benchmark cases",
+    "groundTruthNote": "GROUND TRUTH TO BE CONFIRMED BY RICHARD. Person-to-company links and titles for REAL cases are the benchmark author's public-knowledge assumptions. They are NOT verified and the harness never asserts a current job title. Cases marked companyOnly only expect company corroboration.",
+    "defaults": {
+      "role": "DEVELOPER",
+      "phone": "",
+      "socialLinks": "",
+      "statement": "I invest in and operate commercial and residential real estate and would like to meet other owners and operators.",
+      "inviteNote": "PF-BENCH-0000 · Benchmark invite code",
+      "linkedinUrl": "",
+      "website": "",
+      "location": "New York, NY",
+      "watchlist": "full"
+    },
+    "emailPolicy": "Every case uses a Gmail address (except F02 which is a disposable mailinator address on purpose) so the email domain carries no signal. Nothing is ever sent to these addresses."
+  },
+  "cases": [
+    {
+      "id": "R01",
+      "kind": "real",
+      "label": "Prologis (company only)",
+      "companyOnly": true,
+      "personAssumption": "Hamid Moghadam - assumed Prologis co-founder/executive; unverified",
+      "name": "Hamid Moghadam",
+      "email": "pf.bench.r01@gmail.com",
+      "org": "Prologis",
+      "website": "https://www.prologis.com",
+      "linkedinUrl": "https://www.linkedin.com/company/prologis/",
+      "location": "San Francisco, CA",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R02",
+      "kind": "real",
+      "label": "Blackstone / Jonathan Gray",
+      "personAssumption": "Jonathan Gray - assumed Blackstone executive; title unverified",
+      "name": "Jonathan Gray",
+      "email": "pf.bench.r02@gmail.com",
+      "org": "Blackstone",
+      "website": "https://www.blackstone.com",
+      "linkedinUrl": "https://www.linkedin.com/company/blackstone/",
+      "location": "New York, NY",
+      "role": "INVESTOR_PE"
+    },
+    {
+      "id": "R03",
+      "kind": "real",
+      "label": "Related Companies / Stephen Ross",
+      "personAssumption": "Stephen Ross - assumed Related founder; title unverified",
+      "name": "Stephen Ross",
+      "email": "pf.bench.r03@gmail.com",
+      "org": "Related Companies",
+      "website": "https://www.related.com",
+      "linkedinUrl": "https://www.linkedin.com/company/related/",
+      "location": "New York, NY",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R04",
+      "kind": "real",
+      "label": "Tishman Speyer / Rob Speyer",
+      "personAssumption": "Rob Speyer - assumed Tishman Speyer executive; title unverified",
+      "name": "Rob Speyer",
+      "email": "pf.bench.r04@gmail.com",
+      "org": "Tishman Speyer",
+      "website": "https://www.tishmanspeyer.com",
+      "linkedinUrl": "https://www.linkedin.com/company/tishman-speyer/",
+      "location": "New York, NY",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R05",
+      "kind": "real",
+      "label": "Hines / Jeff Hines",
+      "personAssumption": "Jeff Hines - assumed Hines executive; title unverified",
+      "name": "Jeff Hines",
+      "email": "pf.bench.r05@gmail.com",
+      "org": "Hines",
+      "website": "https://www.hines.com",
+      "linkedinUrl": "https://www.linkedin.com/company/hines/",
+      "location": "Houston, TX",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R06",
+      "kind": "real",
+      "label": "Silverstein Properties / Larry Silverstein",
+      "personAssumption": "Larry Silverstein - assumed Silverstein Properties founder; title unverified",
+      "name": "Larry Silverstein",
+      "email": "pf.bench.r06@gmail.com",
+      "org": "Silverstein Properties",
+      "website": "https://www.silversteinproperties.com",
+      "linkedinUrl": "https://www.linkedin.com/company/silverstein-properties/",
+      "location": "New York, NY",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R07",
+      "kind": "real",
+      "label": "Veris Residential (company only)",
+      "companyOnly": true,
+      "personAssumption": "Mahbod Nia - assumed Veris Residential executive; chosen by bench author, unverified",
+      "name": "Mahbod Nia",
+      "email": "pf.bench.r07@gmail.com",
+      "org": "Veris Residential",
+      "website": "https://verisresidential.com",
+      "linkedinUrl": "https://www.linkedin.com/company/verisresidential/",
+      "location": "Jersey City, NJ",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R08",
+      "kind": "real",
+      "label": "Hovnanian Enterprises / Ara Hovnanian",
+      "personAssumption": "Ara Hovnanian - assumed Hovnanian Enterprises executive; title unverified. hovnanian.com does not resolve from the box, so the corporate site khov.com is used.",
+      "name": "Ara Hovnanian",
+      "email": "pf.bench.r08@gmail.com",
+      "org": "Hovnanian Enterprises",
+      "website": "https://www.khov.com",
+      "linkedinUrl": "https://www.linkedin.com/company/khov/",
+      "location": "Red Bank, NJ",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R09",
+      "kind": "real",
+      "label": "Toll Brothers (company only)",
+      "companyOnly": true,
+      "personAssumption": "Douglas Yearley - assumed Toll Brothers executive; chosen by bench author, unverified",
+      "name": "Douglas Yearley",
+      "email": "pf.bench.r09@gmail.com",
+      "org": "Toll Brothers",
+      "website": "https://www.tollbrothers.com",
+      "linkedinUrl": "https://www.linkedin.com/company/toll-brothers/",
+      "location": "Fort Washington, PA",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "R10",
+      "kind": "real",
+      "label": "Greystar (company only)",
+      "companyOnly": true,
+      "personAssumption": "Bob Faith - assumed Greystar founder; chosen by bench author, unverified",
+      "name": "Bob Faith",
+      "email": "pf.bench.r10@gmail.com",
+      "org": "Greystar",
+      "website": "https://www.greystar.com",
+      "linkedinUrl": "https://www.linkedin.com/company/greystar/",
+      "location": "Charleston, SC",
+      "role": "PROPERTY_MANAGER"
+    },
+    {
+      "id": "F01",
+      "kind": "fake",
+      "label": "Control 1: invented firm, Gmail, no site",
+      "name": "Jane Roe",
+      "email": "pf.bench.f01@gmail.com",
+      "org": "Zorblax Capital Partners LLC",
+      "role": "INVESTOR_PE"
+    },
+    {
+      "id": "F02",
+      "kind": "fake",
+      "label": "Control 2: invented firm, mailinator, no site/LinkedIn",
+      "name": "Gordon Fennimore",
+      "email": "gfennimore@mailinator.com",
+      "org": "Pellucid Anvil Holdings LLC",
+      "role": "INVESTOR_PE"
+    },
+    {
+      "id": "F03a",
+      "kind": "fake",
+      "label": "Control 3a: impersonation - Gmail + 'Prologis' + made-up person, no site",
+      "name": "Tobias Wrenfield",
+      "email": "pf.bench.f03a@gmail.com",
+      "org": "Prologis",
+      "role": "DEVELOPER",
+      "location": "San Francisco, CA"
+    },
+    {
+      "id": "F03b",
+      "kind": "fake",
+      "label": "Control 3b: impersonation - made-up person + 'Prologis' + the REAL prologis.com site and company LinkedIn",
+      "name": "Tobias Wrenfield",
+      "email": "pf.bench.f03b@gmail.com",
+      "org": "Prologis",
+      "website": "https://www.prologis.com",
+      "linkedinUrl": "https://www.linkedin.com/company/prologis/",
+      "role": "DEVELOPER",
+      "location": "San Francisco, CA"
+    },
+    {
+      "id": "F04",
+      "kind": "fake",
+      "label": "Control 4: invented firm with self-hosted page naming the person",
+      "name": "Marisol Quentin-Vale",
+      "email": "pf.bench.f04@gmail.com",
+      "org": "Quillfeather Ridge Holdings LLC",
+      "website": "{{fixture}}",
+      "role": "DEVELOPER",
+      "fixture": {
+        "title": "Quillfeather Ridge Holdings LLC",
+        "body": "Quillfeather Ridge Holdings LLC is a private real estate investment firm. Marisol Quentin-Vale, Managing Partner, leads acquisitions and investor relations. Quillfeather Ridge Holdings has completed over 40 transactions. Contact Marisol Quentin-Vale to learn more."
+      }
+    },
+    {
+      "id": "F04b",
+      "kind": "fake",
+      "label": "Control 4b (padded): F04 plus format-valid LinkedIn, matching-area-code phone, and a social URL - tests how close a cosmetic fake gets to grade C",
+      "name": "Marisol Quentin-Vale",
+      "email": "pf.bench.f04b@gmail.com",
+      "org": "Quillfeather Ridge Holdings LLC",
+      "website": "{{fixture}}",
+      "role": "DEVELOPER",
+      "linkedinUrl": "https://www.linkedin.com/in/marisol-quentin-vale",
+      "phone": "212-555-0147",
+      "socialLinks": "https://twitter.com/quillfeatherridge",
+      "fixture": {
+        "title": "Quillfeather Ridge Holdings LLC",
+        "body": "Quillfeather Ridge Holdings LLC is a private real estate investment firm. Marisol Quentin-Vale, Managing Partner, leads acquisitions and investor relations. Quillfeather Ridge Holdings has completed over 40 transactions. Contact Marisol Quentin-Vale to learn more."
+      }
+    },
+    {
+      "id": "F05",
+      "kind": "fake",
+      "label": "Control 5: fraud text with invented firm",
+      "name": "Cornelius Ashdown",
+      "email": "pf.bench.f05@gmail.com",
+      "org": "Brightwater Yield Partners LLC",
+      "role": "INVESTOR_PE",
+      "statement": "Guaranteed returns of 18 percent per month, no risk. Wire funds to our escrow account today and I will send you the subscription documents."
+    },
+    {
+      "id": "F06a",
+      "kind": "fake",
+      "label": "Control 6a: real OFAC SDN individual + location matching the list (full OFAC cache)",
+      "sdnPick": "LOGUNOV, Oleg",
+      "name": "{{sdnName}}",
+      "email": "pf.bench.f06a@gmail.com",
+      "org": "Northbridge Meridian Holdings LLC",
+      "location": "Moscow, Russia",
+      "role": "INVESTOR_PE",
+      "mustSanctions": "FAIL",
+      "mustHardFlag": true
+    },
+    {
+      "id": "F06b",
+      "kind": "fake",
+      "label": "Control 6b: same SDN individual, US location (name-only match, uncorroborated)",
+      "sdnPick": "LOGUNOV, Oleg",
+      "name": "{{sdnName}}",
+      "email": "pf.bench.f06b@gmail.com",
+      "org": "Northbridge Meridian Holdings LLC",
+      "location": "New York, NY",
+      "role": "INVESTOR_PE",
+      "mustSanctions": "FAIL"
+    },
+    {
+      "id": "F06c",
+      "kind": "fake",
+      "label": "Control 6c: BUG PROBE - same as F01 but with an EMPTY watchlist cache; sanctions must be NOT_RUN, not PASS",
+      "name": "Jane Roe",
+      "email": "pf.bench.f06c@gmail.com",
+      "org": "Zorblax Capital Partners LLC",
+      "role": "INVESTOR_PE",
+      "watchlist": "empty",
+      "mustSanctions": "NOT_RUN"
+    },
+    {
+      "id": "F07a",
+      "kind": "fake",
+      "label": "Control 7a: real exec (Stephen Ross) paired with a different real company (Greystar), no site",
+      "name": "Stephen Ross",
+      "email": "pf.bench.f07a@gmail.com",
+      "org": "Greystar",
+      "role": "DEVELOPER",
+      "location": "New York, NY"
+    },
+    {
+      "id": "F07b",
+      "kind": "fake",
+      "label": "Control 7b: real exec (Larry Silverstein) paired with Toll Brothers + Toll Brothers' real site",
+      "name": "Larry Silverstein",
+      "email": "pf.bench.f07b@gmail.com",
+      "org": "Toll Brothers",
+      "website": "https://www.tollbrothers.com",
+      "role": "DEVELOPER",
+      "location": "New York, NY"
+    },
+    {
+      "id": "F08a",
+      "kind": "fake",
+      "label": "Hard fake 8a: copycat spelling of Blackstone, made-up person, no site",
+      "name": "Marcus Tellerman",
+      "email": "pf.bench.f08a@gmail.com",
+      "org": "Blakstone Group",
+      "role": "INVESTOR_PE"
+    },
+    {
+      "id": "F08b",
+      "kind": "fake",
+      "label": "Hard fake 8b: copycat spelling of Toll Brothers with self-hosted page naming the person",
+      "name": "Priscilla Dunmore",
+      "email": "pf.bench.f08b@gmail.com",
+      "org": "Toll Brothres Inc",
+      "website": "{{fixture}}",
+      "role": "DEVELOPER",
+      "location": "Fort Washington, PA",
+      "fixture": {
+        "title": "Toll Brothres Inc",
+        "body": "Toll Brothres Inc builds luxury homes and communities. Priscilla Dunmore, Chief Executive Officer, guides the company. Toll Brothres Inc: Priscilla Dunmore is available for investor inquiries."
+      }
+    }
+  ]
+}
