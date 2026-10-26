@@ -5,6 +5,7 @@ import { applicantDuesSentence, FREE_MEMBERSHIP_LINE } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
 import { templateDef } from "@/lib/email-templates";
+import { expiredDocument, missingPageDocument } from "@/lib/http-document";
 import { reviewCopy } from "@/lib/review-copy";
 import { isSignedInJoinEntry } from "@/lib/session-gate";
 import { readFileSync } from "node:fs";
@@ -75,8 +76,12 @@ describe("QA fixes that stay outside grading", () => {
   it("does not name the demo member on the administrator sign-in page", () => {
     const page = readFileSync(path.resolve(__dirname, "../src/app/admin/login/page.tsx"), "utf8");
     expect(page).not.toContain("Marcus Hale");
-    const missing = readFileSync(path.resolve(__dirname, "../src/app/not-found.tsx"), "utf8");
+    const missing = missingPageDocument(false);
+    expect(missing).toContain("<h1>");
     expect(missing).toContain("Back to home");
-    expect(missing).toContain("auth(");
+    expect(missing).not.toContain("Back to the feed");
+    expect(missingPageDocument(true)).toContain("Back to the feed");
+    expect(expiredDocument("status")).toContain("<h1>Status link</h1>");
+    expect(expiredDocument("payment")).toContain("<h1>Payment link</h1>");
   });
 });

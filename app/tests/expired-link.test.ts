@@ -28,9 +28,10 @@ describe("expired pay and status links", () => {
     expect(application).toContain('kind="status"');
     expect(invite).toContain('kind="status"');
     expect(request).toContain('kind="status"');
-    expect(readFileSync(path.join(ROOT, "app/pay/[token]/page.tsx"), "utf8")).toContain("notFound()");
-    expect(readFileSync(path.join(ROOT, "app/apply/status/[token]/page.tsx"), "utf8")).toContain("notFound()");
-    expect(readFileSync(path.join(ROOT, "app/request-status/[token]/page.tsx"), "utf8")).toContain("notFound()");
+    expect(readFileSync(path.join(ROOT, "app/pay/[token]/route.ts"), "utf8")).toContain("status: 404");
+    expect(readFileSync(path.join(ROOT, "app/apply/status/[token]/route.ts"), "utf8")).toContain("status: 404");
+    expect(readFileSync(path.join(ROOT, "app/request-status/[token]/route.ts"), "utf8")).toContain("status: 404");
+    expect(readFileSync(path.join(ROOT, "lib/http-document.ts"), "utf8")).toContain("<h1>");
     expect(readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8")).toContain("/request-status/");
   });
 });

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PayDues } from "@/components/pay-dues";
 import { btn } from "@/components/ui";
@@ -19,7 +19,7 @@ export default async function PayTokenPage({
   const { token } = await params;
   const query = await searchParams;
   const member = await prisma.user.findUnique({ where: { paymentToken: token } });
-  if (!member || member.status !== "ACTIVE") notFound();
+  if (!member || member.status !== "ACTIVE") redirect(`/pay/${encodeURIComponent(token)}`);
   const viewer = await currentUser();
   if (viewer && viewer.id !== member.id) {
     return (

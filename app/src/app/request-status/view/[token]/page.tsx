@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
 import { applicationReceivedMessage, INVITE_STATUS_COPY } from "@/lib/applicant-copy";
@@ -16,7 +16,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
     where: { statusToken: token },
     select: { name: true, status: true, role: true },
   });
-  if (!request) notFound();
+  if (!request) redirect(`/request-status/${encodeURIComponent(token)}`);
   const pending = request.status === "PENDING";
   const status = request.status === "DECLINED" ? "DECLINED" : "IN_REVIEW";
   const copy = pending ? memberStatusCopy("IN_REVIEW") : INVITE_STATUS_COPY[request.status];

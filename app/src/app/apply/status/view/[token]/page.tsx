@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { ApplyReply } from "@/components/apply-reply";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function ApplicationStatusPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const application = await prisma.application.findUnique({ where: { statusToken: token } });
-  if (!application) notFound();
+  if (!application) redirect(`/apply/status/${encodeURIComponent(token)}`);
   const copy = memberStatusCopy(application.status);
   const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";

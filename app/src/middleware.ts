@@ -11,6 +11,7 @@ import {
   siteGateExempt,
   skipsMemberSession,
 } from "@/lib/site-gate";
+import { isKnownAppPath, missingPageDocument } from "@/lib/http-document";
 import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
@@ -37,6 +38,14 @@ const withSession = auth(async (req) => {
       new NextResponse(hiddenStatus === 404 ? "Not found" : "Forbidden", {
         status: hiddenStatus,
         headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+    );
+  }
+  if (!isKnownAppPath(path)) {
+    return withRobots(
+      new NextResponse(missingPageDocument(loggedIn), {
+        status: 404,
+        headers: { "content-type": "text/html; charset=utf-8" },
       }),
     );
   }
