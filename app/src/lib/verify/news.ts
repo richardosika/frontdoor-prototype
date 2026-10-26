@@ -516,7 +516,18 @@ function corroborated(item: Classified): boolean {
   return item.kind === "hard" && item.person && (item.company || item.location);
 }
 
+/**
+ * REO, a dividend, a downgrade, or an earnings line is an ordinary results headline.
+ * A lawsuit, a docket, or a fraud word in the same text still counts.
+ */
+export function ordinaryResults(text: string): boolean {
+  if (NEWS_PERSON_HARD.test(text) || civilDocket(text)) return false;
+  if (/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text)) return false;
+  return /\b(reos?|real estate owned|dividends?|downgrades?|earnings)\b/i.test(text);
+}
+
 function negativeKind(text: string): "hard" | "civil" | "none" {
+  if (ordinaryResults(text)) return "none";
   if (NEWS_PERSON_HARD.test(text) && allegedNegative(text)) return "hard";
   if (civilDocket(text)) return "civil";
   if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
@@ -525,6 +536,7 @@ function negativeKind(text: string): "hard" | "civil" | "none" {
 
 /** Foreclosure without a fraud term, a docket, or another civil charge. Review, not a grade cap. */
 export function foreclosureOnly(text: string): boolean {
+  if (ordinaryResults(text)) return false;
   if (!/\bforeclosures?\b/i.test(text)) return false;
   if (NEWS_PERSON_HARD.test(text)) return false;
   if (civilDocket(text)) return false;

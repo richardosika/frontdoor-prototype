@@ -122,12 +122,41 @@ export function decodeHtmlEntities(text: string): string {
 }
 
 /**
+ * YouTube search results and same-origin nav paths live inside script JSON.
+ * Keep those lines, then strip every script so the rest of the page stays small.
+ */
+function preservedStructuredText(html: string): string {
+  const lines: string[] = [];
+  for (const match of html.matchAll(/"title":\{"runs":\[\{"text":"([^"]{3,180})"/g)) lines.push(match[0]);
+  for (const match of html.matchAll(/"snippetText":\{"runs":\[([\s\S]*?)\]\}/g)) {
+    if (match[0].length <= 2000) lines.push(match[0]);
+  }
+  const decoded = html.replace(/\\\//g, "/").replace(/\\"/g, '"');
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const match of decoded.matchAll(/"(?:url|href|permalink|path)"\s*:\s*"([^"]+)"/g)) {
+    const value = match[1].trim();
+    if (value.length < 2 || value.length > 240 || seen.has(value)) continue;
+    if (!value.startsWith("/") && !/^https?:\/\//i.test(value)) continue;
+    if (/\.(?:js|mjs|css|png|jpe?g|gif|svg|webp|ico|woff2?)(?:$|\?)/i.test(value)) continue;
+    seen.add(value);
+    paths.push(value);
+    if (paths.length >= 60) break;
+  }
+  for (const value of paths) lines.push(`"url":"${value}"`);
+  return lines.join("\n");
+}
+
+/**
  * Strip style, script, and head, then decode entities, then apply the size cap.
  * A 180KB head or stylesheet must not cut off the team-page text that follows it.
+ * Titles and nav paths are copied out of script JSON before that strip.
  */
 export function prepareFetchedText(text: string, maxChars: number): string {
   if (!looksLikeHtml(text)) return limitText(text, maxChars);
-  return limitText(decodeHtmlEntities(stripScriptsAndStyles(text)), maxChars);
+  const kept = preservedStructuredText(text);
+  const stripped = decodeHtmlEntities(stripScriptsAndStyles(text));
+  return limitText(kept ? `${stripped}\n${kept}` : stripped, maxChars);
 }
 
 /** Retry network failures, rate limits, and server errors. A normal 4xx, a challenge page, and NXDOMAIN are final. */
@@ -183,6 +212,24 @@ function retryable(result: { status: number; failure?: FetchFailure }): boolean 
   return shouldRetryStatus(result.status);
 }
 
+/** Headers can arrive and the body can still stall. Abandon it on the same budget as the request. */
+async function readBody(response: Response, timeoutMs: number): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          void response.body?.cancel().catch(() => undefined);
+          reject(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function fetchOnce(
   url: string,
   timeoutMs: number,
@@ -217,7 +264,7 @@ async function fetchOnce(
       },
     });
     const cap = options?.maxChars ?? fetchLimits(url).maxChars;
-    const text = prepareFetchedText(await response.text(), cap);
+    const text = prepareFetchedText(await readBody(response, timeoutMs), cap);
     return { ok: response.ok, status: response.status, text, url: response.url || url };
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };

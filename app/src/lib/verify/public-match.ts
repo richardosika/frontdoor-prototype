@@ -15,7 +15,7 @@ const NICKNAMES: Record<string, string[]> = {
   jeffrey: ["jeffrey", "jeff"],
 };
 
-const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp"]);
+const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
 /** Four-letter words that show up in too many firm names to identify one company. "toll" is not in this set. */
 const SHORT_GENERIC = new Set([
   "home",
@@ -384,9 +384,19 @@ function looksLikeGivenName(word: string): boolean {
  * True when every hit is "Givenname Token", as in a different person who shares the surname.
  * A hit inside the firm's own name is the company. "Mack Real Estate" is not surname-only.
  */
+/** "Torcon Inc" is the firm. The word before it is the person's surname, not a different given name. */
+function followedByLegalSuffix(text: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])\\s+(?:inc|incorporated|llc|llp|pllc|corp|corporation|co|ltd|limited|pc|lp)\\b`,
+    "i",
+  ).test(text);
+}
+
 function surnameOnly(text: string, token: string, org = ""): boolean {
   const phrase = companyPhraseTokens(org);
   if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase)) return false;
+  if (followedByLegalSuffix(text, token)) return false;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const all = text.match(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "gi")) || [];
   if (!all.length) return false;
@@ -399,6 +409,34 @@ function surnameOnly(text: string, token: string, org = ""): boolean {
 }
 
 const STOP = new Set(["the", "and", "of", "for", "at"]);
+
+/** A city used as a firm word. "Bristol" alone is not Bristol Development, and "Madison" alone is not Madison Realty Capital. */
+const PLACE_BRAND = new Set([
+  "bristol",
+  "madison",
+  "lincoln",
+  "newark",
+  "trenton",
+  "hackensack",
+  "dallas",
+  "houston",
+  "austin",
+  "boston",
+  "chicago",
+  "denver",
+  "phoenix",
+  "atlanta",
+  "seattle",
+  "portland",
+  "orlando",
+  "tampa",
+  "miami",
+  "brooklyn",
+  "manhattan",
+  "jersey",
+  "philadelphia",
+  "baltimore",
+]);
 
 /** Every non-legal word in the firm name, including a short brand and the generic words that complete it. */
 export function companyPhraseTokens(org: string): string[] {
@@ -447,6 +485,28 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
     if (!prefix.includes(firstDistinctive)) continue;
     if (consecutivePhrase(text, prefix)) return true;
   }
+  // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
+  // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.
   void person;
+  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && brandMention(text, distinctive[0], phrase, org)) return true;
+  return false;
+}
+
+function brandMention(text: string, brand: string, phrase: string[], org: string): boolean {
+  if (!companyTokenHit(text, brand) || surnameOnly(text, brand, org)) return false;
+  const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?:'s)?(?![A-Za-z0-9-])`, "gi"));
+  for (const match of hits) {
+    const after = text.slice((match.index ?? 0) + match[0].length);
+    const next = after.match(/^[\s,.'’:"&/+-]+([A-Za-z][A-Za-z0-9'-]*)/);
+    if (!next) return true;
+    const word = next[1];
+    const lower = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!lower || phrase.includes(lower) || LEGAL.has(lower)) return true;
+    // "Vornado stock" is this firm. "Madison Air" and "Starwood Capital" name a different one.
+    if (word[0] === word[0].toUpperCase()) continue;
+    if (isGenericFirmToken(lower)) continue;
+    return true;
+  }
   return false;
 }

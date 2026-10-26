@@ -8,12 +8,12 @@ import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, dedupeSourceLines, gradeChecks, gradeComparisonLine, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
+import { classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -137,7 +137,7 @@ describe("corroboration is independent of the applicant's own page", () => {
       companies: [{ title: "TOLL BROTHERS INC", ticker: "TOL", cik: "79565" }],
       filingNames: [],
     });
-    expect(companyOnly.status).toBe("PASS");
+    expect(companyOnly.status).toBe("INCONCLUSIVE");
     expect(companyOnly.corroborates).toBe(false);
     expect(companyOnly.finding.toLowerCase()).toContain("does not tie the person");
     const personTied = assessEdgarMatch({
@@ -315,7 +315,7 @@ describe("EDGAR short tokens and offline fetch", () => {
       }
       return { ok: true, status: 200, text: JSON.stringify({ hits: { hits: [] } }) };
     });
-    expect(result.status).toBe("PASS");
+    expect(result.status).toBe("INCONCLUSIVE");
     expect(result.corroborates).toBe(false);
     expect(seen.some((url) => url.includes("sec.gov"))).toBe(true);
     expect(seen.some((url) => url.startsWith("http") && !url.includes("sec.gov"))).toBe(false);
@@ -606,7 +606,7 @@ describe("EDGAR exact company names", () => {
       return { ok: false, status: 0, text: "" };
     };
     const kennedy = await lookupEdgar("Kennedy-Wilson Holdings", "William McMorrow", fetchText);
-    expect(kennedy.status).toBe("PASS");
+    expect(kennedy.status).toBe("INCONCLUSIVE");
     expect(kennedy.corroborates).toBe(false);
     expect(kennedy.finding).toContain("Kennedy-Wilson Holdings");
     expect(kennedy.finding.toLowerCase()).not.toContain("unum");
@@ -614,7 +614,7 @@ describe("EDGAR exact company names", () => {
     expect(kennedy.url).toContain("1408100");
     clearEdgarTickerCache();
     const cbre = await lookupEdgar("CBRE Group", "Bob Sulentic", fetchText);
-    expect(cbre.status).toBe("PASS");
+    expect(cbre.status).toBe("INCONCLUSIVE");
     expect(cbre.corroborates).toBe(false);
     expect(cbre.finding).toContain("CBRE GROUP, INC.");
     expect(cbre.finding.toLowerCase()).not.toContain("unum");
@@ -2303,6 +2303,9 @@ describe("batch 6 name, redirect, and departure", () => {
     const denied = blocked.find((check) => check.key === "website");
     expect(denied?.status).toBe("UNAVAILABLE");
     expect(denied?.finding).toContain("blocked by site (403) — not checkable for free; ask applicant for a team-page URL");
+    expect(denied?.finding).toContain("https://www.hsfkramer.example/");
+    expect(denied?.finding).toContain("The new domain is hsfkramer.example");
+    expect(denied?.url).toContain("hsfkramer.example");
     expect(denied?.finding.toLowerCase()).not.toContain("alias");
   });
 
@@ -2592,5 +2595,148 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
     const links = socialLinksFrom(html);
     expect(links.find((link) => link.url.includes("/people/"))?.url).toBe("https://www.facebook.com/people/Richard-Mack/100063921/");
     expect(links.some((link) => link.url === "https://www.facebook.com/mackrealestate/")).toBe(true);
+  });
+});
+
+describe("thirteenth follow-up", () => {
+  it("keeps YouTube titles and JSON paths that used to be stripped with the script", () => {
+    const youtube = `<html><body><script>var ytInitialData = {"title":{"runs":[{"text":"Steven Roth at Vornado Realty Trust"}]}};</script><p>Search filters</p></body></html>`;
+    const prepared = prepareFetchedText(youtube, 1_200_000);
+    expect(prepared).not.toContain("<script");
+    expect(youtubeTitles(prepared)).toContain("Steven Roth at Vornado Realty Trust");
+    expect(youtubeTitles(youtube.replace(/<script[\s\S]*?<\/script>/gi, ""))).toEqual([]);
+
+    const nav = `<html><script>{"url":"https:\\/\\/www.avisonyoung.us\\/w\\/james-nelson","href":"\\/about\\/leadership"}</script><p>Avison Young</p></html>`;
+    const page = prepareFetchedText(nav, 180_000);
+    expect(page).toContain("/w/james-nelson");
+    expect(page).toContain("/about/leadership");
+    expect(sameOriginPages(page, "https://www.avisonyoung.us/")).toContain("https://www.avisonyoung.us/about/leadership");
+    expect(surnamePageUrls(page, "https://www.avisonyoung.us/", "Nelson")).toContain("https://www.avisonyoung.us/w/james-nelson");
+  });
+
+  it("treats a legal suffix as the company on an unpunctuated card and accepts PLLC", () => {
+    expect(mentionsCompany("Torcon Inc builds in Red Bank", "Torcon Inc")).toBe(true);
+    expect(mentionsCompany("Joseph Torcivia, Torcon Inc, Red Bank", "Torcon Inc")).toBe(true);
+    expect(mentionsCompany("Joseph Torcivia Torcon Inc Red Bank, NJ", "Torcon Inc")).toBe(true);
+    const card = cardConsistencyCheck(facts({
+      name: "Joseph Torcivia",
+      org: "Torcon Inc",
+      cardText: "Joseph Torcivia Torcon Inc Red Bank, NJ",
+    }));
+    expect(card.status).toBe("PASS");
+    expect(card.reviewFlag).not.toBe(true);
+    expect(companyNameLooksReal("Meister Seelig & Schuster PLLC")).toBe(true);
+    expect(plausibilityCheck(facts({ name: "Stephen Meister", org: "Meister Seelig & Schuster PLLC" })).status).toBe("PASS");
+    expect(companyNameLooksReal("Blorptex Qwvzn")).toBe(false);
+  });
+
+  it("matches Vornado without requiring trust, and still rejects a different Starwood firm", () => {
+    const headline = "Steven Roth vows aggressive action as Vornado stock slumps";
+    expect(mentionsCompany(headline, "Vornado Realty Trust")).toBe(true);
+    expect(mentionsCompany("Starwood Capital halts redemptions", "Starwood Property Trust")).toBe(false);
+    expect(mentionsCompany("Starwood Property sold a loan", "Starwood Property Trust")).toBe(true);
+    expect(mentionsCompany("Inside Starwood's SREIT", "Starwood Property Trust")).toBe(false);
+    const news = classifyNews(
+      facts({ name: "Steven Roth", applicantName: "Steven Roth", org: "Vornado Realty Trust", location: "New York, NY" }),
+      [{
+        title: headline,
+        snippet: headline,
+        url: "https://www.crainsnewyork.com/vornado-roth",
+        source: "Crain's",
+        publishedAt: "2026-06-01T15:00:00.000Z",
+        provider: "Google News",
+      }],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(news[0].status).toBe("PASS");
+    expect(news[0].corroborates).toBe(true);
+    expect(news[0].finding.toLowerCase()).not.toContain("without the company");
+    expect(news[0].finding.toLowerCase()).not.toContain("different person");
+  });
+
+  it("does not label an REO or dividend headline as litigation", () => {
+    const title = "Arbor Realty Trust: REO Balances And A Dividend Reset";
+    expect(ordinaryResults(title)).toBe(true);
+    expect(ordinaryResults("Zumba v. Sciame Construction files a civil docket")).toBe(false);
+    const news = classifyNews(
+      facts({ name: "Ivan Kaufman", applicantName: "Ivan Kaufman", org: "Arbor Realty Trust", location: "New York, NY" }),
+      [{
+        title,
+        snippet: "The quarter covered REO and the dividend.",
+        url: "https://seekingalpha.com/arbor-reo",
+        source: "Seeking Alpha",
+        publishedAt: "2026-06-01T15:00:00.000Z",
+        provider: "Google News",
+      }],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(news[0].finding).not.toMatch(/litigation/i);
+    expect(news[0].url).toBe("https://seekingalpha.com/arbor-reo");
+    expect(news.some((item) => /Company litigation/i.test(item.finding))).toBe(false);
+  });
+
+  it("rejects a loose EDGAR filer and does not corroborate a name-only company hit", () => {
+    const rows = [
+      { title: "TERRA PROPERTY TRUST, INC.", ticker: "TPT", cik: "1674356" },
+      { title: "EXTELL ROCK LLC", ticker: "", cik: "1648107" },
+      { title: "AVISON YOUNG (CANADA) INC.", ticker: "", cik: "1682683" },
+      { title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" },
+      { title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" },
+      { title: "GREEN DOT CORP", ticker: "GDOT", cik: "1386278" },
+    ];
+    expect(matchEdgarCompany(rows, "Terra Group")).toBeNull();
+    expect(matchEdgarCompany(rows, "Extell Development Company")).toBeNull();
+    expect(matchEdgarCompany(rows, "Avison Young")).toBeNull();
+    expect(matchEdgarCompany(rows, "SL Green")?.cik).toBe("1040971");
+    expect(matchEdgarCompany(rows, "SL Green")?.ticker).not.toBe("GDOT");
+    expect(matchEdgarCompany(rows, "CBRE Group")?.cik).toBe("1138118");
+    const nameOnly = assessEdgarMatch({
+      org: "SL Green",
+      person: "Marc Holliday",
+      tickersOk: true,
+      companies: [{ title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" }],
+      filingNames: ["SL Green (SLG) (CIK 0001040971)"],
+    });
+    expect(nameOnly.status).toBe("INCONCLUSIVE");
+    expect(nameOnly.corroborates).toBe(false);
+    expect(nameOnly.finding.toLowerCase()).toContain("does not tie the person");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: nameOnly.status, weight: 6, corroborates: false, finding: nameOnly.finding, url: nameOnly.url })],
+      facts({ org: "SL Green", name: "Marc Holliday" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    const tied = assessEdgarMatch({
+      org: "SL Green",
+      person: "Marc Holliday",
+      tickersOk: true,
+      companies: [{ title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" }],
+      filingNames: ["SL GREEN REALTY CORP (SLG) (CIK 0001040971)", "HOLLIDAY MARC"],
+    });
+    expect(tied.status).toBe("PASS");
+    expect(tied.corroborates).toBe(true);
+  });
+
+  it("shows snippet text and drops an unresolved Bing redirect", async () => {
+    const target = "https://news.example/vornado-roth";
+    const packed = `a1${Buffer.from(target).toString("base64")}`;
+    const ddg = `<html><body><a class="result__a" href="//duckduckgo.com/l/?uddg=${encodeURIComponent(target)}">Steven Roth leads Vornado Realty Trust in New York</a></body></html>`;
+    const bing = `<html><body><li class="b_algo"><a href="https://www.bing.com/ck/a?u=${packed}">Steven Roth leads Vornado Realty Trust in New York</a></li></body></html>`;
+    const screened = await runPublicScreen(
+      facts({ name: "Steven Roth", applicantName: "Steven Roth", org: "Vornado Realty Trust", website: "", location: "New York, NY" }),
+      async (url) => {
+        if (url.includes("duckduckgo")) return { ok: true, status: 200, text: ddg };
+        if (url.includes("bing.com/search")) return { ok: true, status: 200, text: bing };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const web = screened.find((check) => check.key === "screen-web");
+    expect(web?.finding).not.toContain("class=");
+    expect(web?.finding).not.toContain("result__a");
+    expect(web?.finding).toContain("Steven Roth");
+    const footprint = screened.find((check) => check.key === "web-footprint");
+    expect(footprint?.url || web?.url || "").not.toContain("bing.com/ck/");
+    expect(`${web?.finding} ${footprint?.url || ""}`).toContain("news.example/vornado-roth");
   });
 });

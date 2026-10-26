@@ -62,6 +62,7 @@ const flag = (name: string) => {
 const label = flag("label") || "run";
 const outBase = flag("out") || path.join(BENCH_DIR, `results-${label}`);
 const only = (flag("only") || "").split(",").map((s) => s.trim()).filter(Boolean);
+const extraFiles = (flag("extra") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const comparePath = flag("compare");
 const refreshOfac = args.includes("--refresh-ofac");
 
@@ -323,6 +324,20 @@ async function main() {
     _meta: { defaults: Record<string, string>; groundTruthNote: string };
     cases: Case[];
   };
+  for (const file of extraFiles) {
+    const extra = JSON.parse(fs.readFileSync(path.resolve(file), "utf8")) as {
+      _meta?: { defaults?: Record<string, string> };
+      cases: Case[];
+    };
+    const defaults = extra._meta?.defaults ?? {};
+    for (const item of extra.cases) {
+      const row = item as Case & Record<string, unknown>;
+      for (const [key, value] of Object.entries(defaults)) {
+        if (row[key] === undefined) row[key] = value;
+      }
+      spec.cases.push(item);
+    }
+  }
   const startedAt = new Date();
   console.log(`[bench] label=${label} rubric=${RUBRIC_VERSION} started ${startedAt.toString()}`);
   const health = await preflight();

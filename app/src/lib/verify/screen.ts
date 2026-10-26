@@ -344,7 +344,7 @@ export async function sitemapLastNameUrls(
       try {
         const url = new URL(loc, base.origin);
         if (url.origin !== base.origin) return false;
-        return /team|people|leader|leadership|professional|attorney|lawyer|staff|bio|about|our-team|our-people|associated|page/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
+        return /team|people|leader|leadership|professional|attorney|lawyer|staff|bio|about|our-team|our-people|associated|page-sitemap|(?:^|\/)page(?:\/|$)/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
       } catch {
         return false;
       }
@@ -564,13 +564,27 @@ function hostLabel(url: string): string {
   }
 }
 
+function decodeBingCk(value: string): string {
+  const payload = value.replace(/^a1/i, "").replace(/-/g, "+").replace(/_/g, "/");
+  try {
+    const decoded = globalThis.atob(payload);
+    return /^https?:\/\//i.test(decoded) ? decoded : "";
+  } catch {
+    return "";
+  }
+}
+
 function unwrapResultUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
   try {
     const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
     const inner = url.searchParams.get("uddg");
-    return inner || url.toString();
+    if (inner) return inner;
+    const host = url.hostname.toLowerCase();
+    if (host.endsWith("bing.com") && url.pathname.startsWith("/ck/")) return decodeBingCk(url.searchParams.get("u") || "");
+    if (host.includes("duckduckgo.com") && url.pathname.startsWith("/l/")) return "";
+    return url.toString();
   } catch {
     return trimmed;
   }
@@ -620,13 +634,19 @@ function headlineImportance(judged: {
 }
 
 function snippetFrom(html: string): { text: string; hrefs: string[] } {
-  const hrefs = [...html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)].map((match) => match[1] || match[2] || "").filter(Boolean);
+  const hrefs = [...html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)]
+    .map((match) => unwrapResultUrl(match[1] || match[2] || ""))
+    .filter((href) => /^https?:\/\//i.test(href));
   return { text: visible(html), hrefs };
 }
 
 function visible(html: string): string {
+  const withoutAttrs = html.replace(
+    /^(?:\s*(?:class|id|href|title|target|rel|data-[\w-]+)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))+\s*>?/,
+    " ",
+  );
   return decodeHtmlEntities(
-    html
+    withoutAttrs
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<[^>]+>/g, " "),
@@ -689,13 +709,24 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
     } else if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
       const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 405 || home.status === 999;
+      const redirectedTo = crossDomainLanding(homeUrl, home);
+      let renamed = "";
+      if (redirectedTo) {
+        let domain = redirectedTo;
+        try {
+          domain = new URL(redirectedTo).hostname.replace(/^www\./, "");
+        } catch {
+          domain = redirectedTo;
+        }
+        renamed = ` The site redirected to ${redirectedTo}. The new domain is ${domain}.`;
+      }
       const detail =
         home.status === 403
-          ? "blocked by site (403) — not checkable for free; ask applicant for a team-page URL"
+          ? `blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
           : blockedBySite
-            ? "blocked by site, ask applicant for a team-page URL"
-            : "The company website did not respond.";
-      attempts.push(blockedAttempt("website", "Company website", website, homeUrl, detail));
+            ? `blocked by site, ask applicant for a team-page URL${renamed}`
+            : `The company website did not respond.${renamed}`;
+      attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
     } else {
       const redirectedTo = crossDomainLanding(homeUrl, home);
       if (redirectedTo) homeUrl = redirectedTo;
@@ -1057,7 +1088,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
   const [ddg, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
-  const ddgSnippets = [...ddg.text.matchAll(/class="result__(?:a|snippet)"[^>]*>([\s\S]*?)<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const ddgSnippets = [...ddg.text.matchAll(/<a\b[^>]*class="result__(?:a|snippet)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
   const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
   const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets.map((item) => item.text), queryFacts);

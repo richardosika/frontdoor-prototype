@@ -87,11 +87,24 @@ function pickByTicker(rows: EdgarCompany[], org: string): EdgarCompany {
   return rows.reduce((best, row) => (preferTicker(tickerPreference(row.ticker, org), tickerPreference(best.ticker, org)) ? row : best));
 }
 
+/** "(Canada)" names a different filer. "(DE)" and a ticker in parentheses do not. */
+function foreignParenthetical(title: string, orgTokens: Set<string>): boolean {
+  for (const match of title.matchAll(/\(([^)]*)\)/g)) {
+    for (const token of match[1].toLowerCase().split(/[^a-z0-9]+/)) {
+      if (token.length < 3 || LEGAL_SUFFIX.has(token) || isGenericFirmToken(token) || orgTokens.has(token)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Exact normalized title first, so "SL Green Realty Corp" is SL GREEN REALTY CORP and not GREEN DOT.
  * A name made only of generic words, such as Group, is not a match.
  * Otherwise every non-generic token of 2 or more characters has to be in the title.
  * A title word of 3 or more characters that is not generic and not in the applicant's name is an extra, and that row is not a match.
+ * One distinctive token does not claim a longer filer: Terra Group is not Terra Property Trust, and Extell is not Extell Rock LLC.
+ * A parenthetical such as (Canada) is a different firm even when the remaining words match.
  * Ties keep the most applicant tokens, then the fewest extras, then the plainer ticker. The shortest title does not win.
  */
 export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompany | null {
@@ -100,13 +113,15 @@ export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompa
   const orgTokens = firmTokens(org);
   const required = orgTokens.filter((token) => !isGenericFirmToken(token));
   if (!required.length) return null;
-  const exact = rows.filter((row) => normalizeFirmName(row.title) === normalized);
-  if (exact.length) return pickByTicker(exact, org);
   const orgSet = new Set(orgTokens);
+  const exact = rows.filter((row) => normalizeFirmName(row.title) === normalized && !foreignParenthetical(row.title, orgSet));
+  if (exact.length) return pickByTicker(exact, org);
+  if (required.length < 2) return null;
   const ranked: { row: EdgarCompany; matched: number; extras: number }[] = [];
   for (const row of rows) {
     const titleTokens = firmTokens(row.title);
     const titleSet = new Set(titleTokens);
+    if (foreignParenthetical(row.title, orgSet)) continue;
     if (!required.every((token) => titleSet.has(token))) continue;
     const distinctiveExtra = titleTokens.some((token) => token.length >= 3 && !orgSet.has(token) && !isGenericFirmToken(token));
     if (distinctiveExtra) continue;
@@ -169,7 +184,8 @@ export function filingNames(payload: string): string[] | null {
 }
 
 export function personOnFiling(names: string[], person: string, org: string): string {
-  const companyNamed = names.some((name) => edgarTitleFits(name, org));
+  const fromDisplay = names.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row));
+  const companyNamed = Boolean(matchEdgarCompany(fromDisplay, org)) || names.some((name) => edgarTitleFits(name, org));
   if (!companyNamed) return "";
   return names.find((name) => mentionsPerson(name, person)) || "";
 }
@@ -211,13 +227,19 @@ export function assessEdgarMatch(input: {
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
   const personSentence = personLine ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.` : "";
   const personTied = Boolean(personLine);
+  if (!personTied) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      url: edgarCompanyUrl(match.cik),
+      finding: `EDGAR lists ${titled}. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+    };
+  }
   return {
     status: "PASS",
-    corroborates: personTied,
+    corroborates: true,
     url: edgarCompanyUrl(match.cik),
-    finding: personTied
-      ? `EDGAR lists ${titled}. Confirm it is the same firm.${personSentence}`
-      : `EDGAR lists ${titled}. That shows a company by this name exists. It does not tie the person to the firm.`,
+    finding: `EDGAR lists ${titled}. Confirm it is the same firm.${personSentence}`,
   };
 }
 
