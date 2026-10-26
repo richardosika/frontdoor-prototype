@@ -150,6 +150,7 @@ describe("separate administrator sign-in", () => {
     expect(adminHttpLocationKind("")).toBe("none");
     expect(adminHttpLocationKind("https://cornicio-mvp.onrender.com/login?error=CredentialsSignin")).toBe("error");
     expect(adminHttpLocationKind("https://cornicio-mvp.onrender.com/admin")).toBe("admin");
+    expect(adminHttpLocationKind("/login?error=MissingCSRF")).toBe("error");
   });
 
   it("sends a signed-in administrator home and a signed-in member back to the floor", () => {

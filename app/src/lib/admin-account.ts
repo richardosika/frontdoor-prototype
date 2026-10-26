@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { NextRequest } from "next/server";
 import { adminPasswordAction, adminPasswordShape, normalizeAdminPassword } from "@/lib/admin-password";
 import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 import { initialsFromName } from "@/lib/domain";
@@ -134,39 +135,31 @@ export function adminHttpLocationKind(location: string): "error" | "admin" | "ot
   return "other";
 }
 
-/** Signs in on this server with the env password and logs status codes only. */
+function cookieLines(response: Response): string[] {
+  if (typeof response.headers.getSetCookie === "function") {
+    const lines = response.headers.getSetCookie();
+    if (lines.length) return lines;
+  }
+  const single = response.headers.get("set-cookie");
+  return single ? [single] : [];
+}
+
+function hasSessionCookie(lines: string[]): boolean {
+  return lines.some((line) => /session-token=[^;]/.test(line) && !/session-token=;/.test(line));
+}
+
+/** Runs the Auth.js credentials callback in-process with the env password. Logs codes only. */
 export async function rehearseAdminHttpLogin(): Promise<void> {
   const password = normalizeAdminPassword(process.env.ADMIN_PASSWORD);
-  const gate = process.env.SITE_GATE_PASSWORD || "";
   if (!password) {
     console.log("ADMIN_HTTP_LOGIN skipped=no_password");
     return;
   }
-  const port = process.env.PORT || "3000";
-  const origin = `http://127.0.0.1:${port}`;
-  const headers = new Headers();
-  if (gate) headers.set("authorization", `Basic ${Buffer.from(`privatefloor:${gate}`).toString("base64")}`);
-  const started = Date.now();
-  let csrf: Response | null = null;
-  while (Date.now() - started < 20000) {
-    try {
-      csrf = await fetch(`${origin}/api/auth/csrf`, { headers });
-      if (csrf.status === 200 || csrf.status === 401) break;
-    } catch {
-      csrf = null;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  if (!csrf) {
-    console.log("ADMIN_HTTP_LOGIN csrf=down");
-    return;
-  }
-  if (csrf.status !== 200) {
-    console.log(`ADMIN_HTTP_LOGIN csrf=${csrf.status}`);
-    return;
-  }
+  const { handlers } = await import("@/auth");
+  const origin = (process.env.AUTH_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
+  const csrf = await handlers.GET(new NextRequest(`${origin}/api/auth/csrf`));
+  const csrfCookies = cookieLines(csrf);
   const payload = (await csrf.json().catch(() => null)) as { csrfToken?: string } | null;
-  const csrfCookies = typeof csrf.headers.getSetCookie === "function" ? csrf.headers.getSetCookie() : [];
   const form = new URLSearchParams({
     csrfToken: payload?.csrfToken || "",
     email: KEEP_ADMIN_EMAIL,
@@ -174,26 +167,26 @@ export async function rehearseAdminHttpLogin(): Promise<void> {
     portal: "admin",
     callbackUrl: "/admin",
   });
-  const postHeaders = new Headers(headers);
-  postHeaders.set("content-type", "application/x-www-form-urlencoded");
-  if (csrfCookies.length) postHeaders.set("cookie", csrfCookies.map((cookie) => cookie.split(";")[0]).join("; "));
-  const callback = await fetch(`${origin}/api/auth/callback/credentials`, {
-    method: "POST",
-    headers: postHeaders,
-    body: form,
-    redirect: "manual",
-  });
-  const locationKind = adminHttpLocationKind(callback.headers.get("location") || "");
-  const sessionCookies = typeof callback.headers.getSetCookie === "function" ? callback.headers.getSetCookie() : [];
-  const session = sessionCookies.some((cookie) => /session-token=([^;]+)/.test(cookie) && !/session-token=;/.test(cookie));
-  let adminStatus = 0;
-  if (session) {
-    const adminHeaders = new Headers(headers);
-    adminHeaders.set("cookie", sessionCookies.map((cookie) => cookie.split(";")[0]).join("; "));
-    const admin = await fetch(`${origin}/admin`, { headers: adminHeaders, redirect: "manual" });
-    adminStatus = admin.status;
+  const callback = await handlers.POST(
+    new NextRequest(`${origin}/api/auth/callback/credentials`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: csrfCookies.map((line) => line.split(";")[0]).join("; "),
+      },
+      body: form,
+    }),
+  );
+  const location = callback.headers.get("location") || "";
+  let error = "none";
+  try {
+    error = new URL(location, origin).searchParams.get("error") || "none";
+  } catch {
+    error = "unparsed";
   }
+  if (!/^[A-Za-z0-9_-]+$/.test(error)) error = "unexpected";
+  const session = hasSessionCookie(cookieLines(callback));
   console.log(
-    `ADMIN_HTTP_LOGIN csrf=200 callback=${callback.status} location=${locationKind} session=${session ? 1 : 0} admin=${adminStatus}`,
+    `ADMIN_HTTP_LOGIN csrf=${csrf.status} csrf_cookies=${csrfCookies.length} callback=${callback.status} error=${error} location=${adminHttpLocationKind(location)} session=${session ? 1 : 0}`,
   );
 }
