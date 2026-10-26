@@ -12,7 +12,7 @@ import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { scoreOf } from "@/lib/verify/score";
+import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -330,6 +330,9 @@ describe("honest labels and the legacy score", () => {
       row({ key: "news", status: "UNAVAILABLE", weight: 40 }),
       row({ key: "edgar", status: "NOT_RUN", weight: 40 }),
     ];
+    expect(formatRunScores({ score: 69, gradeLetter: "F", gradeScore: 55 })).toBe("grade F 55 · legacy weight score 69");
+    expect(formatRunScores({ score: 63, gradeLetter: "F", gradeScore: 52 })).toBe("grade F 52 · legacy weight score 63");
+    expect(formatRunScores({ score: 53 })).toBe("legacy weight score 53");
     expect(scoreOf(passes)).toBe(100);
     expect(scoreOf([...passes, ...blocked])).toBeLessThan(74);
     expect(scoreOf([...passes, blocked[2]])).toBe(100);

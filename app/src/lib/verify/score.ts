@@ -2,6 +2,8 @@ import { gradeChecks, gradePlainText } from "@/lib/verify/grade";
 import type { CheckOutput, ScoredReport, Verdict } from "@/lib/verify/types";
 
 /**
+ * Legacy weight percentage stored on VerificationRun.score.
+ * The authoritative number is the category grade (gradeLetter / gradeScore).
  * Score is the share of weight earned by PASS checks.
  * NOT_RUN checks are left out, because the check was not attempted.
  * UNAVAILABLE, INCONCLUSIVE, and FAIL earn nothing and stay in the denominator,
@@ -13,6 +15,20 @@ import type { CheckOutput, ScoredReport, Verdict } from "@/lib/verify/types";
 export const LEGIT_SCORE = 72;
 export const CORROBORATION_WEIGHT = 8;
 export const CORROBORATION_COUNT = 3;
+
+/** Grade is authoritative. The weight percentage stays visible so older audit rows stay readable. */
+export function formatRunScores(run: {
+  score?: number | null;
+  gradeLetter?: string | null;
+  gradeScore?: number | null;
+}): string {
+  const parts: string[] = [];
+  if (run.gradeLetter) {
+    parts.push(`grade ${run.gradeLetter}${typeof run.gradeScore === "number" ? ` ${run.gradeScore}` : ""}`);
+  }
+  if (typeof run.score === "number") parts.push(`legacy weight score ${run.score}`);
+  return parts.join(" · ");
+}
 
 export function scoreOf(checks: CheckOutput[]): number {
   const counted = checks.filter((check) => check.status !== "NOT_RUN");

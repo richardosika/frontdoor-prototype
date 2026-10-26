@@ -2,6 +2,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
+import { formatRunScores } from "@/lib/verify/score";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function AuditPage() {
     prisma.verificationRun.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, subject: true, status: true, verdict: true, score: true, createdAt: true, application: { select: { name: true } } },
+      select: { id: true, subject: true, status: true, verdict: true, score: true, gradeLetter: true, gradeScore: true, createdAt: true, application: { select: { name: true } } },
     }),
   ]);
   return (
@@ -44,13 +45,16 @@ export default async function AuditPage() {
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification runs</h2>
           <ul className="mt-2 divide-y divide-line text-sm">
-            {runs.map((row) => (
-              <li key={row.id} className="py-2">
-                {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
-                {row.verdict ? ` · ${row.verdict}` : ""}
-                {typeof row.score === "number" ? ` · ${row.score}` : ""} · {row.application?.name || "No application"}
-              </li>
-            ))}
+            {runs.map((row) => {
+              const scores = formatRunScores(row);
+              return (
+                <li key={row.id} className="py-2">
+                  {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
+                  {row.verdict ? ` · ${row.verdict}` : ""}
+                  {scores ? ` · ${scores}` : ""} · {row.application?.name || "No application"}
+                </li>
+              );
+            })}
           </ul>
         </section>
         <section className={`${card} mt-4 p-4`}>

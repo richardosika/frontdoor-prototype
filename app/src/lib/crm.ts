@@ -1,5 +1,6 @@
 import type { CrmStage } from "@prisma/client";
 import { crmStage, stageOverride } from "@/lib/crm-stage";
+import { formatRunScores } from "@/lib/verify/score";
 import { prisma } from "@/lib/prisma";
 
 export async function ensureCrmPerson(input: {
@@ -184,7 +185,8 @@ export async function syncCrm() {
   }
   for (const run of runs) {
     if (!run.application) continue;
-    push(run.application.email, "verification", `Verification ${run.verdict || run.status}${run.score != null ? ` · ${run.score}` : ""}.`, `run:${run.id}`, run.finishedAt || run.createdAt);
+    const scores = formatRunScores(run);
+    push(run.application.email, "verification", `Verification ${run.verdict || run.status}${scores ? ` · ${scores}` : ""}.`, `run:${run.id}`, run.finishedAt || run.createdAt);
   }
   for (const payment of payments) {
     if (!payment.user) continue;
