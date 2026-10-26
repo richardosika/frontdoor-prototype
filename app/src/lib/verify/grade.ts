@@ -96,6 +96,61 @@ export const GRADE_WEIGHTS = {
   },
 } as const;
 
+export type GradeWeightsMode = "standard" | "r2";
+
+/**
+ * R2 is off until Richard turns it on.
+ * It moves the 4 LinkedIn-fetch points and the 2 registry points onto the website and the web footprint.
+ * Letter floors stay A 90, B 80, C 70, D 60.
+ */
+export const GRADE_WEIGHTS_MODE: GradeWeightsMode = "standard";
+
+type GradeWeightTable = {
+  [Group in keyof typeof GRADE_WEIGHTS]: { [Key in keyof (typeof GRADE_WEIGHTS)[Group]]: number };
+};
+
+export function weightsFor(mode: GradeWeightsMode = GRADE_WEIGHTS_MODE): GradeWeightTable {
+  if (mode !== "r2") return GRADE_WEIGHTS;
+  return {
+    ...GRADE_WEIGHTS,
+    identity: { ...GRADE_WEIGHTS.identity, "linkedin-fetch": 0 },
+    company: { ...GRADE_WEIGHTS.company, website: 11, "business-registry": 0 },
+    footprint: { ...GRADE_WEIGHTS.footprint, "web-footprint": 11 },
+  };
+}
+
+/** Points whose check did not run or did not answer. An inconclusive EDGAR row stays in the denominator. */
+export function r2CheckablePossible(checks: CheckOutput[], weights: GradeWeightTable = weightsFor("r2")): number {
+  const pairs: [string, number][] = [
+    ["email-syntax", weights.identity["email-syntax"]],
+    ["disposable-email", weights.identity["disposable-email"]],
+    ["role-address", weights.identity["role-address"]],
+    ["phone-state", weights.identity["phone-state"]],
+    ["linkedin-format", weights.identity["linkedin-format"]],
+    ["linkedin-fetch", weights.identity["linkedin-fetch"]],
+    ["website", weights.company.website],
+    ["edgar", weights.company.edgar],
+    ["business-card", weights.company["business-card"]],
+    ["rdap", weights.company.rdap],
+    ["business-registry", weights.company["business-registry"]],
+    ["web-footprint", weights.footprint["web-footprint"]],
+    ["news", weights.footprint.news],
+    ["social-links", weights.footprint["social-links"]],
+    ["sanctions", weights.risk.sanctions],
+    ["duplicate", weights.risk.duplicate],
+    ["text-risk", weights.risk["text-risk"]],
+    ["velocity", weights.risk.velocity],
+    ["plausibility", weights.role.plausibility],
+    ["invite-source", weights.role["invite-source"]],
+  ];
+  let excluded = 0;
+  for (const [key, weight] of pairs) {
+    const row = checks.find((check) => check.key === key);
+    if (row && (row.status === "NOT_RUN" || row.status === "UNAVAILABLE")) excluded += weight;
+  }
+  return Math.max(0, 100 - excluded);
+}
+
 export const FREE_SOURCE_LIMIT =
   "Paid people-search, credit files, full court dockets, a logged-in LinkedIn page, and state registries that have no stable free API were not checked. A blocked source, or a source that came back empty, is not a clean result. Email domain and mail-server records are not treated as proof of identity.";
 
@@ -522,9 +577,10 @@ function payingRole(role: string | undefined): boolean {
 export function gradeChecks(
   checks: CheckOutput[],
   facts: GradeFacts = {},
-  options?: { gradedAt?: string; subject?: string },
+  options?: { gradedAt?: string; subject?: string; weightsMode?: GradeWeightsMode },
 ): GradeReport {
-  const weights = GRADE_WEIGHTS;
+  const weightsMode = options?.weightsMode || GRADE_WEIGHTS_MODE;
+  const weights = weightsFor(weightsMode);
   const websitePass = passedKey(checks, "website", "fixture-website");
   const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
   const footprintRow = findCheck(checks, "web-footprint");
@@ -605,7 +661,12 @@ export function gradeChecks(
     { id: "completeness", label: CATEGORY_LABELS.completeness, ...completeness, reason: `${completeness.earned} of ${completeness.possible}. ${completeness.reason}` },
   ];
 
-  const rawScore = Math.max(0, Math.min(100, categories.reduce((sum, category) => sum + category.earned, 0)));
+  const earnedPoints = Math.max(0, Math.min(100, categories.reduce((sum, category) => sum + category.earned, 0)));
+  const checkablePoints = weightsMode === "r2" ? r2CheckablePossible(checks, weights) : 100;
+  const rawScore =
+    weightsMode === "r2"
+      ? Math.max(0, Math.min(100, Math.round((100 * earnedPoints) / Math.max(checkablePoints, 1))))
+      : earnedPoints;
   let letter = letterFromScore(rawScore);
   const caps: string[] = [];
   const banners: string[] = [];
@@ -785,7 +846,14 @@ export function gradeChecks(
     company: companySection(checks, facts),
     checkedOut: checked.length ? joinSentences(checked) : "Nothing in the checks that ran confirmed a fact about this person or company.",
     didNotCheckOut: failed.length ? joinSentences(failed) : "Nothing in the checks that ran showed a direct conflict.",
-    couldNotCheck: joinSentences(unchecked),
+    couldNotCheck: joinSentences(
+      weightsMode === "r2"
+        ? [
+            ...unchecked,
+            `Coverage: ${earnedPoints} of ${checkablePoints} checkable points, rescaled to ${rawScore} of 100. ${checkablePoints} of 100 rubric points were checkable for free. An EDGAR result with no registrant stays in that denominator. Letter floors are unchanged.`,
+          ]
+        : unchecked,
+    ),
     reasoning,
     nextStep,
   };
@@ -951,15 +1019,27 @@ export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeRe
   return changes.join(" ");
 }
 
-export function rubricSections(): { title: string; body: string }[] {
+export function rubricSections(mode: GradeWeightsMode = GRADE_WEIGHTS_MODE): { title: string; body: string }[] {
+  const weights = weightsFor(mode);
   const points = (group: Record<string, number>) =>
     Object.entries(group)
       .map(([key, value]) => `${labelFor(key)} ${value}`)
       .join(", ");
+  const identityPossible = Object.values(weights.identity).reduce((sum, value) => sum + value, 0);
+  const companyPossible = Object.values(weights.company).reduce((sum, value) => sum + value, 0);
+  const footprintPossible = Object.values(weights.footprint).reduce((sum, value) => sum + value, 0);
+  const registrySentence =
+    mode === "r2"
+      ? "The state registry is 0 under R2."
+      : "The registry row is 2 only when NY Active Corporations has the exact company name, and that hit does not corroborate a person. Other states are not searched for free and earn 0.";
+  const r2Note =
+    mode === "r2"
+      ? " R2 is on: LinkedIn fetch is 0 and the state registry is 0. Those 6 points sit on the website and the web footprint instead. The displayed score rescales earned points over the checkable points. A check that did not run, or did not answer, leaves the denominator. No SEC registrant stays in the denominator as 0 of 6. Letter floors are unchanged."
+      : "";
   return [
     {
       title: "Points",
-      body: `Identity and contact, ${points(GRADE_WEIGHTS.identity)} (18). Company legitimacy, ${points(GRADE_WEIGHTS.company)} (22). The registry row is 2 only when NY Active Corporations has the exact company name, and that hit does not corroborate a person. Other states are not searched for free and earn 0. Public footprint, ${points(GRADE_WEIGHTS.footprint)} (18). Risk and sanctions, ${points(GRADE_WEIGHTS.risk)} (20). Role fit, ${points(GRADE_WEIGHTS.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.`,
+      body: `Identity and contact, ${points(weights.identity)} (${identityPossible}). Company legitimacy, ${points(weights.company)} (${companyPossible}). ${registrySentence} Public footprint, ${points(weights.footprint)} (${footprintPossible}). Risk and sanctions, ${points(weights.risk)} (20). Role fit, ${points(weights.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.${r2Note}`,
     },
     {
       title: "Letters",
