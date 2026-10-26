@@ -426,7 +426,11 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   }
   const redirectNote = attempt.redirectedTo ? `The site redirected to ${attempt.redirectedTo}.` : "";
   if (attempt.outcome === "not-found") {
-    const lead = attempt.detail === "no match found" ? "no match found" : "No result found that names this person and this company.";
+    const lead = /same source as /.test(attempt.detail)
+      ? attempt.detail
+      : attempt.detail === "no match found"
+        ? "no match found"
+        : "No result found that names this person and this company.";
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -516,7 +520,7 @@ function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
     url: attempt.url,
     ranAt: new Date().toISOString(),
     reviewFlag: judged.reviewFlag || undefined,
-    corroborates: judged.corroborates && !ownSite && !judged.companyOnly,
+    corroborates: attempt.key === "screen-news" ? false : judged.corroborates && !ownSite && !judged.companyOnly,
     selfReported: ownSite ? true : undefined,
     companyOnly: judged.companyOnly || undefined,
   };
@@ -1145,8 +1149,27 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         if (ownHost && page.includes(ownHost)) return false;
         return true;
       });
+    const alreadyCredited = attempts.find(
+      (item) =>
+        item.key !== "web-footprint" &&
+        item.key !== "screen-web" &&
+        item.outcome === "found" &&
+        item.score.name &&
+        item.score.company &&
+        !attemptOnOwnSite(item, ownHost),
+    );
     if (webHit && fresh) {
       attempts.push({ ...webHit, key: "web-footprint", url: fresh, linkedUrl: undefined });
+    } else if (alreadyCredited) {
+      attempts.push({
+        key: "web-footprint",
+        platform: alreadyCredited.platform,
+        searched,
+        url: alreadyCredited.url,
+        outcome: "not-found",
+        score: emptyScore(),
+        detail: `same source as ${alreadyCredited.key}`,
+      });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
       const web = attempts.find((item) => item.key === "screen-web");
       attempts.push(

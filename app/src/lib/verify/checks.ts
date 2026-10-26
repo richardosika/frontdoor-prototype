@@ -297,7 +297,7 @@ export function assessRdap(
     });
   }
   if (!http.ok) {
-    if (rdapServiceMissing(host, http.text) && http.failure !== "nxdomain") {
+    if (rdapServiceMissing(host, http.text)) {
       return check({
         ...base,
         status: "UNAVAILABLE",
@@ -305,22 +305,13 @@ export function assessRdap(
         finding: `RDAP couldn't check for free. ${host} uses a TLD with no RDAP service.`,
       });
     }
-    if (http.failure === "nxdomain") {
+    if (http.failure === "nxdomain" || http.status === 404) {
       return check({
         ...base,
         status: "FAIL",
         reviewFlag: true,
         corroborates: false,
-        finding: `RDAP has no record for ${host}. domain does not resolve.`,
-      });
-    }
-    if (http.status === 404) {
-      return check({
-        ...base,
-        status: "FAIL",
-        reviewFlag: true,
-        corroborates: false,
-        finding: `RDAP has no registration for ${host}. This domain is not registered. This counts against the company.`,
+        finding: `RDAP has no registration for ${host}. domain is not registered. This counts against the company.`,
       });
     }
     return check({

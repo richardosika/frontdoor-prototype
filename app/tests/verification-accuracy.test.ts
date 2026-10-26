@@ -1345,7 +1345,9 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(isReservedDomain("acme-builders.com")).toBe(false);
     const dead = assessRdap("qa-test-nonexistent-holdings.com", { ok: false, status: 404, text: "", failure: "nxdomain" });
     expect(dead?.status).toBe("FAIL");
-    expect(dead?.finding).toContain("domain does not resolve");
+    expect(dead?.reviewFlag).toBe(true);
+    expect(dead?.finding).toContain("domain is not registered");
+    expect(dead?.finding).not.toContain("domain does not resolve");
     const graded = gradeChecks(
       [assessRdap("example.com", { ok: true, status: 200, text: "{}" })!],
       facts({ website: "https://example.com" }),
@@ -2345,8 +2347,10 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
     expect(queries.join(" ")).not.toMatch(/"estate"/);
 
     expect(mentionsCompany("Mack Real Estate Group bought a site", "Mack Real Estate Group")).toBe(true);
+    expect(mentionsCompany("Mack Real Estate Group names Priyanka Garg president", "Mack Real Estate Group")).toBe(true);
     expect(mentionsCompany("Richard Mack founded Mack Real Estate Group", "Mack Real Estate Group", "Richard Mack")).toBe(true);
     expect(mentionsCompany("Richard Mack's brother's estate is tied to fraud", "Mack Real Estate Group", "Richard Mack")).toBe(false);
+    expect(mentionsCompany("debt to brother's estate reeks of fraud", "Mack Real Estate Group")).toBe(false);
 
     const founders = "The firm was founded by William, Richard and Stephen Mack.";
     expect(mentionsPerson(founders, "William Mack")).toBe(true);
@@ -2471,6 +2475,7 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
     expect(judged[0].url).toBe("https://therealdeal.com/vornado-foreclosure");
     expect(screen?.status).toBe(judged[0].status);
     expect(screen?.corroborates).not.toBe(true);
+    expect(judged[0].corroborates).not.toBe(true);
     expect(screen?.finding).toContain("Company-level litigation");
     expect(screen?.url).toBe("https://therealdeal.com/vornado-foreclosure");
   });
@@ -2524,6 +2529,29 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
     expect(fetched?.corroborates).toBe(true);
     expect(footprint?.url || "").not.toContain("linkedin.com/company/f.j.-sciame");
     expect(footprint?.url).toContain("community.solutions");
+    expect(footprint?.corroborates).toBe(true);
+
+    const repeated = await runPublicScreen(
+      facts({
+        name: "Frank Sciame",
+        applicantName: "Frank Sciame",
+        org: "Sciame Construction",
+        location: "New York, NY",
+        website: "",
+        linkedinUrl: linkedin,
+      }),
+      async (url) => {
+        if (url.includes("linkedin.com/company")) return { ok: true, status: 200, text: "Frank Sciame leads Sciame Construction in New York" };
+        if (url.includes("duckduckgo")) {
+          return { ok: true, status: 200, text: `<a class="result__a" href="${linkedin}">Frank Sciame leads Sciame Construction in New York</a>` };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const again = repeated.find((check) => check.key === "web-footprint");
+    expect(again?.status).toBe("INCONCLUSIVE");
+    expect(again?.corroborates).not.toBe(true);
+    expect(again?.finding).toContain("same source as linkedin-fetch");
   });
 
   it("spends the crawl budget on leadership pages and reads escaped JSON paths", () => {
