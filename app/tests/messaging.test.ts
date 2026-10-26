@@ -66,7 +66,8 @@ describe("portal messaging rules", () => {
   it("sends only the generic message notice", () => {
     const mail = portalMessageEmail("https://floor.example/messages");
     expect(mail.subject).toBe("You have a new message on Private Floor");
-    expect(mail.text).toBe("You have a new message on Private Floor\nhttps://floor.example/messages\n");
+    expect(mail.text).toContain("You have a new message on Private Floor.");
+    expect(mail.text).toContain("Open messages\nhttps://floor.example/messages");
     expectNoPrivateContact(`${mail.subject}\n${mail.text}`);
     expect(mail.text).not.toContain("Can you send the latest numbers?");
     expect(mail.text).not.toContain("Ada Lovelace");

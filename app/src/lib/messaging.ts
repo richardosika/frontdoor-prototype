@@ -91,7 +91,7 @@ export function vouchDelivery(input: { counterpartyIsMember: boolean }): { chann
 export function portalMessageEmail(inboxUrl: string): { subject: string; text: string } {
   return {
     subject: PORTAL_MESSAGE_SUBJECT,
-    text: `You have a new message on Private Floor\n${inboxUrl}\n`,
+    text: `You have a new message on Private Floor.\n\nOpen messages\n${inboxUrl}\n`,
   };
 }
 

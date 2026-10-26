@@ -136,7 +136,7 @@ export async function introduceMember(formData: FormData) {
     await sendEmail({
       to: other.email,
       subject: "You have a new message on Private Floor",
-      text: `You have an introduction request on Private Floor.\n${base}/network\n`,
+      text: `You have an introduction request on Private Floor.\n\nOpen messages\n${base}/network\n`,
     });
   }
   revalidatePath("/network");

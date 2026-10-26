@@ -71,7 +71,10 @@ It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
     subject: "We have your Private Floor application",
     body: `${APPLICATION_RECEIVED_TEMPLATE}
 
-It is for {role} at {org}. You can follow it here: {status_link}
+It is for {role} at {org}.
+
+Follow it here
+{status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
   },
@@ -81,7 +84,10 @@ Nothing is charged at this step. If your role has annual dues, they are a flat f
     subject: "Welcome to Private Floor",
     body: `Hello {first_name},
 
-Welcome to Private Floor. Your membership is active. Sign in at {login_link}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+Welcome to Private Floor. Your membership is active. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+
+Sign in
+{login_link}
 
 A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
   },
@@ -95,7 +101,8 @@ Thank you for the application. A Private Floor administrator needs a little more
 
 {note}
 
-Reply on this page: {status_link}${SIGN}`,
+Reply
+{status_link}${SIGN}`,
   },
   {
     key: "approved",
@@ -105,7 +112,13 @@ Reply on this page: {status_link}${SIGN}`,
 
 A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
 
-Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
+Sign in with the email and password you chose.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
 
 {note}${SIGN}`,
   },
@@ -117,7 +130,8 @@ Sign in at {login_link} with the email and password you chose. The decision is a
 
 Thank you for applying to Private Floor. A Private Floor administrator reviewed the application and is not able to offer membership at this time. We don't share the reasons for that decision.
 
-You can see the status here: {status_link}${SIGN}`,
+See the status
+{status_link}${SIGN}`,
   },
   {
     key: "payment_due",
@@ -129,11 +143,16 @@ A Private Floor administrator approved your application. Annual dues for {role} 
 
 Renewal date: {renewal_date}.
 
-Pay here: {payment_link}
+Pay annual dues
+{payment_link}
 
-You can also sign in at {login_link}. Until the annual dues are recorded, the floor stays on the payment page.
+Until the annual dues are recorded, the floor stays on the payment page.
 
-The decision is here: {status_link}
+Sign in
+{login_link}
+
+View the decision
+{status_link}
 
 {note}${SIGN}`,
   },
@@ -143,7 +162,10 @@ The decision is here: {status_link}
     subject: "Your Private Floor dues still need attention",
     body: `Hello {first_name},
 
-Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored. You can try again here: {payment_link}
+Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored.
+
+Pay annual dues
+{payment_link}
 
 The fee stays flat and is never based on a deal.${SIGN}`,
   },
@@ -223,7 +245,24 @@ Thank you. We have your Private Floor application for {role} at {org}.
 A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+It is for {role} at {org}. You can follow it here: {status_link}
+
+Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
   ],
+  welcome: `Hello {first_name},
+
+Welcome to Private Floor. Your membership is active. Sign in at {login_link}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+
+A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+  needs_info: `Hello {first_name},
+
+Thank you for the application. A Private Floor administrator needs a little more before deciding.
+
+{note}
+
+Reply on this page: {status_link}${SIGN}`,
   approved: [
     `Hello {first_name},
 
@@ -239,8 +278,21 @@ A Private Floor administrator approved your application. You are an Invited memb
 Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+
+Sign in at {login_link} with the email and password you chose. The decision is also here: {status_link}
+
+{note}${SIGN}`,
   ],
-  payment_due: `Hello {first_name},
+  declined: `Hello {first_name},
+
+Thank you for applying to Private Floor. A Private Floor administrator reviewed the application and is not able to offer membership at this time. We don't share the reasons for that decision.
+
+You can see the status here: {status_link}${SIGN}`,
+  payment_due: [
+    `Hello {first_name},
 
 A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. That amount is a flat membership fee. It is never based on a deal, and Private Floor does not store a card number.
 
@@ -251,11 +303,32 @@ You can also sign in at {login_link}. Until the dues are recorded, the floor sta
 The decision is here: {status_link}
 
 {note}${SIGN}`,
-  dues_reminder: `Hello {first_name},
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. Annual dues for {role} are {dues_amount}. They are a flat fee, billed once a year, and due only after approval. They are never based on a deal, and Private Floor does not store a card number.
+
+Renewal date: {renewal_date}.
+
+Pay here: {payment_link}
+
+You can also sign in at {login_link}. Until the annual dues are recorded, the floor stays on the payment page.
+
+The decision is here: {status_link}
+
+{note}${SIGN}`,
+  ],
+  dues_reminder: [
+    `Hello {first_name},
 
 Your Private Floor dues of {dues_amount} still need attention. No card number is stored. You can try again here: {payment_link}
 
 The fee stays flat and is not tied to a deal.${SIGN}`,
+    `Hello {first_name},
+
+Your annual dues of {dues_amount} still need attention. They are billed once a year. Renewal date: {renewal_date}. No card number is stored. You can try again here: {payment_link}
+
+The fee stays flat and is never based on a deal.${SIGN}`,
+  ],
   renewal: `Hello {first_name},
 
 Your flat annual dues of {dues_amount} renew on {renewal_date}. This is not a deal fee. Write to connect@privatefloorclub.com if you want to cancel before that date.
