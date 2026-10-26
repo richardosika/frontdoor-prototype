@@ -55,8 +55,8 @@ describe("news feeds", () => {
   it("builds quoted person, company, and company-plus-city queries", () => {
     const applicant = facts();
     expect(newsSearchQueries(applicant)).toEqual([
-      `"Stephen Ross" related`,
-      `"Ross" "related"`,
+      `"Stephen Ross" "related companies"`,
+      `"Ross" "related companies"`,
       `"Related Companies" "New York"`,
     ]);
     expect(googleNewsUrl(newsSearchQueries(applicant)[0])).toContain("https://news.google.com/rss/search?q=");
@@ -419,5 +419,86 @@ describe("news feeds", () => {
     expect(feedBodyState(200, "<html>consent</html>", "rss")).toBe("unavailable");
     expect(feedBodyState(429, "", "json")).toBe("unavailable");
     expect(feedBodyState(200, JSON.stringify({ articles: [] }), "json")).toBe("no-data");
+  });
+
+  it("ignores a place-name collision and separates a lawsuit from fraud", () => {
+    const providers = [
+      { name: "Google News", state: "responded" as const },
+      { name: "Bing News", state: "responded" as const },
+      { name: "GDELT", state: "responded" as const },
+    ];
+    const place = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol council meets on Tuesday",
+          snippet: "The council agenda was routine.",
+          url: "https://example.com/council",
+          source: "Local",
+          publishedAt: "2026-05-01T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(place[0].corroborates).not.toBe(true);
+    expect(place[0].finding).not.toContain("names this person and company");
+    expect(place.some((check) => check.key === "news-story")).toBe(false);
+
+    const sole = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol council meets Ada Quinn",
+          snippet: "A local meeting.",
+          url: "https://example.com/meet",
+          source: "Local",
+          publishedAt: "2026-05-01T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(sole[0].corroborates).not.toBe(true);
+
+    const lawsuit = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol Development sued over a lease",
+          snippet: "The filing names the company only.",
+          url: "https://example.com/suit",
+          source: "Desk",
+          publishedAt: "2026-05-02T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(lawsuit[0].status).toBe("INCONCLUSIVE");
+    expect(lawsuit[0].reviewFlag).toBeUndefined();
+    expect(lawsuit[0].finding).toContain("Company-level litigation");
+
+    const fraud = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Ada Quinn of Bristol Development indicted for fraud",
+          snippet: "Prosecutors described the charge.",
+          url: "https://example.com/fraud",
+          source: "Desk",
+          publishedAt: "2026-05-03T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(fraud[0].status).toBe("FAIL");
+    expect(fraud[0].reviewFlag).toBe(true);
+    expect(fraud[0].finding).toContain("not an automatic decline");
   });
 });

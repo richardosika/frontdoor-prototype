@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { companyPhraseTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -11,6 +11,37 @@ export const NEWS_PERSON_HARD =
 /** Civil or company-level trouble. Surfaced for Richard. It does not by itself cap the grade. */
 export const NEWS_COMPANY_CIVIL =
   /\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|foreclosures?|liens?)\b/i;
+
+/**
+ * A company name that is only a place collides with unrelated headlines.
+ * "Bristol" is not enough. "Bristol Development" still matches the full phrase.
+ */
+const SOLE_PLACE = new Set([
+  "bristol",
+  "madison",
+  "lincoln",
+  "newark",
+  "trenton",
+  "hackensack",
+  "dallas",
+  "houston",
+  "austin",
+  "boston",
+  "chicago",
+  "denver",
+  "phoenix",
+  "atlanta",
+  "seattle",
+  "portland",
+  "orlando",
+  "tampa",
+  "miami",
+  "brooklyn",
+  "manhattan",
+  "jersey",
+  "philadelphia",
+  "baltimore",
+]);
 
 /** Negative coverage terms. Plurals are included. "client" does not match "lien". */
 export const NEWS_NEGATIVE = new RegExp(`${NEWS_PERSON_HARD.source}|${NEWS_COMPANY_CIVIL.source}`, "i");
@@ -56,12 +87,12 @@ export function newsSearchQueries(facts: ApplicantFacts): string[] {
   const person = stripQuotes(facts.applicantName).replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
-  const companyToken = distinctiveCompanyTokens(company)[0] || company;
+  const companyPhrase = companyPhraseTokens(company).join(" ") || company;
   const last = person.split(" ").filter((part) => part.length >= 3).slice(-1)[0] || "";
   const queries: string[] = [];
-  if (person && companyToken && normalizeName(person) !== normalizeName(company)) {
-    queries.push(`"${person}" ${companyToken}`);
-    if (last && normalizeName(last) !== normalizeName(person)) queries.push(`"${last}" "${companyToken}"`);
+  if (person && companyPhrase && normalizeName(person) !== normalizeName(company)) {
+    queries.push(`"${person}" "${companyPhrase}"`);
+    if (last && normalizeName(last) !== normalizeName(person)) queries.push(`"${last}" "${companyPhrase}"`);
   } else if (person || company) queries.push(`"${person || company}"`);
   if (company && city && normalizeName(city) !== normalizeName(company)) queries.push(`"${company}" "${city}"`);
   return queries.slice(0, 3);
@@ -441,6 +472,9 @@ function textHasName(text: string, name: string): boolean {
 }
 
 function textHasCompany(text: string, org: string, person = ""): boolean {
+  const phrase = companyPhraseTokens(org);
+  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  if (phrase.length === 1 && distinctive.length === 1 && SOLE_PLACE.has(distinctive[0])) return false;
   return mentionsCompany(text, org, person);
 }
 
