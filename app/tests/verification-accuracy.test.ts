@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { cardConsistencyCheck, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { cardConsistencyCheck, collectChecks, linkedinFormatCheck, phoneStateCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { fetchLimits, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, gradeChecks, type GradeReport } from "@/lib/verify/grade";
 import { classifyNews } from "@/lib/verify/news";
+import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { distinctiveCompanyTokens, mentionsCompany } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
-import { runPublicScreen, serpUnusable } from "@/lib/verify/screen";
+import { runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -97,16 +98,26 @@ describe("corroboration is independent of the applicant's own page", () => {
         corroborates: false,
         finding: "A footprint from the same page names the person and the company.",
       }),
+      row({ key: "business-card", status: "PASS", selfReported: true, corroborates: false, finding: "The card names the person and the company." }),
+      row({ key: "rdap", status: "PASS", corroborates: false, finding: "RDAP responded." }),
+      row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists the exact company name." }),
     ];
-    const graded = gradeChecks(checks, facts({
-      website: "http://127.0.0.1/F04b/",
-      linkedinUrl: "https://www.linkedin.com/in/marisol-quentin-vale",
-      socialLinks: "https://example.com/marisol",
-      phone: "212-555-0147",
-    }));
-    expect(["D", "F"]).toContain(graded.letter);
+    const graded = gradeChecks(checks, {
+      ...facts({
+        website: "http://127.0.0.1/F04b/",
+        linkedinUrl: "https://www.linkedin.com/in/marisol-quentin-vale",
+        socialLinks: "https://example.com/marisol",
+        phone: "212-555-0147",
+        cardUploaded: true,
+        cardText: "Marisol Quentin Vale, Example Group",
+      }),
+      referenceCount: 1,
+    });
+    expect(graded.score).toBeGreaterThanOrEqual(70);
+    expect(graded.letter).toBe("D");
+    expect(graded.caps.some((line) => line.startsWith("Capped at D"))).toBe(true);
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
-    expect(graded.attention.some((item) => /one self-reported source/i.test(item.detail) && /cannot go above a B/i.test(item.detail))).toBe(true);
+    expect(graded.attention.some((item) => /one self-reported source/i.test(item.detail) && /stays below a C/i.test(item.detail))).toBe(true);
     const identity = graded.categories.find((category) => category.id === "identity");
     expect(identity?.reason).toContain("0 of 3");
   });
@@ -409,5 +420,172 @@ describe("low-risk check fixes", () => {
     expect(graded.letter).toBe("F");
     expect(graded.recommendation).toBe("DECLINE");
     expect(graded.caps.some((line) => line.startsWith("Capped at F"))).toBe(true);
+  });
+});
+
+describe("EDGAR exact company names", () => {
+  const rows = [
+    { title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" },
+    { title: "Unum Group", ticker: "UNM", cik: "5513" },
+    { title: "Madison Air Solutions Corp", ticker: "MAIR", cik: "2098430" },
+    { title: "Sachem Capital Corp.", ticker: "SCCF", cik: "1682220" },
+    { title: "Sachem Capital Corp.", ticker: "SACH", cik: "1682220" },
+    { title: "Sachem Capital Corp.", ticker: "SACH-PA", cik: "1682220" },
+    { title: "PARKE BANCORP, INC.", ticker: "PKBK", cik: "1315399" },
+    { title: "PARKERVISION INC", ticker: "PRKR", cik: "914139" },
+    { title: "Toll Brothers, Inc.", ticker: "TOL", cik: "794170" },
+    { title: "TOLL INC", ticker: "TOLLX", cik: "1" },
+    { title: "GROUP INC", ticker: "GRUP", cik: "9" },
+    { title: "HOLDINGS LLC", ticker: "HOLD", cik: "8" },
+  ];
+
+  it("does not match a different firm that shares only a generic word", () => {
+    expect(matchEdgarCompany(rows, "CBRE Group")?.ticker).toBe("CBRE");
+    expect(matchEdgarCompany(rows, "CBRE Group")?.title).not.toMatch(/unum/i);
+    expect(matchEdgarCompany(rows, "Madison Realty Capital")).toBeNull();
+    expect(matchEdgarCompany(rows, "Group")).toBeNull();
+    expect(matchEdgarCompany(rows, "Capital")).toBeNull();
+    expect(matchEdgarCompany(rows, "Holdings")).toBeNull();
+    expect(matchEdgarCompany(rows, "Realty Partners")).toBeNull();
+  });
+
+  it("keeps Sachem, Parke Bancorp, and Toll Brothers on the exact name", () => {
+    expect(matchEdgarCompany(rows, "Sachem Capital")?.ticker).toBe("SACH");
+    expect(matchEdgarCompany(rows, "Parke Bancorp")?.ticker).toBe("PKBK");
+    expect(matchEdgarCompany(rows, "Parke Bank")).toBeNull();
+    expect(matchEdgarCompany(rows, "Toll Brothers, Inc.")?.ticker).toBe("TOL");
+    expect(matchEdgarCompany(rows, "Toll")?.ticker).not.toBe("TOL");
+    expect(matchEdgarCompany(rows, "Toll")?.title).toBe("TOLL INC");
+  });
+});
+
+describe("self-reported site cannot reach C alone", () => {
+  it("keeps fabricated B2F01 below C and off APPROVE", async () => {
+    clearEdgarTickerCache();
+    const origin = "https://bramblewick-group.example";
+    const home = `<html><a href="/team">Team</a><a href='/professionals'>Professionals</a><p>Bramblewick Group builds in New Jersey.</p></html>`;
+    const team = `<html><p>Dana Pellam leads Bramblewick Group from Hackensack, New Jersey.</p></html>`;
+    const sitemap = `<?xml version="1.0"?><urlset><url><loc>${origin}/team/pellam</loc></url><url><loc>${origin}/about</loc></url></urlset>`;
+    const personPage = `<html><p>Dana Pellam, Bramblewick Group.</p></html>`;
+    const checks = await collectChecks({
+      network: true,
+      watchlist: [{ name: "Unrelated Person", location: "Nowhere" }],
+      facts: facts({
+        name: "Dana Pellam",
+        applicantName: "Dana Pellam",
+        email: "pf.bench.b2f01@gmail.com",
+        org: "Bramblewick Group",
+        location: "Hackensack, NJ",
+        phone: "201-555-0144",
+        website: origin,
+        linkedinUrl: "https://www.linkedin.com/in/dana-pellam",
+        statement: "I develop small buildings in New Jersey and keep a written record of each project for the application.",
+        inviteNote: "PF-BENCH-B2F01",
+      }),
+      fetchText: async (url) => {
+        if (url.endsWith("/sitemap.xml")) return { ok: true, status: 200, text: sitemap };
+        if (url === origin || url === `${origin}/`) return { ok: true, status: 200, text: home };
+        if (url.startsWith(origin) && url.includes("/team/pellam")) return { ok: true, status: 200, text: personPage };
+        if (url.startsWith(origin) && url.includes("/team")) return { ok: true, status: 200, text: team };
+        if (url.includes("company_tickers")) {
+          return {
+            ok: true,
+            status: 200,
+            text: JSON.stringify({
+              "0": { title: "Unum Group", ticker: "UNM", cik_str: 5513 },
+              "1": { title: "Madison Air Solutions Corp", ticker: "MAIR", cik_str: 2098430 },
+            }),
+          };
+        }
+        if (url.includes("efts.sec.gov")) return { ok: true, status: 200, text: JSON.stringify({ hits: { hits: [] } }) };
+        if (url.includes("courtlistener.com")) return { ok: true, status: 200, text: JSON.stringify({ results: [] }) };
+        if (url.includes("bing.com") && !url.includes("/news")) {
+          return { ok: true, status: 200, text: `<li class="b_algo"><a href="${origin}/team">Dana Pellam leads Bramblewick Group in Hackensack</a></li>` };
+        }
+        if (url.includes("news.google.com") || url.includes("bing.com/news")) return { ok: true, status: 200, text: "<rss><channel></channel></rss>" };
+        return { ok: false, status: 403, text: "" };
+      },
+    });
+    const website = checks.find((check) => check.key === "website");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(website?.status).toBe("PASS");
+    expect(website?.selfReported).toBe(true);
+    expect(website?.corroborates).toBe(false);
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.url).toMatch(/team|pellam/);
+    expect(footprint?.selfReported).toBe(true);
+    expect(footprint?.corroborates).toBe(false);
+    const search = checks.find((check) => check.key === "screen-web");
+    expect(search?.selfReported).toBe(true);
+    expect(search?.corroborates).toBe(false);
+    expect(checks.some((check) => check.corroborates)).toBe(false);
+    expect(checks.find((check) => check.key === "edgar")?.status).not.toBe("PASS");
+    const graded = gradeChecks(checks, facts({
+      name: "Dana Pellam",
+      org: "Bramblewick Group",
+      location: "Hackensack, NJ",
+      phone: "201-555-0144",
+      website: origin,
+      linkedinUrl: "https://www.linkedin.com/in/dana-pellam",
+      statement: "I develop small buildings in New Jersey and keep a written record of each project for the application.",
+    }));
+    expect(["D", "F"]).toContain(graded.letter);
+    expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
+  });
+});
+
+describe("team pages and the NY company list", () => {
+  it("reads a linked professionals page and a sitemap path with the last name", async () => {
+    const home = `<a href='/professionals'>People</a><a href="/attorneys/">Attorneys</a><a href="https://other.example/team">Offsite</a>`;
+    expect(sameOriginPages(home, "https://firm.example/")).toEqual([
+      "https://firm.example/professionals",
+      "https://firm.example/attorneys/",
+    ]);
+    const xml = `<urlset><url><loc>https://firm.example/about</loc></url><url><loc>https://firm.example/professionals/richard-w-abramson/</loc></url></urlset>`;
+    expect(sitemapPersonUrls(xml, "https://firm.example", "Abramson")).toEqual([
+      "https://firm.example/professionals/richard-w-abramson/",
+    ]);
+    const fetched: string[] = [];
+    const urls = await sitemapLastNameUrls(async (url) => {
+      fetched.push(url);
+      if (url.endsWith("/sitemap.xml")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<sitemapindex><sitemap><loc>https://firm.example/professionals-sitemap.xml</loc></sitemap><sitemap><loc>https://firm.example/assets-sitemap.xml</loc></sitemap></sitemapindex>`,
+        };
+      }
+      if (url.endsWith("/professionals-sitemap.xml")) return { ok: true, status: 200, text: xml };
+      return { ok: true, status: 200, text: "<urlset></urlset>" };
+    }, "https://firm.example", "Abramson");
+    expect(urls).toEqual(["https://firm.example/professionals/richard-w-abramson/"]);
+    expect(fetched.some((url) => url.endsWith("/assets-sitemap.xml"))).toBe(false);
+  });
+
+  it("treats an NY exact name as company-exists and ignores a similar name and the officer field", () => {
+    expect(normalizeRegistryName("Cole Schotz P.C.")).toBe("cole schotz");
+    const hit = assessNyRegistry("Cole Schotz", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "COLE SCHOTZ P.C.", chairman_name: "RICHARD ABRAMSON", dos_id: "1" }]),
+    });
+    expect(hit.status).toBe("PASS");
+    expect(hit.corroborates).toBe(false);
+    expect(hit.finding).toContain("COLE SCHOTZ P.C.");
+    expect(hit.finding.toLowerCase()).not.toContain("abramson");
+    const similar = assessNyRegistry("Madison Realty Capital", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "MADISON AIR SOLUTIONS CORP" }]),
+    });
+    expect(similar.status).toBe("INCONCLUSIVE");
+    expect(similar.corroborates).toBe(false);
+    const down = assessNyRegistry("Cole Schotz", { ok: false, status: 0, text: "" });
+    expect(down.status).toBe("UNAVAILABLE");
+    const graded = gradeChecks(
+      [row({ key: "business-registry", status: "PASS", corroborates: false, finding: hit.finding })],
+      facts({ org: "Cole Schotz", location: "New York, NY" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(2);
   });
 });

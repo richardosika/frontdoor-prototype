@@ -125,9 +125,14 @@ export function alternatePersonNames(name: string): string[] {
  * A 4-letter token is kept when it is not generic ("toll" in "Toll Brothers") so a real short name can match.
  * A single short token still has to be the whole distinctive name; a longer different firm does not fit.
  */
+/** A token that can identify one firm. Generic words and legal suffixes never qualify. "toll" does. */
+export function isDistinctiveCompanyToken(token: string): boolean {
+  return token.length >= 4 && !GENERIC.has(token) && !SHORT_GENERIC.has(token) && !LEGAL.has(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
-  const distinctive = kept.filter((token) => token.length >= 4 && !GENERIC.has(token) && !SHORT_GENERIC.has(token));
+  const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
   return distinctive.length ? distinctive : kept.filter((token) => token.length >= 5);
 }
 

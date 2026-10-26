@@ -28,6 +28,7 @@ export const LETTER_FLOORS = { A: 90, B: 80, C: 70, D: 60 } as const;
 /**
  * Caps only move a letter down. They are the rules Richard asked to be able to read.
  * noCorroboration: no passing check that actually ties the person to the company.
+ *   The letter stays below C. Point floors are unchanged.
  * ambiguousNews: a negative headline names the person and not the company or city.
  * reviewRedFlag: a disposable address that still has a public page, a sanctions name
  *   without country or date of birth, or fraud, sanctions, or a criminal charge tied to the
@@ -37,7 +38,7 @@ export const LETTER_FLOORS = { A: 90, B: 80, C: 70, D: 60 } as const;
  * twoConflicts: two or more failed checks that disagree with the application.
  */
 export const CAP_RULES = {
-  noCorroboration: "B",
+  noCorroboration: "D",
   ambiguousNews: "C",
   reviewRedFlag: "D",
   hardRedFlag: "F",
@@ -495,11 +496,15 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push("The court search did not confirm a case against this person and company.");
   }
   const registry = findCheck(checks, "business-registry");
-  evidence.push(
-    registry?.url
-      ? `The state registry was not searched automatically. A manual link is on the file (${registry.source}).`
-      : "No free state-registry search was run.",
-  );
+  if (registry?.status === "PASS") {
+    evidence.push("NY Active Corporations has this exact company name. That is company-exists evidence, not a person-to-company link.");
+  } else if (registry?.status === "INCONCLUSIVE" || registry?.status === "UNAVAILABLE") {
+    evidence.push(registry.finding);
+  } else if (registry?.url) {
+    evidence.push(`The state registry was not searched automatically. A manual link is on the file (${registry.source}).`);
+  } else {
+    evidence.push("No free state-registry search was run.");
+  }
   evidence.push("Free sources cannot show ownership, good standing, credit, or that this person controls the company.");
   return joinSentences(evidence);
 }
@@ -544,7 +549,14 @@ export function gradeChecks(
     award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
     award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
     award(passed(findCheck(checks, "rdap")), weights.company.rdap, "A domain record responded", "No domain record was confirmed"),
-    award(false, weights.company["business-registry"], "", "The state registry is not searched for free"),
+    award(
+      passed(findCheck(checks, "business-registry")),
+      weights.company["business-registry"],
+      "NY Active Corporations has this exact company name",
+      !findCheck(checks, "business-registry") || findCheck(checks, "business-registry")?.status === "NOT_RUN"
+        ? "The state registry is not searched for free"
+        : "The state registry did not confirm this exact company name",
+    ),
   ]);
   const footprint = sumLines([
     award(webPass, weights.footprint["web-footprint"], "A public web result names the person and the company", "No public web result confirmed the person and the company"),
@@ -680,8 +692,8 @@ export function gradeChecks(
       severity: "Medium",
       title: "Thin public record",
       detail: selfReported
-        ? "The applicant's own website or card is one self-reported source. No independent source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean."
-        : "No free source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean.",
+        ? "The applicant's own website or card is one self-reported source. No independent source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean."
+        : "No free source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean.",
     });
   }
   for (const check of checks) {
@@ -931,7 +943,7 @@ export function rubricSections(): { title: string; body: string }[] {
   return [
     {
       title: "Points",
-      body: `Identity and contact, ${points(GRADE_WEIGHTS.identity)} (18). Company legitimacy, ${points(GRADE_WEIGHTS.company)} (22). The registry row is always 0 because it is not searched for free. Public footprint, ${points(GRADE_WEIGHTS.footprint)} (18). Risk and sanctions, ${points(GRADE_WEIGHTS.risk)} (20). Role fit, ${points(GRADE_WEIGHTS.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.`,
+      body: `Identity and contact, ${points(GRADE_WEIGHTS.identity)} (18). Company legitimacy, ${points(GRADE_WEIGHTS.company)} (22). The registry row is 2 only when NY Active Corporations has the exact company name, and that hit does not corroborate a person. Other states are not searched for free and earn 0. Public footprint, ${points(GRADE_WEIGHTS.footprint)} (18). Risk and sanctions, ${points(GRADE_WEIGHTS.risk)} (20). Role fit, ${points(GRADE_WEIGHTS.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.`,
     },
     {
       title: "Letters",

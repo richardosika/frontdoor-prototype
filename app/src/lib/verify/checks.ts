@@ -7,6 +7,7 @@ import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
+import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
@@ -584,6 +585,16 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
     VA: "https://cis.scc.virginia.gov/",
   };
+  if (state === "NY") {
+    return check({
+      key: "business-registry",
+      status: "NOT_RUN",
+      weight: 8,
+      finding: "NY Active Corporations was not searched on this pass. A skipped search is not a pass.",
+      source: "NY Active Corporations",
+      url: "https://data.ny.gov/d/n9v6-gdp6",
+    });
+  }
   if (!state || !links[state]) {
     return check({
       key: "business-registry",
@@ -702,6 +713,22 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     );
   }
   out.push(...(await runPublicScreen(ctx.facts, fetchText)));
+  if (/\bNY\b/i.test(ctx.facts.location || "")) {
+    const registryUrl = nyRegistryQueryUrl(ctx.facts.org);
+    const registryHttp = await fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" }));
+    const registry = assessNyRegistry(ctx.facts.org, registryHttp);
+    out.push(
+      check({
+        key: "business-registry",
+        status: registry.status,
+        weight: 8,
+        finding: registry.finding,
+        source: "NY Active Corporations",
+        url: registry.url,
+        corroborates: false,
+      }),
+    );
+  }
   const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name, fetchText);
   out.push(
     check({
@@ -766,6 +793,7 @@ export function strongFixtureChecks(): CheckOutput[] {
 }
 
 export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
+  const nyOnNetwork = Boolean(ctx.network && /\bNY\b/i.test(ctx.facts.location || ""));
   const local = [
     ...emailChecks(ctx.facts),
     phoneStateCheck(ctx.facts),
@@ -778,7 +806,7 @@ export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     plausibilityCheck(ctx.facts),
     velocityCheck(ctx.facts),
     socialFormatCheck(ctx.facts),
-    registryLinkCheck(ctx.facts),
+    ...(nyOnNetwork ? [] : [registryLinkCheck(ctx.facts)]),
   ];
   const remote = await networkChecks(ctx);
   const fixture = ctx.facts.testProfile === "strong" && !ctx.network ? strongFixtureChecks() : [];

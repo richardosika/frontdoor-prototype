@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsPerson } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -29,24 +29,71 @@ export function parseCompanyTickers(payload: string): EdgarCompany[] | null {
   }
 }
 
-/** A shared first word is not enough when the SEC title names a different firm. */
-export function edgarTitleFits(title: string, org: string): boolean {
-  if (!mentionsCompany(title, org)) return false;
-  const orgTokens = new Set(distinctiveCompanyTokens(org));
-  const extras = distinctiveCompanyTokens(title).filter((token) => !orgTokens.has(token));
-  return !(orgTokens.size === 1 && extras.length > 0);
+const LEGAL_SUFFIX = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pc", "pllc"]);
+
+/** Lowercase name with punctuation and legal suffixes removed. "CBRE Group, Inc." and "CBRE GROUP INC" both become "cbre group". */
+export function normalizeFirmName(value: string): string {
+  return value
+    .replace(/\([^)]*\)/g, " ")
+    .toLowerCase()
+    .replace(/&amp;/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token))
+    .join(" ");
 }
 
-/** The shortest SEC company title that contains this firm's distinguishing words. */
+/**
+ * EDGAR matches on a normalized exact name, or on a ticker that is the whole applicant name.
+ * A shared generic word such as group, capital, or realty is not a match.
+ * "toll" does not match "Toll Brothers".
+ */
+export function edgarCompanyMatches(title: string, org: string, ticker = ""): boolean {
+  const distinctive = distinctiveCompanyTokens(org).filter((token) => isDistinctiveCompanyToken(token));
+  if (!distinctive.length) return false;
+  const left = normalizeFirmName(org);
+  const right = normalizeFirmName(title);
+  if (left && left === right) return true;
+  const symbol = ticker.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!symbol || symbol.length < 2) return false;
+  return left.replace(/\s+/g, "") === symbol;
+}
+
+/** A shared first word is not enough when the SEC title names a different firm. */
+export function edgarTitleFits(title: string, org: string, ticker = ""): boolean {
+  return edgarCompanyMatches(title, org, ticker);
+}
+
+function tickerPreference(ticker: string, org: string): [number, number, number] {
+  const symbol = ticker.trim().toUpperCase();
+  const punctuated = /[-.]/.test(symbol) ? 1 : 0;
+  const compact = normalizeFirmName(org).replace(/\s+/g, "");
+  const aligned = compact.startsWith(symbol.toLowerCase()) ? 0 : 1;
+  return [punctuated, aligned, symbol.length || 99];
+}
+
+function preferTicker(left: [number, number, number], right: [number, number, number]): boolean {
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return left[index] < right[index];
+  }
+  return false;
+}
+
+/** The SEC row whose normalized name is this firm. A shorter plain ticker wins ties, so Sachem Capital resolves to SACH. */
 export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompany | null {
   let best: EdgarCompany | null = null;
   let bestWords = Number.POSITIVE_INFINITY;
+  let bestTicker: [number, number, number] = [1, 1, 99];
   for (const row of rows) {
-    if (!edgarTitleFits(row.title, org)) continue;
-    const words = row.title.split(/\s+/).filter(Boolean).length;
-    if (words < bestWords) {
+    if (!edgarCompanyMatches(row.title, org, row.ticker)) continue;
+    const words = normalizeFirmName(row.title).split(/\s+/).filter(Boolean).length;
+    const preference = tickerPreference(row.ticker, org);
+    const betterName = words < bestWords;
+    const betterTicker = words === bestWords && preferTicker(preference, bestTicker);
+    if (!best || betterName || betterTicker) {
       best = row;
       bestWords = words;
+      bestTicker = preference;
     }
   }
   return best;

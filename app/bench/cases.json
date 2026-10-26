@@ -311,6 +311,62 @@
         "title": "Toll Brothres Inc",
         "body": "Toll Brothres Inc builds luxury homes and communities. Priscilla Dunmore, Chief Executive Officer, guides the company. Toll Brothres Inc: Priscilla Dunmore is available for investor inquiries."
       }
+    },
+    {
+      "id": "R11",
+      "kind": "real",
+      "label": "CBRE Group / Bob Sulentic (company only)",
+      "companyOnly": true,
+      "personAssumption": "Bob Sulentic is assumed to be associated with CBRE Group. The person link is unverified.",
+      "name": "Bob Sulentic",
+      "email": "pf.bench.r11@gmail.com",
+      "org": "CBRE Group",
+      "website": "https://www.cbre.com",
+      "linkedinUrl": "https://www.linkedin.com/company/cbre/",
+      "location": "Dallas, TX",
+      "role": "BROKER"
+    },
+    {
+      "id": "R12",
+      "kind": "real",
+      "label": "Madison Realty Capital / Josh Zegen (company only)",
+      "companyOnly": true,
+      "personAssumption": "Josh Zegen is assumed to be associated with Madison Realty Capital. The person link is unverified.",
+      "name": "Josh Zegen",
+      "email": "pf.bench.r12@gmail.com",
+      "org": "Madison Realty Capital",
+      "website": "https://www.madisonrealtycapital.com",
+      "linkedinUrl": "https://www.linkedin.com/company/madison-realty-capital/",
+      "location": "New York, NY",
+      "role": "LENDER"
+    },
+    {
+      "id": "R13",
+      "kind": "real",
+      "label": "Cole Schotz / Richard Abramson (company only)",
+      "companyOnly": true,
+      "personAssumption": "Richard Abramson is assumed to be associated with Cole Schotz. The person link is unverified.",
+      "name": "Richard Abramson",
+      "email": "pf.bench.r13@gmail.com",
+      "org": "Cole Schotz",
+      "website": "https://www.coleschotz.com",
+      "linkedinUrl": "https://www.linkedin.com/company/cole-schotz-pc/",
+      "location": "Hackensack, NJ",
+      "role": "RE_ATTORNEY"
+    },
+    {
+      "id": "R14",
+      "kind": "real",
+      "label": "Parke Bancorp / Vito Pantilione (company only)",
+      "companyOnly": true,
+      "personAssumption": "Vito Pantilione is assumed to be associated with Parke Bancorp. The person link is unverified.",
+      "name": "Vito Pantilione",
+      "email": "pf.bench.r14@gmail.com",
+      "org": "Parke Bancorp",
+      "website": "https://www.parkebank.com",
+      "linkedinUrl": "https://www.linkedin.com/company/parke-bank/",
+      "location": "Sewell, NJ",
+      "role": "LENDER"
     }
   ]
 }

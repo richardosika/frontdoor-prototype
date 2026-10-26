@@ -35,6 +35,7 @@ type Attempt = {
   score: MatchScore;
   detail: string;
   selfReported?: boolean;
+  linkedUrl?: string;
 };
 
 export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
@@ -103,6 +104,8 @@ export function tiktokProfileText(html: string): string {
   return [nickname, uniqueId, signature].filter(Boolean).join(" ");
 }
 
+const TEAM_PAGE = /about|contact|team|leader|people|executive|management|our-company|our-firm|our-story|who-we|professional|attorney|lawyer|staff|\bbio\b/i;
+
 export function sameOriginPages(html: string, base: string): string[] {
   let origin = "";
   try {
@@ -112,23 +115,100 @@ export function sameOriginPages(html: string, base: string): string[] {
   }
   const found: string[] = [];
   const seen = new Set<string>();
-  for (const match of html.matchAll(/href="([^"]+)"/gi)) {
+  for (const match of html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'=<>`]+))/gi)) {
+    const raw = match[1] || match[2] || match[3] || "";
     let url: URL;
     try {
-      url = new URL(match[1], base);
+      url = new URL(raw, base);
     } catch {
       continue;
     }
     if (url.origin !== origin) continue;
-    if (!/about|contact|team|leader|people|executive|management|our-company|our-firm|our-story|who-we/i.test(`${url.pathname} ${match[1]}`)) continue;
+    if (!TEAM_PAGE.test(`${url.pathname} ${raw}`)) continue;
     url.hash = "";
     const href = url.toString();
-    if (seen.has(href)) continue;
+    if (seen.has(href) || href === new URL(base).toString()) continue;
     seen.add(href);
     found.push(href);
     if (found.length >= 4) break;
   }
   return found;
+}
+
+/** Up to eight sitemap URLs whose path contains the person's last name. Other sitemap paths are not fetched. */
+export function sitemapPersonUrls(xml: string, origin: string, lastName: string): string[] {
+  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
+  if (needle.length < 3) return [];
+  let base: URL;
+  try {
+    base = new URL(origin);
+  } catch {
+    return [];
+  }
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const match of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)) {
+    let url: URL;
+    try {
+      url = new URL(match[1].trim(), base.origin);
+    } catch {
+      continue;
+    }
+    if (url.origin !== base.origin) continue;
+    if (!decodeURIComponent(url.pathname).toLowerCase().includes(needle)) continue;
+    url.hash = "";
+    const href = url.toString();
+    if (seen.has(href)) continue;
+    seen.add(href);
+    found.push(href);
+    if (found.length >= 8) break;
+  }
+  return found;
+}
+
+/** Homepage sitemap, or a few people-page sitemaps when the root file is an index. Capped at eight last-name URLs. */
+export async function sitemapLastNameUrls(
+  fetchText: FetchText,
+  origin: string,
+  lastName: string,
+): Promise<string[]> {
+  const root = await pull(fetchText, `${origin}/sitemap.xml`);
+  if (root.status < 200 || root.status >= 400 || !root.text.includes("<loc")) return [];
+  if (!/<sitemapindex\b/i.test(root.text)) return sitemapPersonUrls(root.text, origin, lastName);
+  let base: URL;
+  try {
+    base = new URL(origin);
+  } catch {
+    return [];
+  }
+  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
+  const children = [...root.text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)]
+    .map((match) => match[1].trim())
+    .filter((loc) => {
+      try {
+        const url = new URL(loc, base.origin);
+        if (url.origin !== base.origin) return false;
+        return /team|people|leader|professional|attorney|staff|bio|about/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
+      } catch {
+        return false;
+      }
+    })
+    .slice(0, 4);
+  const found: string[] = [];
+  for (const child of children) {
+    const page = await pull(fetchText, child);
+    if (page.status >= 200 && page.status < 400) found.push(...sitemapPersonUrls(page.text, origin, lastName));
+    if (found.length >= 8) break;
+  }
+  return [...new Set(found)].slice(0, 8);
+}
+
+export function applicantHost(website: string): string {
+  try {
+    return new URL(website).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
 }
 
 export function socialLinksFrom(html: string): { platform: string; url: string }[] {
@@ -208,18 +288,20 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   };
 }
 
-function toCheck(attempt: Attempt): CheckOutput {
-  const judged = findingFor(attempt);
+function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
+  const blob = `${attempt.url} ${attempt.detail} ${attempt.linkedUrl || ""}`.toLowerCase();
+  const ownSite = Boolean(attempt.selfReported) || Boolean(ownHost && blob.includes(ownHost));
+  const judged = findingFor({ ...attempt, selfReported: ownSite || attempt.selfReported });
   return {
     key: attempt.key,
     status: judged.status,
-    weight: judged.corroborates ? 8 : 4,
+    weight: judged.corroborates && !ownSite ? 8 : 4,
     finding: judged.finding,
     source: attempt.platform,
     url: attempt.url,
     ranAt: new Date().toISOString(),
-    corroborates: judged.corroborates,
-    selfReported: attempt.selfReported,
+    corroborates: judged.corroborates && !ownSite,
+    selfReported: ownSite ? true : undefined,
   };
 }
 
@@ -233,6 +315,11 @@ async function pull(fetchText: FetchText, url: string): Promise<{ ok: boolean; s
   } catch {
     return { ok: false, status: 0, text: "" };
   }
+}
+
+function snippetFrom(html: string): { text: string; hrefs: string[] } {
+  const hrefs = [...html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)].map((match) => match[1] || match[2] || "").filter(Boolean);
+  return { text: visible(html), hrefs };
 }
 
 function visible(html: string): string {
@@ -289,7 +376,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       attempts.push(blockedAttempt("website", "Company website", website, homeUrl, "The company website did not respond."));
     } else {
       pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
-      const extra = sameOriginPages(home.text, homeUrl);
+      const linked = sameOriginPages(home.text, homeUrl);
+      let fromSitemap: string[] = [];
+      try {
+        const origin = new URL(homeUrl).origin;
+        const lastName = person.split(/\s+/).filter((part) => /[A-Za-z]/.test(part)).slice(-1)[0] || "";
+        fromSitemap = await sitemapLastNameUrls(fetchText, origin, lastName);
+      } catch {
+        fromSitemap = [];
+      }
+      const extra = [...new Set([...linked, ...fromSitemap])];
       const more = await Promise.all(extra.map(async (url) => ({ url, response: await pull(fetchText, url) })));
       for (const page of more) {
         if (page.response.status >= 200 && page.response.status < 400) {
@@ -566,10 +662,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
   const [ddg, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
-  const ddgSnippets = [...ddg.text.matchAll(/class="result__(?:a|snippet)"[^>]*>([\s\S]*?)<\/a>/gi)].map((match) => visible(match[1]));
-  const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => visible(match[0]));
-  const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets, queryFacts);
-  const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets, queryFacts);
+  const ddgSnippets = [...ddg.text.matchAll(/class="result__(?:a|snippet)"[^>]*>([\s\S]*?)<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
+  const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
+  const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets.map((item) => item.text), queryFacts);
   if (ddgBlocked && bingBlocked) {
     attempts.push(
       blockedAttempt(
@@ -582,8 +678,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     );
   } else {
     const pool = [
-      ...(!ddgBlocked ? ddgSnippets.map((text) => ({ text, url: ddgUrl, platform: "DuckDuckGo" })) : []),
-      ...(!bingBlocked ? bingSnippets.map((text) => ({ text, url: bingUrl, platform: "Bing" })) : []),
+      ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUrl, platform: "DuckDuckGo" })) : []),
+      ...(!bingBlocked ? bingSnippets.map((item) => ({ ...item, url: bingUrl, platform: "Bing" })) : []),
     ];
     const hit = pool
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
@@ -597,6 +693,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         outcome: "found",
         score: hit.score,
         detail: hit.text.slice(0, 180),
+        linkedUrl: hit.hrefs.join(" "),
       });
     } else {
       attempts.push({
@@ -632,7 +729,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
-  return attempts.map(toCheck);
+  const ownHost = applicantHost(website);
+  return attempts.map((attempt) => toCheck(attempt, ownHost));
 }
 
 function rank(score: MatchScore): number {

@@ -44,7 +44,7 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 | Category | Possible | What earns the points |
 | --- | --- | --- |
 | Identity and contact | 18 | Well-formed email 2, not disposable 4, not a shared inbox 2, phone area code matches 3, LinkedIn link shape 3, public LinkedIn page names the person 4 |
-| Company legitimacy | 22 | Website names the person or company 8, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (always 0; it is not searched for free) |
+| Company legitimacy | 22 | Website names the person or company 8, EDGAR hit 6, business card matches 4, domain record 2, state registry 2 (NY Active Corporations exact name only; other states earn 0) |
 | Public footprint and reputation | 18 | Web result names person and company 8, headline names both 8, social links are full URLs 2 |
 | Risk and sanctions | 20 | Sanctions list clear 8, not a duplicate 6, no fraud-pattern text 4, no application burst 2 |
 | Role fit and plausibility | 12 | Name, company, and role readable 8, invite code on file 4 |
@@ -52,7 +52,7 @@ Points are fixed and sum to 100. A missing, blocked, or empty source earns 0 and
 
 Letters before caps: A 90–100, B 80–89, C 70–79, D 60–69, F 0–59. Caps only lower the letter.
 
-- No independent person-and-company corroboration: cannot exceed B. The applicant's own website and a footprint taken from that same page count as one self-reported source. They do not lift this cap or confidence by themselves. A company-name-only EDGAR or registry hit is company-exists evidence and does not corroborate the person. A LinkedIn or social URL that was not fetched does not earn its points unless an independent source already corroborated the file.
+- No independent person-and-company corroboration: cannot exceed D, so the letter stays below C. Letter floors are unchanged (C still starts at 70). The applicant's own website, team pages on that site, and a footprint from that same site count as one self-reported source. They do not lift this cap or confidence by themselves. A company-name-only EDGAR or NY registry hit is company-exists evidence and does not corroborate the person. EDGAR matches a normalized exact name or a ticker that is the whole applicant name. Generic words such as group, capital, and realty do not match a different firm. A LinkedIn or social URL that was not fetched does not earn its points unless an independent source already corroborated the file.
 - Negative headline that is only a name match: cannot exceed C. The file says “possible match, verify” and does not state the headline as fact. A headline is attributed to the person only on a full-name match, not a single surname token.
 - Disposable email that still has a public page, sanctions name without country or date of birth, or fraud, sanctions, or a criminal charge tied to the person together with the company or city: cannot exceed D, with a red banner. A company-level lawsuit or lien is an attention item for Richard. It is not that cap. Separate news headlines are not separate conflicts. An OpenSanctions hard flag, if that paid source ever answers, uses the same sanctions caps.
 - Corroborated sanctions, fraud-pattern text, disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed F, with a red banner.
