@@ -13,7 +13,7 @@ import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registr
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, surnamePageUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -1133,7 +1133,9 @@ describe("QA follow-up scoring", () => {
     expect(website?.finding).toContain("domain does not resolve");
     const rdap = assessRdap("qa-test-nonexistent-holdings.com", { ok: false, status: 404, text: "" });
     expect(rdap?.status).toBe("FAIL");
-    expect(rdap?.finding).toContain("domain does not resolve");
+    expect(rdap?.reviewFlag).toBe(true);
+    expect(rdap?.finding.toLowerCase()).toContain("not registered");
+    expect(rdap?.finding).not.toContain("domain does not resolve");
     const graded = gradeChecks([website!, rdap!], facts({ website: "https://qa-test-nonexistent.example", org: "Nonexistent Holdings Law Group" }));
     expect(graded.summary.didNotCheckOut).toContain("domain does not resolve");
     expect(graded.summary.didNotCheckOut).not.toContain("Nothing in the checks that ran showed a direct conflict");
@@ -2325,5 +2327,228 @@ describe("batch 6 name, redirect, and departure", () => {
     expect(news[0].reviewFlag).toBe(true);
     expect(news[0].finding.toLowerCase()).toContain("may no longer be at");
     expect(news[0].finding.toLowerCase()).not.toContain("possible match");
+  });
+});
+
+describe("batch 7 firm names, news links, and crawl budget", () => {
+  const providers = [{ name: "Google News", state: "responded" as const }];
+
+  it("keeps Mack as the brand and does not match LEAD REAL ESTATE or a brother's estate", () => {
+    expect(isDistinctiveCompanyToken("mack")).toBe(true);
+    for (const word of ["real", "estate", "trust", "usa"]) expect(isDistinctiveCompanyToken(word)).toBe(false);
+    expect(distinctiveCompanyTokens("Mack Real Estate Group")).toEqual(["mack"]);
+    expect(companySearchTerm("Mack Real Estate Group", "Richard Mack")).toBe("mack real estate group");
+    const queries = newsSearchQueries(
+      facts({ name: "Richard Mack", applicantName: "Richard Mack", org: "Mack Real Estate Group", location: "New York, NY" }),
+    );
+    expect(queries[0]).toContain("mack real estate group");
+    expect(queries.join(" ")).not.toMatch(/"estate"/);
+
+    expect(mentionsCompany("Mack Real Estate Group bought a site", "Mack Real Estate Group")).toBe(true);
+    expect(mentionsCompany("Richard Mack founded Mack Real Estate Group", "Mack Real Estate Group", "Richard Mack")).toBe(true);
+    expect(mentionsCompany("Richard Mack's brother's estate is tied to fraud", "Mack Real Estate Group", "Richard Mack")).toBe(false);
+
+    const founders = "The firm was founded by William, Richard and Stephen Mack.";
+    expect(mentionsPerson(founders, "William Mack")).toBe(true);
+    expect(mentionsPerson(founders, "Richard Mack")).toBe(true);
+    expect(mentionsPerson(founders, "Stephen Mack")).toBe(true);
+    expect(mentionsPerson("Jason & Ashleigh Crabb ft. Corvin Brown", "Corvin Ashleigh")).toBe(false);
+    expect(mentionsPerson("A page-turner for Jane.", "Jane Turner")).toBe(false);
+
+    const rows = [
+      { title: "LEAD REAL ESTATE CO", ticker: "LRE", cik: "1888980" },
+      { title: "ARBOR REALTY TRUST INC", ticker: "ABR", cik: "1253986" },
+      { title: "STARWOOD PROPERTY TRUST, INC.", ticker: "STWD", cik: "1465128" },
+    ];
+    expect(matchEdgarCompany(rows, "Mack Real Estate Group")).toBeNull();
+    expect(matchEdgarCompany(rows, "Arbor Realty Trust")?.cik).toBe("1253986");
+    expect(matchEdgarCompany(rows, "Starwood Property Trust")?.cik).toBe("1465128");
+
+    const brother = classifyNews(
+      facts({ name: "Richard Mack", applicantName: "Richard Mack", org: "Mack Real Estate Group", location: "New York, NY" }),
+      [
+        {
+          title: "A brother's estate and a fraud case",
+          snippet: "The dispute is about a relative's estate, not this firm.",
+          url: "https://example.com/brother-estate",
+          source: "Local",
+          publishedAt: "2024-03-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+        {
+          title: "The Real Deal: Mack Real Estate Group foreclosure in 2024",
+          snippet: "A foreclosure names Mack Real Estate Group. The applicant is not in the story.",
+          url: "https://therealdeal.com/2024/mack-foreclosure",
+          source: "The Real Deal",
+          publishedAt: "2024-06-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(brother[0].status).toBe("INCONCLUSIVE");
+    expect(brother[0].status).not.toBe("FAIL");
+    expect(brother[0].reviewFlag).toBeUndefined();
+    expect(brother[0].url).toBe("https://therealdeal.com/2024/mack-foreclosure");
+    expect(brother[0].finding).toContain("Company-level litigation");
+    const graded = gradeChecks(
+      [
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "website", status: "PASS", corroborates: true }),
+        row({ key: "edgar", status: "PASS", corroborates: true }),
+        row({ key: "web-footprint", status: "PASS", corroborates: true }),
+        row({ key: "news", status: "PASS", corroborates: true }),
+        ...brother,
+      ],
+      facts({ name: "Richard Mack", applicantName: "Richard Mack", org: "Mack Real Estate Group", location: "New York, NY" }),
+    );
+    expect(graded.caps.some((line) => /doubtful hit/i.test(line))).toBe(false);
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+  });
+
+  it("points a failing news check at the negative headline", () => {
+    const news = classifyNews(
+      facts({ name: "Frank Sciame", applicantName: "Frank Sciame", org: "Sciame Construction", location: "New York, NY" }),
+      [
+        {
+          title: "Frank Sciame leads Sciame Construction",
+          snippet: "Frank Sciame leads Sciame Construction in New York.",
+          url: "https://example.com/neutral",
+          source: "Desk",
+          publishedAt: "2026-01-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+        {
+          title: "Frank Sciame sued over a Sciame Construction job site",
+          snippet: "The civil complaint names Frank Sciame.",
+          url: "https://example.com/negative",
+          source: "Law.com",
+          publishedAt: "2026-05-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(news[0].status).toBe("FAIL");
+    expect(news[0].url).toBe("https://example.com/negative");
+  });
+
+  it("judges the same Vornado and Avison Young headlines in news and screen-news", async () => {
+    const vornado = facts({
+      name: "Steven Roth",
+      applicantName: "Steven Roth",
+      org: "Vornado Realty Trust",
+      location: "New York, NY",
+      website: "",
+      linkedinUrl: "",
+    });
+    expect(mentionsCompany("The family trust opened a fund", "Vornado Realty Trust")).toBe(false);
+    expect(mentionsCompany("Vornado Realty Trust leased a tower", "Vornado Realty Trust")).toBe(true);
+    expect(mentionsCompany("A young broker changed firms", "Avison Young")).toBe(false);
+    expect(mentionsCompany("Avison Young hired a broker", "Avison Young")).toBe(true);
+
+    const foreclosure = "Vornado Realty Trust faces foreclosure, The Real Deal";
+    const neutral = "Steven Roth leads Vornado Realty Trust";
+    const rss = `<rss><channel><title>News</title><item><title>${neutral}</title><link>https://example.com/vornado-neutral</link></item><item><title>${foreclosure}</title><link>https://therealdeal.com/vornado-foreclosure</link></item></channel></rss>`;
+    const judged = classifyNews(
+      vornado,
+      [
+        { title: neutral, snippet: neutral, url: "https://example.com/vornado-neutral", source: "Desk", publishedAt: "2026-02-01T15:00:00.000Z", provider: "Google News" },
+        { title: foreclosure, snippet: foreclosure, url: "https://therealdeal.com/vornado-foreclosure", source: "The Real Deal", publishedAt: "2024-06-01T15:00:00.000Z", provider: "Google News" },
+      ],
+      providers,
+      NOW,
+    );
+    const checks = await runPublicScreen(vornado, async (url) => {
+      if (url.includes("news.google.com")) return { ok: true, status: 200, text: rss };
+      return { ok: false, status: 404, text: "" };
+    });
+    const screen = checks.find((check) => check.key === "screen-news");
+    expect(judged[0].status).toBe("INCONCLUSIVE");
+    expect(judged[0].finding).toContain("Company-level litigation");
+    expect(judged[0].url).toBe("https://therealdeal.com/vornado-foreclosure");
+    expect(screen?.status).toBe(judged[0].status);
+    expect(screen?.corroborates).not.toBe(true);
+    expect(screen?.finding).toContain("Company-level litigation");
+    expect(screen?.url).toBe("https://therealdeal.com/vornado-foreclosure");
+  });
+
+  it("treats a TLD with no RDAP service as unavailable and an unregistered domain as a company finding", () => {
+    const unsupported = assessRdap("mackreg.us", { ok: false, status: 404, text: '{"description":["No RDAP servers found for us"]}' });
+    expect(unsupported?.status).toBe("UNAVAILABLE");
+    expect(unsupported?.finding.toLowerCase()).toContain("couldn't check for free");
+    expect(unsupported?.finding).not.toContain("domain does not resolve");
+
+    const unregistered = assessRdap("not-a-real-firm.com", {
+      ok: false,
+      status: 404,
+      text: '{"errorCode":404,"description":["The requested domain was not found"]}',
+    });
+    expect(unregistered?.status).toBe("FAIL");
+    expect(unregistered?.reviewFlag).toBe(true);
+    expect(unregistered?.finding.toLowerCase()).toContain("not registered");
+    expect(unregistered?.finding).not.toContain("domain does not resolve");
+    const graded = gradeChecks([unregistered!], facts({ website: "https://not-a-real-firm.com", org: "Not A Real Firm" }));
+    expect(graded.summary.didNotCheckOut.toLowerCase()).toContain("not registered");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("domain is not registered (0 of 2)");
+  });
+
+  it("does not re-credit a LinkedIn URL the fetch check already passed", async () => {
+    const linkedin = "https://www.linkedin.com/company/f.j.-sciame-construction-inc./";
+    const checks = await runPublicScreen(
+      facts({
+        name: "Frank Sciame",
+        applicantName: "Frank Sciame",
+        org: "Sciame Construction",
+        location: "New York, NY",
+        website: "",
+        linkedinUrl: linkedin,
+      }),
+      async (url) => {
+        if (url.includes("linkedin.com/company")) return { ok: true, status: 200, text: "Frank Sciame leads Sciame Construction in New York" };
+        if (url.includes("duckduckgo")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<a class="result__a" href="${linkedin}">Frank Sciame leads Sciame Construction in New York</a><a class="result__a" href="https://community.solutions/about-us/the-team/frank-sciame/">Frank Sciame leads Sciame Construction in New York</a>`,
+          };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const fetched = checks.find((check) => check.key === "linkedin-fetch");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(fetched?.status).toBe("PASS");
+    expect(fetched?.corroborates).toBe(true);
+    expect(footprint?.url || "").not.toContain("linkedin.com/company/f.j.-sciame");
+    expect(footprint?.url).toContain("community.solutions");
+  });
+
+  it("spends the crawl budget on leadership pages and reads escaped JSON paths", () => {
+    const home = [
+      `<a href="/asset-management">Assets</a>`,
+      `<a href="/property-management">Property</a>`,
+      `<a href="/investment-management">Investments</a>`,
+      `<a href="/facility-management">Facilities</a>`,
+      `<a href="/leadership">Leaders</a>`,
+      `<a href="/about">About</a>`,
+      `<script>{"url":"https:\\/\\/firm.example\\/about\\/leadership"}</script>`,
+    ].join("");
+    expect(sameOriginPages(home, "https://firm.example/")).toEqual([
+      "https://firm.example/leadership",
+      "https://firm.example/about/leadership",
+      "https://firm.example/about",
+    ]);
+    expect(fetchLimits("https://firm.example/sitemap.xml").maxChars).toBeGreaterThan(180_000);
+    expect(fetchLimits("https://firm.example/about").maxChars).toBe(180_000);
+  });
+
+  it("keeps the id on a Facebook people URL", () => {
+    const html = `<a href="https://www.facebook.com/people/Richard-Mack/100063921/">Mack</a><a href="https://www.facebook.com/mackrealestate/">Page</a>`;
+    const links = socialLinksFrom(html);
+    expect(links.find((link) => link.url.includes("/people/"))?.url).toBe("https://www.facebook.com/people/Richard-Mack/100063921/");
+    expect(links.some((link) => link.url === "https://www.facebook.com/mackrealestate/")).toBe(true);
   });
 });
