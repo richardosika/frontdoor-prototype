@@ -79,6 +79,19 @@ export function verificationStatusLabel(status: string): string {
   return VERIFICATION_STATUSES.find((item) => item.id === status)?.label ?? status;
 }
 
+/** The file status follows the decision. Approve, request more info, and decline each set one status. */
+export function statusForDecision(decision: "APPROVED" | "DECLINED" | "NEEDS_INFO"): VerificationStatus {
+  if (decision === "APPROVED") return "VERIFIED";
+  if (decision === "DECLINED") return "REJECTED";
+  return "NEEDS_INFO";
+}
+
+export function decisionLabel(decision: "APPROVED" | "DECLINED" | "NEEDS_INFO"): string {
+  if (decision === "APPROVED") return "Approve";
+  if (decision === "DECLINED") return "Decline";
+  return "Request more info";
+}
+
 export function checkResultLabel(result: string): string {
   return CHECK_RESULTS.find((item) => item.id === result)?.label ?? result;
 }

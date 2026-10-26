@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteBusinessCard, rerunGuidedChecks, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { loadMemberReview } from "@/lib/applicant-review";
 import { Banner } from "@/components/banner";
 import { ExecutiveSummary } from "@/components/grade-summary";
+import { GuidedReview } from "@/components/guided-review";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
@@ -37,6 +39,8 @@ export default async function VerificationCasePage({
     where: { id },
     include: {
       user: { select: { id: true, name: true, org: true, location: true } },
+      application: { select: { name: true, org: true, location: true } },
+      inviteRequest: { select: { name: true, org: true, location: true } },
       project: { select: { id: true, name: true, location: true, year: true, userId: true, user: { select: { name: true } } } },
       checks: { orderBy: { label: "asc" }, include: { reviewer: { select: { name: true } } } },
       events: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
@@ -47,6 +51,12 @@ export default async function VerificationCasePage({
   const stepIndex = Number.isFinite(requestedStep) ? Math.min(record.checks.length, Math.max(1, requestedStep)) : 1;
   const currentCheck = record.checks[stepIndex - 1];
   const heading = verificationCaseHeading(record);
+  if (record.subject === "MEMBER" && !record.user) {
+    const person = record.application || record.inviteRequest;
+    heading.title = person?.name?.trim() || "Applicant";
+    heading.detail = ["Applicant", person?.org, person?.location].filter(Boolean).join(" · ");
+  }
+  const memberReview = record.subject === "MEMBER" ? await loadMemberReview(record.id, query.step) : null;
   const grade = parseGradeSnapshot(record.gradeSnapshot);
   const shownGrade = grade
     ? applyReviewSkips(
@@ -88,21 +98,33 @@ export default async function VerificationCasePage({
         <Banner error={query.error} notice={query.notice} />
       </div>
       <p className="mt-3 text-sm text-ink">
-        {ADMIN_INTROS.verification} The badge is shown to members only after you mark this file Verified and every item is Pass. A skip is not a pass. Members otherwise see “Verification in progress.”
+        {ADMIN_INTROS.verification} {record.subject === "MEMBER"
+          ? "File status follows the decision on step 8. The member badge appears only when the status is Verified and every confirmed step is a pass. A suggestion is not a pass. Could not verify is not a pass."
+          : "The badge is shown to members only after you mark this file Verified and every item is Pass. A skip is not a pass. Members otherwise see “Verification in progress.”"}
       </p>
 
       <form action={updateVerificationCase} className={`${card} mt-4 space-y-3 p-4`}>
         <input type="hidden" name="caseId" value={record.id} />
-        <div>
-          <label className={labelCls}>Status</label>
-          <select name="status" className={field} defaultValue={record.status}>
-            {VERIFICATION_STATUSES.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {record.subject === "MEMBER" ? (
+          <div>
+            <input type="hidden" name="status" value={record.status} />
+            <p className={labelCls}>File status</p>
+            <p className="mt-1 text-sm text-ink">
+              {verificationStatusLabel(record.status)}. Set by step 8. Approve sets Verified. Request more info sets Needs info. Decline sets Rejected.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label className={labelCls}>Project file status</label>
+            <select name="status" className={field} defaultValue={record.status}>
+              {VERIFICATION_STATUSES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className={labelCls}>Re-verify / expiry date</label>
           <input name="expiresAt" type="date" className={field} defaultValue={expiresValue} />
@@ -146,18 +168,44 @@ export default async function VerificationCasePage({
         </section>
       ) : null}
 
-      {shownGrade ? (
+      {record.subject === "MEMBER" && memberReview ? (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-ink">Same 8-step review from Applications, People, and Verification files. Step 8 is the decision.</p>
+            <form action={rerunGuidedChecks}>
+              <input type="hidden" name="caseId" value={record.id} />
+              <button className={btnOutline} type="submit">
+                Re-run checks
+              </button>
+            </form>
+          </div>
+          <GuidedReview
+            applicationId={memberReview.applicationId || ""}
+            caseId={record.id}
+            steps={memberReview.steps}
+            currentId={memberReview.currentId}
+            grade={memberReview.grade || shownGrade}
+            paying={memberReview.paying}
+            notLegit={memberReview.notLegit}
+            confirmLabel={memberReview.confirmLabel}
+            mode={memberReview.mode}
+          />
+        </div>
+      ) : null}
+
+      {record.subject === "PROJECT" && shownGrade ? (
         <div>
           <p className="mt-4 text-sm text-ink">Suggested grade from the rubric. Auto-suggested. Confirm the steps, then make the decision on this file. A suggestion is not a pass.</p>
           <ExecutiveSummary report={shownGrade} title="Suggested grade" />
         </div>
-      ) : (
+      ) : null}
+      {record.subject === "PROJECT" && !shownGrade ? (
         <p className="mt-4 text-sm text-ink">No suggested grade yet. Re-run checks writes one from the rubric.</p>
-      )}
+      ) : null}
 
-      <section className={`${card} mt-4 p-4`}>
+      {record.subject === "PROJECT" ? <section className={`${card} mt-4 p-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Project checklist</p>
           <form action={rerunGuidedChecks}>
             <input type="hidden" name="caseId" value={record.id} />
             <button className={btnOutline} type="submit">
@@ -239,8 +287,8 @@ export default async function VerificationCasePage({
         ) : (
           <p className="mt-2 text-sm text-mut">This file has no checklist items.</p>
         )}
-      </section>
-      <details className={`${card} mt-4 p-4`}>
+      </section> : null}
+      {record.subject === "PROJECT" ? <details className={`${card} mt-4 p-4`}>
         <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
         <ul className="mt-3 space-y-3">
           {record.checks.map((check) => (
@@ -270,7 +318,7 @@ export default async function VerificationCasePage({
             </li>
           ))}
         </ul>
-      </details>
+      </details> : null}
 
       <h2 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Audit log</h2>
       <ul className={`${card} divide-y divide-line px-4`}>

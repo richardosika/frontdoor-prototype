@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { applyReviewSkips, RUBRIC_VERSION, type GradeReport } from "@/lib/verify/grade";
 import {
+  applicantReviewTitles,
   buildReviewSteps,
   displayCheckStatus,
   emptyProgress,
   parseReviewProgress,
   publicFinding,
+  reviewStepFromQuery,
   stepCountsAsPass,
 } from "@/lib/review-steps";
 
@@ -75,6 +77,18 @@ describe("guided review steps", () => {
     expect(graded.attention[0]?.detail).toMatch(/not a pass/i);
     expect(graded.plainText).toMatch(/not a pass/i);
     expect(applyReviewSkips(report("Low"), [{ title: "News", reason: "Ambiguous" }]).confidence).toBe("Low");
+  });
+
+  it("is one 8-step review and the last step is the decision", () => {
+    const steps = buildReviewSteps({ evidence: [], saved: emptyProgress(), references: [], cardOnFile: false });
+    expect(steps.map((step) => step.title)).toEqual([...applicantReviewTitles()]);
+    expect(steps).toHaveLength(8);
+    expect(steps[7]?.id).toBe("decision");
+    expect(reviewStepFromQuery("1")).toBe("identity");
+    expect(reviewStepFromQuery("5")).toBe("company");
+    expect(reviewStepFromQuery("8")).toBe("decision");
+    expect(reviewStepFromQuery("decision")).toBe("decision");
+    expect(reviewStepFromQuery("track", "identity")).toBe("identity");
   });
 
   it("resumes at the saved step and treats a checklist skip as skipped", () => {

@@ -1,29 +1,32 @@
 import { saveReviewStep } from "@/actions/review";
-import { DecisionForm } from "@/components/decision-form";
+import { DecisionForm, InviteDecisionForm } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import type { GradeReport } from "@/lib/verify/grade";
 import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
+import type { MemberReviewMode } from "@/lib/applicant-review";
 
 export function GuidedReview({
   applicationId,
+  caseId,
   steps,
   currentId,
   grade,
   paying,
   notLegit,
   confirmLabel,
-  decided,
+  mode = "application",
 }: {
   applicationId: string;
+  caseId: string;
   steps: BuiltStep[];
   currentId: ReviewStepId;
   grade: GradeReport | null;
   paying: boolean;
   notLegit: boolean;
   confirmLabel: string;
-  decided: boolean;
+  mode?: MemberReviewMode;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -41,6 +44,7 @@ export function GuidedReview({
         {steps.map((step) => (
           <form key={step.id} action={saveReviewStep}>
             <input type="hidden" name="applicationId" value={applicationId} />
+            <input type="hidden" name="caseId" value={caseId} />
             <input type="hidden" name="stepId" value={step.id} />
             <input type="hidden" name="intent" value="jump" />
             <button
@@ -59,11 +63,12 @@ export function GuidedReview({
       {current.id === "decision" ? (
         <DecisionStep
           applicationId={applicationId}
+          caseId={caseId}
           grade={grade}
           paying={paying}
           notLegit={notLegit}
           confirmLabel={confirmLabel}
-          decided={decided}
+          mode={mode}
           skipped={skipped}
           previous={previous}
         />
@@ -94,6 +99,7 @@ export function GuidedReview({
           {current.saved?.skipReason ? <p className="mt-3 text-sm text-ink">Skip reason: {current.saved.skipReason}</p> : null}
           <form action={saveReviewStep} className="mt-4 space-y-3">
             <input type="hidden" name="applicationId" value={applicationId} />
+            <input type="hidden" name="caseId" value={caseId} />
             <input type="hidden" name="stepId" value={current.id} />
             <input type="hidden" name="intent" value="save" />
             <label className="block">
@@ -121,6 +127,7 @@ export function GuidedReview({
           {current.index > 1 ? (
             <form action={saveReviewStep} className="mt-2">
               <input type="hidden" name="applicationId" value={applicationId} />
+              <input type="hidden" name="caseId" value={caseId} />
               <input type="hidden" name="stepId" value={previous} />
               <input type="hidden" name="intent" value="jump" />
               <button className={`${btnOutline} min-h-11 w-full sm:w-auto`} type="submit">
@@ -129,7 +136,7 @@ export function GuidedReview({
             </form>
           ) : null}
           <div className="mt-3">
-            <SkipStepForm applicationId={applicationId} stepId={current.id} />
+            <SkipStepForm applicationId={applicationId} caseId={caseId} stepId={current.id} />
           </div>
         </article>
       )}
@@ -139,20 +146,22 @@ export function GuidedReview({
 
 function DecisionStep({
   applicationId,
+  caseId,
   grade,
   paying,
   notLegit,
   confirmLabel,
-  decided,
+  mode,
   skipped,
   previous,
 }: {
   applicationId: string;
+  caseId: string;
   grade: GradeReport | null;
   paying: boolean;
   notLegit: boolean;
   confirmLabel: string;
-  decided: boolean;
+  mode: MemberReviewMode;
   skipped: BuiltStep[];
   previous: ReviewStepId;
 }) {
@@ -160,7 +169,9 @@ function DecisionStep({
     <div className="mt-4" id="decision-step">
       <h3 className="font-serif text-xl font-normal">Your decision</h3>
       <p className="mt-1 text-sm leading-relaxed text-ink">
-        This is a recommendation for Richard Osika. He approves every member. Approve sends the annual-dues link for a paid role, and opens the floor right away for a free role. Decline sends a short notice. The applicant does not see the grade.
+        {mode === "invite"
+          ? "This person asked to join and has not submitted an application. Approve sends an invite code and marks this file Verified. Request more info marks it Needs info. Decline marks it Rejected."
+          : "This is a recommendation for Richard Osika. He approves every member. Approve sends the annual-dues link for a paid role, and opens the floor right away for a free role. Decline sends a short notice. The applicant does not see the grade. The file status follows this decision."}
       </p>
       {skipped.length ? (
         <div className="mt-3 rounded border border-[#7A2E2E] bg-cream p-3 text-sm" role="status">
@@ -177,14 +188,17 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">No steps were skipped.</p>
       )}
-      {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Run verification before you decide.</p>}
-      {decided ? (
-        <p className="mt-4 text-sm text-ink">This application already has a decision. The log below is the record.</p>
-      ) : (
-        <DecisionForm applicationId={applicationId} notLegit={notLegit} confirmLabel={confirmLabel} paying={paying} />
-      )}
+      {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
+      {mode === "application" && applicationId ? (
+        <DecisionForm applicationId={applicationId} caseId={caseId} notLegit={notLegit} confirmLabel={confirmLabel} paying={paying} />
+      ) : null}
+      {mode === "invite" ? <InviteDecisionForm caseId={caseId} /> : null}
+      {mode === "closed" ? (
+        <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>
+      ) : null}
       <form action={saveReviewStep} className="mt-3">
         <input type="hidden" name="applicationId" value={applicationId} />
+        <input type="hidden" name="caseId" value={caseId} />
         <input type="hidden" name="stepId" value={previous} />
         <input type="hidden" name="intent" value="jump" />
         <button className={`${btnOutline} min-h-11`} type="submit">

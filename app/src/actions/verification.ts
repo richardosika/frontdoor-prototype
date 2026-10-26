@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireVerificationAdmin } from "@/lib/current-user";
+import { issueInviteCodeForRequest } from "@/lib/invite-issue";
 import {
+  applyDecisionStatus,
   assertChecklistAllowsVerified,
   ensureVerificationCase,
   parseCheckResult,
@@ -25,6 +27,9 @@ export async function updateVerificationCase(formData: FormData) {
 
   const existing = await prisma.verificationCase.findUnique({ where: { id: caseId } });
   if (!existing) notFound();
+  if (existing.subject === "MEMBER" && status !== existing.status) {
+    redirect(`${back}?error=${encodeURIComponent("File status follows the decision on step 8. Use Approve, Request more info, or Decline.")}`);
+  }
 
   const allowed = await assertChecklistAllowsVerified(caseId, status);
   if (!allowed.ok) redirect(`${back}?error=${encodeURIComponent(allowed.reason)}`);
@@ -219,7 +224,7 @@ export async function startGuidedReview(formData: FormData) {
   await prepareGuidedCase(record.id);
   revalidatePath(`/admin/verification/${record.id}`);
   revalidatePath("/admin/verification");
-  redirect(`/admin/verification/${record.id}?step=1`);
+  redirect(`/admin/verification/${record.id}?step=identity`);
 }
 
 export async function rerunGuidedChecks(formData: FormData) {
@@ -231,5 +236,53 @@ export async function rerunGuidedChecks(formData: FormData) {
   await runLivePrefill(caseId);
   revalidatePath(back);
   revalidatePath("/admin/verification");
-  redirect(`${back}?step=1&notice=${encodeURIComponent("Free-source checks finished. Marks stay Auto-suggested until you confirm them.")}`);
+  redirect(`${back}?step=identity&notice=${encodeURIComponent("Free-source checks finished. Marks stay Auto-suggested until you confirm them.")}`);
+}
+
+export async function decideInviteReview(formData: FormData) {
+  const admin = await requireVerificationAdmin();
+  const caseId = String(formData.get("caseId") || "");
+  const decision = String(formData.get("decision") || "");
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+  const back = `/admin/verification/${caseId}?step=decision`;
+  if (decision !== "APPROVED" && decision !== "DECLINED" && decision !== "NEEDS_INFO") {
+    redirect(`${back}&error=${encodeURIComponent("Choose Approve, Request more info, or Decline.")}`);
+  }
+  const record = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    include: { inviteRequest: true },
+  });
+  if (!record?.inviteRequest) redirect(`${back}&error=${encodeURIComponent("This file has no request to join.")}`);
+  if (record.inviteRequest.status !== "PENDING") {
+    redirect(`${back}&error=${encodeURIComponent("That request to join is not waiting.")}`);
+  }
+  if (decision === "NEEDS_INFO" && note.length < 2) {
+    redirect(`${back}&error=${encodeURIComponent("Write what you need from the applicant.")}`);
+  }
+  if (decision === "APPROVED") {
+    const issued = await issueInviteCodeForRequest({ adminId: admin.id, requestId: record.inviteRequest.id });
+    if (!issued.ok) redirect(`${back}&error=${encodeURIComponent(issued.error)}`);
+    await applyDecisionStatus({ caseId: record.id, decision, actorId: admin.id, actorName: admin.name });
+    revalidatePath(back);
+    revalidatePath("/admin");
+    revalidatePath("/admin/applications");
+    revalidatePath("/admin/verification");
+    redirect(`${back}&notice=${encodeURIComponent(`Invite code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`)}`);
+  }
+  if (decision === "DECLINED") {
+    await prisma.inviteRequest.update({ where: { id: record.inviteRequest.id }, data: { status: "DECLINED" } });
+    await applyDecisionStatus({ caseId: record.id, decision, actorId: admin.id, actorName: admin.name });
+    revalidatePath("/admin/applications");
+    revalidatePath("/admin/verification");
+    redirect(`${back}&notice=${encodeURIComponent("Declined. This file is Rejected.")}`);
+  }
+  await applyDecisionStatus({ caseId: record.id, decision: "NEEDS_INFO", actorId: admin.id, actorName: admin.name });
+  if (note) {
+    await prisma.verificationCase.update({
+      where: { id: record.id },
+      data: { internalNote: note.slice(0, 4000) },
+    });
+  }
+  revalidatePath("/admin/verification");
+  redirect(`${back}&notice=${encodeURIComponent("Asked for more info. This file is Needs info.")}`);
 }

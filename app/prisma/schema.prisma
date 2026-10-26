@@ -569,6 +569,8 @@ model VerificationCase {
   inviteRequestId  String?                @unique
   inviteRequest    InviteRequest?         @relation(fields: [inviteRequestId], references: [id], onDelete: SetNull)
   gradeSnapshot    Json?
+  sourceSnapshot   Json?
+  reviewProgress   Json?
   verifiedAt       DateTime?
   expiresAt        DateTime?
   createdAt        DateTime               @default(now())

@@ -11,7 +11,8 @@ import { tierLabel } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
-import { noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
+import { applyDecisionStatus, noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
+import { issueInviteCodeForRequest } from "@/lib/invite-issue";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { annualDuesCents, duesLabel } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
@@ -26,6 +27,34 @@ import { appBaseUrl } from "@/lib/url";
 export async function reviewApplication(formData: FormData) {
   const admin = await requireAdmin();
   const applicationId = String(formData.get("applicationId") || "");
+  const caseId = String(formData.get("caseId") || "");
+  const postedReturn = String(formData.get("returnTo") || "");
+  const reviewPath = postedReturn.startsWith("/admin/verification/") && !postedReturn.includes("..") && !postedReturn.includes("://")
+    ? postedReturn.split("?")[0]
+    : "";
+  const fail = (message: string) => {
+    if (reviewPath) redirect(`${reviewPath}?step=decision&error=${encodeURIComponent(message)}`);
+    redirect(`/admin/applications/${applicationId}?error=${encodeURIComponent(message)}`);
+  };
+  const succeed = async (notice: string, chosen: "APPROVED" | "DECLINED" | "NEEDS_INFO") => {
+    const linked = caseId
+      ? await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } })
+      : applicationId
+        ? await prisma.verificationCase.findUnique({ where: { applicationId }, select: { id: true } })
+        : null;
+    if (linked) {
+      await applyDecisionStatus({
+        caseId: linked.id,
+        decision: chosen,
+        actorId: admin.id,
+        actorName: admin.name,
+      });
+      revalidatePath(`/admin/verification/${linked.id}`);
+      revalidatePath("/admin/verification");
+    }
+    if (reviewPath) redirect(`${reviewPath}?step=decision&notice=${encodeURIComponent(notice)}`);
+    redirect(`/admin/applications/${applicationId}?notice=${encodeURIComponent(notice)}`);
+  };
   const decision = String(formData.get("decision") || "");
   let note = String(formData.get("note") || "").trim().slice(0, 500);
   const normalized = decision === "REJECTED" ? "DECLINED" : decision;
@@ -35,23 +64,24 @@ export async function reviewApplication(formData: FormData) {
 
   const application = await prisma.application.findUnique({ where: { id: applicationId } });
   if (!application || !(OPEN_APPLICATION_STATUSES as readonly string[]).includes(application.status)) {
-    redirect(`/admin/applications/${applicationId}?error=That+application+is+not+open`);
+    fail("That application is not open");
+    return;
   }
 
   if (normalized === "NEEDS_INFO" && note.length < 2) {
-    redirect(`/admin/applications/${application.id}?error=Write+what+you+need+from+the+applicant`);
+    fail("Write what you need from the applicant");
   }
   if (normalized === "APPROVED") {
     const existing = await prisma.user.findUnique({ where: { email: application.email } });
     if (existing) {
-      redirect(`/admin/applications/${application.id}?error=That+email+is+already+a+member`);
+      fail("That email is already a member");
     }
     const latest = await prisma.verificationRun.findFirst({
       where: { applicationId: application.id, subject: "APPLICATION", status: "DONE" },
       orderBy: { createdAt: "desc" },
     });
     if (latest?.verdict === "NOT_LEGIT" && String(formData.get("confirmNotLegit") || "") !== "yes") {
-      redirect(`/admin/applications/${application.id}?error=${encodeURIComponent("Confirm the NOT LEGIT recommendation before approving.")}`);
+      fail("Confirm the NOT LEGIT recommendation before approving.");
     }
     if (latest?.verdict === "NOT_LEGIT") {
       note = [note, "Approved despite recommendation NOT LEGIT."].filter(Boolean).join(" ");
@@ -106,7 +136,8 @@ export async function reviewApplication(formData: FormData) {
     revalidatePath("/admin/applications");
     revalidatePath("/admin/members");
     revalidatePath("/admin/crm");
-    redirect(`/admin/applications/${application.id}?notice=Declined`);
+    await succeed("Declined", "DECLINED");
+    return;
   }
 
   if (normalized === "NEEDS_INFO") {
@@ -130,7 +161,8 @@ export async function reviewApplication(formData: FormData) {
     revalidatePath("/admin/applications");
     revalidatePath("/admin/members");
     revalidatePath("/admin/crm");
-    redirect(`/admin/applications/${application.id}?notice=Asked+for+more+info`);
+    await succeed("Asked for more info", "NEEDS_INFO");
+    return;
   }
 
   const card = await prisma.businessCard.findUnique({
@@ -237,9 +269,7 @@ export async function reviewApplication(formData: FormData) {
   revalidatePath("/admin/members");
   revalidatePath("/admin/crm");
   revalidatePath("/network");
-  redirect(
-    `/admin/applications/${application.id}?notice=${encodeURIComponent(paying ? `Approved, payment due — ${application.name}` : `Approved ${application.name}`)}`,
-  );
+  await succeed(paying ? `Approved, payment due — ${application.name}` : `Approved ${application.name}`, "APPROVED");
 }
 
 async function tellRichard(
@@ -379,60 +409,15 @@ export async function createInvite(formData: FormData) {
   redirect("/admin?notice=Invite+created");
 }
 
-function mintInviteCode(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const chunk = (size: number) =>
-    Array.from(randomBytes(size), (byte) => alphabet[byte % alphabet.length]).join("");
-  return `PF-${chunk(4)}-${chunk(4)}`;
-}
-
 export async function issueInviteForRequest(formData: FormData) {
   const admin = await requireAdmin();
   const requestId = String(formData.get("requestId") || "");
-  const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
-  if (!request || request.status !== "PENDING") redirect("/admin?error=That+invite+request+is+not+waiting");
-
-  let code = mintInviteCode();
-  let inviteId = "";
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const invite = await prisma.inviteCode.create({
-        data: {
-          code,
-          maxUses: 1,
-          note: `For ${request.name}`,
-          createdById: admin.id,
-        },
-      });
-      inviteId = invite.id;
-      break;
-    } catch {
-      code = mintInviteCode();
-    }
-  }
-  if (!inviteId) redirect("/admin?error=Could+not+issue+a+code.+Try+again.");
-  const base = await appBaseUrl();
-
-  await prisma.inviteRequest.update({
-    where: { id: request.id },
-    data: { status: "ISSUED", inviteCodeId: inviteId },
-  });
-  await sendTemplate({
-    key: "info",
-    to: request.email,
-    vars: buildMailVars({
-      name: request.name,
-      role: roleLabel(request.role),
-      org: request.org,
-      applyLink: `${base}/apply`,
-      inviteCode: code,
-    }),
-    person: { name: request.name, role: request.role, org: request.org, location: request.location, inviteCode: code },
-  });
+  const issued = await issueInviteCodeForRequest({ adminId: admin.id, requestId });
+  if (!issued.ok) redirect(`/admin?error=${encodeURIComponent(issued.error)}`);
   revalidatePath("/admin");
   revalidatePath("/admin/outbox");
   redirect(
-    `/admin?issued=${encodeURIComponent(code)}&issuedFor=${encodeURIComponent(request.email)}&notice=${encodeURIComponent("Invite code issued. The information email is in the Outbox for the test recipient. Copy the code below.")}`,
+    `/admin?issued=${encodeURIComponent(issued.code)}&issuedFor=${encodeURIComponent(issued.email)}&notice=${encodeURIComponent("Invite code issued. The information email is in the Outbox for the test recipient. Copy the code below.")}`,
   );
 }
 

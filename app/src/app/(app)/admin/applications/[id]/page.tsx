@@ -1,18 +1,18 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { GuidedReview } from "@/components/guided-review";
 import { PaymentPanel } from "@/components/payment-admin";
-import { CheckTable, ExecutiveSummary, GradeMark, recommendationNeedsConfirm } from "@/components/grade-summary";
+import { CheckTable, ExecutiveSummary, GradeMark } from "@/components/grade-summary";
 import { RunAndReload } from "@/components/run-and-reload";
-import { btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
+import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
-import { adminDuesLine, annualDuesCents } from "@/lib/dues";
+import { adminDuesLine } from "@/lib/dues";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
-import { buildReviewSteps, isReviewStepId, parseReviewProgress, skippedFrom } from "@/lib/review-steps";
+import { buildReviewSteps, parseReviewProgress, reviewStepFromQuery, skippedFrom } from "@/lib/review-steps";
+import { ensureVerificationCase } from "@/lib/verification-db";
 import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
@@ -55,7 +55,18 @@ export default async function ApplicationDetailPage({
   const card = application.businessCard;
   const cardOnFile = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
   const progress = parseReviewProgress(application.reviewProgress);
-  const currentStep = query.step && isReviewStepId(query.step) ? query.step : progress.current;
+  const reviewCase = await ensureVerificationCase({
+    subject: "MEMBER",
+    applicationId: application.id,
+    userId: application.userId || undefined,
+  });
+  if (query.step) {
+    const step = reviewStepFromQuery(query.step, progress.current);
+    const params = new URLSearchParams({ step });
+    if (query.notice) params.set("notice", query.notice);
+    if (query.error) params.set("error", query.error);
+    redirect(`/admin/verification/${reviewCase.id}?${params.toString()}`);
+  }
   const reviewSteps = buildReviewSteps({
     evidence: (report?.evidence ?? []).map((item) => ({
       checkKey: item.checkKey,
@@ -84,11 +95,7 @@ export default async function ApplicationDetailPage({
         skippedFrom(reviewSteps).map((step) => ({ title: step.title, reason: step.saved?.skipReason || "" })),
       )
     : null;
-  const paying = annualDuesCents(application.role) > 0 && !application.duesWaived;
-  const open = ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"].includes(application.status);
-  const verification = application.userId
-    ? await prisma.verificationCase.findFirst({ where: { userId: application.userId }, select: { id: true } })
-    : null;
+  const verification = { id: reviewCase.id };
 
   return (
     <div>
@@ -105,16 +112,12 @@ export default async function ApplicationDetailPage({
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
         {shownGrade ? <ExecutiveSummary report={shownGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
-        <GuidedReview
-          applicationId={application.id}
-          steps={reviewSteps}
-          currentId={currentStep}
-          grade={shownGrade}
-          paying={paying}
-          notLegit={recommendationNeedsConfirm(shownGrade?.recommendation, report?.verdict)}
-          confirmLabel={shownGrade?.recommendation === "DECLINE" ? "The recommendation is DECLINE." : "The recommendation is NOT LEGIT."}
-          decided={!open}
-        />
+        <div className="mt-4">
+          <Link href={`/admin/verification/${reviewCase.id}?step=${progress.current}`} className={`${btn} inline-flex min-h-11 items-center`}>
+            Open the review
+          </Link>
+          <p className="mt-2 text-sm text-ink">The same 8-step review opens from Applications, People, and Verification files. Step 8 is Approve, Request more info, or Decline.</p>
+        </div>
         <section className={`${card} mt-4 space-y-2 p-4 text-sm`}>
           <p>
             <b>Email:</b> {application.email}

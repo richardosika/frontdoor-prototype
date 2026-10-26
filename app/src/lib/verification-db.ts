@@ -5,8 +5,10 @@ import {
   PROJECT_CHECKS,
   VOUCH_CHECK_KEY,
   canMarkCaseVerified,
+  decisionLabel,
   isCheckResult,
   referenceCheckForApplication,
+  statusForDecision,
   verificationStatusLabel,
   vouchEvidenceNote,
   type VerificationStatus,
@@ -220,4 +222,30 @@ export async function writeStatusEvent(input: {
 
 export function parseCheckResult(value: string): VerificationCheckResult | null {
   return isCheckResult(value) ? value : null;
+}
+
+/** The decision sets the file status. A manual status menu does not. */
+export async function applyDecisionStatus(input: {
+  caseId: string;
+  decision: "APPROVED" | "DECLINED" | "NEEDS_INFO";
+  actorId: string;
+  actorName: string;
+}) {
+  const existing = await prisma.verificationCase.findUnique({ where: { id: input.caseId } });
+  if (!existing) return;
+  const toStatus = statusForDecision(input.decision);
+  const verifiedAt = toStatus === "VERIFIED" ? existing.verifiedAt ?? new Date() : existing.verifiedAt;
+  await prisma.verificationCase.update({
+    where: { id: existing.id },
+    data: { status: toStatus, verifiedAt },
+  });
+  await prisma.verificationEvent.create({
+    data: {
+      caseId: existing.id,
+      actorId: input.actorId,
+      fromStatus: existing.status,
+      toStatus,
+      summary: `${input.actorName} chose ${decisionLabel(input.decision)}. File status is ${verificationStatusLabel(toStatus)}.`,
+    },
+  });
 }

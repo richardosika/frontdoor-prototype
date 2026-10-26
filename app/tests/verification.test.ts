@@ -9,6 +9,7 @@ import {
   gateVerificationRequest,
   isAwaitingVerification,
   referenceCheckForApplication,
+  statusForDecision,
   toPublicVerification,
   verificationDenial,
   vouchEvidenceNote,
@@ -129,6 +130,14 @@ describe("application references", () => {
     expect(named.result).toBe("PENDING");
     expect(named.note).toContain("Not started");
     expect(named.note).toContain("ada@example.com");
+  });
+});
+
+describe("decision sets the file status", () => {
+  it("maps approve, request more info, and decline", () => {
+    expect(statusForDecision("APPROVED")).toBe("VERIFIED");
+    expect(statusForDecision("NEEDS_INFO")).toBe("NEEDS_INFO");
+    expect(statusForDecision("DECLINED")).toBe("REJECTED");
   });
 });
 

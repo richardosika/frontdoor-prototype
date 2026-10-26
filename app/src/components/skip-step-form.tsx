@@ -4,7 +4,7 @@ import { useState } from "react";
 import { saveReviewStep } from "@/actions/review";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 
-export function SkipStepForm({ applicationId, stepId }: { applicationId: string; stepId: string }) {
+export function SkipStepForm({ applicationId, caseId, stepId }: { applicationId: string; caseId: string; stepId: string }) {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
@@ -16,6 +16,7 @@ export function SkipStepForm({ applicationId, stepId }: { applicationId: string;
   return (
     <form action={saveReviewStep} className="rounded border border-[#7A2E2E] bg-cream p-3">
       <input type="hidden" name="applicationId" value={applicationId} />
+      <input type="hidden" name="caseId" value={caseId} />
       <input type="hidden" name="stepId" value={stepId} />
       <input type="hidden" name="intent" value="skip" />
       <p className="font-serif text-xl text-forest">Skip this step</p>

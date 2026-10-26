@@ -17,6 +17,14 @@ function checklistKeys(subject: string): string[] {
   return (subject === "PROJECT" ? PROJECT_CHECKS : MEMBER_CHECKS).map((item) => item.key);
 }
 
+async function rememberSources(caseId: string, rows: EvidenceRow[]): Promise<void> {
+  if (!rows.length) return;
+  await prisma.verificationCase.update({
+    where: { id: caseId },
+    data: { sourceSnapshot: rows },
+  });
+}
+
 function asEvidence(checks: CheckOutput[]): EvidenceRow[] {
   return checks.map((check) => ({
     checkKey: check.key,
@@ -267,6 +275,7 @@ export async function prepareGuidedCase(caseId: string): Promise<void> {
   const loaded = await factsForCase(caseId);
   if (!loaded) return;
   const stored = await storedEvidence(caseId);
+  if (stored.evidence.length) await rememberSources(caseId, stored.evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
   const grade = stored.evidence.length
     ? stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject))
@@ -294,6 +303,7 @@ export async function refreshGuidedCase(caseId: string): Promise<void> {
   }
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
   const grade = stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.facts, loaded.subject));
+  await rememberSources(caseId, stored.evidence);
   await writeSuggestions({
     caseId,
     suggestions,
@@ -328,8 +338,10 @@ export async function runLivePrefill(caseId: string): Promise<void> {
     fetchText: politeFetch,
   };
   const checks = await collectChecks(ctx);
+  const evidence = asEvidence(checks);
   const grade = await gradeFor(checks, loaded.facts, loaded.subject);
-  const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, asEvidence(checks));
+  await rememberSources(caseId, evidence);
+  const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, evidence);
   await writeSuggestions({
     caseId,
     suggestions,

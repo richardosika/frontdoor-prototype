@@ -86,6 +86,28 @@ export function isReviewStepId(value: string): value is ReviewStepId {
   return (REVIEW_STEP_IDS as readonly string[]).includes(value);
 }
 
+/** `?step=5` and `?step=company` both open the same step. There are 8 steps, and the last one is the decision. */
+export function reviewStepFromQuery(value: string | undefined, fallback: ReviewStepId = "identity"): ReviewStepId {
+  if (!value) return fallback;
+  if (isReviewStepId(value)) return value;
+  const index = Number(value);
+  if (Number.isInteger(index) && index >= 1 && index <= REVIEW_STEP_IDS.length) return REVIEW_STEP_IDS[index - 1];
+  return fallback;
+}
+
+export function applicantReviewTitles(): string[] {
+  return [
+    "Identity and LinkedIn",
+    "Business card",
+    "Match the card to public records",
+    "References",
+    "Company and registry",
+    "News and public footprint",
+    "Sanctions and risk",
+    "Your decision",
+  ];
+}
+
 export function isStepStatus(value: string): value is StepStatus {
   return (STEP_STATUSES as readonly string[]).includes(value);
 }
