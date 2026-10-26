@@ -11,7 +11,7 @@ import { applyReviewSkips, dedupeSourceLines, gradeChecks, gradeComparisonLine, 
 import { classifyNews, newsSearchQueries } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, surnamePageUrls } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
@@ -553,6 +553,31 @@ describe("EDGAR exact company names", () => {
     expect(matchEdgarCompany(rows, "Toll")?.title).toBe("TOLL INC");
   });
 
+  it("matches SL Green Realty to its own filer and not the shortest title", () => {
+    const listed = [
+      { title: "GREEN DOT CORP", ticker: "GDOT", cik: "1386278" },
+      { title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" },
+      { title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" },
+      { title: "ARBOR REALTY TRUST, INC.", ticker: "ABR", cik: "1253986" },
+      { title: "STARWOOD PROPERTY TRUST, INC.", ticker: "STWD", cik: "1465128" },
+      { title: "LADDER CAPITAL CORP", ticker: "LADR", cik: "1577670" },
+      { title: "TUTOR PERINI CORP", ticker: "TPC", cik: "77543" },
+      { title: "NEWMARK GROUP, INC.", ticker: "NMRK", cik: "1690680" },
+      { title: "Madison Air Solutions Corp", ticker: "MAIR", cik: "2098430" },
+    ];
+    expect(matchEdgarCompany(listed, "SL Green Realty Corp")?.cik).toBe("1040971");
+    expect(matchEdgarCompany(listed, "SL Green")?.cik).toBe("1040971");
+    expect(matchEdgarCompany(listed, "SL Green Realty Corp")?.ticker).not.toBe("GDOT");
+    expect(matchEdgarCompany(listed, "SL Green")?.ticker).not.toBe("GDOT");
+    expect(matchEdgarCompany(listed, "CBRE Group, Inc.")?.cik).toBe("1138118");
+    expect(matchEdgarCompany(listed, "Arbor Realty Trust")?.cik).toBe("1253986");
+    expect(matchEdgarCompany(listed, "Starwood Property Trust")?.cik).toBe("1465128");
+    expect(matchEdgarCompany(listed, "Ladder Capital")?.cik).toBe("1577670");
+    expect(matchEdgarCompany(listed, "Tutor Perini")?.cik).toBe("77543");
+    expect(matchEdgarCompany(listed, "Newmark Group")?.cik).toBe("1690680");
+    expect(matchEdgarCompany(listed, "Madison Realty Capital")).toBeNull();
+  });
+
   it("finds Kennedy-Wilson by company name when the ticker file has no row, and still refuses Unum for CBRE", async () => {
     expect(companyFromDisplayName("Kennedy-Wilson Holdings, Inc.  (KW)  (CIK 0001408100)")).toEqual({
       title: "Kennedy-Wilson Holdings, Inc.",
@@ -857,6 +882,33 @@ describe("website text survives the size cap", () => {
     expect(prepareFetchedText(`{"title":"CBRE Group","pad":"${"y".repeat(80)}"}`, 40)).toHaveLength(40);
   });
 
+  it("keeps a team link when the head is longer than the cap", async () => {
+    const html = `<!doctype html><html><head>${"m".repeat(200_001)}</head><body><a href="/about/leadership">Leadership</a></body></html>`;
+    const prepared = prepareFetchedText(html, 180_000);
+    expect(prepared.length).toBeLessThanOrEqual(180_000);
+    expect(prepared).toContain("/about/leadership");
+    expect(prepared.includes("m".repeat(1000))).toBe(false);
+    const checks = await runPublicScreen(
+      facts({
+        name: "Jane Roe",
+        applicantName: "Jane Roe",
+        org: "Zorblax Holdings",
+        website: "https://zorblax.example",
+        location: "Austin, TX",
+      }),
+      async (url) => {
+        if (url === "https://zorblax.example" || url === "https://zorblax.example/") return { ok: true, status: 200, text: prepared };
+        if (url === "https://zorblax.example/about/leadership") {
+          return { ok: true, status: 200, text: "<html><body><p>Jane Roe leads Zorblax Holdings.</p></body></html>" };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.url).toBe("https://zorblax.example/about/leadership");
+  });
+
   it("follows professionals, leadership, and our-team when the nav is empty", async () => {
     const samples = [
       {
@@ -894,6 +946,8 @@ describe("website text survives the size cap", () => {
       "https://firm.example/our-team",
       "https://firm.example/team",
       "https://firm.example/about",
+      "https://firm.example/about/leadership",
+      "https://firm.example/about/executive-management",
     ]);
     for (const sample of samples) {
       const home = `<!doctype html><html><head><style>${"z".repeat(4000)}</style></head><body><div id="app"></div></body></html>`;
@@ -2153,5 +2207,123 @@ describe("batch 4 address and company-name plausibility", () => {
     expect(role?.reason).toContain("0 of 8");
     expect(role?.reason).not.toContain("8 of 8");
     expect(report.summary.couldNotCheck.toLowerCase()).not.toContain("domain does not resolve");
+  });
+});
+
+describe("batch 6 name, redirect, and departure", () => {
+  it("does not corroborate a name and city when the company is absent", async () => {
+    const checks = await runPublicScreen(
+      facts({
+        name: "Jane Roe",
+        applicantName: "Jane Roe",
+        org: "Zorblax Holdings",
+        location: "New York, NY",
+        website: "https://zorblax.example",
+      }),
+      async (url) => {
+        if (url.startsWith("https://zorblax.example")) {
+          return { ok: true, status: 200, text: "<html><body><p>Jane Roe works in New York.</p></body></html>" };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.status).toBe("INCONCLUSIVE");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.reviewFlag).toBe(true);
+    expect(website?.finding).toContain("name found, company not named");
+  });
+
+  it("records a renamed firm as a review-only alias and leaves a 403 unchanged", async () => {
+    const renamed = await runPublicScreen(
+      facts({
+        name: "Jane Roe",
+        applicantName: "Jane Roe",
+        org: "Kramer Levin",
+        website: "https://kramerlevin.example",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.startsWith("https://kramerlevin.example")) {
+          return {
+            ok: true,
+            status: 200,
+            url: "https://www.hsfkramer.example/",
+            text: "<html><body><p>HSF Kramer is a law firm.</p></body></html>",
+          };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = renamed.find((check) => check.key === "website");
+    expect(website?.status).toBe("INCONCLUSIVE");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.reviewFlag).toBe(true);
+    expect(website?.finding).toContain("https://www.hsfkramer.example/");
+    expect(website?.finding.toLowerCase()).toContain("review-only alias");
+    expect(website?.finding.toLowerCase()).not.toContain("possible match");
+
+    const stillNamed = await runPublicScreen(
+      facts({
+        name: "Jane Roe",
+        applicantName: "Jane Roe",
+        org: "Kramer Levin",
+        website: "https://kramerlevin.example",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.startsWith("https://kramerlevin.example")) {
+          return {
+            ok: true,
+            status: 200,
+            url: "https://www.hsfkramer.example/",
+            text: "<html><body><p>Jane Roe is a partner at Kramer Levin.</p></body></html>",
+          };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const kept = stillNamed.find((check) => check.key === "website");
+    expect(kept?.status).toBe("PASS");
+    expect(kept?.corroborates).not.toBe(true);
+    expect(kept?.finding).toContain("https://www.hsfkramer.example/");
+    expect(kept?.finding).toContain("Name: yes");
+    expect(kept?.finding.toLowerCase()).not.toContain("review-only alias");
+
+    const blocked = await runPublicScreen(
+      facts({ org: "Kramer Levin", website: "https://kramerlevin.example" }),
+      async () => ({ ok: false, status: 403, url: "https://www.hsfkramer.example/", text: "denied" }),
+    );
+    const denied = blocked.find((check) => check.key === "website");
+    expect(denied?.status).toBe("UNAVAILABLE");
+    expect(denied?.finding).toContain("blocked by site (403) — not checkable for free; ask applicant for a team-page URL");
+    expect(denied?.finding.toLowerCase()).not.toContain("alias");
+  });
+
+  it("treats taking a step back as a departure and not current employment", () => {
+    expect(leftTheCompany("Richard LeFrak is taking a step back at LeFrak", "LeFrak")).toBe(true);
+    const news = classifyNews(
+      facts({ name: "Richard LeFrak", applicantName: "Richard LeFrak", org: "LeFrak", location: "New York, NY" }),
+      [
+        {
+          title: "Richard LeFrak is taking a step back at LeFrak",
+          snippet: "Richard LeFrak is taking a step back at LeFrak.",
+          url: "https://example.com/lefrak",
+          source: "Trade Desk",
+          publishedAt: "2026-06-01T15:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(news[0].status).toBe("INCONCLUSIVE");
+    expect(news[0].status).not.toBe("PASS");
+    expect(news[0].corroborates).not.toBe(true);
+    expect(news[0].reviewFlag).toBe(true);
+    expect(news[0].finding.toLowerCase()).toContain("may no longer be at");
+    expect(news[0].finding.toLowerCase()).not.toContain("possible match");
   });
 });
