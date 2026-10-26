@@ -154,7 +154,19 @@ export function tiktokProfileText(html: string): string {
 const TEAM_PAGE = /about|contact|team|leader|leadership|people|executive|management|our-company|our-firm|our-story|our-team|who-we|professionals?|attorneys?|lawyers?|staff|\bbio\b/i;
 
 /** Probed when the nav did not already link them. A JavaScript menu still leaves these paths. */
-export const TEAM_FALLBACK_PATHS = ["/professionals", "/attorneys", "/people", "/leadership", "/our-team", "/team", "/about"];
+export const TEAM_FALLBACK_PATHS = [
+  "/professionals",
+  "/attorneys",
+  "/attorney",
+  "/lawyers",
+  "/our-people",
+  "/associated_attorney",
+  "/people",
+  "/leadership",
+  "/our-team",
+  "/team",
+  "/about",
+];
 
 export function fallbackTeamUrls(base: string, already: string[]): string[] {
   let origin = "";
@@ -234,6 +246,38 @@ export function sitemapPersonUrls(xml: string, origin: string, lastName: string)
   return found;
 }
 
+/** Same-origin links whose path contains the surname, including /our-people/partners/stephen-b-meister/. */
+export function surnamePageUrls(html: string, base: string, lastName: string): string[] {
+  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
+  if (needle.length < 3) return [];
+  let origin = "";
+  try {
+    origin = new URL(base).origin;
+  } catch {
+    return [];
+  }
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const match of html.matchAll(/href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'=<>`]+))/gi)) {
+    const raw = match[1] || match[2] || match[3] || "";
+    let url: URL;
+    try {
+      url = new URL(raw, base);
+    } catch {
+      continue;
+    }
+    if (url.origin !== origin) continue;
+    if (!decodeURIComponent(url.pathname).toLowerCase().replace(/[^a-z]/g, "").includes(needle)) continue;
+    url.hash = "";
+    const href = url.toString();
+    if (seen.has(href)) continue;
+    seen.add(href);
+    found.push(href);
+    if (found.length >= 8) break;
+  }
+  return found;
+}
+
 /** Homepage sitemap, or a few people-page sitemaps when the root file is an index. Capped at eight last-name URLs. */
 export async function sitemapLastNameUrls(
   fetchText: FetchText,
@@ -256,7 +300,7 @@ export async function sitemapLastNameUrls(
       try {
         const url = new URL(loc, base.origin);
         if (url.origin !== base.origin) return false;
-        return /team|people|leader|leadership|professional|attorney|staff|bio|about|our-team/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
+        return /team|people|leader|leadership|professional|attorney|lawyer|staff|bio|about|our-team|our-people|associated|page/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
       } catch {
         return false;
       }
@@ -281,7 +325,7 @@ export function applicantHost(website: string): string {
 
 export function socialLinksFrom(html: string): { platform: string; url: string }[] {
   const patterns: { platform: string; re: RegExp }[] = [
-    { platform: "LinkedIn", re: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[a-z0-9\-_%&]+\/?/gi },
+    { platform: "LinkedIn", re: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[a-z0-9\-_%&.]+\/?/gi },
     { platform: "X", re: /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[a-z0-9_]+\/?/gi },
     { platform: "Facebook", re: /https?:\/\/(?:www\.)?facebook\.com\/[a-z0-9.\-]+\/?/gi },
     { platform: "Instagram", re: /https?:\/\/(?:www\.)?instagram\.com\/[a-z0-9._]+\/?/gi },
@@ -500,18 +544,52 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const linked = sameOriginPages(home.text, homeUrl);
       const fallback = fallbackTeamUrls(homeUrl, linked);
       let fromSitemap: string[] = [];
+      let lastName = "";
       try {
         const origin = new URL(homeUrl).origin;
-        const lastName = surnameForSearch(person);
+        lastName = surnameForSearch(person);
         fromSitemap = await sitemapLastNameUrls(fetchText, origin, lastName);
       } catch {
         fromSitemap = [];
       }
       const extra = [...new Set([...linked, ...fallback, ...fromSitemap])];
       const more = await Promise.all(extra.map(async (url) => ({ url, response: await pull(fetchText, url) })));
+      const seenPages = new Set<string>();
+      const remember = (url: string) => {
+        seenPages.add(url.replace(/\/$/, ""));
+      };
+      remember(homeUrl);
       for (const page of more) {
+        remember(page.url);
         if (page.response.status >= 200 && page.response.status < 400 && !isBotChallenge(page.response.text)) {
           pages.push({ url: page.url, text: visible(page.response.text), raw: page.response.text });
+        }
+      }
+      if (lastName) {
+        const hops: string[] = [];
+        const sources = [
+          ...(homeChallenge ? [] : [{ url: homeUrl, raw: home.text }]),
+          ...more
+            .filter((page) => page.response.status >= 200 && page.response.status < 400 && !isBotChallenge(page.response.text))
+            .map((page) => ({ url: page.url, raw: page.response.text })),
+        ];
+        for (const source of sources) {
+          for (const href of surnamePageUrls(source.raw, source.url, lastName)) {
+            const key = href.replace(/\/$/, "");
+            if (seenPages.has(key)) continue;
+            seenPages.add(key);
+            hops.push(href);
+            if (hops.length >= 4) break;
+          }
+          if (hops.length >= 4) break;
+        }
+        if (hops.length) {
+          const hopped = await Promise.all(hops.map(async (url) => ({ url, response: await pull(fetchText, url) })));
+          for (const page of hopped) {
+            if (page.response.status >= 200 && page.response.status < 400 && !isBotChallenge(page.response.text)) {
+              pages.push({ url: page.url, text: visible(page.response.text), raw: page.response.text });
+            }
+          }
         }
       }
       const best = pages
