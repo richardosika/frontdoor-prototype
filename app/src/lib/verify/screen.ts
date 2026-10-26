@@ -83,6 +83,25 @@ export function isScriptRenderedShell(raw: string, text: string): boolean {
   return words < 8 && /<script\b/i.test(raw);
 }
 
+/** HTTP 200 can still be an Imperva or Cloudflare challenge. That is not page content. */
+export function isBotChallenge(text: string): boolean {
+  if (/_Incapsula_Resource|cf-chl|challenge-platform|<title>\s*Just a moment|Attention Required!\s*\|\s*Cloudflare|Access Denied[\s\S]{0,120}Reference\s*#/i.test(text)) {
+    return true;
+  }
+  // A Next/React/Angular shell already has its own unreadability message.
+  if (/enable javascript|__next_data__|id=["']__next["']|id=["']root["']|data-reactroot|ng-version|<app-root\b/i.test(text)) {
+    return false;
+  }
+  const stripped = text
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const scriptBlocks = text.match(/<script\b/gi) || [];
+  return scriptBlocks.length > 0 && stripped.length < 200 && text.length > 40 && stripped.length * 4 < text.length;
+}
+
 /** A login wall or a bot challenge is a blocked source, not an empty result. */
 export function accessBlocked(status: number, text: string, url = ""): boolean {
   if (status === 0 || status === 202 || status === 400 || status === 401 || status === 403 || status === 405 || status === 429 || status === 999 || status >= 500) {
@@ -476,7 +495,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
             : "The company website did not respond.";
       attempts.push(blockedAttempt("website", "Company website", website, homeUrl, detail));
     } else {
-      pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
+      const homeChallenge = isBotChallenge(home.text);
+      if (!homeChallenge) pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
       const linked = sameOriginPages(home.text, homeUrl);
       const fallback = fallbackTeamUrls(homeUrl, linked);
       let fromSitemap: string[] = [];
@@ -490,14 +510,24 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const extra = [...new Set([...linked, ...fallback, ...fromSitemap])];
       const more = await Promise.all(extra.map(async (url) => ({ url, response: await pull(fetchText, url) })));
       for (const page of more) {
-        if (page.response.status >= 200 && page.response.status < 400) {
+        if (page.response.status >= 200 && page.response.status < 400 && !isBotChallenge(page.response.text)) {
           pages.push({ url: page.url, text: visible(page.response.text), raw: page.response.text });
         }
       }
       const best = pages
         .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
-      if (pages.length && pages.every((page) => isScriptRenderedShell(page.raw, page.text))) {
+      if (!pages.length && homeChallenge) {
+        attempts.push(
+          blockedAttempt(
+            "website",
+            "Company website",
+            website,
+            homeUrl,
+            "The company website served a bot challenge.",
+          ),
+        );
+      } else if (pages.length && pages.every((page) => isScriptRenderedShell(page.raw, page.text))) {
         attempts.push(
           blockedAttempt(
             "website",

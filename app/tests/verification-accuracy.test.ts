@@ -13,7 +13,7 @@ import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registr
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { distinctiveCompanyTokens, isDistinctiveCompanyToken, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
+import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls } from "@/lib/verify/screen";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -1511,5 +1511,61 @@ describe("batch 4 ordered company names", () => {
     expect(mentionsCompany("Ronald Tutor stays on at Tutor Perini's", "Tutor Perini Corporation")).toBe(true);
     expect(mentionsCompany("CBRE Group closed a Dallas sale", "CBRE Group")).toBe(true);
     expect(mentionsCompany("Unum Group raised its dividend", "CBRE Group")).toBe(false);
+  });
+});
+
+describe("batch 4 bot challenges", () => {
+  it("treats an HTTP 200 challenge page as not checkable and does not retry with a browser", async () => {
+    const challenge = `<html><head><META NAME="robots" CONTENT="noindex,nofollow"><script src="/_Incapsula_Resource?SWUDNSAI=1"></script></head><body></body></html>`;
+    expect(isBotChallenge(challenge)).toBe(true);
+    const calls: string[] = [];
+    const checks = await runPublicScreen(
+      facts({
+        name: "Barry Sternlicht",
+        applicantName: "Barry Sternlicht",
+        org: "Starwood Property Trust",
+        website: "https://starwoodpropertytrust.example",
+        location: "Miami Beach, FL",
+      }),
+      async (url) => {
+        calls.push(url);
+        if (url.includes("starwoodpropertytrust.example")) return { ok: true, status: 200, text: challenge };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.status).toBe("UNAVAILABLE");
+    expect(website?.status).not.toBe("PASS");
+    expect(website?.status).not.toBe("FAIL");
+    expect(website?.finding).toContain("The company website served a bot challenge.");
+    expect(website?.finding).not.toContain("Company: no");
+    expect(website?.finding).not.toContain("No result found");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.url || "").not.toContain("starwoodpropertytrust.example");
+    expect(calls.some((url) => /chrome|mozilla/i.test(url))).toBe(false);
+  });
+
+  it("still scores a readable team page when the homepage is only a challenge", async () => {
+    const challenge = `<html><script src="/_Incapsula_Resource?SWUDNSAI=1"></script><body></body></html>`;
+    const team = "<html><body><p>Barry Sternlicht leads Starwood Property Trust in Miami Beach.</p></body></html>";
+    const checks = await runPublicScreen(
+      facts({
+        name: "Barry Sternlicht",
+        applicantName: "Barry Sternlicht",
+        org: "Starwood Property Trust",
+        website: "https://starwoodpropertytrust.example",
+        location: "Miami Beach, FL",
+      }),
+      async (url) => {
+        if (url.includes("/team")) return { ok: true, status: 200, text: team };
+        if (url.includes("starwoodpropertytrust.example")) return { ok: true, status: 200, text: challenge };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const website = checks.find((check) => check.key === "website");
+    expect(website?.finding).not.toContain("bot challenge");
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.finding).toContain("Company: yes");
+    expect(website?.status).not.toBe("UNAVAILABLE");
   });
 });
