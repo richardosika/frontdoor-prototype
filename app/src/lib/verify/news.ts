@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { companyPhraseTokens, companySearchTerm, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { companyPhraseTokens, companySearchTerm, isDistinctiveCompanyToken, isShortBrandToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -119,13 +119,17 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   const phrase = companyTerm.trim();
   if (!cleanedPerson || !phrase) return null;
   const seen = new Set(wordsOf(cleanedPerson));
-  const kept = phrase.split(/\s+/).filter((word) => {
+  const words = phrase.split(/\s+/).filter(Boolean);
+  // "bk real estate" and "sl green realty" stay quoted in full. Do not reduce them to "advisors" or "green".
+  if (words.length >= 2 && words.some((word) => isShortBrandToken(bareToken(word)))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
+  const kept = words.filter((word) => {
     const token = bareToken(word);
     return token.length >= 2 && !seen.has(token);
   });
   const distinctive = kept.filter((word) => isDistinctiveCompanyToken(bareToken(word)));
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
-  const words = phrase.split(/\s+/).filter(Boolean);
   const phraseHasDistinctive = words.some((word) => isDistinctiveCompanyToken(bareToken(word)));
   // "estate" alone is a generic leftover, not a firm. A full name that still contains the brand is kept.
   if (!phraseHasDistinctive && words.length < 2) return null;

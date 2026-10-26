@@ -196,6 +196,11 @@ export function isGenericFirmToken(token: string): boolean {
   return GENERIC.has(token) || SHORT_GENERIC.has(token) || LEGAL.has(token);
 }
 
+/** A 2- or 3-letter brand such as "bk" or "sl". It is not generic, and it is too short to be a distinctive token. */
+export function isShortBrandToken(token: string): boolean {
+  return token.length >= 2 && token.length <= 3 && !isGenericFirmToken(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -206,6 +211,7 @@ export function distinctiveCompanyTokens(org: string): string[] {
  * Distinctive firm words that are not the applicant's own name.
  * When the only distinctive token is that short brand ("mack" in "Mack Real Estate Group"),
  * keep the whole firm name. Do not drop the brand and search a generic leftover such as "estate".
+ * A 2- or 3-letter brand stays, with the next two words: "bk real estate", not "advisors".
  */
 export function companySearchTerm(org: string, person = ""): string {
   const phrase = companyPhraseTokens(org);
@@ -216,6 +222,8 @@ export function companySearchTerm(org: string, person = ""): string {
       .map((part) => part.toLowerCase())
       .filter(Boolean),
   );
+  const shortAt = phrase.findIndex((token) => isShortBrandToken(token) && !names.has(token));
+  if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
   const distinctive = brand.filter((token) => !names.has(token));
   if (distinctive.length) return distinctive.join(" ");

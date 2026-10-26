@@ -2345,6 +2345,20 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
     );
     expect(queries[0]).toContain("mack real estate group");
     expect(queries.join(" ")).not.toMatch(/"estate"/);
+    expect(companySearchTerm("BK Real Estate Advisors", "Bob Knakal")).toBe("bk real estate");
+    expect(companySearchTerm("SL Green Realty Corp", "Marc Holliday")).toBe("sl green realty");
+    expect(companySearchTerm("SL Green", "Marc Holliday")).toBe("sl green");
+    expect(companySearchTerm("CBRE Group", "Bob Sulentic")).toBe("cbre");
+    expect(companySearchTerm("Starwood Property Trust", "Barry Sternlicht")).toBe("starwood");
+    expect(
+      newsSearchQueries(facts({ name: "Bob Knakal", applicantName: "Bob Knakal", org: "BK Real Estate Advisors", location: "New York, NY" }))[0],
+    ).toBe(`"Bob Knakal" "bk real estate"`);
+    expect(
+      newsSearchQueries(facts({ name: "Marc Holliday", applicantName: "Marc Holliday", org: "SL Green Realty Corp" }))[0],
+    ).toBe(`"Marc Holliday" "sl green realty"`);
+    expect(mentionsCompany("BK Real Estate Advisors hired a broker in New York", "BK Real Estate Advisors")).toBe(true);
+    expect(mentionsCompany("SL Green Realty sold a tower", "SL Green Realty Corp")).toBe(true);
+    expect(mentionsCompany("advisors met in New York", "BK Real Estate Advisors")).toBe(false);
 
     expect(mentionsCompany("Mack Real Estate Group bought a site", "Mack Real Estate Group")).toBe(true);
     expect(mentionsCompany("Mack Real Estate Group names Priyanka Garg president", "Mack Real Estate Group")).toBe(true);
