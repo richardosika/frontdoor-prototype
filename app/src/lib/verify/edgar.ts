@@ -89,6 +89,7 @@ function pickByTicker(rows: EdgarCompany[], org: string): EdgarCompany {
 
 /**
  * Exact normalized title first, so "SL Green Realty Corp" is SL GREEN REALTY CORP and not GREEN DOT.
+ * A name made only of generic words, such as Group, is not a match.
  * Otherwise every non-generic token of 2 or more characters has to be in the title.
  * A title word of 3 or more characters that is not generic and not in the applicant's name is an extra, and that row is not a match.
  * Ties keep the most applicant tokens, then the fewest extras, then the plainer ticker. The shortest title does not win.
