@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CopyCode } from "@/components/copy-code";
 import { btn, field } from "@/components/ui";
-import { INVITE_REQUEST_THANKS_BODY, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
+import { applicationReceivedMessage, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
@@ -11,6 +11,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [thanksName, setThanksName] = useState("");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,6 +54,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       setError(payload?.error || "Could not send that request.");
       return;
     }
+    setThanksName(firstName.trim());
     setDone(true);
   }
 
@@ -70,7 +72,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       {done ? (
         <div className="mt-3 rounded border border-brass bg-brass-soft px-3 py-3">
           <p className="font-serif text-lg">{INVITE_REQUEST_THANKS_TITLE}</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink">{INVITE_REQUEST_THANKS_BODY}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink">{applicationReceivedMessage(thanksName)}</p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">

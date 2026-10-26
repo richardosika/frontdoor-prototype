@@ -1,3 +1,6 @@
+import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+import { JOIN_CTA, MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
+
 export const SIGN_OFF = "Richard Osika, Founder";
 
 export const TEMPLATE_KEYS = [
@@ -29,26 +32,25 @@ export const TEMPLATE_DEFS: TemplateDef[] = [
   {
     key: "info",
     name: "Information",
-    subject: "You're invited to Private Floor",
+    subject: "About Private Floor",
     body: `Hello {first_name},
 
-You're invited to Private Floor, the vetted circle for real estate deal teams. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
 
 A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
-Invite code: {invite_code}
+Code: {invite_code}
 
-Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
   },
   {
     key: "invite_received",
     name: "Invite request received",
     subject: "Thank you for applying to Private Floor",
-    body: `Hello {first_name},
-
-Thank you for applying to Private Floor.
-
-A Private Floor administrator reviews every application. You will hear from us by email.
+    body: `${APPLICATION_RECEIVED_TEMPLATE}
 
 Check your status
 {status_link}
@@ -67,11 +69,9 @@ It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
     key: "application_thanks",
     name: "Thank you",
     subject: "We have your Private Floor application",
-    body: `Hello {first_name},
+    body: `${APPLICATION_RECEIVED_TEMPLATE}
 
-Thank you. We have your Private Floor application for {role} at {org}.
-
-A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
+It is for {role} at {org}. You can follow it here: {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
   },
@@ -178,7 +178,8 @@ export const TEMPLATE_VARIABLES = [
 
 /** Unedited letters from before the annual-dues wording. An admin edit is left alone. */
 export const TEMPLATE_PREVIOUS_BODIES: Partial<Record<TemplateKey, string | string[]>> = {
-  info: `Hello {first_name},
+  info: [
+    `Hello {first_name},
 
 You're invited to Private Floor, the vetted circle for real estate deal teams. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
 
@@ -187,13 +188,42 @@ A Private Floor administrator reviews every application. The check uses public r
 Invite code: {invite_code}
 
 Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles have flat annual dues, and those are asked for only after approval. Nothing is charged on the application, and no fee is tied to a deal.${SIGN}`,
-  application_thanks: `Hello {first_name},
+    `Hello {first_name},
+
+You're invited to Private Floor, the vetted circle for real estate deal teams. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Invite code: {invite_code}
+
+Next step: open {apply_link} and enter that code when you are ready. After you submit, a Private Floor administrator reviews the file. Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+  ],
+  invite_received: `Hello {first_name},
+
+Thank you for applying to Private Floor.
+
+A Private Floor administrator reviews every application. You will hear from us by email.
+
+Check your status
+{status_link}
+
+Richard Osika, Founder, Private Floor Club`,
+  application_thanks: [
+    `Hello {first_name},
 
 Thank you. We have your Private Floor application for {role} at {org}.
 
 A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat amount and they come only after approval.${SIGN}`,
+    `Hello {first_name},
+
+Thank you. We have your Private Floor application for {role} at {org}.
+
+A Private Floor administrator reviews every application personally. You can follow it here: {status_link}
+
+Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+  ],
   approved: [
     `Hello {first_name},
 

@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+import { TEMPLATE_DEFS, templateDef } from "@/lib/email-templates";
 import { JOIN_CTA, MEMBERSHIP_PHRASE, MEMBERSHIP_SHORT } from "@/lib/membership-copy";
 
 const ROOT = path.resolve(__dirname, "../src");
@@ -46,5 +48,26 @@ describe("membership wording", () => {
       }
     }
     expect(hits).toEqual([]);
+  });
+
+  it("keeps the email templates on the approved wording", () => {
+    const banned = [/you're invited/i, /invite-only/i, /by invitation/i, /request an invite/i];
+    const hits: string[] = [];
+    for (const item of TEMPLATE_DEFS) {
+      const text = `${item.subject}\n${item.body}`;
+      for (const pattern of banned) {
+        if (pattern.test(text)) hits.push(`${item.key}: ${pattern}`);
+      }
+    }
+    expect(hits).toEqual([]);
+    const info = templateDef("info");
+    expect(info?.subject).toBe("About Private Floor");
+    expect(info?.body).toContain(MEMBERSHIP_PHRASE);
+    expect(info?.body).toContain(JOIN_CTA);
+    expect(info?.body.toLowerCase()).not.toContain("invited");
+    const thanks = templateDef("invite_received");
+    expect(thanks?.subject).toBe("Thank you for applying to Private Floor");
+    expect(thanks?.body).toContain(APPLICATION_RECEIVED_TEMPLATE);
+    expect(templateDef("application_thanks")?.body).toContain(APPLICATION_RECEIVED_TEMPLATE);
   });
 });

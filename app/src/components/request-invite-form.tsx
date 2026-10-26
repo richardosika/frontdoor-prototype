@@ -5,7 +5,7 @@ import { btn, field, labelCls } from "@/components/ui";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
-export function RequestInviteForm({ onSubmitted }: { onSubmitted: () => void }) {
+export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: string) => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,7 +50,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: () => void }) 
       setError(payload?.error || "Could not send that request.");
       return;
     }
-    onSubmitted();
+    onSubmitted(firstName.trim());
   }
 
   return (

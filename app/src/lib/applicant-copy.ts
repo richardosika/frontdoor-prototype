@@ -7,13 +7,19 @@ export const APPLY_ENCOURAGEMENT =
 
 export const INVITE_REQUEST_THANKS_TITLE = "Thank you for applying";
 
-export const INVITE_REQUEST_THANKS_BODY =
-  "A Private Floor administrator reviews every application. You will hear from us by email.";
+/** Shared by the receipt email and the Application received screen. */
+export const APPLICATION_RECEIVED_TEMPLATE =
+  "Thank you, {first_name}. We've got your application. A member of the Private Floor team will personally review it, usually within a few days. We'll email you as soon as there's news. We're glad you want to be part of this.";
+
+export function applicationReceivedMessage(fullName: string): string {
+  const first = fullName.trim().split(/\s+/)[0] || "there";
+  return APPLICATION_RECEIVED_TEMPLATE.replaceAll("{first_name}", first);
+}
 
 export const INVITE_STATUS_COPY = {
   PENDING: {
     title: "Application received",
-    body: "Thank you. A Private Floor administrator reviews every application. You will hear from us by email.",
+    body: APPLICATION_RECEIVED_TEMPLATE,
   },
   ISSUED: {
     title: "Your invite is on its way",

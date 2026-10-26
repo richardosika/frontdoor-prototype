@@ -8,7 +8,7 @@ import {
   showTestCodeRequested,
   verificationCodeForScreen,
 } from "@/lib/application-code";
-import { APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO } from "@/lib/applicant-copy";
+import { applicationReceivedMessage, APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO } from "@/lib/applicant-copy";
 import { validateApplication } from "@/lib/domain";
 import { validateInviteRequest } from "@/lib/invite-request";
 import { formatAddress, validatePhone } from "@/lib/person-fields";
@@ -68,7 +68,11 @@ describe("applicant details", () => {
 
   it("uses warm invite status wording", () => {
     expect(INVITE_STATUS_COPY.PENDING.title).toBe("Application received");
-    expect(INVITE_STATUS_COPY.PENDING.body).toContain("You will hear from us by email.");
+    expect(INVITE_STATUS_COPY.PENDING.body).toContain("We've got your application");
+    expect(INVITE_STATUS_COPY.PENDING.body).toContain("We're glad you want to be part of this.");
+    expect(applicationReceivedMessage("Ada Lovelace")).toBe(
+      "Thank you, Ada. We've got your application. A member of the Private Floor team will personally review it, usually within a few days. We'll email you as soon as there's news. We're glad you want to be part of this.",
+    );
     expect(INVITE_STATUS_COPY.PENDING.body).not.toContain("has not issued a code");
     expect(INVITE_STATUS_COPY.ISSUED.body).toContain("invite code");
     expect(INVITE_STATUS_COPY.DECLINED.title).toBe("Thank you for applying");

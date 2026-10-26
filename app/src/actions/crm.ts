@@ -186,7 +186,7 @@ export async function sendPersonInfo(formData: FormData) {
       role: person.role ? roleLabel(person.role) : "",
       org: person.org,
       applyLink: `${base}/apply`,
-      inviteCode: person.inviteCode || "A code has not been issued yet.",
+      inviteCode: person.inviteCode,
     }),
     person: { name: person.name, role: person.role, org: person.org, location: person.location, inviteCode: person.inviteCode },
   });

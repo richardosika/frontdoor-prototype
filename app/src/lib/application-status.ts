@@ -1,3 +1,5 @@
+import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+
 export const OPEN_APPLICATION_STATUSES = ["PENDING", "SUBMITTED", "IN_REVIEW", "NEEDS_INFO"] as const;
 export const DECLINED_APPLICATION_STATUSES = ["REJECTED", "DECLINED"] as const;
 
@@ -37,8 +39,8 @@ export function memberStatusCopy(status: string): { title: string; body: string 
     };
   }
   return {
-    title: "Application under review",
-    body: "Verification in progress. A Private Floor administrator reviews every application. This page updates when there is a decision.",
+    title: "Application received",
+    body: APPLICATION_RECEIVED_TEMPLATE,
   };
 }
 

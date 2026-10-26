@@ -1,11 +1,16 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { STAGE_OVERRIDE_OPTIONS, crmStage, csvCell, followUpDue, isDecisionStage, stageOverride } from "@/lib/crm-stage";
 import {
   SIGN_OFF,
   TEMPLATE_DEFS,
+  TEMPLATE_PREVIOUS_BODIES,
   deliveryTarget,
   firstName,
   renderTemplate,
+  replacementTemplateBody,
+  sampleTemplateVars,
   shouldSuppressSend,
   templateDef,
 } from "@/lib/email-templates";
@@ -57,11 +62,33 @@ describe("email templates", () => {
       first_name: "Ada",
       status_link: "https://cornicio-mvp.onrender.com/invite-status/preview",
     });
+    expect(rendered).toContain("Thank you, Ada. We've got your application.");
     expect(rendered).toContain("Check your status");
     expect(rendered).toContain("https://cornicio-mvp.onrender.com/invite-status/preview");
     expect(rendered).toContain("Richard Osika, Founder, Private Floor Club");
     expect(rendered.match(/Richard Osika, Founder/g)).toHaveLength(1);
     expect(templateDef("application_code")?.body).toContain("{code}");
+    const info = renderTemplate(templateDef("info")?.body || "", { ...sampleTemplateVars(), invite_code: "" });
+    expect(templateDef("info")?.subject).toBe("About Private Floor");
+    expect(info).toContain("Request to join");
+    expect(info).toContain("A private network where every member is personally reviewed");
+    expect(info.toLowerCase()).not.toContain("invited");
+    expect(info).not.toContain("Code:");
+    expect(renderTemplate(templateDef("info")?.body || "", sampleTemplateVars())).toContain("PF-PREVIEW");
+    const previousInfo = TEMPLATE_PREVIOUS_BODIES.info;
+    const storedInfo = Array.isArray(previousInfo) ? previousInfo[1] : previousInfo;
+    const replaced = replacementTemplateBody("info", storedInfo || "") || "";
+    expect(replaced).toContain("Request to join");
+    expect(replaced.toLowerCase()).not.toContain("you're invited");
+  });
+
+  it("sends approval and dues mail from the decision, not the stage menu", () => {
+    const crm = readFileSync(path.resolve(__dirname, "../src/actions/crm.ts"), "utf8");
+    const decision = readFileSync(path.resolve(__dirname, "../src/actions/admin.ts"), "utf8");
+    expect(crm).not.toMatch(/key:\s*"approved"/);
+    expect(crm).not.toMatch(/key:\s*"payment_due"/);
+    expect(decision).toMatch(/key:\s*"payment_due"/);
+    expect(decision).toMatch(/key:\s*"approved"/);
   });
 
   it("keeps live mode on the test outbox", () => {

@@ -94,7 +94,7 @@ export default async function CrmPersonPage({
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-[11px] text-mut">Approve, Active, and Declined come from the guided review decision. This menu cannot set them.</span>
+            <span className="mt-1 block text-[11px] text-mut">Approve, Active, and Declined come from the guided review decision. That decision sends the approval email, or the dues email for a paid role. This menu cannot set them.</span>
           </label>
           <label>
             <span className={labelCls}>Tags</span>

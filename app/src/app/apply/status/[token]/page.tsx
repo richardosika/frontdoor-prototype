@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ApplyReply } from "@/components/apply-reply";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
+import { applicationReceivedMessage } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
 import { DUES_ANNUAL_NOTE, DUES_WAIVED, duesLabel } from "@/lib/dues";
@@ -15,6 +16,7 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
   const application = await prisma.application.findUnique({ where: { statusToken: token } });
   if (!application) notFound();
   const copy = memberStatusCopy(application.status);
+  const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
   const showNote =
     !declined &&
@@ -32,7 +34,7 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{BRAND.name}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
           <p className="mt-2 font-serif text-lg">{application.name}</p>
-          <p className="mt-1 text-sm text-ink">{copy.body}</p>
+          <p className="mt-1 text-sm text-ink">{shownBody}</p>
           <div className="mt-4 rounded border border-line bg-cream p-3 text-sm">
             <p>
               <b>Membership status.</b> {applicationStatusLabel(application.status)}

@@ -37,7 +37,8 @@ describe("round 3 copy", () => {
   });
 
   it("uses administrator on the member status page", () => {
-    expect(memberStatusCopy("SUBMITTED").body).toContain("A Private Floor administrator reviews every application");
+    expect(memberStatusCopy("SUBMITTED").title).toBe("Application received");
+    expect(memberStatusCopy("SUBMITTED").body).toContain("We've got your application");
     expect(memberStatusCopy("SUBMITTED").body).not.toContain("Richard Osika");
   });
 

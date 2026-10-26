@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
-import { INVITE_STATUS_COPY } from "@/lib/applicant-copy";
+import { applicationReceivedMessage, INVITE_STATUS_COPY } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
 
@@ -26,8 +26,14 @@ export default async function InviteStatusPage({ params }: { params: Promise<{ t
         <div className="px-6 py-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{BRAND.name}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
-          <p className="mt-2 font-serif text-lg">{request.name}</p>
-          <p className="mt-1 text-sm text-ink">{copy.body}</p>
+          {request.status === "PENDING" ? (
+            <p className="mt-2 text-sm text-ink">{applicationReceivedMessage(request.name)}</p>
+          ) : (
+            <>
+              <p className="mt-2 font-serif text-lg">{request.name}</p>
+              <p className="mt-1 text-sm text-ink">{copy.body}</p>
+            </>
+          )}
         </div>
       </div>
     </main>

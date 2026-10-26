@@ -7,7 +7,7 @@ import { AdminEntryLink } from "@/components/admin-mark";
 import { AgreementBoxes, BeforeSubmit, StepIntro } from "@/components/apply-before-submit";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDetailsIssue } from "@/lib/apply-details";
-import { APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
+import { applicationReceivedMessage, APPLY_ENCOURAGEMENT } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
 import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 import { DUES_ANNUAL_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, DUES_WAIVED, duesForRole } from "@/lib/dues";
@@ -269,10 +269,9 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ) : null}
         {done ? (
           <div className="py-4">
-            <h1 className="font-serif text-2xl">Application under review</h1>
-            <p className="mt-2 text-sm text-ink">
-              A Private Floor administrator reviews every application. Verification is in progress. Nothing was charged. Keep the status link. Messages about this application stay on that page.
-            </p>
+            <h1 className="font-serif text-2xl">Application received</h1>
+            <p className="mt-2 text-sm text-ink">{applicationReceivedMessage(firstName)}</p>
+            <p className="mt-2 text-sm text-ink">Nothing was charged. Keep the status link. Messages about this application stay on that page.</p>
             {statusToken ? (
               <Link href={`/apply/status/${statusToken}`} className={`${btn} mt-4 w-full`}>
                 View application status
