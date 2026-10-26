@@ -50,8 +50,8 @@ export async function syncAdminPasswordsFromEnv(
 }
 
 /** When ADMIN_PASSWORD is set, every administrator password becomes that value. Member passwords stay put. */
-export async function syncAdminPasswords(): Promise<void> {
-  await syncAdminPasswordsFromEnv(
+export async function syncAdminPasswords(): Promise<"unset" | "too-short" | "updated" | "unchanged"> {
+  return syncAdminPasswordsFromEnv(
     process.env.ADMIN_PASSWORD,
     {
       listAdmins: () =>

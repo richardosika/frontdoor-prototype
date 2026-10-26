@@ -36,6 +36,7 @@ export default async function MembersAdminPage({
         accountStatus: member.status,
         paymentStatus: member.paymentStatus,
         hasMember: true,
+        isAdmin: member.isAdmin,
       });
       const demo = isDemoRecord({ isTest: member.isTest || member.ownedApplication?.isTest, email: member.email });
       return { member, standing, demo };

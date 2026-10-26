@@ -7,9 +7,21 @@ export async function register() {
   } catch {
     console.error("Could not clean test data");
   }
+  const { prepareAdministratorAccounts } = await import("@/lib/admin-account");
+  const prepared = await prepareAdministratorAccounts().catch((error) => {
+    console.error("Could not prepare administrator accounts", error);
+    return null;
+  });
+  if (prepared) console.log(`ADMIN_ACCOUNTS revoked=${prepared.revoked} owner=${prepared.owner}`);
   const { syncAdminPasswords } = await import("@/lib/admin-password");
-  await syncAdminPasswords().catch((error) => {
+  const passwordResult = await syncAdminPasswords().catch((error) => {
     console.error("Could not apply ADMIN_PASSWORD", error);
+    return "failed";
+  });
+  console.log(`ADMIN_PASSWORD result=${passwordResult}`);
+  const { logApplicantCensus } = await import("@/lib/live-census");
+  await logApplicantCensus().catch(() => {
+    console.error("Could not count applicants");
   });
   const { resumeVerificationJobs } = await import("@/lib/verify/queue");
   resumeVerificationJobs().catch((error) => {

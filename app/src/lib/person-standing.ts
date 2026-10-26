@@ -36,6 +36,7 @@ export function personStanding(input: {
   accountStatus?: string | null;
   paymentStatus?: string | null;
   hasMember?: boolean;
+  isAdmin?: boolean;
 }): PersonStanding {
   const app = input.applicationStatus || "";
   const invite = input.inviteStatus || "";
@@ -46,8 +47,11 @@ export function personStanding(input: {
   const paymentDue = PAYMENT_DUE.has(input.paymentStatus || "") || app === "PAYMENT_DUE";
   const approvedApplication = app === "APPROVED" || app === "PAYMENT_DUE";
   const activeMember = Boolean(input.hasMember) && (account === "ACTIVE" || account === "");
+  const openApplicantFile = Boolean(app) || invite === "PENDING" || invite === "ISSUED";
   // An active member stays Approved. A later open application does not demote them.
-  if (approvedApplication || activeMember) {
+  // The administrator account is the operator. An open request on that same email stays Pending.
+  const memberCountsAsApproved = activeMember && !(input.isAdmin && openApplicantFile && !approvedApplication);
+  if (approvedApplication || memberCountsAsApproved) {
     return { status: "APPROVED", stage: paymentDue ? "PAYMENT_DUE" : "ACTIVE" };
   }
   if (invite === "DECLINED" && !app) return { status: "DECLINED", stage: "DECLINED" };

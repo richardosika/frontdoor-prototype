@@ -6,7 +6,9 @@ import {
   type AdminPasswordAccount,
 } from "@/lib/admin-password";
 import { adminEntryRedirect } from "@/lib/session-gate";
-import { credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { adminSignInAllowed, credentialsPortalAllowed, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { demoAdministratorIds, ownerAccountNeedsRepair } from "@/lib/admin-account";
+import { KEEP_ADMIN_EMAIL } from "@/lib/clean-test-data";
 
 const MEMBER: AdminPasswordAccount = { id: "member", isAdmin: false, passwordHash: "member-hash" };
 const ADMIN: AdminPasswordAccount = { id: "admin", isAdmin: true, passwordHash: "admin-hash" };
@@ -100,6 +102,19 @@ describe("separate administrator sign-in", () => {
         pendingApplicationPasswordMatches: false,
       }),
     ).toBe(INACTIVE_ACCOUNT_ERROR);
+  });
+
+  it("refuses a demo account on the administrator sign-in and keeps the owner", () => {
+    const marcus = { id: "user_mh", email: "marcus.hale@halerow.example", isAdmin: true, isTest: false, status: "ACTIVE" };
+    const owner = { id: "user_owner", email: KEEP_ADMIN_EMAIL, isAdmin: true, isTest: false, status: "ACTIVE" };
+    expect(adminSignInAllowed(marcus)).toBe(false);
+    expect(adminSignInAllowed({ ...marcus, isAdmin: false })).toBe(false);
+    expect(adminSignInAllowed(owner)).toBe(true);
+    expect(adminSignInAllowed({ isAdmin: true, isTest: true, email: KEEP_ADMIN_EMAIL })).toBe(false);
+    expect(demoAdministratorIds([marcus, owner])).toEqual(["user_mh"]);
+    expect(ownerAccountNeedsRepair(null)).toBe("create");
+    expect(ownerAccountNeedsRepair(owner)).toBe("ready");
+    expect(ownerAccountNeedsRepair({ ...owner, isAdmin: false })).toBe("repair");
   });
 
   it("sends a signed-in administrator home and a signed-in member back to the floor", () => {

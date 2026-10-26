@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { moderationDenial } from "@/lib/messaging";
 import { blocksMembership } from "@/lib/payments";
+import { adminSignInAllowed } from "@/lib/sign-in";
 import { verificationDenial } from "@/lib/verification";
 
 export async function currentUser() {
@@ -26,7 +27,7 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const user = await requireUser();
-  if (!user.isAdmin) redirect("/feed");
+  if (!adminSignInAllowed(user)) redirect("/feed");
   return user;
 }
 
@@ -35,9 +36,9 @@ export async function verificationActor() {
   if (!session?.user?.id) return null;
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, isAdmin: true, status: true },
+    select: { id: true, name: true, isAdmin: true, status: true, isTest: true, email: true },
   });
-  if (!user || user.status !== "ACTIVE") return null;
+  if (!user || user.status !== "ACTIVE" || !adminSignInAllowed(user)) return null;
   return user;
 }
 

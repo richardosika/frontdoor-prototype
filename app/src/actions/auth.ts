@@ -5,7 +5,7 @@ import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DECLINED_APPLICATION_STATUSES, OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { GENERIC_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { adminSignInAllowed, GENERIC_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
 
 function safeNext(value: string): string {
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "/feed";
@@ -61,7 +61,7 @@ export async function adminLoginAction(formData: FormData): Promise<{ error: str
   const password = String(formData.get("password") || "");
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   const matches = Boolean(user && password && (await bcrypt.compare(password, user.passwordHash)));
-  const ok = Boolean(user?.isAdmin && user.status === "ACTIVE" && matches);
+  const ok = Boolean(user?.status === "ACTIVE" && matches && adminSignInAllowed(user));
   if (!ok) return { error: GENERIC_SIGN_IN_ERROR };
   try {
     await signIn("credentials", { email, password, portal: "admin", redirectTo: "/admin" });

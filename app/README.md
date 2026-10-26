@@ -38,16 +38,17 @@ Generate `AUTH_SECRET` with `openssl rand -base64 32`.
 | `AUTH_URL` | Auth.js origin. Use the same value as `APP_URL`. |
 | `AUTH_TRUST_HOST` | Set to `true` behind Render's proxy |
 | `SITE_GATE_PASSWORD` | Optional. When set, the whole site asks for HTTP Basic username `privatefloor` and this password. Unset leaves the site open. `/api/health`, `/api/stripe/webhook`, and `/email-assets/` stay open. |
-| `ADMIN_PASSWORD` | Optional. At least 12 characters. Startup replaces every administrator password. Member passwords stay the seeded demo password. |
+| `ADMIN_PASSWORD` | Optional. At least 12 characters. Startup replaces the owner administrator password. Demo accounts are not administrators. Member passwords stay the seeded demo password. |
 | `CLEAN_TEST_DATA` | Optional. `dry` logs how many testing rows would be removed. `1` removes them at startup and logs the same counts. Unset does nothing. Seeded members, projects, templates, legal pages, settings, and administrator password hashes stay. The demo invite `PF-7K2M-91QX` stays at 0 of 40 uses. |
 
 ### Demo login
 
-Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login`. When `ADMIN_PASSWORD` is set to at least 12 characters, startup replaces every administrator password with that value and `cornicio-demo` no longer signs in an administrator. Member passwords stay `cornicio-demo`. The member sign-in page does not accept an administrator.
+Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` as `rich@privatefloorclub.com`. The password is `ADMIN_PASSWORD` when that value is at least 12 characters. Startup replaces the administrator password with it. `cornicio-demo` stays the member password and does not sign in an administrator. Demo accounts, including Marcus Hale, cannot open the administrator pages. The member sign-in page does not accept an administrator.
 
 | Email | Role |
 | --- | --- |
-| marcus.hale@halerow.example | Developer, admin, Confirmed |
+| rich@privatefloorclub.com | Administrator. Password is `ADMIN_PASSWORD`, not the demo member password. |
+| marcus.hale@halerow.example | Developer, Confirmed demo member. Not an administrator. |
 | jordan.ellis@ellisarch.example | Pending application (cannot sign in yet) |
 
 Invite code: `PF-7K2M-91QX`.

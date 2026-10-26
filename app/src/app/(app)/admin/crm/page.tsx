@@ -54,6 +54,7 @@ export default async function CrmPage({
       accountStatus: person.user?.status,
       paymentStatus: person.user?.paymentStatus,
       hasMember: Boolean(person.userId),
+      isAdmin: person.user?.isAdmin,
     });
     const demo = isDemoRecord({
       isTest: Boolean(person.user?.isTest || person.application?.isTest),

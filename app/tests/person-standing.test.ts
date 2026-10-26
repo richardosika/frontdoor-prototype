@@ -33,6 +33,18 @@ describe("one status for applications, members, and people", () => {
       status: "APPROVED",
       stage: "ACTIVE",
     });
+    expect(
+      personStanding({
+        inviteStatus: "PENDING",
+        hasMember: true,
+        accountStatus: "ACTIVE",
+        isAdmin: true,
+      }),
+    ).toEqual({ status: "PENDING", stage: "REQUESTED" });
+    expect(personStanding({ hasMember: true, accountStatus: "ACTIVE", isAdmin: true })).toEqual({
+      status: "APPROVED",
+      stage: "ACTIVE",
+    });
   });
 
   it("marks demo and sample rows without marking a real address", () => {

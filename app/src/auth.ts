@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { authConfig } from "@/auth.config";
-import { credentialsPortalAllowed } from "@/lib/sign-in";
+import { adminSignInAllowed, credentialsPortalAllowed } from "@/lib/sign-in";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -23,6 +23,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
         if (!credentialsPortalAllowed(user.isAdmin, credentials?.portal)) return null;
+        if (credentials?.portal === "admin" && !adminSignInAllowed(user)) return null;
         return {
           id: user.id,
           email: user.email,

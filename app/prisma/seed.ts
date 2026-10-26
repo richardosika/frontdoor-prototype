@@ -40,7 +40,6 @@ const people: Person[] = [
     org: "Hale Row Partners",
     location: "Newark, NJ",
     tier: "CONFIRMED",
-    isAdmin: true,
     credentialNote: "Hale Row Partners LLC · NJ entity in good standing · deeds and permits matched",
     bio: "Sponsor of small multifamily and mixed-use projects in the NY/NJ market. Fictional.",
   },

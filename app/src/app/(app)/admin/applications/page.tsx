@@ -6,12 +6,13 @@ import { ConfirmSubmitButton, RunAndReload } from "@/components/run-and-reload";
 import { GradeMark } from "@/components/grade-summary";
 import { DemoChip, StatusChip } from "@/components/status-chip";
 import { btnOutline, card } from "@/components/ui";
+import { applicantQueue, standingForInvite } from "@/lib/applicant-queue";
 import {
   APPLICATION_FILTERS,
   type ApplicationFilter,
   applicationStatusLabel,
-  matchesApplicationFilter,
 } from "@/lib/application-status";
+import { syncCrm } from "@/lib/crm";
 import { requireAdmin } from "@/lib/current-user";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
 import { isDemoRecord, personStageLabel, personStanding } from "@/lib/person-standing";
@@ -36,26 +37,55 @@ export default async function ApplicationsPage({
   const gradeFilter = ["A", "B", "C", "D", "F"].includes(params.grade || "") ? params.grade : "";
   const hideDemo = params.demo === "hide";
   const demoQuery = hideDemo ? "&demo=hide" : "";
-  const members = await prisma.user.findMany({ select: { email: true, status: true, paymentStatus: true } });
+  await syncCrm();
+  const members = await prisma.user.findMany({ select: { email: true, status: true, paymentStatus: true, isAdmin: true } });
   const memberByEmail = new Map(members.map((member) => [member.email.toLowerCase(), member]));
-  const applications = await prisma.application.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 200,
-    include: {
-      runs: { where: { subject: "APPLICATION" }, orderBy: { createdAt: "desc" }, take: 1 },
-      user: { select: { status: true, paymentStatus: true, renewalAt: true } },
-    },
-  });
+  const [applications, invites] = await Promise.all([
+    prisma.application.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: {
+        runs: { where: { subject: "APPLICATION" }, orderBy: { createdAt: "desc" }, take: 1 },
+        user: { select: { status: true, paymentStatus: true, renewalAt: true, isAdmin: true } },
+      },
+    }),
+    prisma.inviteRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: { crmPeople: { select: { id: true }, take: 1 } },
+    }),
+  ]);
   const gradeRank = (letter?: string | null) => ({ A: 5, B: 4, C: 3, D: 2, F: 1 })[letter || ""] || 0;
-  const rows = applications
-    .filter((application) => matchesApplicationFilter(filter, application.status, application.runs[0]?.verdict))
-    .filter((application) => !gradeFilter || application.runs[0]?.gradeLetter === gradeFilter)
-    .filter((application) => (hideDemo ? !isDemoRecord({ isTest: application.isTest, email: application.email }) : true))
-    .sort((a, b) => {
-      if (sort === "grade") return gradeRank(b.runs[0]?.gradeLetter) - gradeRank(a.runs[0]?.gradeLetter) || (b.runs[0]?.gradeScore ?? -1) - (a.runs[0]?.gradeScore ?? -1);
-      if (sort === "score") return (b.runs[0]?.gradeScore ?? b.runs[0]?.score ?? -1) - (a.runs[0]?.gradeScore ?? a.runs[0]?.score ?? -1);
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    });
+  const applicationById = new Map(applications.map((application) => [application.id, application]));
+  const inviteById = new Map(invites.map((invite) => [invite.id, invite]));
+  const gradeApplications = applications.filter((application) => !gradeFilter || application.runs[0]?.gradeLetter === gradeFilter);
+  const queued = applicantQueue(
+    filter,
+    hideDemo,
+    gradeApplications.map((application) => ({
+      id: application.id,
+      email: application.email,
+      status: application.status,
+      isTest: application.isTest,
+      createdAt: application.createdAt.getTime(),
+      verdict: application.runs[0]?.verdict,
+    })),
+    gradeFilter
+      ? []
+      : invites.map((invite) => ({
+          id: invite.id,
+          email: invite.email,
+          status: invite.status,
+          createdAt: invite.createdAt.getTime(),
+        })),
+  );
+  const rows = [...queued].sort((a, b) => {
+    if (sort !== "grade" && sort !== "score") return 0;
+    const left = a.kind === "application" ? applicationById.get(a.id) : undefined;
+    const right = b.kind === "application" ? applicationById.get(b.id) : undefined;
+    if (sort === "grade") return gradeRank(right?.runs[0]?.gradeLetter) - gradeRank(left?.runs[0]?.gradeLetter);
+    return (right?.runs[0]?.gradeScore ?? right?.runs[0]?.score ?? -1) - (left?.runs[0]?.gradeScore ?? left?.runs[0]?.score ?? -1);
+  });
 
   return (
     <div>
@@ -118,13 +148,39 @@ export default async function ApplicationsPage({
         </div>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">Nothing in this filter.</p> : null}
         <ul className="mt-4 space-y-3">
-          {rows.map((application) => {
+          {rows.map((row) => {
+            if (row.kind === "invite") {
+              const invite = inviteById.get(row.id);
+              if (!invite) return null;
+              const standing = standingForInvite(invite.status);
+              const personId = invite.crmPeople[0]?.id;
+              return (
+                <li key={invite.id}>
+                  <Link href={personId ? `/admin/crm/${personId}` : "/admin"} className={`${card} block p-4`}>
+                    <h2 className="font-serif text-xl font-normal">{invite.name}</h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <StatusChip status={standing.status} />
+                      {isDemoRecord({ email: invite.email }) ? <DemoChip /> : null}
+                    </div>
+                    <p className="text-sm text-ink">
+                      {invite.org} · {roleLabel(invite.role)} · {invite.location}
+                    </p>
+                    <p className="text-xs text-mut">
+                      {formatAuditTime(invite.createdAt)} · {personStageLabel(standing.stage)}
+                    </p>
+                  </Link>
+                </li>
+              );
+            }
+            const application = applicationById.get(row.id);
+            if (!application) return null;
             const member = application.user || memberByEmail.get(application.email.toLowerCase());
             const standing = personStanding({
               applicationStatus: application.status,
               accountStatus: member?.status,
               paymentStatus: member?.paymentStatus,
               hasMember: Boolean(member),
+              isAdmin: member?.isAdmin,
             });
             return (
             <li key={application.id} className="flex items-start gap-2">

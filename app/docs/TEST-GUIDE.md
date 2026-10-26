@@ -1,8 +1,8 @@
 # Test guide
 
-Use this on the deployed site or on a local server. Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` (also linked as **Admin**, with a brass shield, from the home page, the member sign-in page, apply, and the legal pages). Marcus Hale is `marcus.hale@halerow.example`.
+Use this on the deployed site or on a local server. Seeded members use the password `cornicio-demo`. Administrators sign in only at `/admin/login` (also linked as **Admin**, with a brass shield, from the home page, the member sign-in page, apply, and the legal pages). The administrator is `rich@privatefloorclub.com`. The password is the server’s `ADMIN_PASSWORD`. It is not written in this guide. Marcus Hale (`marcus.hale@halerow.example`) is a demo member. A demo account cannot open the administrator pages.
 
-When `ADMIN_PASSWORD` is set to at least 12 characters, the server replaces every administrator password with that value at startup. `cornicio-demo` then stops working for administrators and still works for members. A shorter value is ignored. If `ADMIN_PASSWORD` is unset, Marcus’s password remains `cornicio-demo`, but only on `/admin/login`.
+When `ADMIN_PASSWORD` is set to at least 12 characters, the server replaces the administrator password with that value at startup. `cornicio-demo` works for members and does not sign in an administrator. A shorter value is ignored. If `ADMIN_PASSWORD` is unset, the administrator password is left as it already is.
 
 The member sign-in page does not accept an administrator, and it uses the same generic error it uses for a wrong password. `/admin/login` does not accept a member, including a member password that is correct, and it uses that same generic error. After an administrator signs in, the next page is `/admin`. Open a private window when you want a member session and an administrator session at the same time.
 
@@ -31,7 +31,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 
 ## Admin side
 
-1. Open `/admin/login` from the **Admin** link, or go there directly. The title is **Private Floor administrator**. Sign in as Marcus Hale. `/admin` shows open applications, the Outbox count, and test applications. The signed-in nav keeps **Admin**, with the same brass shield. Signing in as Marcus on `/login`, or as a member on `/admin/login`, stays on that page and shows **Those credentials were not recognized.**
+1. Open `/admin/login` from the **Admin** link, or go there directly. The title is **Private Floor administrator**. Sign in as `rich@privatefloorclub.com` with `ADMIN_PASSWORD`. `/admin` shows open applications, the Outbox count, and test applications. The signed-in nav keeps **Admin**, with the same brass shield. Signing in as Marcus Hale, or as any other demo member, on `/admin/login` stays on that page and shows **Those credentials were not recognized.** Signing in as the administrator on `/login` does the same.
 2. `/admin/test`. Choose **Create sample applicants**. Six labelled TEST people appear:
    - Strong legit (offline fixtures, recommendation LEGIT)
    - Ambiguous (phone area code does not match the state)
@@ -39,7 +39,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
    - Thin Gmail file
    - Disposable email with no site or LinkedIn
    - Duplicate of Marcus Hale
-3. `/admin/applications`. The default filter is **Needs action** (open applications, including ones that already have a verdict). Other filters: New, In review, Needs info, Recommended legit, Recommended not legit, Needs your decision, Approved, and Declined. Sort by submitted time and by score. Times are America/New_York. Select rows and **Delete selected**, or open a row and **Delete this applicant and all their data**. Both write an audit event.
+3. `/admin/applications`. The default filter is **Needs action** (open applications, including ones that already have a verdict). A request to join, before the full application exists, is listed under **Needs action** and **New**. It is not a verification file. Other filters: In review, Needs info, Recommended legit, Recommended not legit, Needs your decision, Approved, and Declined. Sort by submitted time and by score. Times are America/New_York. Select rows and **Delete selected**, or open a row and **Delete this applicant and all their data**. Both write an audit event. The list is the same for every administrator. It is not limited to the person who is signed in. **Hide demo** hides `.example` addresses and `is_test` rows. A real address stays visible.
 4. Open a row. Read the applicant, the business card if one was uploaded, the automated report, the company report, and the evidence table. Save an internal note. **Re-run verification** calls the live free sources and can change a sample verdict. Approve, decline, or ask for more info. The decision log records who, when, and the note. A decline does not put that note on the member status page.
 5. `/admin/outbox` lists every test notice.
 6. `/admin/audit` lists decisions, verification runs, and moderation events.
