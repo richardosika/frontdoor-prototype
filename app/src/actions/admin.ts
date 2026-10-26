@@ -14,7 +14,7 @@ import { canPromoteTierFromVouch } from "@/lib/verification";
 import { applyDecisionStatus, noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { issueInviteCodeForRequest } from "@/lib/invite-issue";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { annualDuesCents, duesLabel } from "@/lib/dues";
+import { annualDuesCents, mailDuesAmounts } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
 import { sendNotice } from "@/lib/notices";
@@ -230,6 +230,7 @@ export async function reviewApplication(formData: FormData) {
 
   const person = { name: application.name, role: application.role, org: application.org, location: application.location };
   if (paying && paymentToken) {
+    const amounts = mailDuesAmounts(application.role, duesCents);
     await sendTemplate({
       key: "payment_due",
       to: application.email,
@@ -241,7 +242,8 @@ export async function reviewApplication(formData: FormData) {
         statusLink: `${base}/apply/status/${application.statusToken}`,
         paymentLink: `${base}/pay/${paymentToken}`,
         loginLink: `${base}/login`,
-        duesAmount: duesLabel(duesCents),
+        duesAmount: amounts.duesAmount,
+        introAmount: amounts.introAmount,
         renewalDate: paymentRenewalLabel(null),
         note,
       }),
