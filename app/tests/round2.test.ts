@@ -73,6 +73,7 @@ describe("web providers", () => {
     expect(providerAttemptState(429, 0)).toBe("unavailable");
     expect(providerAttemptState(403, 3)).toBe("unavailable");
     expect(providerAttemptState(0, 0)).toBe("unavailable");
+    expect(providerAttemptState(202, 3)).toBe("unavailable");
     expect(wikipediaRestResultTexts(JSON.stringify({ pages: [{ title: "Ada", description: "Builder", excerpt: "Ada builds." }] }))).toEqual([
       "Ada Builder Ada builds.",
     ]);

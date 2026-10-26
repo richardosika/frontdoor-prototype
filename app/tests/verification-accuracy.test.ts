@@ -683,6 +683,51 @@ describe("team pages and the NY company list", () => {
   });
 });
 
+describe("blocked sites and search fallbacks", () => {
+  it("asks for a team-page URL when the site blocks, and uses Wikipedia when search is challenged", async () => {
+    const blocked = await runPublicScreen(
+      facts({ website: "https://cbre.example", name: "Bob Sulentic", applicantName: "Bob Sulentic", org: "CBRE Group" }),
+      async (url) => (url.includes("cbre.example") ? { ok: false, status: 403, text: "" } : { ok: false, status: 202, text: "challenge" }),
+    );
+    const website = blocked.find((check) => check.key === "website");
+    expect(website?.status).toBe("UNAVAILABLE");
+    expect(website?.finding).toContain("blocked by site, ask applicant for a team-page URL");
+    const silent = await runPublicScreen(
+      facts({ website: "https://blackstone.example" }),
+      async (url) => (url.includes("blackstone.example") ? { ok: false, status: 0, text: "" } : { ok: false, status: 403, text: "" }),
+    );
+    const quiet = silent.find((check) => check.key === "website");
+    expect(quiet?.finding).toContain("The company website did not respond.");
+    expect(quiet?.finding).not.toContain("blocked by site, ask applicant for a team-page URL");
+
+    const wiki = await runPublicScreen(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", website: "https://bristol.example", location: "New York, NY" }),
+      async (url) => {
+        if (url.includes("wikipedia.org")) {
+          return {
+            ok: true,
+            status: 200,
+            text: JSON.stringify({ pages: [{ title: "Ada Quinn", description: "Bristol Development", excerpt: "Ada Quinn leads Bristol Development." }] }),
+          };
+        }
+        if (url.includes("bristol.example")) return { ok: true, status: 200, text: "<html><body>Bristol Development</body></html>" };
+        return { ok: false, status: 202, text: "challenge" };
+      },
+    );
+    const search = wiki.find((check) => check.key === "screen-web");
+    expect(search?.status).toBe("PASS");
+    expect(search?.source).toBe("Wikipedia");
+    expect(search?.corroborates).toBe(true);
+    const challenged = await runPublicScreen(
+      facts({ website: "" }),
+      async () => ({ ok: false, status: 202, text: "challenge" }),
+    );
+    const missed = challenged.find((check) => check.key === "screen-web");
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.finding).toContain("DuckDuckGo returned a challenge page and is not checkable for free.");
+  });
+});
+
 describe("website text survives the size cap", () => {
   it("strips style and script before the 180k cap and decodes names", () => {
     const filler = `<style>${"x".repeat(200_000)}</style>`;

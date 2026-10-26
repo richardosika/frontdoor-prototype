@@ -97,7 +97,7 @@ function stripTags(value: string): string {
 
 /** Blocked or rate-limited responses are unavailable. An HTTP success with nothing parsed is no data. */
 export function providerAttemptState(status: number, snippetCount: number): "unavailable" | "no-data" | "ready" {
-  if (status === 0 || status === 401 || status === 403 || status === 429 || status >= 500) return "unavailable";
+  if (status === 0 || status === 202 || status === 401 || status === 403 || status === 429 || status === 999 || status >= 500) return "unavailable";
   if (snippetCount === 0) return "no-data";
   return "ready";
 }

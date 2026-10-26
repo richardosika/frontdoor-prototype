@@ -2,6 +2,7 @@ import { decodeHtmlEntities } from "@/lib/verify/fetch";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, newsSearchQueries } from "@/lib/verify/news";
 import { alternatePersonNames, distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 
@@ -397,7 +398,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
     }
     if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
-      attempts.push(blockedAttempt("website", "Company website", website, homeUrl, "The company website did not respond."));
+      const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 999;
+      attempts.push(
+        blockedAttempt(
+          "website",
+          "Company website",
+          website,
+          homeUrl,
+          blockedBySite ? "blocked by site, ask applicant for a team-page URL" : "The company website did not respond.",
+        ),
+      );
     } else {
       pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
       const linked = sameOriginPages(home.text, homeUrl);
@@ -676,20 +686,34 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
   const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
   const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets.map((item) => item.text), queryFacts);
+  let wikiUrl = "";
+  let wikiSnippets: { text: string; hrefs: string[] }[] = [];
+  let wikiBlocked = true;
   if (ddgBlocked && bingBlocked) {
+    wikiUrl = `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`;
+    const wiki = await pull(fetchText, wikiUrl);
+    const texts = wiki.status >= 200 && wiki.status < 300 ? wikipediaRestResultTexts(wiki.text) : [];
+    wikiSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
+    wikiBlocked = accessBlocked(wiki.status, wiki.text, wikiUrl) || texts.length === 0;
+  }
+  if (ddgBlocked && bingBlocked && wikiBlocked) {
+    const challenge = ddg.status === 202 || /challenge|captcha/i.test(`${ddgUrl} ${ddg.text.slice(0, 2500)}`);
     attempts.push(
       blockedAttempt(
         "screen-web",
         "Web search",
         searched,
         ddgUrl,
-        "DuckDuckGo and Bing did not return a usable results page from this network.",
+        challenge
+          ? "DuckDuckGo returned a challenge page and is not checkable for free."
+          : "DuckDuckGo, Bing, and Wikipedia did not return a usable results page. Web search is not checkable for free.",
       ),
     );
   } else {
     const pool = [
       ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUrl, platform: "DuckDuckGo" })) : []),
       ...(!bingBlocked ? bingSnippets.map((item) => ({ ...item, url: bingUrl, platform: "Bing" })) : []),
+      ...(!wikiBlocked ? wikiSnippets.map((item) => ({ ...item, url: wikiUrl, platform: "Wikipedia" })) : []),
     ];
     const hit = pool
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
@@ -726,8 +750,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (best) {
       attempts.push({ ...best, key: "web-footprint", platform: best.platform });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
+      const web = attempts.find((item) => item.key === "screen-web");
       attempts.push(
-        blockedAttempt("web-footprint", "Web search", searched, ddgUrl, "Public web search did not return a usable page from this network."),
+        blockedAttempt(
+          "web-footprint",
+          "Web search",
+          searched,
+          ddgUrl,
+          web?.detail || "Public web search is not checkable for free.",
+        ),
       );
     } else {
       attempts.push({
