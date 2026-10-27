@@ -1,7 +1,7 @@
 import { annualDuesCents } from "@/lib/dues";
 import { normalizeInviteCode } from "@/lib/domain";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { assessCourts } from "@/lib/verify/courts";
+import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
 import { isReservedDomain, registrableHost } from "@/lib/verify/host";
@@ -248,7 +248,7 @@ export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
   const digits = facts.phone.replace(/\D/g, "");
   const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits.length >= 10 ? digits.slice(-10) : "";
   const area = national.length === 10 ? national.slice(0, 3) : "";
-  const state = facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
   const base = { key: "phone-state", weight: 4, source: "Local area-code table", url: "" };
   if (area && TOLL_FREE_AREA_CODES.has(area)) {
     const where = state ? `so it does not confirm ${state}` : "so it does not confirm a state";
@@ -793,7 +793,7 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN)\b/)?.[1];
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN|AZ)\b/)?.[1];
   const portal = state ? registryPortal(state) : undefined;
   if (portal) {
     return check({
@@ -826,6 +826,7 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     IA: "https://sos.iowa.gov/search/business/search.aspx",
     NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
     TN: "https://sos.tn.gov/business-services/business-search",
+    AZ: "https://ecorp.azcc.gov/EntitySearch/Index",
   };
   if (!state || !links[state]) {
     return check({
@@ -994,9 +995,14 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       companyOnly: edgar.companyOnly,
     }),
   );
-  const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
+  const courtQuery = courtSearchQuery(ctx.facts.name);
+  const courtUrl = courtQuery
+    ? `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(courtQuery)}&type=o`
+    : "https://www.courtlistener.com/";
   const courtFallback = { ok: false, status: 0, text: "" };
-  const court = await settleWithinRetry(() => fetchText(courtUrl), 20_000, courtFallback);
+  const court = courtQuery
+    ? await settleWithinRetry(() => fetchText(courtUrl), 20_000, courtFallback)
+    : { ok: true, status: 200, text: JSON.stringify({ results: [] }) };
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
   const companyQuery = searchFacts.org.trim();
   const registryHttp = companyQuery

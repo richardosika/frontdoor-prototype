@@ -467,6 +467,7 @@ function socialScoreQualified(score: string): boolean {
 
 function failSentence(check: CheckOutput): string | null {
   if (check.status !== "FAIL") return null;
+  if (check.key === "business-registry" || check.key === "courts") return null;
   const source = check.source || "the check";
   if (isHardSanctions(check)) {
     return `A sanctions list name matches, and the location or date of birth on the application lines up with the list entry (${source}). Confirm the entry before you decide.`;
@@ -639,6 +640,8 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
   if (edgar?.status === "PASS") {
     evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
+  } else if (edgar && /parent match, needs review/i.test(edgar.finding)) {
+    evidence.push(edgar.finding);
   } else if (edgar?.companyOnly && !edgar.reviewFlag) {
     evidence.push(`EDGAR lists this exact company name (${edgar.source}). It does not tie the person to the firm.`);
   } else {
@@ -658,7 +661,7 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   } else if (isCorroboratedNegative(courts)) {
     evidence.push("A court result may name this person and company near a serious word. Possible match, verify. It is not treated as a confirmed case.");
   } else if (courts.status === "PASS") {
-    evidence.push("No record was found in CourtListener federal data. That is not a clearance of all litigation.");
+    evidence.push("None found in CourtListener federal data. That is not a risk flag, not credit, and not a clearance of all litigation.");
   } else {
     evidence.push("The court search did not confirm a case against this person and company.");
   }
@@ -735,6 +738,9 @@ export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
 function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
   if (row?.status === "PASS") {
     return award(true, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
+  }
+  if (row && /parent match, needs review/i.test(row.finding)) {
+    return portionLine(companyOnlyPoints(possible), possible, "parent match, needs review");
   }
   // Exact normalized-name filer, not a different firm. Person credit stays off, so an
   // impersonation of a public registrant does not gain points unless something else
@@ -1068,7 +1074,7 @@ export function gradeChecks(
     pushAttention({
       severity: "Low",
       title: "No manual registry link for this state",
-      detail: "No manual registry link is on file for this location. It was not searched, and that is not a clean result.",
+      detail: "This location is not a US state on the registry list. It was not searched. That is not a failure.",
     });
   }
   if ((facts.referenceCount || 0) === 0) {

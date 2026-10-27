@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessLocalAddress, zipMatchesState } from "@/lib/verify/address";
+import { assessLocalAddress, statedUsState, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
 import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
@@ -570,7 +570,8 @@ describe("low-risk check fixes", () => {
     expect(clean.weight).toBe(0);
     expect(clean.finding).toContain("Not checkable for free.");
     expect(clean.corroborates).toBe(false);
-    expect(clean.finding).toContain("No record found in CourtListener federal data");
+    expect(clean.finding).toContain("None found");
+    expect(clean.finding.toLowerCase()).toContain("not a risk flag and not credit");
     expect(clean.finding.toLowerCase()).toContain("not a clearance of all litigation");
     expect(clean.finding.toLowerCase()).not.toContain("cleared of all");
   });
@@ -3137,7 +3138,10 @@ describe("thirteenth follow-up", () => {
       [row({ key: "edgar", status: partial.status, weight: 6, corroborates: false, reviewFlag: true, finding: partial.finding })],
       facts({ org: "Terra Group", name: "Pat Example" }),
     );
-    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(partial.finding.toLowerCase()).toContain("parent match, needs review");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("parent match, needs review");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(partialGrade.letter).not.toBe("C");
     expect(partialGrade.recommendation.startsWith("APPROVE")).toBe(false);
     expect(matchEdgarCompany(rows, "SL Green")?.cik).toBe("1040971");
@@ -3617,13 +3621,93 @@ describe("qa october 27", () => {
     expect(affiliate.corroborates).toBe(false);
     expect(affiliate.reviewFlag).toBe(true);
     expect(affiliate.finding).toContain("HINES GLOBAL INCOME TRUST");
+    expect(affiliate.finding.toLowerCase()).toContain("parent match, needs review");
     expect(affiliate.finding.toLowerCase()).toContain("not a pass");
+    expect(affiliate.finding.toLowerCase()).toContain("not credited");
     const affiliateGrade = gradeChecks(
       [row({ key: "edgar", status: affiliate.status, weight: 6, corroborates: false, reviewFlag: true, finding: affiliate.finding })],
       facts({ org: "Hines", name: "Jeff Hines" }),
     );
-    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(affiliateGrade.recommendation.startsWith("APPROVE")).toBe(false);
     expect(affiliateGrade.letter).not.toBe("C");
+  });
+
+  it("labels Brookfield and AECOM parent filers the same way and covers Arizona", () => {
+    const companies = [
+      { title: "Brookfield Property Partners L.P.", ticker: "BPYPN", cik: "1545772" },
+      { title: "BROOKFIELD Corp /ON/", ticker: "BNH", cik: "1001085" },
+      { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
+      { title: "AECOM", ticker: "ACM", cik: "868857" },
+      { title: "Unum Group", ticker: "UNM", cik: "5513" },
+    ];
+    const brookfield = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "Brian Kingston",
+      tickersOk: true,
+      companies,
+      filingNames: [["BROOKFIELD Corp /ON/ (BN) (CIK 0001001085)"]],
+    });
+    const aecom = assessEdgarMatch({
+      org: "AECOM Tishman",
+      person: "Troy Rudd",
+      tickersOk: true,
+      companies,
+      filingNames: [["AECOM (ACM) (CIK 0000868857)", "RUDD TROY"]],
+    });
+    for (const result of [brookfield, aecom]) {
+      expect(result.status).toBe("INCONCLUSIVE");
+      expect(result.status).not.toBe("PASS");
+      expect(result.corroborates).toBe(false);
+      expect(result.reviewFlag).toBe(true);
+      expect(result.finding.toLowerCase()).toContain("parent match, needs review");
+      expect(result.finding.toLowerCase()).toContain("not a pass");
+      expect(result.finding.toLowerCase()).toContain("not credited");
+      const graded = gradeChecks(
+        [row({ key: "edgar", status: result.status, weight: 6, corroborates: false, reviewFlag: true, finding: result.finding })],
+        facts({ org: "Brookfield Properties" }),
+      );
+      const reason = graded.categories.find((category) => category.id === "company")?.reason || "";
+      expect(reason).toContain("parent match, needs review");
+      expect(reason).toContain("3 of 6");
+      expect(reason).not.toContain("6 of 6");
+      expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
+      expect(graded.letter).not.toBe("C");
+    }
+    expect(brookfield.finding).toContain("BROOKFIELD Corp /ON/");
+    expect(brookfield.finding).toContain("(BN)");
+    expect(brookfield.finding).not.toContain("Property Partners");
+    expect(brookfield.finding.toLowerCase()).toContain("not named");
+    expect(aecom.finding).toContain("AECOM");
+    expect(aecom.finding).toContain("ACM");
+    expect(aecom.finding.toLowerCase()).toContain("still not credited");
+    expect(brookfield.finding.toLowerCase()).not.toContain("unum");
+    expect(aecom.finding.toLowerCase()).not.toContain("unum");
+
+    expect(statedUsState("Phoenix, Arizona")).toBe("AZ");
+    expect(statedUsState("Phoenix, AZ")).toBe("AZ");
+    expect(statedUsState("New York, New York")).toBe("NY");
+    const phoenix = phoneStateCheck(facts({ phone: "602-555-0100", location: "Phoenix, Arizona" }));
+    expect(phoenix.status).toBe("PASS");
+    expect(phoenix.finding).toContain("602");
+    expect(phoenix.finding).toContain("AZ");
+    expect(phoneStateCheck(facts({ phone: "602-555-0100", location: "Scottsdale, AZ" })).status).toBe("PASS");
+    const arizona = registryLinkCheck(facts({ location: "Phoenix, Arizona", org: "Desert Builders" }));
+    expect(arizona.status).not.toBe("FAIL");
+    expect(arizona.url).toBe("https://ecorp.azcc.gov/EntitySearch/Index");
+    const ny = registryLinkCheck(facts({ location: "New York, New York", org: "Related Companies" }));
+    expect(ny.status).not.toBe("FAIL");
+    expect(ny.finding.toLowerCase()).not.toContain("outside the free us registry list");
+    for (const location of ["Phoenix, Arizona", "Phoenix, AZ", "New York, New York", "Hartford, Connecticut", "Columbus, Ohio"]) {
+      const graded = gradeChecks(
+        [registryLinkCheck(facts({ location, org: "Desert Builders" })), phoneStateCheck(facts({ phone: "602-555-0100", location }))],
+        facts({ location, phone: "602-555-0100", org: "Desert Builders" }),
+      );
+      const text = `${graded.plainText} ${graded.attention.map((item) => `${item.title} ${item.detail}`).join(" ")} ${graded.summary.didNotCheckOut}`;
+      expect(text.toLowerCase()).not.toContain("outside the free us registry list");
+      expect(graded.attention.some((item) => item.title === "No manual registry link for this state")).toBe(false);
+      expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("registry");
+    }
   });
 });

@@ -74,6 +74,70 @@ const ZIP_RANGES: Record<string, [number, number][]> = {
 
 export const US_POSTAL_CODES = new Set(Object.keys(ZIP_RANGES));
 
+/** Full state and territory names. "Arizona" is AZ. A two-letter code is handled separately. */
+const STATE_NAMES: Record<string, string> = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  "district of columbia": "DC",
+  "washington dc": "DC",
+  "washington d c": "DC",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "puerto rico": "PR",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+};
+
+export function stateCodeFromToken(token: string): string {
+  const compact = token.toLowerCase().replace(/\./g, " ").replace(/\s+/g, " ").trim();
+  if (/^[a-z]{2}$/.test(compact) && US_POSTAL_CODES.has(compact.toUpperCase())) return compact.toUpperCase();
+  return STATE_NAMES[compact] || "";
+}
+
 const ZIP5 = /^\d{5}(?:-\d{4})?$/;
 const STREET_SUFFIX = /\b(?:lane|ln|street|st|avenue|ave|road|rd|drive|dr|boulevard|blvd|way|court|ct|place|pl|terrace|ter)\b/i;
 
@@ -87,19 +151,36 @@ function rejectedStreetNumber(parsed: ParsedAddress): boolean {
   return !parsed.street && STREET_SUFFIX.test(parsed.city) && numberBelowOne(parsed.city);
 }
 
+function splitStateZip(tail: string): { state: string; zip: string } | null {
+  const parts = tail.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return null;
+  for (let take = parts.length; take >= 1; take -= 1) {
+    const state = stateCodeFromToken(parts.slice(0, take).join(" "));
+    if (!state) continue;
+    return { state, zip: parts.slice(take).join(" ") };
+  }
+  if (/^[A-Za-z]{2}$/.test(parts[0]) && parts.length <= 2) {
+    return { state: parts[0].toUpperCase(), zip: parts.slice(1).join(" ") };
+  }
+  return null;
+}
+
 export function parseApplicationLocation(location: string): ParsedAddress | null {
   const text = location.trim().replace(/\s+/g, " ");
   if (!text) return null;
-  const comma = text.match(/^(.*),\s*([A-Za-z]{2})(?:\s+(\S+))?$/);
-  if (comma) {
-    const before = comma[1].trim();
-    const split = before.lastIndexOf(",");
-    const street = split >= 0 ? before.slice(0, split).trim() : "";
-    const city = split >= 0 ? before.slice(split + 1).trim() : before;
-    return { street, city, state: comma[2].toUpperCase(), zip: (comma[3] || "").trim() };
+  const comma = text.lastIndexOf(",");
+  if (comma >= 0) {
+    const parsed = splitStateZip(text.slice(comma + 1));
+    if (parsed) {
+      const before = text.slice(0, comma).trim();
+      const split = before.lastIndexOf(",");
+      const street = split >= 0 ? before.slice(0, split).trim() : "";
+      const city = split >= 0 ? before.slice(split + 1).trim() : before;
+      return { street, city, state: parsed.state, zip: parsed.zip };
+    }
   }
-  const bare = text.match(/^([A-Za-z]{2})(?:\s+(\S+))?$/);
-  if (bare) return { street: "", city: "", state: bare[1].toUpperCase(), zip: (bare[2] || "").trim() };
+  const bare = splitStateZip(text);
+  if (bare && !bare.zip.includes(" ")) return { street: "", city: "", state: bare.state, zip: bare.zip };
   return null;
 }
 

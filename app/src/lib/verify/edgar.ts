@@ -124,6 +124,71 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
 }
 
 /**
+ * A shorter parent whose distinctive name leads the applicant's name.
+ * Brookfield Corporation is the parent of Brookfield Properties.
+ * AECOM is the parent of AECOM Tishman. A different brand is not.
+ */
+function shorterParentCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
+  const orgTokens = firmTokens(org);
+  const orgDistinctive = orgTokens.filter((token) => isDistinctiveCompanyToken(token));
+  if (!orgDistinctive.length || orgTokens.length < 2) return null;
+  const orgSet = new Set(orgTokens);
+  const meaningful = (tokens: string[]) => tokens.filter((token) => token.length >= 3);
+  let best: EdgarCompany | null = null;
+  let bestOverlap = -1;
+  let bestLength = 99;
+  for (const row of rows) {
+    if (normalizeFirmName(row.title) === normalizeFirmName(org)) continue;
+    if (foreignParenthetical(row.title, orgSet)) continue;
+    const titleTokens = firmTokens(row.title);
+    const titleDistinctive = titleTokens.filter((token) => isDistinctiveCompanyToken(token));
+    if (!titleDistinctive.length) continue;
+    if (titleDistinctive.some((token) => !orgSet.has(token))) continue;
+    if (!titleDistinctive.every((token, index) => orgDistinctive[index] === token)) continue;
+    const shorter = titleDistinctive.length < orgDistinctive.length || meaningful(titleTokens).length < meaningful(orgTokens).length;
+    if (!shorter) continue;
+    const titleLength = meaningful(titleTokens).length;
+    const plainer =
+      !best ||
+      tickerPreference(row.ticker, org)[0] < tickerPreference(best.ticker, org)[0] ||
+      (tickerPreference(row.ticker, org)[0] === tickerPreference(best.ticker, org)[0] && row.ticker.trim().length < best.ticker.trim().length);
+    if (titleDistinctive.length > bestOverlap || (titleDistinctive.length === bestOverlap && titleLength < bestLength) || (titleDistinctive.length === bestOverlap && titleLength === bestLength && plainer)) {
+      best = row;
+      bestOverlap = titleDistinctive.length;
+      bestLength = titleLength;
+    }
+  }
+  return best;
+}
+
+function personNamedWithFirm(names: string[] | string[][], person: string, firm: string): boolean {
+  for (const group of filingGroups(names)) {
+    const here = group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, firm));
+    if (!here) continue;
+    if (group.some((name) => mentionsPerson(name, person))) return true;
+  }
+  return false;
+}
+
+function parentMatchResult(
+  row: EdgarCompany,
+  personNamed: boolean,
+): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
+  const titled = `${row.title}${row.ticker ? ` (${row.ticker})` : ""}`;
+  const personSentence = personNamed
+    ? " The person is named on that parent filing and is still not credited for this company."
+    : " The person is not named in that filing and is not credited.";
+  return {
+    status: "INCONCLUSIVE",
+    corroborates: false,
+    reviewFlag: true,
+    companyOnly: false,
+    url: edgarCompanyUrl(row.cik),
+    finding: `Parent match, needs review. EDGAR lists ${titled}, CIK ${row.cik}. A parent or affiliate is not an exact match and is not a pass. It does not corroborate.${personSentence}`,
+  };
+}
+
+/**
  * Exact normalized title first, so "SL Green Realty Corp" is SL GREEN REALTY CORP and not GREEN DOT.
  * A name made only of generic words, such as Group, is not a match.
  * Otherwise every non-generic token of 2 or more characters has to be in the title.
@@ -266,17 +331,8 @@ export function assessEdgarMatch(input: {
     };
   }
   if (!match) {
-    const partial = partialEdgarCandidate(input.companies, input.org);
-    if (partial) {
-      const titled = `${partial.title}${partial.ticker ? ` (${partial.ticker})` : ""}`;
-      return {
-        status: "INCONCLUSIVE",
-        corroborates: false,
-        reviewFlag: true,
-        url: edgarCompanyUrl(partial.cik),
-        finding: `EDGAR lists ${titled}. That is a parent, affiliate, or partial name match for a different firm, not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass. Needs review.`,
-      };
-    }
+    const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
+    if (parent) return parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
     return {
       status: "INCONCLUSIVE",
       corroborates: false,

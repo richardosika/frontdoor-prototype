@@ -4,7 +4,7 @@ import { DUES_WAIVED, annualDuesCents } from "@/lib/dues";
 import { applicationStatusAfterVerification, matchesApplicationFilter } from "@/lib/application-status";
 import { resolvePublicBase } from "@/lib/url";
 import { cardConsistencyCheck, collectChecks, emailChecks, sanctionsCheck } from "@/lib/verify/checks";
-import { assessCourts } from "@/lib/verify/courts";
+import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { limitText, politeFetch, shouldRetryStatus } from "@/lib/verify/fetch";
 import { locationsCorroborate, nameMatchScore } from "@/lib/verify/fuzzy";
 import { registrableHost } from "@/lib/verify/host";
@@ -294,8 +294,10 @@ describe("courts", () => {
       facts({ name: "Jeff Hines", org: "Skanska USA" }),
     );
     expect(scattered.status).toBe("PASS");
-    expect(scattered.finding).toContain("No record found");
-    expect(scattered.finding.toLowerCase()).not.toContain("mention the full name");
+    expect(scattered.finding).toContain("None found");
+    expect(scattered.reviewFlag).not.toBe(true);
+    expect(scattered.corroborates).not.toBe(true);
+    expect(scattered.finding.toLowerCase()).not.toContain("mention");
     const companyWord = assessCourts(
       JSON.stringify({
         results: [{ caseName: "Campbell v. Hines", snippet: "Jeff filed a motion in another matter." }],
@@ -314,26 +316,30 @@ describe("courts", () => {
       facts({ name: "Jeff Hines", org: "Hines" }),
     );
     expect(phrase.status).toBe("INCONCLUSIVE");
-    expect(phrase.finding).toContain("mention the full name");
+    expect(phrase.finding).toContain("Exact name match");
+    expect(phrase.finding).toContain("Gilley's Antique Mall and Jeff Hines v. Doug Sarver");
     const reversed = assessCourts(
       JSON.stringify({ results: [{ caseName: "Hines, Jeff v. Sarver", snippet: "" }] }),
       { ok: true, status: 200 },
       facts({ name: "Jeff Hines", org: "Hines" }),
     );
-    expect(reversed.finding).toContain("mention the full name");
+    expect(reversed.finding).toContain("Exact name match");
+    expect(reversed.finding).toContain("Hines, Jeff v. Sarver");
     const middle = assessCourts(
       JSON.stringify({ results: [{ caseNameFull: "Richard T. Kennedy v. State", caseName: "", snippet: "" }] }),
       { ok: true, status: 200 },
       facts({ name: "Richard Kennedy", org: "Skanska USA" }),
     );
-    expect(middle.finding).toContain("mention the full name");
+    expect(middle.finding).toContain("Exact name match");
+    expect(middle.finding).toContain("Richard T. Kennedy v. State");
     const otherGiven = assessCourts(
       JSON.stringify({ results: [{ caseNameFull: "Douglas Richard Kennedy, Appellee", caseName: "Commonwealth v. Kennedy", snippet: "" }] }),
       { ok: true, status: 200 },
       facts({ name: "Richard Kennedy", org: "Skanska USA" }),
     );
     expect(otherGiven.status).toBe("PASS");
-    expect(otherGiven.finding).toContain("No record found");
+    expect(otherGiven.finding).toContain("None found");
+    expect(otherGiven.reviewFlag).not.toBe(true);
     const company = assessCourts(
       JSON.stringify({
         results: [{ caseName: "Skanska USA v. Owner", snippet: "Richard testified. Kennedy was counsel." }],
@@ -343,7 +349,38 @@ describe("courts", () => {
     );
     expect(company.status).toBe("INCONCLUSIVE");
     expect(company.finding).toContain("name the company");
-    expect(company.finding.toLowerCase()).not.toContain("mention the full name");
+    expect(company.finding).toContain("None found");
+    expect(company.reviewFlag).not.toBe(true);
+    expect(company.corroborates).not.toBe(true);
+    const madeUp = assessCourts(
+      JSON.stringify({
+        results: [
+          { caseName: "QA v. State", snippet: "TestAF filed a motion in another matter." },
+          { caseName: "In re TestAF", snippet: "QA was the judge." },
+          { caseName: "Builder v. Owner", snippet: "The words QA and TestAF appear in different sentences." },
+          { caseName: "Sample Opinion", snippet: "Nothing about this applicant." },
+          { caseName: "Fifth Result", snippet: "A single token is not the person." },
+        ],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "QA TestAF", org: "QA TestAF Holdings" }),
+    );
+    expect(madeUp.status).not.toBe("FAIL");
+    expect(madeUp.reviewFlag).not.toBe(true);
+    expect(madeUp.corroborates).not.toBe(true);
+    expect(madeUp.finding).toContain("None found");
+    expect(madeUp.finding.toLowerCase()).not.toContain("mention");
+    expect(madeUp.finding).not.toMatch(/\b5\b/);
+    const exactMadeUp = assessCourts(
+      JSON.stringify({ results: [{ caseName: "QA TestAF v. Builder", snippet: "The caption names QA TestAF." }] }),
+      { ok: true, status: 200 },
+      facts({ name: "QA TestAF", org: "QA TestAF Holdings" }),
+    );
+    expect(exactMadeUp.finding).toContain("Exact name match");
+    expect(exactMadeUp.finding).toContain("QA TestAF v. Builder");
+    expect(courtSearchQuery("QA TestAF")).toBe('"QA TestAF"');
+    expect(courtSearchQuery("TestAF")).toBe("");
+    expect(courtSearchQuery("QA")).toBe("");
   });
 });
 
