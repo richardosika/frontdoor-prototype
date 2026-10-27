@@ -39,8 +39,8 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
           <p className="mt-2 font-serif text-lg">{request.name}</p>
           <p className="mt-1 text-sm text-ink">{shownBody}</p>
-          <Link href="/apply" className={`${btn} mt-4 w-full`}>
-            Back to apply
+          <Link href="/" className={`${btn} mt-4 w-full`}>
+            Back to home
           </Link>
         </div>
       </div>

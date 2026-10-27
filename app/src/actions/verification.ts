@@ -405,6 +405,7 @@ export async function decideInviteReview(formData: FormData) {
       email: record.inviteRequest.email,
       letter: grade?.letter,
       recommendation: grade?.recommendation,
+      verdict: "NEEDS_OWNER_DECISION",
     });
     if (audit && String(formData.get("confirmStrong") || "") !== "yes") {
       redirect(`${back}&error=${encodeURIComponent("Confirm the grade warning before approving.")}`);

@@ -88,6 +88,8 @@ describe("applicant details", () => {
     expect(statusPage).toContain("requestReceivedMessage");
     expect(statusPage).not.toContain("statusMembershipLine");
     expect(statusPage).not.toContain("Application received");
+    expect(statusPage).toContain("Back to home");
+    expect(statusPage).not.toContain("Back to apply");
   });
 
   it("blocks a second request to join while an account, application, or open request exists", () => {

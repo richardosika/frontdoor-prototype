@@ -418,6 +418,16 @@ describe("QA fixes that stay outside grading", () => {
     expect(audit?.action).toBe("APPROVE_DESPITE_GRADE");
     expect(audit?.summary).toContain("despite grade F");
     expect(audit?.note).toContain("Approved despite grade F.");
+    const requestAudit = strongApprovalAudit({
+      actorName: "Richard Osika",
+      personName: "QA-TEST Mary Ann Smith",
+      email: "qa@example.com",
+      letter: "F",
+      recommendation: "DECLINE",
+      verdict: "NEEDS_OWNER_DECISION",
+    });
+    expect(requestAudit?.summary).toContain("Needs your decision");
+    expect(requestAudit?.summary).not.toContain("no verdict");
     expect(readFileSync(path.join(ROOT, "lib/delete-join-request.ts"), "utf8")).toContain("inviteCode.delete");
     expect(readFileSync(path.join(ROOT, "actions/verification.ts"), "utf8")).toContain("strongApprovalAudit");
     expect(readFileSync(path.join(ROOT, "lib/notices.ts"), "utf8")).toContain("runOnServer");
