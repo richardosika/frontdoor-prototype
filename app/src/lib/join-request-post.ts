@@ -3,7 +3,8 @@ import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { duplicateJoinMessage, inviteRequestAddress, INVITE_REQUESTS_PER_EMAIL_PER_DAY, shouldDiscardInviteRequest, validateInviteRequest } from "@/lib/invite-request";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { withinRateLimit } from "@/lib/messaging";
-import { joinName } from "@/lib/person-fields";
+import { givenNameFrom, joinName } from "@/lib/person-fields";
+import { runOnServer } from "@/lib/server-work";
 import { prisma } from "@/lib/prisma";
 import { publicStatusPath } from "@/lib/public-status";
 import { isRoleId, roleLabel } from "@/lib/roles";
@@ -75,12 +76,14 @@ export async function postJoinRequest(request: Request): Promise<Response> {
   });
   if (duplicate) return Response.json({ error: duplicate }, { status: 409 });
 
+  const givenName = givenNameFrom(input.firstName);
   const name = joinName(input.firstName, input.lastName);
   const location = inviteRequestAddress(input);
   const statusToken = randomBytes(24).toString("hex");
   const created = await prisma.inviteRequest.create({
     data: {
       name,
+      givenName,
       email,
       role: input.role,
       org: input.company.trim(),
@@ -89,32 +92,35 @@ export async function postJoinRequest(request: Request): Promise<Response> {
       statusToken,
     },
   });
-  const { openInviteReview } = await import("@/lib/guided-prefill-db");
-  await openInviteReview(created.id).catch((error) => {
-    console.error("guided prefill failed", error instanceof Error ? error.message : "error");
-  });
   const statusPath = publicStatusPath(statusToken);
   const statusUrl = `${await appBaseUrl()}${statusPath}`;
-  try {
+  const org = input.company.trim();
+  // The thank-you page returns now. The letter and the review file finish on the server if the browser closes.
+  runOnServer(async () => {
+    const { openInviteReview } = await import("@/lib/guided-prefill-db");
+    await openInviteReview(created.id).catch((error) => {
+      console.error("guided prefill failed", error instanceof Error ? error.message : "error");
+    });
     await sendTemplate({
       key: "invite_received",
       to: email,
       vars: buildMailVars({
         name,
+        givenName,
         role: roleLabel(input.role),
-        org: input.company.trim(),
+        org,
         statusLink: statusUrl,
       }),
       person: {
         name,
         role: input.role,
-        org: input.company.trim(),
+        org,
         location,
         inviteRequestId: created.id,
       },
+    }).catch((error) => {
+      console.error("request received email failed", error instanceof Error ? error.message : "error");
     });
-  } catch {
-    return Response.json({ error: "We saved the request, but the note could not be recorded. Try again in a moment." }, { status: 500 });
-  }
+  });
   return Response.json({ ok: true, statusUrl: statusPath });
 }

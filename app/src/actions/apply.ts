@@ -34,6 +34,7 @@ import { queueApplicationVerification } from "@/lib/verify/queue";
 import { appendMemberReply } from "@/lib/statement";
 import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
+import { givenNameFrom } from "@/lib/person-fields";
 
 const CODE_MINUTES = 15;
 
@@ -182,6 +183,7 @@ export async function submitApplication(
   }
 
   const references = (input.referenceEmails ?? []).map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const givenName = givenNameFrom(input.firstName);
   const name = applicationName(input);
   const location = applicationLocation(input);
   const passwordHash = await bcrypt.hash(input.password, 10);
@@ -198,6 +200,7 @@ export async function submitApplication(
         email,
         statusToken,
         name,
+        givenName,
         passwordHash,
         role,
         org: input.org.trim(),
@@ -250,12 +253,13 @@ export async function submitApplication(
     key: "application_thanks",
     to: email,
     applicationId: application.id,
-    vars: buildMailVars({
-      name,
-      role: roleLabel(role),
-      org: input.org.trim(),
-      statusLink: `${base}${publicStatusPath(statusToken)}`,
-    }),
+      vars: buildMailVars({
+        name,
+        givenName,
+        role: roleLabel(role),
+        org: input.org.trim(),
+        statusLink: `${base}${publicStatusPath(statusToken)}`,
+      }),
     person: {
       name,
       role,

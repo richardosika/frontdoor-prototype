@@ -73,8 +73,10 @@ describe("applicant details", () => {
     expect(INVITE_STATUS_COPY.PENDING.body).toContain("We've got your request to join");
     expect(INVITE_STATUS_COPY.PENDING.body).toContain("A private network where every member is personally reviewed");
     expect(INVITE_STATUS_COPY.PENDING.body).not.toMatch(/invite|founding|limited|\$|dues|price/i);
-    expect(requestReceivedMessage("Ada Lovelace")).toContain("Thank you, Ada. We've got your request to join.");
-    expect(applicationReceivedMessage("Ada Lovelace")).toBe(
+    expect(requestReceivedMessage("Ada")).toContain("Thank you, Ada. We've got your request to join.");
+    expect(requestReceivedMessage("QA-TEST Mary Ann")).toContain("Thank you, QA-TEST Mary Ann.");
+    expect(requestReceivedMessage("QA-TEST Mary Ann")).not.toContain("Thank you, QA-TEST.");
+    expect(applicationReceivedMessage("Ada")).toBe(
       "Thank you, Ada. We've got your application. A member of the Private Floor team will personally review it, usually within a few days. We'll email you as soon as there's news. We're glad you want to be part of this.",
     );
     expect(INVITE_STATUS_COPY.PENDING.body).not.toContain("has not issued a code");

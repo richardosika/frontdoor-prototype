@@ -17,6 +17,7 @@ import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
 import { rememberAdminNotice } from "@/lib/admin-notice";
 import { rerunApplicantName, rerunFinishedSummary, rerunGradeFields } from "@/lib/rerun-audit";
 import { parseGradeSnapshot } from "@/lib/verify/grade";
+import { strongApprovalAudit } from "@/lib/approval-audit";
 import type { Prisma } from "@prisma/client";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
@@ -397,11 +398,34 @@ export async function decideInviteReview(formData: FormData) {
     redirect(`${back}&error=${encodeURIComponent("Write what you need from the applicant.")}`);
   }
   if (decision === "APPROVED") {
+    const grade = parseGradeSnapshot(record.gradeSnapshot);
+    const audit = strongApprovalAudit({
+      actorName: admin.name,
+      personName: record.inviteRequest.name,
+      email: record.inviteRequest.email,
+      letter: grade?.letter,
+      recommendation: grade?.recommendation,
+    });
+    if (audit && String(formData.get("confirmStrong") || "") !== "yes") {
+      redirect(`${back}&error=${encodeURIComponent("Confirm the grade warning before approving.")}`);
+    }
     const issued = await issueInviteCodeForRequest({ adminId: admin.id, requestId: record.inviteRequest.id });
     if (!issued.ok) redirect(`${back}&error=${encodeURIComponent(issued.error)}`);
-    await applyDecisionStatus({ caseId: record.id, decision, actorId: admin.id, actorName: admin.name });
+    if (audit) {
+      await prisma.moderationEvent.create({
+        data: { actorId: admin.id, action: audit.action, summary: audit.summary },
+      });
+    }
+    await applyDecisionStatus({
+      caseId: record.id,
+      decision,
+      actorId: admin.id,
+      actorName: admin.name,
+      auditNote: audit?.note,
+    });
     revalidatePath(back);
     revalidatePath("/admin");
+    revalidatePath("/admin/audit");
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
     const approvedNotice = `Referral code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`;

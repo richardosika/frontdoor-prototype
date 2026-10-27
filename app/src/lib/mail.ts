@@ -1,8 +1,8 @@
 import { noticeTestRecipient } from "@/lib/brand";
+import { givenNameFrom } from "@/lib/person-fields";
 import { ensureCrmPerson } from "@/lib/crm";
 import {
   deliveryTarget,
-  firstName,
   isTemplateKey,
   renderTemplate,
   replacementTemplateBody,
@@ -86,9 +86,10 @@ export function buildMailVars(input: {
   note?: string;
   inviteCode?: string;
   code?: string;
+  givenName?: string;
 }): Record<string, string> {
   return {
-    first_name: firstName(input.name),
+    first_name: givenNameFrom(input.givenName, input.name),
     full_name: input.name,
     role: input.role || "",
     org: input.org || "",

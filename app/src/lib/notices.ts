@@ -1,10 +1,10 @@
-import { after } from "next/server";
 import { BRAND, noticeTestRecipient } from "@/lib/brand";
 import { reviewNotice } from "@/lib/review-copy";
 import { recordCrmEvent } from "@/lib/crm";
 import { deliveryTarget, repairDoubledTerminalPeriod } from "@/lib/email-templates";
 import { prisma } from "@/lib/prisma";
 import { buildTestMail, deliverResendMail, emailFromAddress, safeMailError } from "@/lib/resend-mail";
+import { runOnServer } from "@/lib/server-work";
 
 export type NoticeInput = {
   intendedTo: string;
@@ -83,16 +83,8 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
     text: body,
     to: target.to,
   };
-  // Resend can take several seconds. The on-screen code waits on this function, so the copy goes out after the response.
-  try {
-    after(() => {
-      void sendStoredNotice(row.id, delivery);
-    });
-  } catch (error) {
-    console.error("Could not defer the test email");
-    console.error(error instanceof Error ? error.message : "error");
-    await sendStoredNotice(row.id, delivery);
-  }
+  // Resend can take several seconds. The page returns after the row is stored. The send finishes if the browser closes.
+  runOnServer(() => sendStoredNotice(row.id, delivery));
   return { id: row.id, deliveredTo: target.to };
 }
 

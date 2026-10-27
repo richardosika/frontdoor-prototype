@@ -230,6 +230,7 @@ export async function applyDecisionStatus(input: {
   decision: "APPROVED" | "DECLINED" | "NEEDS_INFO";
   actorId: string;
   actorName: string;
+  auditNote?: string;
 }) {
   const existing = await prisma.verificationCase.findUnique({ where: { id: input.caseId } });
   if (!existing) return;
@@ -245,7 +246,9 @@ export async function applyDecisionStatus(input: {
       actorId: input.actorId,
       fromStatus: existing.status,
       toStatus,
-      summary: `${input.actorName} chose ${decisionLabel(input.decision)}. File status is ${verificationStatusLabel(toStatus)}.`,
+      summary: [`${input.actorName} chose ${decisionLabel(input.decision)}. File status is ${verificationStatusLabel(toStatus)}.`, input.auditNote || ""]
+        .filter(Boolean)
+        .join(" "),
     },
   });
 }

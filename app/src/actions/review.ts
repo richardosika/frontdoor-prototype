@@ -122,5 +122,7 @@ export async function saveReviewStep(formData: FormData) {
   if (application) revalidatePath(`/admin/applications/${application.id}`);
   revalidatePath(`/admin/verification/${record.id}`);
   revalidatePath("/admin/audit");
-  redirect(backTo(record.id, destination, intent === "jump" ? undefined : "Progress saved."));
+  // A jump stays on this page. A redirect unmounted Approve for about a second after the save.
+  if (intent === "jump") return;
+  redirect(backTo(record.id, destination, "Progress saved."));
 }

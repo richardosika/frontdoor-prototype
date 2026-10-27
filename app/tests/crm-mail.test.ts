@@ -28,6 +28,7 @@ describe("email templates", () => {
     expect(renderTemplate("Hello {first_name}.", { first_name: "Alex" })).toContain(SIGN_OFF);
     expect(renderTemplate("Hello {unknown_token}.", {})).toContain("{unknown_token}");
     expect(firstName("Alex Rivera")).toBe("Alex");
+    expect(firstName("QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
   });
 
   it("keeps the declined letter free of a reason variable", () => {
@@ -74,6 +75,8 @@ describe("email templates", () => {
     expect(templateDef("info")?.subject).toBe("About Private Floor");
     expect(templateDef("approved")?.subject).toBe("You're approved to Private Floor");
     expect(info).toContain("Request to join");
+    expect(info).toContain("reviews every request to join");
+    expect(info).not.toMatch(/\$|dues|charged|fee/i);
     expect(info).toContain("A private network where every member is personally reviewed");
     expect(info.toLowerCase()).not.toContain("invited");
     expect(info).not.toContain("Code:");

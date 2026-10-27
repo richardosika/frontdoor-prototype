@@ -7,6 +7,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { STAGE_OVERRIDE_OPTIONS, crmStage, crmStageLabel, eventKindLabel, followUpDue, stageOverride } from "@/lib/crm-stage";
+import { crmEventDisplay } from "@/lib/review-copy";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -161,26 +162,30 @@ export default async function CrmPersonPage({
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Timeline</h2>
           {person.events.length === 0 ? <p className="mt-2 text-sm text-mut">No events yet.</p> : null}
           <ul className="mt-2 divide-y divide-line text-sm">
-            {person.events.map((event) => (
+            {person.events.map((event) => {
+              const shown = crmEventDisplay(event.kind, event.summary);
+              const label = shown.label || eventKindLabel(event.kind);
+              return (
               <li key={event.id} className="py-2">
-                <p className="text-xs uppercase tracking-wide text-brass">{eventKindLabel(event.kind)}</p>
-                <p>{event.summary}</p>
+                <p className={shown.label ? "text-xs tracking-wide text-brass" : "text-xs uppercase tracking-wide text-brass"}>{label}</p>
+                {shown.detail ? <p>{shown.detail}</p> : null}
                 <p className="text-xs text-mut">{formatAuditTime(event.createdAt)}</p>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete CRM person</h2>
           {person.inviteRequest && !person.applicationId && !person.userId ? (
             <>
-              <p className="mt-2 text-sm text-ink">Removes this CRM person and the linked request to join, including the verification file. Home, then Requests to join, then Delete request does the same thing.</p>
+              <p className="mt-2 text-sm text-ink">Removes this CRM person, the linked request to join, the verification file, and the referral code issued for this request. Home, then Requests to join, then Delete request does the same thing.</p>
               <form id="delete-crm" action={deleteCrmPerson} className="mt-3">
                 <input type="hidden" name="personId" value={person.id} />
                 <ConfirmSubmitButton
                   form="delete-crm"
                   className={btnOutline}
-                  message={`Delete the CRM record for ${person.name}? This also deletes the request to join, the verification file, and the outbox notices for this request.`}
+                  message={`Delete the CRM record for ${person.name}? This also deletes the request to join, the verification file, the referral code, and the outbox notices for this request.`}
                 >
                   Delete CRM person
                 </ConfirmSubmitButton>

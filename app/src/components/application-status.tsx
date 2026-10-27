@@ -3,6 +3,7 @@ import { ApplyReply } from "@/components/apply-reply";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
 import { applicationReceivedMessage } from "@/lib/applicant-copy";
+import { givenNameFrom } from "@/lib/person-fields";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
 import { currentMonthlyCents, statusMembershipLine } from "@/lib/dues";
@@ -13,6 +14,7 @@ export function ApplicationStatus({
 }: {
   application: {
     name: string;
+    givenName?: string;
     status: string;
     statusToken: string;
     reviewerNote: string;
@@ -23,7 +25,7 @@ export function ApplicationStatus({
   };
 }) {
   const copy = memberStatusCopy(application.status);
-  const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
+  const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(givenNameFrom(application.givenName, application.name)) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
   const showNote =
     !declined &&

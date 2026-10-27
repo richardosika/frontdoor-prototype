@@ -37,9 +37,45 @@ export function reviewNotice(text: string, role?: string | null): string {
   return reviewCopy(text, role);
 }
 
-/** The stored template key stays put. The outbox label uses the current name. */
+const NOTICE_LABELS: Record<string, string> = {
+  info: "Information email",
+  invite_received: "Request received email",
+  request_received: "Request received email",
+  application_code: "Email code",
+  application_thanks: "Application received email",
+  welcome: "Welcome email",
+  needs_info: "Needs more info email",
+  approved: "Approved email",
+  declined: "Declined email",
+  payment_due: "Payment due email",
+  dues_reminder: "Dues reminder email",
+  renewal: "Renewal email",
+  payment_failed: "Payment failed email",
+  admin_decision: "Decision email",
+  notice: "Email",
+};
+
+/** The stored template key stays put. Screens show this name. */
 export function reviewTemplateKey(key: string): string {
-  return key === "invite_received" ? "request_received" : key;
+  if (NOTICE_LABELS[key]) return NOTICE_LABELS[key];
+  if (/^[a-z0-9_]+$/.test(key)) {
+    const words = key.replace(/_/g, " ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  return key;
+}
+
+/** Timeline text for a stored CRM event. Old rows still start with the raw template key. */
+export function crmEventDisplay(kind: string, summary: string): { label: string; detail: string } {
+  if (kind === "email" || kind === "suppressed") {
+    const splitAt = summary.indexOf(" · ");
+    const head = (splitAt === -1 ? summary : summary.slice(0, splitAt)).trim();
+    const rest = splitAt === -1 ? "" : summary.slice(splitAt + 3).trim();
+    const label = reviewTemplateKey(head);
+    if (kind === "suppressed" && !rest) return { label: "Not sent", detail: summary };
+    return { label, detail: rest };
+  }
+  return { label: "", detail: summary };
 }
 
 /** The check table prints the stored key. Show referral wording without changing the stored key. */

@@ -272,6 +272,7 @@ model InviteCode {
 model InviteRequest {
   id           String              @id @default(cuid())
   name         String
+  givenName    String              @default("")
   email        String
   role         MemberRole
   org          String
@@ -295,6 +296,7 @@ model Application {
   inviteCode      InviteCode?       @relation(fields: [inviteCodeId], references: [id])
   email           String
   name            String
+  givenName       String            @default("")
   passwordHash    String
   role            MemberRole
   org             String

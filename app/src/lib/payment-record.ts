@@ -3,6 +3,7 @@ import { RECEIPT_SUBJECT } from "@/lib/email-layout";
 import { SIGN_OFF } from "@/lib/email-templates";
 import { ensureCrmPerson } from "@/lib/crm";
 import { formatLongEtDate } from "@/lib/format";
+import { givenNameFrom } from "@/lib/person-fields";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { notify } from "@/lib/notify";
 import { sendNotice } from "@/lib/notices";
@@ -101,7 +102,7 @@ export async function activatePaidMembership(input: {
       intendedTo: user.email,
       subject: RECEIPT_SUBJECT,
       text: paymentReceiptText({
-        firstName: user.name.trim().split(/\s+/)[0] || "there",
+        firstName: givenNameFrom("", user.name),
         role: roleLabel(user.role),
         firstCharge,
         monthly: formatMoney(monthlyCents),
@@ -138,7 +139,7 @@ export async function markPaymentFailed(userId: string) {
   const base = await appBaseUrl();
   const link = user.paymentToken ? `${base}/pay/${user.paymentToken}` : `${base}/pay`;
   const letter = failedPaymentNotice({
-    firstName: user.name.trim().split(/\s+/)[0] || "there",
+    firstName: givenNameFrom("", user.name),
     paymentLink: link,
   });
   await ensureCrmPerson({

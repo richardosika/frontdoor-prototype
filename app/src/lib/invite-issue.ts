@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
+import { givenNameFrom } from "@/lib/person-fields";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
 
@@ -49,6 +50,7 @@ export async function issueInviteCodeForRequest(input: {
     to: request.email,
     vars: buildMailVars({
       name: request.name,
+      givenName: givenNameFrom(request.givenName, request.name),
       role: roleLabel(request.role),
       org: request.org,
       applyLink: `${base}/apply`,

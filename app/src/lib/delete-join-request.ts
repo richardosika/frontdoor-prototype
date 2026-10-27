@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 /** Removes a request to join and the rows that would recreate its CRM person. */
 export async function deleteJoinRequest(request: { id: string; email: string; statusToken: string }) {
   await prisma.$transaction(async (tx) => {
+    const row = await tx.inviteRequest.findUnique({ where: { id: request.id }, select: { inviteCodeId: true } });
     await tx.verificationCase.deleteMany({ where: { inviteRequestId: request.id } });
     await deleteOutboxTied(tx, [request.email], {
       tokens: [request.statusToken, `/request-status/${request.statusToken}`],
@@ -17,5 +18,13 @@ export async function deleteJoinRequest(request: { id: string; email: string; st
       },
     });
     await tx.inviteRequest.delete({ where: { id: request.id } });
+    if (!row?.inviteCodeId) return;
+    const [applications, otherRequests] = await Promise.all([
+      tx.application.count({ where: { inviteCodeId: row.inviteCodeId } }),
+      tx.inviteRequest.count({ where: { inviteCodeId: row.inviteCodeId } }),
+    ]);
+    if (applications === 0 && otherRequests === 0) {
+      await tx.inviteCode.delete({ where: { id: row.inviteCodeId } });
+    }
   });
 }

@@ -1,6 +1,7 @@
 import { saveReviewStep } from "@/actions/review";
 import { DecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
+import { ReviewStepFrame, StepJumpForm } from "@/components/guided-step-switcher";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { StepSaveForm } from "@/components/step-save-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -50,124 +51,122 @@ export function GuidedReview({
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
   const skipped = skippedFrom(steps);
-  const previous = previousStepId(current.id);
 
   return (
     <section className="mt-4 rounded border border-line bg-paper p-4">
       <script dangerouslySetInnerHTML={{ __html: decisionDialogBootstrap() }} />
       <SettleDecision applicationId={applicationId} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
-      <h2 className="mt-1 font-serif text-2xl font-normal text-forest">
-        Step {current.index} of {total}
-      </h2>
-      <p className="mt-1 text-sm text-ink">Progress is saved on this application. You can leave and come back to the same step.</p>
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {steps.map((step) => (
-          <StepSaveForm key={step.id} action={saveReviewStep}>
-            <input type="hidden" name="applicationId" value={applicationId} />
-            <input type="hidden" name="caseId" value={caseId} />
-            <input type="hidden" name="stepId" value={step.id} />
-            <input type="hidden" name="intent" value="jump" />
-            <button
-              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-sm border px-3 text-xs ${
-                step.id === current.id ? "border-brass bg-forest text-paper" : "border-line bg-cream text-ink"
-              }`}
-              type="submit"
-            >
-              {step.index}. {step.title}
-              {step.id !== "decision" && step.status === "SKIPPED" ? " · skipped" : ""}
-              {step.id !== "decision" && stepCountsAsPass(step.status) ? " · pass" : ""}
-            </button>
-          </StepSaveForm>
-        ))}
-      </div>
-      {current.id === "decision" ? (
-        <DecisionStep
-          applicationId={applicationId}
-          caseId={caseId}
-          grade={grade}
-          paying={paying}
-          notLegit={notLegit}
-          confirmLabel={confirmLabel}
-          mode={mode}
-          skipped={skipped}
-          previous={previous}
-          applicationStatus={applicationStatus}
-          verdict={verdict}
-          steps={steps}
-          role={role}
-          location={location}
-          unverified={unverified}
-          applicationGrade={applicationGrade}
-        />
-      ) : (
-        <article className="mt-4">
-          <h3 className="font-serif text-xl font-normal">{current.title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{current.about}</p>
-          <p className="mt-3 text-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Status</span>
-            <span className="ml-2">{stepStatusLabel(current.status)}</span>
-            {!current.saved ? <span className="ml-2">Auto-suggested</span> : null}
-            {current.status === "SKIPPED" || current.status === "COULDNT_VERIFY" ? <span className="ml-2 text-[#7A2E2E]">Not a pass.</span> : null}
-          </p>
-          <ul className="mt-3 space-y-3">
-            {current.findings.length === 0 ? <li className="text-sm text-mut">No automated result for this step.</li> : null}
-            {current.findings.map((finding, index) => (
-              <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
-                <p className="mt-1 leading-relaxed text-ink">{reviewCopy(finding.text)}</p>
-                {finding.url ? (
-                  <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">
-                    Open evidence
-                  </a>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-          {current.saved?.skipReason ? <p className="mt-3 text-sm text-ink">Skip reason: {current.saved.skipReason}</p> : null}
-          <StepSaveForm action={saveReviewStep} className="mt-4 space-y-3">
-            <input type="hidden" name="applicationId" value={applicationId} />
-            <input type="hidden" name="caseId" value={caseId} />
-            <input type="hidden" name="stepId" value={current.id} />
-            <input type="hidden" name="intent" value="save" />
-            <label className="block">
-              <span className={labelCls}>Your mark</span>
-              <select name="status" className={field} defaultValue={current.saved ? (current.status === "SKIPPED" ? "COULDNT_VERIFY" : current.status) : current.status}>
-                <option value="PASS">Pass</option>
-                <option value="CONCERN">Concern</option>
-                <option value="FAIL">Fail</option>
-                <option value="COULDNT_VERIFY">{"Couldn't verify"}</option>
-                <option value="NOT_CHECKED">Not checked</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelCls}>Evidence link</span>
-              <input name="evidenceUrl" className={field} defaultValue={publicEvidenceHref(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: current.saved?.evidenceUrl || current.prefill?.evidenceUrl || "", location }).url)} placeholder="https://" />
-            </label>
-            <label className="block">
-              <span className={labelCls}>Note</span>
-              <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: "", location }).finding)} placeholder="What was found, and what was not" />
-            </label>
-            <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
-              Save & next
-            </button>
-          </StepSaveForm>
-          {current.index > 1 ? (
-            <StepSaveForm action={saveReviewStep} className="mt-2">
-              <input type="hidden" name="applicationId" value={applicationId} />
-              <input type="hidden" name="caseId" value={caseId} />
-              <input type="hidden" name="stepId" value={previous} />
-              <input type="hidden" name="intent" value="jump" />
-              <button className={`${btnOutline} min-h-11 w-full sm:w-auto`} type="submit">
-                Back
+      <ReviewStepFrame currentId={current.id}>
+        <h2 className="mt-1 font-serif text-2xl font-normal text-forest" data-review-heading data-total={total}>
+          Step {current.index} of {total}
+        </h2>
+        <p className="mt-1 text-sm text-ink">Progress is saved on this application. You can leave and come back to the same step.</p>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {steps.map((step) => (
+            <StepJumpForm key={step.id} applicationId={applicationId} caseId={caseId} stepId={step.id}>
+              <button
+                className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-sm border px-3 text-xs ${
+                  step.id === current.id ? "border-brass bg-forest text-paper" : "border-line bg-cream text-ink"
+                }`}
+                data-review-tab={step.id}
+                type="submit"
+              >
+                {step.index}. {step.title}
+                {step.id !== "decision" && step.status === "SKIPPED" ? " · skipped" : ""}
+                {step.id !== "decision" && stepCountsAsPass(step.status) ? " · pass" : ""}
               </button>
-            </StepSaveForm>
-          ) : null}
-          <div className="mt-3">
-            <SkipStepForm applicationId={applicationId} caseId={caseId} stepId={current.id} />
-          </div>
-        </article>
-      )}
+            </StepJumpForm>
+          ))}
+        </div>
+        {steps.map((step) =>
+          step.id === "decision" ? (
+            <div key={step.id} data-review-step={step.id} data-step-index={step.index} hidden={step.id !== current.id}>
+              <DecisionStep
+                applicationId={applicationId}
+                caseId={caseId}
+                grade={grade}
+                paying={paying}
+                notLegit={notLegit}
+                confirmLabel={confirmLabel}
+                mode={mode}
+                skipped={skipped}
+                previous={previousStepId(step.id)}
+                applicationStatus={applicationStatus}
+                verdict={verdict}
+                steps={steps}
+                role={role}
+                location={location}
+                unverified={unverified}
+                applicationGrade={applicationGrade}
+              />
+            </div>
+          ) : (
+            <article key={step.id} className="mt-4" data-review-step={step.id} data-step-index={step.index} hidden={step.id !== current.id}>
+              <h3 className="font-serif text-xl font-normal">{step.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{step.about}</p>
+              <p className="mt-3 text-sm">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Status</span>
+                <span className="ml-2">{stepStatusLabel(step.status)}</span>
+                {!step.saved ? <span className="ml-2">Auto-suggested</span> : null}
+                {step.status === "SKIPPED" || step.status === "COULDNT_VERIFY" ? <span className="ml-2 text-[#7A2E2E]">Not a pass.</span> : null}
+              </p>
+              <ul className="mt-3 space-y-3">
+                {step.findings.length === 0 ? <li className="text-sm text-mut">No automated result for this step.</li> : null}
+                {step.findings.map((finding, index) => (
+                  <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
+                    <p className="mt-1 leading-relaxed text-ink">{reviewCopy(finding.text)}</p>
+                    {finding.url ? (
+                      <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">
+                        Open evidence
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {step.saved?.skipReason ? <p className="mt-3 text-sm text-ink">Skip reason: {step.saved.skipReason}</p> : null}
+              <StepSaveForm action={saveReviewStep} className="mt-4 space-y-3">
+                <input type="hidden" name="applicationId" value={applicationId} />
+                <input type="hidden" name="caseId" value={caseId} />
+                <input type="hidden" name="stepId" value={step.id} />
+                <input type="hidden" name="intent" value="save" />
+                <label className="block">
+                  <span className={labelCls}>Your mark</span>
+                  <select name="status" className={field} defaultValue={step.saved ? (step.status === "SKIPPED" ? "COULDNT_VERIFY" : step.status) : step.status}>
+                    <option value="PASS">Pass</option>
+                    <option value="CONCERN">Concern</option>
+                    <option value="FAIL">Fail</option>
+                    <option value="COULDNT_VERIFY">{"Couldn't verify"}</option>
+                    <option value="NOT_CHECKED">Not checked</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Evidence link</span>
+                  <input name="evidenceUrl" className={field} defaultValue={publicEvidenceHref(shownRegistryCheck({ finding: step.saved?.note || step.prefill?.note || "", url: step.saved?.evidenceUrl || step.prefill?.evidenceUrl || "", location }).url)} placeholder="https://" />
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Note</span>
+                  <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(shownRegistryCheck({ finding: step.saved?.note || step.prefill?.note || "", url: "", location }).finding)} placeholder="What was found, and what was not" />
+                </label>
+                <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
+                  Save & next
+                </button>
+              </StepSaveForm>
+              {step.index > 1 ? (
+                <StepJumpForm applicationId={applicationId} caseId={caseId} stepId={previousStepId(step.id)} className="mt-2">
+                  <button className={`${btnOutline} min-h-11 w-full sm:w-auto`} type="submit">
+                    Back
+                  </button>
+                </StepJumpForm>
+              ) : null}
+              <div className="mt-3">
+                <SkipStepForm applicationId={applicationId} caseId={caseId} stepId={step.id} />
+              </div>
+            </article>
+          ),
+        )}
+      </ReviewStepFrame>
     </section>
   );
 }
@@ -285,15 +284,11 @@ function DecisionStep({
           {canRevoke ? <RevokeApprovalForm applicationId={applicationId} caseId={caseId} /> : null}
         </>
       ) : null}
-      <StepSaveForm action={saveReviewStep} className="mt-3">
-        <input type="hidden" name="applicationId" value={applicationId} />
-        <input type="hidden" name="caseId" value={caseId} />
-        <input type="hidden" name="stepId" value={previous} />
-        <input type="hidden" name="intent" value="jump" />
+      <StepJumpForm applicationId={applicationId} caseId={caseId} stepId={previous} className="mt-3">
         <button className={`${btnOutline} min-h-11`} type="submit">
           Back
         </button>
-      </StepSaveForm>
+      </StepJumpForm>
     </div>
   );
 }

@@ -41,11 +41,9 @@ ${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, fa
 ${JOIN_CTA}
 {apply_link}
 
-A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+A Private Floor administrator reviews every request to join. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
-Referral code, optional: {invite_code}
-
-${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
+Referral code, optional: {invite_code}${SIGN}`,
   },
   {
     key: "invite_received",
@@ -246,6 +244,18 @@ ${JOIN_CTA}
 A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
 Code: {invite_code}
+
+${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
+    `Hello {first_name},
+
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Referral code, optional: {invite_code}
 
 ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   ],
@@ -503,8 +513,10 @@ export function templateDef(key: string): TemplateDef | undefined {
 }
 
 export function firstName(fullName: string): string {
-  const token = fullName.trim().split(/\s+/)[0];
-  return token || "there";
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "there";
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join(" ");
 }
 
 /** Drops a label whose token rendered empty, such as "The decision is here:" with no link. */

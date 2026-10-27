@@ -4,6 +4,7 @@ import { ApplicationStatus } from "@/components/application-status";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
 import { INVITE_STATUS_COPY, requestReceivedMessage } from "@/lib/applicant-copy";
+import { givenNameFrom } from "@/lib/person-fields";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
@@ -14,7 +15,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
   const { token } = await params;
   const request = await prisma.inviteRequest.findUnique({
     where: { statusToken: token },
-    select: { name: true, status: true },
+    select: { name: true, givenName: true, status: true },
   });
   if (!request) {
     const application = await prisma.application.findUnique({
@@ -25,7 +26,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
     redirect(`${await appBaseUrl()}/request-status/${encodeURIComponent(token)}`);
   }
   const copy = INVITE_STATUS_COPY[request.status];
-  const shownBody = copy.body.includes("{first_name}") ? requestReceivedMessage(request.name) : copy.body;
+  const shownBody = copy.body.includes("{first_name}") ? requestReceivedMessage(givenNameFrom(request.givenName, request.name)) : copy.body;
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">

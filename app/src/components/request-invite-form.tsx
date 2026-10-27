@@ -51,6 +51,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
     }
     const response = await fetch("/api/request-to-join", {
       method: "POST",
+      keepalive: true,
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         firstName,

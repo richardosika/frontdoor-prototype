@@ -13,7 +13,7 @@ import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
 import { applyDecisionStatus, noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { issueInviteCodeForRequest } from "@/lib/invite-issue";
-import { OPEN_APPLICATION_STATUSES, verdictLabel } from "@/lib/application-status";
+import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import { annualDuesCents, mailDuesAmounts } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
@@ -22,7 +22,7 @@ import { notifyAdmins } from "@/lib/notify";
 import { deleteJoinRequest } from "@/lib/delete-join-request";
 import { reviewCopy } from "@/lib/review-copy";
 import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
-import { needsStrongApprovalWarning } from "@/lib/approval-warning";
+import { strongApprovalAudit } from "@/lib/approval-audit";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 import { rememberAdminNotice } from "@/lib/admin-notice";
@@ -97,29 +97,27 @@ export async function reviewApplication(formData: FormData) {
     });
     const gradeLetter = parseGradeSnapshot(latest?.gradeSnapshot)?.letter || latest?.gradeLetter || "";
     const recommendation = parseGradeSnapshot(latest?.gradeSnapshot)?.recommendation || latest?.recommendation || "";
-    const strong = needsStrongApprovalWarning({
+    const audit = strongApprovalAudit({
+      actorName: admin.name,
+      personName: application.name,
+      email: application.email,
       letter: gradeLetter,
       recommendation,
       verdict: latest?.verdict,
     });
-    if (strong && String(formData.get("confirmStrong") || "") !== "yes") {
+    if (audit && String(formData.get("confirmStrong") || "") !== "yes") {
       fail("Confirm the grade warning before approving.");
     }
     if (latest?.verdict === "NOT_LEGIT" && String(formData.get("confirmNotLegit") || "") !== "yes") {
       fail("Confirm the NOT LEGIT recommendation before approving.");
     }
-    if (strong) {
-      const flags = [
-        gradeLetter === "F" ? "Approved despite grade F." : "",
-        latest?.verdict === "NOT_LEGIT" ? "Approved despite recommendation NOT LEGIT." : "",
-        recommendation === "DECLINE" ? "Approved despite recommendation DECLINE." : "",
-      ].filter(Boolean);
-      auditNote = [auditNote, ...flags].filter(Boolean).join(" ");
+    if (audit) {
+      auditNote = [auditNote, audit.note].filter(Boolean).join(" ");
       await prisma.moderationEvent.create({
         data: {
           actorId: admin.id,
-          action: latest?.verdict === "NOT_LEGIT" ? "APPROVE_NOT_LEGIT" : "APPROVE_DESPITE_GRADE",
-          summary: `${admin.name} approved ${application.name} (${application.email}) despite grade ${gradeLetter || "ungraded"}, ${latest?.verdict ? verdictLabel(latest.verdict) : "no verdict"}, recommendation ${recommendation || "none"}.`,
+          action: audit.action,
+          summary: audit.summary,
         },
       });
     }
@@ -161,6 +159,7 @@ export async function reviewApplication(formData: FormData) {
       applicationId: application.id,
       vars: buildMailVars({
         name: application.name,
+        givenName: application.givenName,
         role: roleLabel(application.role),
         org: application.org,
         statusLink: `${base}${publicStatusPath(application.statusToken)}`,
@@ -193,6 +192,7 @@ export async function reviewApplication(formData: FormData) {
       applicationId: application.id,
       vars: buildMailVars({
         name: application.name,
+        givenName: application.givenName,
         role: roleLabel(application.role),
         org: application.org,
         statusLink: `${base}${publicStatusPath(application.statusToken)}`,
@@ -280,6 +280,7 @@ export async function reviewApplication(formData: FormData) {
       applicationId: application.id,
       vars: buildMailVars({
         name: application.name,
+        givenName: application.givenName,
         role: roleLabel(application.role),
         org: application.org,
         statusLink: `${base}${publicStatusPath(application.statusToken)}`,
@@ -299,6 +300,7 @@ export async function reviewApplication(formData: FormData) {
       applicationId: application.id,
       vars: buildMailVars({
         name: application.name,
+        givenName: application.givenName,
         role: roleLabel(application.role),
         org: application.org,
         statusLink: `${base}${publicStatusPath(application.statusToken)}`,
@@ -407,6 +409,7 @@ export async function revokeApproval(formData: FormData) {
     applicationId: application.id,
     vars: buildMailVars({
       name: application.name,
+      givenName: application.givenName,
       role: roleLabel(application.role),
       org: application.org,
       statusLink: `${base}${publicStatusPath(application.statusToken)}`,

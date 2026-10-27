@@ -65,6 +65,8 @@ describe("membership wording", () => {
     expect(info?.body).toContain(MEMBERSHIP_PHRASE);
     expect(info?.body).toContain(JOIN_CTA);
     expect(info?.body.toLowerCase()).not.toContain("invited");
+    expect(info?.body).toContain("reviews every request to join");
+    expect(info?.body).not.toMatch(/\$|dues|charged|fee/i);
     const thanks = templateDef("invite_received");
     expect(thanks?.subject).toBe("Thank you for your request to join");
     expect(thanks?.body).toContain(REQUEST_RECEIVED_TEMPLATE);

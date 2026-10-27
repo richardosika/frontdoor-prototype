@@ -14,14 +14,16 @@ export const APPLICATION_RECEIVED_TEMPLATE =
 /** A request to join has no application yet. */
 export const REQUEST_RECEIVED_TEMPLATE = `Thank you, {first_name}. We've got your request to join. ${MEMBERSHIP_PHRASE}. A member of the Private Floor team will personally review it, usually within a few days. We'll email you as soon as there's news.`;
 
-export function applicationReceivedMessage(fullName: string): string {
-  const first = fullName.trim().split(/\s+/)[0] || "there";
-  return APPLICATION_RECEIVED_TEMPLATE.replaceAll("{first_name}", first);
+function greeting(givenName: string): string {
+  return givenName.replace(/\s+/g, " ").trim() || "there";
 }
 
-export function requestReceivedMessage(fullName: string): string {
-  const first = fullName.trim().split(/\s+/)[0] || "there";
-  return REQUEST_RECEIVED_TEMPLATE.replaceAll("{first_name}", first);
+export function applicationReceivedMessage(givenName: string): string {
+  return APPLICATION_RECEIVED_TEMPLATE.replaceAll("{first_name}", greeting(givenName));
+}
+
+export function requestReceivedMessage(givenName: string): string {
+  return REQUEST_RECEIVED_TEMPLATE.replaceAll("{first_name}", greeting(givenName));
 }
 
 export const INVITE_STATUS_COPY = {

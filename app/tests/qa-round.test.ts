@@ -14,7 +14,9 @@ import { publicAbsoluteUrl, withRequestSearch } from "@/lib/public-origin";
 import { publicStatusPath } from "@/lib/public-status";
 import { verificationCaseIsDeletableOrphan } from "@/lib/orphan-case";
 import { outboxTiedToEmails } from "@/lib/remove-member";
-import { reviewCheckKey, reviewCopy, reviewNotice, reviewTemplateKey } from "@/lib/review-copy";
+import { crmEventDisplay, reviewCheckKey, reviewCopy, reviewNotice, reviewTemplateKey } from "@/lib/review-copy";
+import { strongApprovalAudit } from "@/lib/approval-audit";
+import { givenNameFrom } from "@/lib/person-fields";
 import { rubricSections } from "@/lib/verify/grade";
 import { payPageState } from "@/lib/dues";
 import { guidedGradeApplicant } from "@/lib/guided-prefill-db";
@@ -324,8 +326,8 @@ describe("QA fixes that stay outside grading", () => {
     expect(letter).toContain("/request-status/abc");
     expect(letter).not.toContain("Invite code");
     expect(letter).not.toContain("/invite-status");
-    expect(reviewTemplateKey("invite_received")).toBe("request_received");
-    expect(reviewTemplateKey("welcome")).toBe("welcome");
+    expect(reviewTemplateKey("invite_received")).toBe("Request received email");
+    expect(reviewTemplateKey("welcome")).toBe("Welcome email");
 
     expect(statusMembershipLine({ status: "DECLINED", monthlyCents: 12_900, waived: false })).toBeNull();
     expect(statusMembershipLine({ status: "REJECTED", monthlyCents: 12_900, waived: false })).toBeNull();
@@ -360,7 +362,10 @@ describe("QA fixes that stay outside grading", () => {
     expect(verification).toContain("rerunGradeFields");
     expect(verification).toContain("verificationRun.create");
     expect(verification).toContain("rerunApplicantName");
-    const rerun = verification.slice(verification.indexOf("export async function rerunGuidedChecks"));
+    const rerun = verification.slice(
+      verification.indexOf("export async function rerunGuidedChecks"),
+      verification.indexOf("export async function decideInviteReview"),
+    );
     expect(rerun).not.toContain("moderationEvent.create");
     expect(rerun).not.toContain("verificationRun.updateMany");
     expect(readFileSync(path.join(ROOT, "app/(app)/admin/audit/page.tsx"), "utf8")).toContain("auditRunScore");
@@ -393,5 +398,30 @@ describe("QA fixes that stay outside grading", () => {
     const inviteStatus = readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8");
     expect(inviteStatus).toContain("/request-status/");
     expect(inviteStatus).toContain("publicAbsoluteUrl");
+  });
+
+  it("keeps the full first name, the request email label, and the despite-grade audit", () => {
+    expect(givenNameFrom("QA-TEST Mary Ann")).toBe("QA-TEST Mary Ann");
+    expect(givenNameFrom("", "QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
+    expect(givenNameFrom("", "Alex Rivera")).toBe("Alex");
+    expect(crmEventDisplay("email", "invite_received · Thank you for your request to join")).toEqual({
+      label: "Request received email",
+      detail: "Thank you for your request to join",
+    });
+    const audit = strongApprovalAudit({
+      actorName: "Richard Osika",
+      personName: "QA-TEST Mary Ann Smith",
+      email: "qa@example.com",
+      letter: "F",
+      recommendation: "DECLINE",
+    });
+    expect(audit?.action).toBe("APPROVE_DESPITE_GRADE");
+    expect(audit?.summary).toContain("despite grade F");
+    expect(audit?.note).toContain("Approved despite grade F.");
+    expect(readFileSync(path.join(ROOT, "lib/delete-join-request.ts"), "utf8")).toContain("inviteCode.delete");
+    expect(readFileSync(path.join(ROOT, "actions/verification.ts"), "utf8")).toContain("strongApprovalAudit");
+    expect(readFileSync(path.join(ROOT, "lib/notices.ts"), "utf8")).toContain("runOnServer");
+    expect(readFileSync(path.join(ROOT, "lib/join-request-post.ts"), "utf8")).toContain("runOnServer");
+    expect(readFileSync(path.join(ROOT, "components/guided-review.tsx"), "utf8")).toContain("data-review-step");
   });
 });
