@@ -19,7 +19,7 @@ import { companyPhraseTokens, isDistinctiveCompanyToken, isShortBrandToken, ment
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { alignNewsRows, newsChecks } from "@/lib/verify/news";
-import { lookupEdgar } from "@/lib/verify/edgar";
+import { edgarIsExactCompany, incorporationStateFromFinding, lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
@@ -819,6 +819,37 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+/**
+ * An exact EDGAR filer incorporated in another state. The address-state miss does not count against the company.
+ * A free registry in the incorporation state replaces the miss when that lookup passes.
+ */
+export function noteIncorporationRegistry(
+  registry: CheckOutput,
+  edgarFinding: string,
+  addressState: string,
+  incorporationPass?: CheckOutput | null,
+): CheckOutput {
+  const incorporated = incorporationStateFromFinding(edgarFinding);
+  if (!incorporated || !addressState || incorporated === addressState || !edgarIsExactCompany(edgarFinding)) return registry;
+  if (registry.status === "PASS") return registry;
+  if (incorporationPass?.status === "PASS") {
+    return {
+      ...registry,
+      status: "PASS",
+      finding: incorporationPass.finding,
+      source: incorporationPass.source || registry.source,
+      url: incorporationPass.url || registry.url,
+      corroborates: false,
+      reviewFlag: undefined,
+    };
+  }
+  const url = stateRegistrySearchUrl(incorporated) || registry.url;
+  const finding = `${registry.finding} This miss does not count against the company. EDGAR lists an exact match incorporated in ${incorporated}. Open the ${incorporated} secretary of state search.`
+    .replace(/\s+/g, " ")
+    .trim();
+  return { ...registry, finding, url };
+}
+
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
   const state = statedUsState(facts.location) || "";
   const portal = state ? registryPortal(state) : undefined;
@@ -1002,6 +1033,33 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       companyOnly: edgar.companyOnly,
     }),
   );
+  const incorporated = incorporationStateFromFinding(edgar.finding);
+  const registryIndex = out.findIndex((row) => row.key === "business-registry");
+  if (registryIndex >= 0 && incorporated && registryState && incorporated !== registryState && edgarIsExactCompany(edgar.finding)) {
+    const homePortal = registryPortal(incorporated);
+    let incorporationPass: CheckOutput | null = null;
+    if (homePortal) {
+      const homeUrl = homePortal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(homePortal, searchFacts.org);
+      const homeHttp = await settleWithin(fetchText(homeUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      });
+      const home = homePortal.state === "NY" ? assessNyRegistry(searchFacts.org, homeHttp) : assessStateRegistry(homePortal, searchFacts.org, homeHttp);
+      if (home.status === "PASS") {
+        incorporationPass = check({
+          key: "business-registry",
+          status: "PASS",
+          weight: 8,
+          finding: home.finding,
+          source: homePortal.source,
+          url: home.url,
+          corroborates: false,
+        });
+      }
+    }
+    out[registryIndex] = noteIncorporationRegistry(out[registryIndex], edgar.finding, registryState, incorporationPass);
+  }
   const courtQuery = courtSearchQuery(ctx.facts.name);
   const courtUrl = courtQuery
     ? `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(courtQuery)}&type=o`
@@ -1137,7 +1195,7 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
       : "Could not check. A geocoder returned no match and the other did not respond. This is inconclusive. It is not a pass and not a failure.";
   return check({
     ...base,
-    status: "UNAVAILABLE",
+    status: "INCONCLUSIVE",
     url,
     corroborates: false,
     finding,

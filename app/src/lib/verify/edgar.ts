@@ -109,6 +109,7 @@ export function padCik(cik: string): string {
 export type EdgarFilerIdentity = {
   currentName: string;
   formerNames: string[];
+  stateOfIncorporation?: string;
 };
 
 export function submissionsUrl(cik: string): string {
@@ -118,7 +119,7 @@ export function submissionsUrl(cik: string): string {
 /** Current legal name and former names from the SEC submissions JSON. */
 export function parseSubmissionsIdentity(text: string): EdgarFilerIdentity | null {
   try {
-    const body = JSON.parse(text) as { name?: unknown; formerNames?: unknown };
+    const body = JSON.parse(text) as { name?: unknown; formerNames?: unknown; stateOfIncorporation?: unknown };
     const currentName = String(body.name || "").trim();
     if (!currentName) return null;
     const formerNames = Array.isArray(body.formerNames)
@@ -126,7 +127,8 @@ export function parseSubmissionsIdentity(text: string): EdgarFilerIdentity | nul
           .map((row) => (row && typeof row === "object" ? String((row as { name?: unknown }).name || "").trim() : ""))
           .filter(Boolean)
       : [];
-    return { currentName, formerNames };
+    const state = String(body.stateOfIncorporation || "").trim().toUpperCase();
+    return { currentName, formerNames, stateOfIncorporation: /^[A-Z]{2}$/.test(state) ? state : "" };
   } catch {
     return null;
   }
@@ -266,6 +268,22 @@ function personNamedWithFirm(names: string[] | string[][], person: string, firm:
     if (group.some((name) => mentionsPerson(name, person))) return true;
   }
   return false;
+}
+
+function withIncorporation(finding: string, identity?: EdgarFilerIdentity | null): string {
+  const state = (identity?.stateOfIncorporation || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(state) || /state of incorporation/i.test(finding)) return finding;
+  return `${finding} State of incorporation: ${state}.`;
+}
+
+/** An exact current-name filer. A former name or a parent match is not exact. */
+export function edgarIsExactCompany(finding: string): boolean {
+  if (/former name|parent match|not an exact match|no company on the SEC list/i.test(finding)) return false;
+  return /exact current-name match|name-only company match|confirm it is the same firm/i.test(finding);
+}
+
+export function incorporationStateFromFinding(finding: string): string {
+  return finding.match(/state of incorporation:\s*([A-Z]{2})\b/i)?.[1]?.toUpperCase() || "";
 }
 
 function listedParent(finding: string): { title: string; ticker: string } {
@@ -522,7 +540,10 @@ export function assessEdgarMatch(input: {
         corroborates: false,
         companyOnly: true,
         url: edgarCompanyUrl(match.cik),
-        finding: `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match. It does not tie the person to the firm.`,
+        finding: withIncorporation(
+          `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match. It does not tie the person to the firm.`,
+          input.identity,
+        ),
       };
     }
     return {
@@ -530,14 +551,17 @@ export function assessEdgarMatch(input: {
       corroborates: false,
       companyOnly: true,
       url: edgarCompanyUrl(match.cik),
-      finding: `EDGAR lists ${titled}, CIK ${match.cik}.${tickerNote} A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+      finding: withIncorporation(
+        `EDGAR lists ${titled}, CIK ${match.cik}.${tickerNote} A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+        input.identity,
+      ),
     };
   }
   return {
     status: "PASS",
     corroborates: true,
     url: edgarCompanyUrl(match.cik),
-    finding: `EDGAR lists ${titled}, CIK ${match.cik}. Confirm it is the same firm.${personSentence}`,
+    finding: withIncorporation(`EDGAR lists ${titled}, CIK ${match.cik}. Confirm it is the same firm.${personSentence}`, input.identity),
   };
 }
 

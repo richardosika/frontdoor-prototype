@@ -154,29 +154,56 @@ function rejectedStreetNumber(parsed: ParsedAddress): boolean {
 function splitStateZip(tail: string): { state: string; zip: string } | null {
   const parts = tail.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
-  for (let take = parts.length; take >= 1; take -= 1) {
-    const state = stateCodeFromToken(parts.slice(0, take).join(" "));
-    if (!state) continue;
-    return { state, zip: parts.slice(take).join(" ") };
+  const zip = ZIP5.test(parts[parts.length - 1]) ? parts.pop() || "" : "";
+  if (!parts.length) return null;
+  const last = parts[parts.length - 1];
+  if (/^[A-Za-z]{2}$/.test(last)) {
+    const code = stateCodeFromToken(last);
+    return { state: code || last.toUpperCase(), zip };
   }
-  if (/^[A-Za-z]{2}$/.test(parts[0]) && parts.length <= 2) {
-    return { state: parts[0].toUpperCase(), zip: parts.slice(1).join(" ") };
-  }
+  const spelled = stateCodeFromToken(parts.join(" "));
+  if (spelled) return { state: spelled, zip };
   return null;
+}
+
+const UNIT_LINE = /^(?:suite|ste\.?|floor|fl\.?|unit|apt\.?|apartment|#)\b/i;
+
+/** "New York NY 10017" keeps New York as the city. A bare "NY 10017" has no city. */
+function cityWordsBeforeState(segment: string, state: string): string {
+  const withoutZip = segment.replace(/\b\d{5}(?:-\d{4})?\b/, " ").replace(/\s+/g, " ").trim();
+  const words = withoutZip.split(" ").filter(Boolean);
+  if (words.length && words[words.length - 1].toUpperCase() === state) words.pop();
+  const city = words.join(" ");
+  if (!city) return "";
+  if (city.toLowerCase() === state.toLowerCase()) return "";
+  return city;
 }
 
 export function parseApplicationLocation(location: string): ParsedAddress | null {
   const text = location.trim().replace(/\s+/g, " ");
   if (!text) return null;
-  const comma = text.lastIndexOf(",");
-  if (comma >= 0) {
-    const parsed = splitStateZip(text.slice(comma + 1));
+  const parts = text.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const parsed = splitStateZip(parts[parts.length - 1]);
     if (parsed) {
-      const before = text.slice(0, comma).trim();
-      const split = before.lastIndexOf(",");
-      const street = split >= 0 ? before.slice(0, split).trim() : "";
-      const city = split >= 0 ? before.slice(split + 1).trim() : before;
-      return { street, city, state: parsed.state, zip: parsed.zip };
+      const head = parts.slice(0, -1).filter((part) => !UNIT_LINE.test(part));
+      const embedded = cityWordsBeforeState(parts[parts.length - 1], parsed.state);
+      if (head.length >= 2) {
+        return {
+          street: head.slice(0, -1).join(", "),
+          city: head[head.length - 1],
+          state: parsed.state,
+          zip: parsed.zip,
+        };
+      }
+      if (head.length === 1) {
+        const only = head[0];
+        if (embedded && embedded.toLowerCase() !== only.toLowerCase()) {
+          return { street: only, city: embedded, state: parsed.state, zip: parsed.zip };
+        }
+        return { street: "", city: only, state: parsed.state, zip: parsed.zip };
+      }
+      return { street: "", city: embedded, state: parsed.state, zip: parsed.zip };
     }
   }
   const bare = splitStateZip(text);

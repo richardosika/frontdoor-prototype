@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSaysAddressInvalid, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
+import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSaysAddressInvalid, parseApplicationLocation, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, personNameTokensLookMadeUp, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, noteIncorporationRegistry, personNameTokensLookMadeUp, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
@@ -15,6 +15,7 @@ import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand,
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
+import { approveConfirmMessage, unverifiedPersonItems } from "@/lib/review-steps";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -1709,7 +1710,7 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     });
     expect(seen.some((url) => url.includes("geocoding.geo.census.gov"))).toBe(true);
     expect(seen.some((url) => url.includes("nominatim.openstreetmap.org"))).toBe(true);
-    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.status).toBe("INCONCLUSIVE");
     expect(missed?.reviewFlag).not.toBe(true);
     expect(missed?.finding.toLowerCase()).toContain("could not check");
     expect(missed?.finding.toLowerCase()).toContain("inconclusive");
@@ -1727,7 +1728,7 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
         throw new Error("timeout");
       },
     });
-    expect(down?.status).toBe("UNAVAILABLE");
+    expect(down?.status).toBe("INCONCLUSIVE");
     expect(down?.finding.toLowerCase()).toContain("could not check");
     expect(down?.finding.toLowerCase()).toContain("inconclusive");
     expect(down?.finding.toLowerCase()).not.toContain("did not check out");
@@ -4483,7 +4484,7 @@ describe("batch 12 former names, registry links, geocoder misses, and missing co
         return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
       },
     });
-    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.status).toBe("INCONCLUSIVE");
     expect(missed?.finding.toLowerCase()).toContain("could not check");
     expect(missed?.finding.toLowerCase()).toContain("inconclusive");
     const missedGrade = gradeChecks([missed!], facts({ location: "1 New York Plaza, New York, NY 10004" }));
@@ -5137,6 +5138,159 @@ describe("batch 12 surnames, aliases, and company pages", () => {
     const linkedin = checks.find((check) => check.key === "linkedin-fetch");
     expect(linkedin?.status).not.toBe("PASS");
     expect(linkedin?.companyOnly).not.toBe(true);
+  });
+});
+
+describe("Willy Walker live inputs", () => {
+  const walkerLocation = "One Vanderbilt Ave, Suite 3300, New York NY 10017";
+  const walker = facts({
+    name: "Willy Walker",
+    applicantName: "Willy Walker",
+    org: "Walker & Dunlop",
+    role: "MORTGAGE_BROKER",
+    location: walkerLocation,
+    phone: "212-555-0100",
+    website: "https://www.walkerdunlop.com",
+  });
+
+  it("treats a Census and Nominatim miss for One Vanderbilt as inconclusive, not a failure", async () => {
+    const parsed = parseApplicationLocation(walkerLocation);
+    expect(parsed?.state).toBe("NY");
+    expect(parsed?.zip).toBe("10017");
+    expect(parsed?.city.toLowerCase()).toBe("new york");
+    expect(parsed?.street.toLowerCase()).toContain("vanderbilt");
+    expect(parsed?.street.toLowerCase()).not.toContain("suite");
+    expect(parsed?.city.toLowerCase()).not.toContain("suite");
+
+    const address = await resolveAddressCheck({
+      facts: walker,
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+        expect(decoded.toLowerCase()).toContain("new york");
+        expect(decoded.toLowerCase()).not.toContain("suite 3300");
+        if (url.includes("nominatim.openstreetmap.org")) return { ok: false, status: 0, text: "" };
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(address?.status).toBe("INCONCLUSIVE");
+    expect(address?.finding.toLowerCase()).toContain("could not check");
+    expect(address?.finding.toLowerCase()).not.toContain("did not check out");
+    const graded = gradeChecks(
+      [
+        address!,
+        row({
+          key: "news",
+          status: "PASS",
+          corroborates: true,
+          finding: "A headline names the person and the company. Willy Walker, Walker & Dunlop. Name: yes. Company: yes. Confidence: high.",
+        }),
+        row({
+          key: "web-footprint",
+          status: "INCONCLUSIVE",
+          corroborates: false,
+          finding: "No result found that names this person and this company. Name: no. Company: no. City: no. Confidence: none.",
+        }),
+      ],
+      walker,
+    );
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(graded.attention.some((item) => item.title === "Address" && item.severity === "Medium")).toBe(false);
+    expect(graded.summary.company).toContain("The public web search did not return a page naming both; a news story did.");
+    expect(graded.summary.company).not.toContain("No public web result confirmed the person and the company together.");
+    expect(graded.categories.find((category) => category.id === "footprint")?.reason).toContain(
+      "The public web search did not return a page naming both; a news story did",
+    );
+    const dialog = approveConfirmMessage({
+      dues: "Approve this person?",
+      unverified: unverifiedPersonItems([
+        { checkKey: "address", status: "INCONCLUSIVE" },
+        { checkKey: "news", status: "PASS", corroborates: true },
+      ]),
+    });
+    expect(dialog).toContain("Unverified: Address");
+    expect(dialog).not.toContain("Failed: Address");
+  });
+
+  it("points Walker & Dunlop at the Maryland registry when EDGAR says it is incorporated there", () => {
+    const identity = parseSubmissionsIdentity(JSON.stringify({ name: "WALKER & DUNLOP, INC.", stateOfIncorporation: "MD", formerNames: [] }));
+    expect(identity?.stateOfIncorporation).toBe("MD");
+    const edgar = assessEdgarMatch({
+      org: "Walker & Dunlop",
+      person: "Willy Walker",
+      tickersOk: true,
+      companies: [{ title: "WALKER & DUNLOP, INC.", ticker: "WD", cik: "1497770" }],
+      filingNames: [],
+      insiderNames: [["Walker William M (CIK 0001503841)"]],
+      identity,
+    });
+    expect(edgar.finding).toContain("1497770");
+    expect(edgar.finding).toContain("State of incorporation: MD");
+    const nyMiss = row({
+      key: "business-registry",
+      status: "INCONCLUSIVE",
+      finding: "NY Active Corporations responded. No active entity uses this exact name. A similar name is not a match, and this is not a pass.",
+      url: "https://data.ny.gov/d/n9v6-gdp6",
+      source: "NY Active Corporations",
+    });
+    const noted = noteIncorporationRegistry(nyMiss, edgar.finding, "NY");
+    expect(noted.finding.toLowerCase()).toContain("does not count against");
+    expect(noted.finding).toContain("MD");
+    expect(noted.url).toContain("maryland.gov");
+    const graded = gradeChecks([noted, row({ key: "edgar", status: edgar.status, corroborates: edgar.corroborates, companyOnly: edgar.companyOnly, finding: edgar.finding })], walker);
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("does not count against the company");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).not.toContain("did not confirm this exact company name");
+  });
+
+  it("reads a request-only file as incomplete and does not raise the fake", () => {
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are readable." }),
+    ];
+    const request = gradeChecks(
+      local,
+      facts({
+        name: "Ada Request",
+        applicantName: "Ada Request",
+        org: "Request Realty",
+        website: "",
+        phone: "",
+        applicationSubmitted: false,
+        statement: "I work in commercial real estate and would like to meet other owners.",
+      }),
+    );
+    const fake = gradeChecks(
+      [
+        ...local,
+        row({ key: "rdap", status: "FAIL", finding: "The domain is not registered." }),
+        row({ key: "website", status: "FAIL", finding: "The domain does not resolve." }),
+      ],
+      facts({
+        name: "Zuplantor Vexmire",
+        applicantName: "Zuplantor Vexmire",
+        org: "Zuplantor Vexmire Builders LLC",
+        website: "https://zuplantorvexmire.example",
+        phone: "212-555-0199",
+        applicationSubmitted: true,
+      }),
+    );
+    expect(request.summary.reasoning).toContain("Incomplete application. Request a website, phone, or business card. Send to review: incomplete.");
+    expect(request.summary.nextStep).toContain("Send to review: incomplete.");
+    expect(request.summary.applicant).toContain("fewer checks were available");
+    expect(fake.summary.reasoning).not.toContain("Incomplete application");
+    expect(request.score).toBe(36);
+    expect(fake.score).toBe(28);
+    expect(request.score - fake.score).toBeGreaterThanOrEqual(8);
+    expect(fake.letter).toBe("F");
+    expect(request.letter).toBe("F");
   });
 });
 

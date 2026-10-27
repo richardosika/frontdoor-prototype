@@ -41,7 +41,11 @@ export type StepEvidence = {
  */
 export function unverifiedPersonItems(evidence: { checkKey: string; status: string; corroborates?: boolean }[]): string[] {
   const personTied = evidence.some((row) => row.status === "PASS" && row.corroborates === true);
-  return personTied ? [] : ["person-to-company link"];
+  const items = personTied ? [] : ["person-to-company link"];
+  if (evidence.some((row) => row.checkKey === "address" && (row.status === "INCONCLUSIVE" || row.status === "UNAVAILABLE"))) {
+    items.push("Address");
+  }
+  return items;
 }
 
 export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[] }): string {

@@ -648,7 +648,9 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   const invite = facts.inviteNote?.trim() ? `They came in through a referral or request: ${facts.inviteNote.trim()}.` : "No referral was supplied.";
   const requestOnly =
     facts.applicationSubmitted === false
-      ? "Referral or request only — no application submitted; grade based on request fields only."
+      ? `Referral or request only — no application submitted; grade based on request fields only.${
+          !facts.website?.trim() && !facts.phone?.trim() ? " This file has no website and no phone, so fewer checks were available." : ""
+        }`
       : "";
   if (subject === "COMPANY") {
     return `${requestOnly} This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`.trim();
@@ -719,8 +721,11 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   } else {
     evidence.push("No EDGAR filing was confirmed.");
   }
+  const namedElsewhere = otherSourceNamedBoth(checks, facts);
   if (passedKey(checks, "web-footprint", "fixture-web")) {
     evidence.push(`A public web result names the person and the company (${sourceOf(checks, "web-footprint", "fixture-web")}).`);
+  } else if (namedElsewhere) {
+    evidence.push(`The public web search did not return a page naming both; ${namedElsewhere} did.`);
   } else {
     evidence.push("No public web result confirmed the person and the company together.");
   }
@@ -828,12 +833,21 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
   return award(row?.status === "PASS", possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
 }
 
-function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode): Line {
+function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode, aside = ""): Line {
   if (!earned && row?.status === "UNAVAILABLE") {
     const blocked = /challenge page|search blocked/i.test(row.finding || "");
     return unavailableLine(possible, blocked ? "Could not check, search blocked" : "Web search is not checkable for free", mode);
   }
+  if (!earned && aside) return portionLine(0, possible, aside);
   return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
+}
+
+/** News or an EDGAR filing already names the person and the company. The web-search sentence should say so. */
+function otherSourceNamedBoth(checks: CheckOutput[], facts: GradeFacts): string {
+  const news = checks.some((check) => (check.key === "news" || check.key === "screen-news") && namesPersonAndCompany(check, facts));
+  const edgar = checks.some((check) => (check.key === "edgar" || check.key === "fixture-edgar") && namesPersonAndCompany(check, facts));
+  const parts = [news ? "a news story" : "", edgar ? "an EDGAR filing" : ""].filter(Boolean);
+  return parts.join(" and ");
 }
 
 /**
@@ -896,6 +910,9 @@ function registryAward(row: CheckOutput | undefined, possible: number, mode: Gra
     return award(false, possible, "A free state registry has this exact company name", "The state registry is not searched for free");
   }
   if (row.status === "UNAVAILABLE") return unavailableLine(possible, "The state registry is not checkable for free", mode);
+  if (/does not count against/i.test(row.finding)) {
+    return portionLine(0, possible, "A miss in the address state does not count against the company. EDGAR has an exact match incorporated in another state");
+  }
   return award(
     row.status === "PASS",
     possible,
@@ -978,7 +995,13 @@ export function gradeChecks(
   const newsRow = findCheck(checks, "news");
   const newsFootprint = passed(newsRow) || (newsRow?.status === "INCONCLUSIVE" && neutralScreenNewsPass(checks));
   const footprint = sumLines([
-    footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode),
+    footprintAward(
+      footprintRow,
+      webPass,
+      weights.footprint["web-footprint"],
+      weightsMode,
+      !webPass ? (otherSourceNamedBoth(checks, facts) ? `The public web search did not return a page naming both; ${otherSourceNamedBoth(checks, facts)} did` : "") : "",
+    ),
     award(newsFootprint, weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
     award(
       passed(findCheck(checks, "social-links")) && independent,
@@ -1257,7 +1280,7 @@ export function gradeChecks(
     recommendation = "APPROVE WITH CONDITIONS";
   } else recommendation = "NEEDS MORE INFO";
 
-  const reasoning = capitalizeSentences(reasoningFor({
+  let reasoning = capitalizeSentences(reasoningFor({
     recommendation,
     letter,
     score,
@@ -1268,7 +1291,17 @@ export function gradeChecks(
     review: reviewRed.length > 0,
     companyConfirmed: companyConfirmed && !bothNamed,
   }));
-  const nextStep = capitalizeSentences(nextStepFor({ recommendation, checks, facts, paying }));
+  let nextStep = capitalizeSentences(nextStepFor({ recommendation, checks, facts, paying }));
+  const incompleteRequest =
+    facts.applicationSubmitted === false &&
+    !facts.website?.trim() &&
+    !facts.phone?.trim() &&
+    !companyCouldNotBeFound(checks);
+  if (incompleteRequest) {
+    const line = "Incomplete application. Request a website, phone, or business card. Send to review: incomplete.";
+    reasoning = capitalizeSentences(`${line} ${reasoning}`);
+    nextStep = line;
+  }
   const summary: ExecutiveSections = {
     applicant: capitalizeSentences(applicantSection(facts, options?.subject || "APPLICATION")),
     company: companySection(checks, facts),
