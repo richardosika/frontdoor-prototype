@@ -982,7 +982,14 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       if (job.platform === "YouTube" && !job.fromSite && url === job.url && youtubeTitles(response.text).length === 0 && youtubeSnippets(response.text).length === 0) {
         return blockedAttempt(job.key, job.platform, job.searched, job.url, "YouTube did not include readable video titles.");
       }
-      const score = scorePublicText(text, queryFacts);
+      // Each title is its own page. A person in one video and the company in another is not a match.
+      const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+      const perLine = needsNameAndPlace && lines.length > 1
+        ? lines.map((line) => ({ line, score: scorePublicText(line, queryFacts) })).sort((left, right) => rank(right.score) - rank(left.score))
+        : [];
+      const together = perLine.find((item) => socialMatch(item.score));
+      const score = together?.score || (perLine[0]?.score ?? scorePublicText(text, queryFacts));
+      if (together) text = together.line;
       const counts = needsNameAndPlace ? socialMatch(score) : score.confidence !== "none";
       if (!counts) {
         return {

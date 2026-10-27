@@ -14,7 +14,7 @@ export const NEWS_PERSON_HARD =
  * REO, a dividend cut or reset, a loss, and a downgrade are ordinary results and are not in this list.
  */
 export const NEWS_COMPANY_CIVIL =
-  /\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|foreclosures?|liens?)\b/i;
+  /\b(lawsuits?|sued|bankruptc(?:y|ies)|foreclosures?|liens?)\b|\binvestigations?\b(?!\s+(?:practice|group|team|department|unit)\b)/i;
 
 /**
  * A civil caption such as "Zumba v. Sciame Construction".

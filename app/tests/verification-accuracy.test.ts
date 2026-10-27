@@ -2809,6 +2809,37 @@ describe("thirteenth follow-up", () => {
     expect(silence[0].finding.toLowerCase()).not.toContain("without the company");
   });
 
+  it("does not treat a law-firm investigations practice as a lawsuit", () => {
+    const title = "Jordan Estes Joins Kramer Levin's White Collar and Government Investigations Practice as Partner";
+    const news = classifyNews(
+      facts({ name: "Jay Neveloff", applicantName: "Jay Neveloff", org: "Kramer Levin Naftalis & Frankel LLP", location: "New York, NY" }),
+      [{
+        title,
+        snippet: title,
+        url: "https://news.example/kramer-join",
+        source: "Example",
+        publishedAt: "2023-05-02T15:00:00.000Z",
+        provider: "Google News",
+      }],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(news[0].finding).not.toMatch(/litigation/i);
+    expect(news.some((item) => /Company litigation/i.test(item.finding))).toBe(false);
+  });
+
+  it("does not join a person in one YouTube title with the company in another", async () => {
+    const html = `<html><script>{"title":{"runs":[{"text":"Larry Silverstein and CBRE"}]}}{"title":{"runs":[{"text":"Cramer's lightning round: I like Toll Brothers"}]}}</script></html>`;
+    const checks = await runPublicScreen(
+      facts({ name: "Larry Silverstein", applicantName: "Larry Silverstein", org: "Toll Brothers", location: "New York, NY", website: "" }),
+      async (url) => (url.includes("youtube.com") ? { ok: true, status: 200, text: html } : { ok: false, status: 404, text: "" }),
+    );
+    const youtube = checks.find((check) => check.key === "screen-youtube");
+    expect(youtube?.status).not.toBe("PASS");
+    expect(youtube?.corroborates).not.toBe(true);
+    expect(youtube?.finding).not.toContain(" — ");
+  });
+
   it("abandons one slow check instead of holding the case", async () => {
     const result = await settleWithin(new Promise<string>(() => undefined), 30, "timed out");
     expect(result).toBe("timed out");
