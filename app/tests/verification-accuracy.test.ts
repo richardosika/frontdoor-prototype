@@ -894,6 +894,76 @@ describe("team pages and the NY company list", () => {
     expect(fetched.some((url) => url.endsWith("/assets-sitemap.xml"))).toBe(false);
   });
 
+  it("reads a surname bio from a sitemap index whose children are not named people pages", async () => {
+    const fetched: string[] = [];
+    const urls = await sitemapLastNameUrls(async (url) => {
+      fetched.push(url);
+      if (url.endsWith("/sitemap.xml")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<sitemapindex><sitemap><loc>https://www.avisonyoung.us/sitemap.xml?p_l_id=1&amp;layoutUuid=abc</loc></sitemap><sitemap><loc>https://www.avisonyoung.us/sitemap.xml?p_l_id=2&amp;layoutUuid=def</loc></sitemap></sitemapindex>`,
+        };
+      }
+      if (url.includes("p_l_id=1")) return { ok: true, status: 200, text: "<urlset><url><loc>https://www.avisonyoung.us/about</loc></url></urlset>" };
+      if (url.includes("p_l_id=2")) {
+        return { ok: true, status: 200, text: "<urlset><url><loc>https://www.avisonyoung.us/w/james-nelson</loc></url></urlset>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    }, "https://www.avisonyoung.us", "Nelson");
+    expect(urls).toEqual(["https://www.avisonyoung.us/w/james-nelson"]);
+    expect(fetched.some((url) => url.includes("p_l_id=2"))).toBe(true);
+  });
+
+  it("names James Nelson from the Avison Young bio and does not call a blocked Skanska page Name: no", async () => {
+    const avison = await runPublicScreen(
+      facts({
+        name: "James Nelson",
+        applicantName: "James Nelson",
+        org: "Avison Young",
+        website: "https://www.avisonyoung.us",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url === "https://www.avisonyoung.us/sitemap.xml") {
+          return {
+            ok: true,
+            status: 200,
+            text: `<sitemapindex><sitemap><loc>https://www.avisonyoung.us/sitemap.xml?p_l_id=9&amp;layoutUuid=bio</loc></sitemap></sitemapindex>`,
+          };
+        }
+        if (url.includes("p_l_id=9")) {
+          return { ok: true, status: 200, text: "<urlset><url><loc>https://www.avisonyoung.us/w/james-nelson</loc></url></urlset>" };
+        }
+        if (url.includes("/w/james-nelson")) {
+          return { ok: true, status: 200, text: "<html><body><p>James Nelson is a Principal at Avison Young in New York.</p></body></html>" };
+        }
+        if (url.includes("avisonyoung.us")) return { ok: true, status: 200, text: "<html><body><p>Avison Young</p><a href=\"/leadership\">Leadership</a></body></html>" };
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    const avisonSite = avison.find((check) => check.key === "website");
+    expect(avisonSite?.url).toContain("/w/james-nelson");
+    expect(avisonSite?.finding).toContain("Name: yes");
+    expect(avisonSite?.companyOnly).not.toBe(true);
+    expect(avisonSite?.selfReported).toBe(true);
+
+    const skanska = await runPublicScreen(
+      facts({
+        name: "Richard Kennedy",
+        applicantName: "Richard Kennedy",
+        org: "Skanska USA",
+        website: "https://www.skanska.com/us/en/",
+        location: "New York, NY",
+      }),
+      async () => ({ ok: false, status: 403, text: "<html><title>Just a moment...</title><p>Skanska</p></html>" }),
+    );
+    const skanskaSite = skanska.find((check) => check.key === "website");
+    expect(skanskaSite?.status).toBe("UNAVAILABLE");
+    expect(skanskaSite?.finding).toContain("blocked by site (403)");
+    expect(skanskaSite?.finding).not.toContain("Name: no");
+  });
+
   it("reads an attorney bio from a sitemap surname URL and from a nested our-people link", async () => {
     const bio = "<html><body><p>Stephen Meister is a co-founder of Meister Seelig & Schuster in New York.</p></body></html>";
     const xml = `<urlset><url><loc>https://meisterseelig.example/associated_attorney/stephen-b-meister/</loc></url><url><loc>https://meisterseelig.example/our-people/partners/stephen-b-meister/</loc></url></urlset>`;
@@ -1925,7 +1995,10 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
         return { ok: false, status: 404, text: "" };
       },
     );
-    expect(calls.filter((url) => url.startsWith("https://bramblewick-group.example"))).toHaveLength(1);
+    expect(calls.filter((url) => url.startsWith("https://bramblewick-group.example"))).toEqual([
+      "https://bramblewick-group.example",
+      "https://bramblewick-group.example/sitemap.xml",
+    ]);
     for (const host of ["bramblewick-group.example", "www.linkedin.com", "x.com", "www.facebook.com", "www.instagram.com", "www.youtube.com", "www.tiktok.com"]) {
       expect(userAgentFor(host)).toBe(USER_AGENT);
       expect(userAgentFor(host).toLowerCase()).not.toContain("chrome");

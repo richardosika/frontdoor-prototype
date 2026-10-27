@@ -322,7 +322,45 @@ export function surnamePageUrls(html: string, base: string, lastName: string): s
   return found;
 }
 
-/** Homepage sitemap, or a few people-page sitemaps when the root file is an index. Capped at eight last-name URLs. */
+function decodeXml(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .trim();
+}
+
+function sitemapLocs(xml: string, origin: string): string[] {
+  let base: URL;
+  try {
+    base = new URL(origin);
+  } catch {
+    return [];
+  }
+  const found: string[] = [];
+  for (const match of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)) {
+    try {
+      const url = new URL(decodeXml(match[1]), base.origin);
+      if (url.origin !== base.origin) continue;
+      found.push(url.toString());
+    } catch {
+      continue;
+    }
+  }
+  return found;
+}
+
+function looksLikePeopleSitemap(loc: string, needle: string): boolean {
+  try {
+    const url = new URL(loc);
+    return /team|people|leader|leadership|professional|attorney|lawyer|staff|bio|about|our-team|our-people|associated|page-sitemap|(?:^|\/)page(?:\/|$)/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
+  } catch {
+    return false;
+  }
+}
+
+/** Homepage sitemap, or child sitemaps when the root file is an index. Capped at eight last-name URLs. */
 export async function sitemapLastNameUrls(
   fetchText: FetchText,
   origin: string,
@@ -331,30 +369,21 @@ export async function sitemapLastNameUrls(
   const root = await pull(fetchText, `${origin}/sitemap.xml`);
   if (root.status < 200 || root.status >= 400 || !root.text.includes("<loc")) return [];
   if (!/<sitemapindex\b/i.test(root.text)) return sitemapPersonUrls(root.text, origin, lastName);
-  let base: URL;
-  try {
-    base = new URL(origin);
-  } catch {
-    return [];
-  }
   const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
-  const children = [...root.text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)]
-    .map((match) => match[1].trim())
-    .filter((loc) => {
-      try {
-        const url = new URL(loc, base.origin);
-        if (url.origin !== base.origin) return false;
-        return /team|people|leader|leadership|professional|attorney|lawyer|staff|bio|about|our-team|our-people|associated|page-sitemap|(?:^|\/)page(?:\/|$)/i.test(url.pathname) || (needle.length >= 3 && decodeURIComponent(url.pathname).toLowerCase().includes(needle));
-      } catch {
-        return false;
-      }
-    })
-    .slice(0, 4);
+  const children = sitemapLocs(root.text, origin);
+  const named = children.filter((loc) => looksLikePeopleSitemap(loc, needle)).slice(0, 4);
+  // A Liferay index uses sitemap.xml?p_l_id=… with no "people" in the path. Scan a few of those
+  // until the surname shows up, and stop so one company does not download the whole index.
+  const queue = named.length ? named : children.slice(0, 8);
   const found: string[] = [];
-  for (const child of children) {
+  for (const child of queue) {
     const page = await pull(fetchText, child);
     if (page.status >= 200 && page.status < 400) found.push(...sitemapPersonUrls(page.text, origin, lastName));
-    if (found.length >= 8) break;
+    if (named.length) {
+      if (found.length >= 8) break;
+    } else if (found.length) {
+      break;
+    }
   }
   return [...new Set(found)].slice(0, 8);
 }
@@ -684,6 +713,33 @@ function withWww(url: string): string {
   }
 }
 
+/** A blocked homepage can still publish a readable sitemap. Open a surname page from it when one exists. */
+async function personPageFromSitemap(
+  fetchText: FetchText,
+  pageUrl: string,
+  person: string,
+  queryFacts: { name: string; org: string; location: string },
+): Promise<{ url: string; score: MatchScore } | null> {
+  let origin = "";
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    return null;
+  }
+  const lastName = surnameForSearch(person);
+  if (!lastName) return null;
+  const urls = await sitemapLastNameUrls(fetchText, origin, lastName);
+  let best: { url: string; score: MatchScore } | null = null;
+  for (const url of urls.slice(0, 4)) {
+    const page = await pull(fetchText, url);
+    if (page.status < 200 || page.status >= 400 || isBotChallenge(page.text)) continue;
+    const score = scorePublicText(visible(page.text), queryFacts);
+    if (!score.name) continue;
+    if (!best || rank(score) > rank(best.score)) best = { url, score };
+  }
+  return best;
+}
+
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
   const queryFacts = { name: person, org: facts.org, location: facts.location };
@@ -738,13 +794,29 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         }
         renamed = ` The site redirected to ${redirectedTo}. The new domain is ${domain}. The new brand is a review-only alias and does not corroborate the company on the application.`;
       }
-      const detail =
-        home.status === 403
-          ? `blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
-          : blockedBySite
-            ? `blocked by site, ask applicant for a team-page URL${renamed}`
-            : `The company website did not respond.${renamed}`;
-      attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
+      const rescued = renamed
+        ? null
+        : await personPageFromSitemap(fetchText, homeUrl, person, queryFacts);
+      if (rescued) {
+        attempts.push({
+          key: "website",
+          platform: "Company website",
+          searched: website,
+          url: rescued.url,
+          outcome: "found",
+          score: rescued.score,
+          detail: "a page on the company site",
+          selfReported: true,
+        });
+      } else {
+        const detail =
+          home.status === 403
+            ? `blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
+            : blockedBySite
+              ? `blocked by site, ask applicant for a team-page URL${renamed}`
+              : `The company website did not respond.${renamed}`;
+        attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
+      }
     } else {
       const redirectedTo = crossDomainLanding(homeUrl, home);
       if (redirectedTo) homeUrl = redirectedTo;
