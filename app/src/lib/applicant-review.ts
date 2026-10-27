@@ -24,7 +24,10 @@ export type MemberReview = {
   confirmLabel: string;
   applicationId: string | null;
   inviteRequestId: string | null;
+  applicationStatus: string | null;
+  verdict: string;
   mode: MemberReviewMode;
+  location: string;
   unverified: string[];
   applicationGrade: { letter: string; score: number } | null;
 };
@@ -144,7 +147,10 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
     confirmLabel: grade?.recommendation === "DECLINE" ? "The recommendation is DECLINE." : "The recommendation is NOT LEGIT.",
     applicationId,
     inviteRequestId: invite?.id || null,
+    applicationStatus: application?.status || null,
+    verdict,
     mode: open ? "application" : invitePending ? "invite" : "closed",
+    location: application?.location || invite?.location || user?.location || "",
     unverified: unverifiedPersonItems(evidence),
     applicationGrade,
   };

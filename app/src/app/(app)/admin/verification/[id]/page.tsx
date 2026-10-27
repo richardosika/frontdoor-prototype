@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteVerificationCase } from "@/actions/owner";
 import { deleteBusinessCard, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { loadMemberReview } from "@/lib/applicant-review";
 import { Banner } from "@/components/banner";
 import { ExecutiveSummary } from "@/components/grade-summary";
@@ -8,6 +10,7 @@ import { GuidedReview } from "@/components/guided-review";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
+import { publicEvidenceHref } from "@/lib/evidence-link";
 import { httpUrls } from "@/lib/guided-prefill";
 import { prepareGuidedCase } from "@/lib/guided-prefill-db";
 import { formatAuditTime } from "@/lib/format";
@@ -15,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
 import { displayCheckStatus } from "@/lib/review-steps";
 import { CHECK_RESULTS, VERIFICATION_STATUSES, checkResultLabel, verificationCaseHeading, verificationStatusLabel } from "@/lib/verification";
+import { restoreAdminNotice } from "@/lib/admin-notice";
 import { applyReviewSkips, parseGradeSnapshot } from "@/lib/verify/grade";
 
 export const dynamic = "force-dynamic";
@@ -34,13 +38,19 @@ export default async function VerificationCasePage({
   await requireVerificationAdmin();
   const { id } = await params;
   const query = await searchParams;
+  await restoreAdminNotice({
+    scope: `case:${id}`,
+    pathname: `/admin/verification/${id}`,
+    step: query.step,
+    notice: query.notice,
+  });
   await prepareGuidedCase(id);
   const record = await prisma.verificationCase.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, org: true, location: true } },
-      application: { select: { name: true, org: true, location: true } },
-      inviteRequest: { select: { name: true, org: true, location: true } },
+      user: { select: { id: true, name: true, org: true, location: true, role: true } },
+      application: { select: { name: true, org: true, location: true, role: true } },
+      inviteRequest: { select: { name: true, org: true, location: true, role: true } },
       project: { select: { id: true, name: true, location: true, year: true, userId: true, user: { select: { name: true } } } },
       checks: { orderBy: { label: "asc" }, include: { reviewer: { select: { name: true } } } },
       events: { orderBy: { createdAt: "desc" }, include: { actor: { select: { name: true } } } },
@@ -212,6 +222,10 @@ export default async function VerificationCasePage({
             notLegit={memberReview.notLegit}
             confirmLabel={memberReview.confirmLabel}
             mode={memberReview.mode}
+            applicationStatus={memberReview.applicationStatus}
+            verdict={memberReview.verdict}
+            role={record.application?.role || record.user?.role || record.inviteRequest?.role || ""}
+            location={memberReview.location}
             unverified={memberReview.unverified}
             applicationGrade={memberReview.applicationGrade}
           />
@@ -253,8 +267,8 @@ export default async function VerificationCasePage({
               <ul className="mt-2 space-y-1 text-sm">
                 {evidenceLinks(currentCheck.evidenceUrl, currentCheck.note).map((url) => (
                   <li key={url}>
-                    <a className="break-all text-forest underline" href={url} target="_blank" rel="noreferrer">
-                      {url}
+                    <a className="break-all text-forest underline" href={publicEvidenceHref(url)} target="_blank" rel="noreferrer">
+                      {publicEvidenceHref(url)}
                     </a>
                   </li>
                 ))}
@@ -343,6 +357,23 @@ export default async function VerificationCasePage({
           ))}
         </ul>
       </details> : null}
+
+      <section className={`${card} mt-6 p-4`}>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete case</h2>
+        <p className="mt-2 text-sm text-ink">
+          Removes this verification file, its checklist, and its audit log. The member, application, and request stay.
+        </p>
+        <form id="delete-case" action={deleteVerificationCase} className="mt-3">
+          <input type="hidden" name="caseId" value={record.id} />
+          <ConfirmSubmitButton
+            form="delete-case"
+            className={btnOutline}
+            message={`Delete the verification case for ${heading.title}? This removes the checklist and the audit log on this file. The member, application, and request stay. This cannot be undone.`}
+          >
+            Delete case
+          </ConfirmSubmitButton>
+        </form>
+      </section>
 
       <h2 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Audit log</h2>
       <ul className={`${card} divide-y divide-line px-4`}>

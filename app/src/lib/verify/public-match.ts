@@ -259,6 +259,31 @@ export function companySearchTerm(org: string, person = ""): string {
  * whose given name (or nickname) appears before the surname. "walkerharris" is
  * Walker Harris, not Willy Walker. A URL the applicant typed is not decided here.
  */
+/**
+ * A LinkedIn company slug has to carry the applicant's distinctive words.
+ * gilbane-development-company is not Gilbane Building Company: "building" is missing,
+ * so one shared token is not the firm. A one-word slug may be the brand plus a short tail,
+ * such as buildprocs for BuildPro. A numeric company id is resolved before this runs.
+ */
+export function linkedinCompanyMatchesOrg(url: string, org: string): boolean {
+  const raw = decodeURIComponent(url.match(/linkedin\.com\/company\/([^/?#]+)/i)?.[1] || "").toLowerCase();
+  if (!raw || /^\d+$/.test(raw)) return false;
+  const pieces = raw.replace(/\./g, "").split(/[-_]+/).filter(Boolean);
+  const slugTokens = pieces.filter((token) => token.length >= 2 && !isGenericFirmToken(token));
+  const orgDistinctive = companyPhraseTokens(org).filter((token) => isDistinctiveCompanyToken(token));
+  if (!orgDistinctive.length || !slugTokens.length) return false;
+  if (pieces.length === 1) {
+    const slug = slugTokens[0];
+    const lead = orgDistinctive[0];
+    return slug === lead || slug.startsWith(lead) || lead.startsWith(slug);
+  }
+  const pieceSet = new Set(pieces);
+  if (orgDistinctive.some((token) => !pieceSet.has(token))) return false;
+  const orgSet = new Set(companyPhraseTokens(org));
+  const slugDistinctive = slugTokens.filter((token) => isDistinctiveCompanyToken(token));
+  return slugDistinctive.length > 0 && slugDistinctive.every((token) => orgSet.has(token));
+}
+
 export function linkedinProfileMatchesPerson(url: string, person: string): boolean {
   if (/linkedin\.com\/company\//i.test(url)) return true;
   const slug = decodeURIComponent(url.match(/linkedin\.com\/in\/([^/?#]+)/i)?.[1] || "")
@@ -285,6 +310,27 @@ export function linkedinProfileMatchesPerson(url: string, person: string): boole
 }
 
 const ALIAS_STOP = new Set(["www", "com", "home", "index", "welcome", "official"]);
+
+/** A domain stem may end in a state code. "twotreesny" is Two Trees, not a second brand. */
+const DOMAIN_STATE_TAIL =
+  /(?:nyc|ny|nj|dc|ca|tx|fl|il|ma|pa|ct|wa|ga|co|or|az|nc|tn|md|oh|mi|wi|mn|mo|va|al|ak|ar|de|hi|ia|ks|ky|la|me|mt|ne|nv|nh|nm|nd|ok|ri|sc|sd|ut|vt|wv|wy)$/;
+
+/** Distinctive words of the firm, joined. Generic words such as management are left off. */
+export function companyNameStem(org: string): string {
+  return companyPhraseTokens(org)
+    .filter((token) => !isGenericFirmToken(token))
+    .join("");
+}
+
+/** The domain label is this firm, including a trailing state code such as ny or nyc. */
+export function domainMatchesOrgStem(label: string, org: string): boolean {
+  const stem = companyNameStem(org);
+  const compact = label.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!stem || compact.length < 2) return false;
+  if (compact === stem) return true;
+  const peeled = compact.replace(DOMAIN_STATE_TAIL, "");
+  return peeled.length >= 2 && peeled === stem;
+}
 
 /** The site's own brand label. jll.com is "jll". A generic label such as "usa" is not a brand. */
 export function domainBrand(website: string): string {
@@ -352,6 +398,7 @@ export function brandAliases(org: string, website: string, html = ""): string[] 
     if (compact.length < 2 || compact.length > 24) return;
     if (legal.has(compact) || compact === legalCompact) return;
     if (isGenericFirmToken(compact) || ALIAS_STOP.has(compact)) return;
+    if (domainMatchesOrgStem(compact, org)) return;
     if (mentionsCompany(value, org)) return;
     if (!out.includes(compact)) out.push(compact);
   };

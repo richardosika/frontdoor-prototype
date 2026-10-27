@@ -6,6 +6,7 @@ import {
   isTemplateKey,
   renderTemplate,
   replacementTemplateBody,
+  staleTemplateSubject,
   TEMPLATE_DEFS,
   type TemplateKey,
 } from "@/lib/email-templates";
@@ -36,7 +37,8 @@ export async function ensureTemplates() {
   for (const def of TEMPLATE_DEFS) {
     const existing = await prisma.emailTemplate.findUnique({ where: { key: def.key } });
     const nextBody = existing ? replacementTemplateBody(def.key, existing.body) : null;
-    if (!existing || !nextBody) continue;
+    const subjectStale = Boolean(existing && staleTemplateSubject(def.key, existing.subject));
+    if (!existing || (!nextBody && !subjectStale)) continue;
     const latest = await prisma.emailTemplateVersion.findFirst({
       where: { templateId: existing.id },
       orderBy: { version: "desc" },
@@ -45,9 +47,9 @@ export async function ensureTemplates() {
       where: { id: existing.id },
       data: {
         subject: def.subject,
-        body: nextBody,
+        body: nextBody ?? existing.body,
         versions: {
-          create: { version: (latest?.version ?? 1) + 1, subject: def.subject, body: nextBody, savedById: "" },
+          create: { version: (latest?.version ?? 1) + 1, subject: def.subject, body: nextBody ?? existing.body, savedById: "" },
         },
       },
     });

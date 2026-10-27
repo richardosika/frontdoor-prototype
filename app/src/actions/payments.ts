@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser, requireAccount, requireAdmin } from "@/lib/current-user";
-import { formatEtDate } from "@/lib/format";
+import { formatLongEtDate } from "@/lib/format";
 import { mailDuesAmounts } from "@/lib/dues";
 import { firstName } from "@/lib/email-templates";
 import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
@@ -52,8 +52,9 @@ export async function simulatePayment(formData: FormData) {
   revalidatePath("/feed");
   revalidatePath("/admin");
   const viewer = await currentUser();
-  if (viewer?.id === account.id) redirect("/feed?notice=Test+payment+recorded.+No+card+was+charged");
-  redirect(`/pay/${token}?notice=Test+payment+recorded.+Sign+in+to+open+the+floor`);
+  const base = await appBaseUrl();
+  if (viewer?.id === account.id) redirect(`${base}/feed?notice=Test+payment+recorded.+No+card+was+charged`);
+  redirect(`${base}/pay/${encodeURIComponent(token)}?notice=Test+payment+recorded.+Sign+in+to+open+the+floor`);
 }
 
 export async function simulateFailedPayment(formData: FormData) {
@@ -63,7 +64,8 @@ export async function simulateFailedPayment(formData: FormData) {
   if (checkoutModeForRole(account.role) === "stripe") redirect("/pay?error=Stripe+reports+failed+payments+by+webhook");
   await markPaymentFailed(account.id);
   revalidatePath("/pay");
-  redirect(token ? `/pay/${token}?notice=Test+failure+recorded` : "/pay?notice=Test+failure+recorded");
+  const base = await appBaseUrl();
+  redirect(token ? `${base}/pay/${encodeURIComponent(token)}?notice=Test+failure+recorded` : `${base}/pay?notice=Test+failure+recorded`);
 }
 
 export async function startStripeCheckout(formData: FormData) {
@@ -284,7 +286,7 @@ export async function cancelMembership(formData: FormData) {
   }
   const through =
     account.paymentStatus === "PAID" && account.renewalAt
-      ? `Access continues through ${formatEtDate(account.renewalAt)}. No further charge is scheduled after that date.`
+      ? `Access continues through ${formatLongEtDate(account.renewalAt)}. No further charge is scheduled after that date.`
       : "Nothing further will be charged.";
   await sendNotice({
     intendedTo: account.email,

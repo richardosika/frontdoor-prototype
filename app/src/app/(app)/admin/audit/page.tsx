@@ -2,8 +2,9 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
-import { formatRunScores } from "@/lib/verify/score";
+import { verdictLabel } from "@/lib/application-status";
 import { prisma } from "@/lib/prisma";
+import { auditRunScore } from "@/lib/rerun-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,18 @@ export default async function AuditPage() {
     prisma.verificationRun.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, subject: true, status: true, verdict: true, score: true, gradeLetter: true, gradeScore: true, createdAt: true, application: { select: { name: true } } },
+      select: {
+        id: true,
+        subject: true,
+        status: true,
+        verdict: true,
+        score: true,
+        gradeLetter: true,
+        gradeScore: true,
+        companyName: true,
+        createdAt: true,
+        application: { select: { name: true } },
+      },
     }),
   ]);
   return (
@@ -46,13 +58,14 @@ export default async function AuditPage() {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Verification runs</h2>
           <ul className="mt-2 divide-y divide-line text-sm">
             {runs.map((row) => {
-              const scores = formatRunScores(row);
+              const points = auditRunScore(row);
+              const grade = row.gradeLetter && typeof points === "number" ? `Grade ${row.gradeLetter} (${points})` : typeof points === "number" ? String(points) : "";
               return (
-                <li key={row.id} className="py-2">
-                  {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
-                  {row.verdict ? ` · ${row.verdict}` : ""}
-                  {scores ? ` · ${scores}` : ""} · {row.application?.name || "No application"}
-                </li>
+              <li key={row.id} className="py-2">
+                {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
+                {row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}
+                {grade ? ` · ${grade}` : ""} · {row.application?.name || row.companyName || "No application"}
+              </li>
               );
             })}
           </ul>

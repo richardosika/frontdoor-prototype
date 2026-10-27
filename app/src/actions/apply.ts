@@ -3,6 +3,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { isRoleId, roleLabel } from "@/lib/roles";
 import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
 import {
@@ -31,18 +32,20 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { sendNotice } from "@/lib/notices";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 import { appendMemberReply } from "@/lib/statement";
+import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
 
 const CODE_MINUTES = 15;
 
 export async function checkInvite(code: string): Promise<{ ok: true; note: string } | { ok: false; error: string }> {
   const normalized = normalizeInviteCode(code);
-  if (normalized.length < 4) return { ok: false, error: "Enter the invite code a member shared with you." };
+  if (!normalized) return { ok: true, note: "" };
+  if (normalized.length < 4) return { ok: false, error: "That referral code is not valid." };
   const invite = await prisma.inviteCode.findUnique({ where: { code: normalized } });
   if (!invite || !isInviteUsable(invite)) {
-    return { ok: false, error: "That invite code is not active. Ask a member for a current code." };
+    return { ok: false, error: "That referral code is not active." };
   }
-  return { ok: true, note: invite.note || "Invite accepted." };
+  return { ok: true, note: invite.note || "Referral code accepted." };
 }
 
 function textField(formData: FormData, key: string): string {
@@ -173,9 +176,9 @@ export async function submitApplication(
   });
   if (pending) return { ok: false, error: "An application for that email is already under review." };
 
-  const invite = await prisma.inviteCode.findUnique({ where: { code } });
-  if (!invite || !isInviteUsable(invite)) {
-    return { ok: false, error: "That invite code is not active." };
+  const invite = code ? await prisma.inviteCode.findUnique({ where: { code } }) : null;
+  if (code && (!invite || !isInviteUsable(invite))) {
+    return { ok: false, error: "That referral code is not active." };
   }
 
   const references = (input.referenceEmails ?? []).map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -191,7 +194,7 @@ export async function submitApplication(
   const application = await prisma.$transaction(async (tx) => {
     const created = await tx.application.create({
       data: {
-        inviteCodeId: invite.id,
+        inviteCodeId: invite?.id ?? null,
         email,
         statusToken,
         name,
@@ -206,7 +209,7 @@ export async function submitApplication(
         statement: (input.statement ?? "").trim(),
         website,
         socialLinks,
-        status: "SUBMITTED",
+        status: "IN_REVIEW",
         emailVerifiedAt: verified.verifiedAt,
         duesCents: annualDuesCents(role),
         duesWaived: annualDuesCents(role) === 0,
@@ -233,10 +236,12 @@ export async function submitApplication(
         ipHash,
       })),
     });
-    await tx.inviteCode.update({
-      where: { id: invite.id },
-      data: { uses: { increment: 1 } },
-    });
+    if (invite) {
+      await tx.inviteCode.update({
+        where: { id: invite.id },
+        data: { uses: { increment: 1 } },
+      });
+    }
     return created;
   });
 
@@ -249,7 +254,7 @@ export async function submitApplication(
       name,
       role: roleLabel(role),
       org: input.org.trim(),
-      statusLink: `${base}/apply/status/${statusToken}`,
+      statusLink: `${base}${publicStatusPath(statusToken)}`,
     }),
     person: {
       name,
@@ -258,7 +263,11 @@ export async function submitApplication(
       location,
     },
   });
-  await queueApplicationVerification(application.id, input.org.trim(), { network: true });
+  after(() => {
+    void queueApplicationVerification(application.id, input.org.trim(), { network: true }).catch((error) => {
+      console.error("verification queue failed", error instanceof Error ? error.message : "error");
+    });
+  });
 
   return { ok: true, statusToken };
 }
@@ -311,6 +320,10 @@ export async function respondToApplication(formData: FormData): Promise<{ ok: tr
     subject: `${BRAND.name} reply received`,
     text: `${application.name} replied on the application status page.\n\n${note}`,
   });
-  await queueApplicationVerification(application.id, application.org, { network: true });
+  after(() => {
+    void queueApplicationVerification(application.id, application.org, { network: true }).catch((error) => {
+      console.error("verification queue failed", error instanceof Error ? error.message : "error");
+    });
+  });
   return { ok: true };
 }

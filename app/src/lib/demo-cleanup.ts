@@ -22,7 +22,7 @@ export function cleanupWindowHours(raw: string): number | null {
 }
 
 export function applicantRemovalList(input: { member: boolean; crm: boolean }): string[] {
-  const items = ["the application", "verification runs", "outbox notices for that email", "the business card"];
+  const items = ["the application", "the verification case", "verification runs", "outbox notices for that email", "the business card"];
   if (input.member) items.push("the linked member account", "that member's posts and messages");
   if (input.crm) items.push("the CRM person record");
   return items;

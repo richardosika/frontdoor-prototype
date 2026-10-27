@@ -17,7 +17,7 @@ export default async function AdminLoginPage() {
         <div className="px-6 py-6">
           <h1 className="font-serif text-2xl font-normal">Private Floor administrator</h1>
           <p className="mb-4 mt-1 text-sm text-ink">
-            Richard Osika signs in here. The browser prompt before this page is the site gate, username privatefloor. Marcus Hale is a demo member and cannot open this page.
+            Richard Osika signs in here. The browser prompt before this page is the site gate, username privatefloor.
           </p>
           <LoginForm portal="admin" />
           <p className="mt-4 text-center text-sm text-mut">

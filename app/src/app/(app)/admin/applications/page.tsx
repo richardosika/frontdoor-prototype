@@ -17,7 +17,7 @@ import { syncCrm } from "@/lib/crm";
 import { requireAdmin } from "@/lib/current-user";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
 import { isDemoRecord, personStageLabel, personStanding } from "@/lib/person-standing";
-import { formatAuditTime, formatEtDate } from "@/lib/format";
+import { formatAuditTime, formatLongEtDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { settleStuckRuns } from "@/lib/verify/queue";
 import { paymentStatusLabel } from "@/lib/payments";
@@ -220,7 +220,7 @@ export default async function ApplicationsPage({
                       <p className="text-xs text-mut">
                         {formatAuditTime(application.createdAt)} · {personStageLabel(standing.stage)} · {applicationStatusLabel(application.status)}
                         {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
-                        {application.user?.renewalAt ? ` · renews ${formatEtDate(application.user.renewalAt)}` : ""}
+                        {application.user?.renewalAt ? ` · renews ${formatLongEtDate(application.user.renewalAt)}` : ""}
                       </p>
                     </div>
                     <GradeMark

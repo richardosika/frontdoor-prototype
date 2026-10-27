@@ -1,20 +1,27 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { ApplyReply } from "@/components/apply-reply";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
 import { applicationReceivedMessage } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
-import { DUES_BILLING_NOTE, DUES_WAIVED, currentMonthlyCents, duesLabel, offerLabel } from "@/lib/dues";
-import { prisma } from "@/lib/prisma";
+import { currentMonthlyCents, statusMembershipLine } from "@/lib/dues";
+import { formatLongEtDate } from "@/lib/format";
 
-export const dynamic = "force-dynamic";
-
-export default async function ApplicationStatusPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const application = await prisma.application.findUnique({ where: { statusToken: token } });
-  if (!application) notFound();
+export function ApplicationStatus({
+  application,
+}: {
+  application: {
+    name: string;
+    status: string;
+    statusToken: string;
+    reviewerNote: string;
+    role: string;
+    duesCents: number;
+    duesWaived: boolean;
+    user: { paymentStatus: string; renewalAt: Date | null } | null;
+  };
+}) {
   const copy = memberStatusCopy(application.status);
   const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(application.name) : copy.body;
   const declined = application.status === "DECLINED" || application.status === "REJECTED";
@@ -23,6 +30,13 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
     Boolean(application.reviewerNote) &&
     (application.status === "NEEDS_INFO" || application.status === "APPROVED" || application.status === "PAYMENT_DUE");
   const canSignIn = application.status === "APPROVED" || application.status === "PAYMENT_DUE";
+  const membershipLine = statusMembershipLine({
+    status: application.status,
+    monthlyCents: application.duesCents > 0 ? currentMonthlyCents(application.role, application.duesCents) : 0,
+    waived: application.duesWaived,
+    paymentStatus: application.user?.paymentStatus,
+    renewalLabel: application.user?.renewalAt ? formatLongEtDate(application.user.renewalAt) : null,
+  });
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
@@ -42,9 +56,7 @@ export default async function ApplicationStatusPage({ params }: { params: Promis
             {application.status === "SUBMITTED" || application.status === "IN_REVIEW" || application.status === "PENDING" ? (
               <p className="mt-1">Verification in progress.</p>
             ) : null}
-            <p className="mt-1">
-              {application.duesCents > 0 ? offerLabel(currentMonthlyCents(application.role, application.duesCents)) : duesLabel(0)}. {application.duesCents > 0 ? DUES_BILLING_NOTE : ""} {application.duesWaived ? DUES_WAIVED : ""}
-            </p>
+            {membershipLine ? <p className="mt-1">{membershipLine}</p> : null}
           </div>
           {showNote ? (
             <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm text-ink">

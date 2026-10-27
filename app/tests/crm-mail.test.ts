@@ -70,6 +70,7 @@ describe("email templates", () => {
     expect(templateDef("application_code")?.body).toContain("{code}");
     const info = renderTemplate(templateDef("info")?.body || "", { ...sampleTemplateVars(), invite_code: "" });
     expect(templateDef("info")?.subject).toBe("About Private Floor");
+    expect(templateDef("approved")?.subject).toBe("You're approved to Private Floor");
     expect(info).toContain("Request to join");
     expect(info).toContain("A private network where every member is personally reviewed");
     expect(info.toLowerCase()).not.toContain("invited");
@@ -88,7 +89,8 @@ describe("email templates", () => {
     expect(crm).not.toMatch(/key:\s*"approved"/);
     expect(crm).not.toMatch(/key:\s*"payment_due"/);
     expect(decision).toMatch(/key:\s*"payment_due"/);
-    expect(decision).toMatch(/key:\s*"approved"/);
+    expect(decision).toMatch(/key:\s*"welcome"/);
+    expect(decision).not.toMatch(/key:\s*"approved"/);
   });
 
   it("keeps live mode on the test outbox", () => {

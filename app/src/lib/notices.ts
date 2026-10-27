@@ -1,6 +1,7 @@
 import { BRAND, noticeTestRecipient } from "@/lib/brand";
+import { reviewNotice } from "@/lib/review-copy";
 import { recordCrmEvent } from "@/lib/crm";
-import { deliveryTarget } from "@/lib/email-templates";
+import { deliveryTarget, repairDoubledTerminalPeriod } from "@/lib/email-templates";
 import { prisma } from "@/lib/prisma";
 import { buildTestMail, deliverResendMail, emailFromAddress, safeMailError } from "@/lib/resend-mail";
 
@@ -18,6 +19,8 @@ export type NoticeInput = {
  * A do-not-contact flag suppresses the send and keeps the reason. A Resend failure is recorded and does not throw.
  */
 export async function sendNotice(input: NoticeInput): Promise<{ id: string; deliveredTo: string; suppressed?: boolean; reason?: string }> {
+  const subject = reviewNotice(repairDoubledTerminalPeriod(input.subject));
+  const text = reviewNotice(repairDoubledTerminalPeriod(input.text));
   const settings = await prisma.mailSettings.findUnique({ where: { id: "default" } });
   const mode = settings?.delivery === "live" ? "live" : "outbox";
   const target = deliveryTarget(mode, noticeTestRecipient());
@@ -29,7 +32,7 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
       data: {
         intendedTo: input.intendedTo,
         deliveredTo: target.to,
-        subject: input.subject,
+        subject,
         body: `Not sent. Do not contact: ${reason}\n\nIntended recipient: ${input.intendedTo}`,
         applicationId: input.applicationId || null,
         templateKey: input.templateKey || "",
@@ -50,18 +53,18 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
     mode === "live"
       ? "Delivery mode is set to live. This notice is stored in the Outbox. Resend, when configured, emails only the test recipient.\n\n"
       : "";
-  const body = `${liveNote}Intended recipient: ${input.intendedTo}\n\n${input.text}`;
+  const body = `${liveNote}Intended recipient: ${input.intendedTo}\n\n${text}`;
   console.log(`\n----- ${BRAND.name} outbox -----`);
   console.log(`Intended: ${input.intendedTo}`);
   console.log(`Delivered only to: ${target.to}`);
-  console.log(`Subject: ${input.subject}`);
+  console.log(`Subject: ${subject}`);
   console.log(body);
   console.log("--------------------------------\n");
   const row = await prisma.outboxNotice.create({
     data: {
       intendedTo: input.intendedTo,
       deliveredTo: target.to,
-      subject: input.subject,
+      subject,
       body,
       applicationId: input.applicationId || null,
       templateKey: input.templateKey || "",
@@ -70,12 +73,12 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
   await recordCrmEvent({
     email,
     kind: "email",
-    summary: `${input.templateKey || "notice"} · ${input.subject}`,
+    summary: `${input.templateKey || "notice"} · ${subject}`,
     sourceKey: `outbox:${row.id}`,
   });
   await sendStoredNotice(row.id, {
     intendedTo: input.intendedTo,
-    subject: input.subject,
+    subject,
     text: body,
     to: target.to,
   });

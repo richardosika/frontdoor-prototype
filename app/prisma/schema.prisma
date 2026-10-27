@@ -291,8 +291,8 @@ model InviteRequest {
 
 model Application {
   id              String            @id @default(cuid())
-  inviteCodeId    String
-  inviteCode      InviteCode        @relation(fields: [inviteCodeId], references: [id])
+  inviteCodeId    String?
+  inviteCode      InviteCode?       @relation(fields: [inviteCodeId], references: [id])
   email           String
   name            String
   passwordHash    String

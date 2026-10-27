@@ -269,6 +269,11 @@ export async function factsForCase(caseId: string): Promise<{ facts: PrefillFact
   };
 }
 
+/** The known applicant keeps the real role. Prefill facts alone default to Developer. */
+export function guidedGradeApplicant(facts: PrefillFacts, known: Partial<ApplicantFacts> = {}): ApplicantFacts {
+  return factsToApplicant(facts, known);
+}
+
 async function gradeFor(checks: CheckOutput[], applicant: ApplicantFacts, subject: string): Promise<GradeReport> {
   return gradeChecks(checks, applicant, { gradedAt: new Date().toISOString(), subject });
 }

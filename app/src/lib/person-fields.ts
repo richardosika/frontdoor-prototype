@@ -1,3 +1,5 @@
+import { US_STATES } from "@/lib/member-network";
+
 export type AddressParts = {
   street: string;
   city: string;
@@ -7,6 +9,25 @@ export type AddressParts = {
 
 const STATE = /^[A-Za-z]{2}$/;
 const ZIP = /^\d{5}(?:-\d{4})?$/;
+
+export function isUsState(value: string): boolean {
+  return (US_STATES as readonly string[]).includes(value.trim().toUpperCase());
+}
+
+/** Five digits, or ZIP+4. 00000 is not a ZIP. */
+export function zipIssue(value: string): string | null {
+  const zip = value.trim();
+  if (!ZIP.test(zip)) return "Enter a ZIP code.";
+  if (zip.slice(0, 5) === "00000") return "Enter a real ZIP code.";
+  return null;
+}
+
+export function stateIssue(value: string): string | null {
+  const state = value.trim();
+  if (!STATE.test(state)) return "Enter a two-letter state.";
+  if (!isUsState(state)) return "Enter a real two-letter US state.";
+  return null;
+}
 
 export function joinName(firstName: string, lastName: string): string {
   return `${firstName.trim()} ${lastName.trim()}`.replace(/\s+/g, " ").trim();
@@ -23,8 +44,10 @@ export function validateAddress(input: AddressParts): string[] {
   const errors: string[] = [];
   if (input.street.trim().length < 2) errors.push("Enter your street address.");
   if (input.city.trim().length < 2) errors.push("Enter your city.");
-  if (!STATE.test(input.state.trim())) errors.push("Enter a two-letter state.");
-  if (!ZIP.test(input.zip.trim())) errors.push("Enter a ZIP code.");
+  const state = stateIssue(input.state);
+  const zip = zipIssue(input.zip);
+  if (state) errors.push(state);
+  if (zip) errors.push(zip);
   return errors;
 }
 

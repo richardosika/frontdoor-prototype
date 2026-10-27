@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
+import { JoinLanguages } from "@/components/join-languages";
 import { AgreementBoxes, BeforeSubmit, StepIntro } from "@/components/apply-before-submit";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { applyDetailsIssues, DETAILS_CONTINUE_MESSAGE, stillNeeded, type ApplyDetailsIssue } from "@/lib/apply-details";
@@ -12,11 +13,12 @@ import { BRAND } from "@/lib/brand";
 import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 import { DuesLanguages } from "@/components/dues-languages";
 import { DUES_BILLING_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, duesForRole, formatMoney } from "@/lib/dues";
+import { publicStatusPath } from "@/lib/public-status";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
 
 const STEPS = [
-  { id: 1, label: "Invite code" },
+  { id: 1, label: "Referral code" },
   { id: 2, label: "Choose role" },
   { id: 3, label: "Your details" },
   { id: 4, label: "Terms" },
@@ -115,6 +117,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   async function nextFromCode() {
     setPending(true);
     setError("");
+    if (!code.trim()) {
+      setPending(false);
+      setStep(2);
+      return;
+    }
     const result = await checkInvite(code);
     setPending(false);
     if (!result.ok) {
@@ -274,7 +281,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <p className="mt-2 text-sm text-ink">{applicationReceivedMessage(firstName)}</p>
             <p className="mt-2 text-sm text-ink">Nothing was charged. Keep the status link. Messages about this application stay on that page.</p>
             {statusToken ? (
-              <Link href={`/apply/status/${statusToken}`} className={`${btn} mt-4 w-full`}>
+              <Link href={publicStatusPath(statusToken)} className={`${btn} mt-4 w-full`}>
                 View application status
               </Link>
             ) : null}
@@ -285,15 +292,16 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
         ) : null}
         {!done && step === 1 ? (
           <div>
-            <StepIntro title="Invite code">
-              <p>{MEMBERSHIP_PHRASE}. Enter the invite code a member shared with you, or request to join.</p>
+            <StepIntro title="Referral code">
+              <p>{MEMBERSHIP_PHRASE}. A referral code from a member is optional. Leave it blank to continue.</p>
             </StepIntro>
-            <label className={labelCls}>Invite code</label>
-            <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="PF-XXXX-XXXX" />
+            <JoinLanguages />
+            <label className={labelCls}>Referral code, optional</label>
+            <input className={field} value={code} onChange={(event) => setCode(event.target.value)} placeholder="Optional" />
             <button className={`${btn} mt-4 w-full`} type="button" disabled={pending} onClick={nextFromCode}>
               Continue
             </button>
-            <Link href="/#request-invite" className={`${btnOutline} mt-2 w-full`}>
+            <Link href="/#request-to-join" className={`${btnOutline} mt-2 w-full`}>
               Request to join
             </Link>
           </div>

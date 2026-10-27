@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notFound, redirect, unstable_rethrow } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { issueInviteCodeForRequest } from "@/lib/invite-issue";
@@ -14,7 +14,10 @@ import {
 } from "@/lib/verification-db";
 import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
 import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
-import { rerunChecksHref } from "@/lib/rerun-checks";
+import { rememberAdminNotice } from "@/lib/admin-notice";
+import { rerunApplicantName, rerunFinishedSummary, rerunGradeFields } from "@/lib/rerun-audit";
+import { parseGradeSnapshot } from "@/lib/verify/grade";
+import type { Prisma } from "@prisma/client";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
 
 export async function updateVerificationCase(formData: FormData) {
@@ -228,28 +231,149 @@ export async function startGuidedReview(formData: FormData) {
   redirect(`/admin/verification/${record.id}?step=identity`);
 }
 
+async function createRerunRun(input: {
+  subject: "APPLICATION" | "PROJECT";
+  applicationId?: string;
+  projectId?: string;
+  companyName: string;
+  summary: string;
+  gradeFields: {
+    score?: number;
+    gradeLetter?: string;
+    gradeScore?: number;
+    gradeConfidence?: string;
+    recommendation?: string;
+    gradeSnapshot?: Prisma.InputJsonValue;
+  };
+}) {
+  const previous = await prisma.verificationRun.findFirst({
+    where: input.applicationId
+      ? { applicationId: input.applicationId, subject: "APPLICATION" }
+      : { projectId: input.projectId, subject: "PROJECT" },
+    orderBy: { createdAt: "desc" },
+    include: { evidence: true },
+  });
+  await prisma.verificationRun.create({
+    data: {
+      subject: input.subject,
+      status: "DONE",
+      applicationId: input.applicationId,
+      projectId: input.projectId,
+      companyName: input.companyName,
+      summary: input.summary,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      ...input.gradeFields,
+      evidence: previous
+        ? {
+            create: previous.evidence.map((row) => ({
+              checkKey: row.checkKey,
+              status: row.status,
+              weight: row.weight,
+              finding: row.finding,
+              source: row.source,
+              url: row.url,
+              ranAt: row.ranAt,
+              hardFlag: row.hardFlag,
+              reviewFlag: row.reviewFlag,
+              corroborates: row.corroborates,
+            })),
+          }
+        : undefined,
+    },
+  });
+}
+
+/** Re-run checks, then add a named Verification runs row. Returns the notice, or null when the file is missing. */
+export async function recordGuidedRerun(caseId: string, actorId: string): Promise<string | null> {
+  const existing = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    select: {
+      id: true,
+      status: true,
+      applicationId: true,
+      projectId: true,
+      application: { select: { name: true } },
+      user: { select: { name: true } },
+      inviteRequest: { select: { name: true } },
+      project: { select: { name: true } },
+    },
+  });
+  if (!existing) return null;
+  await runLivePrefill(caseId);
+  const saved = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { gradeSnapshot: true, status: true } });
+  const grade = parseGradeSnapshot(saved?.gradeSnapshot);
+  const summary = rerunFinishedSummary(grade);
+  const applicantName = rerunApplicantName({
+    applicationName: existing.application?.name,
+    memberName: existing.user?.name,
+    requestName: existing.inviteRequest?.name,
+    projectName: existing.project?.name,
+  });
+  const gradeFields = grade
+    ? { ...rerunGradeFields(grade), gradeSnapshot: grade as unknown as Prisma.InputJsonValue }
+    : {};
+  const wroteApplication = Boolean(grade && existing.applicationId);
+  const wroteProject = Boolean(grade && existing.projectId);
+  if (wroteApplication && existing.applicationId) {
+    await createRerunRun({
+      subject: "APPLICATION",
+      applicationId: existing.applicationId,
+      companyName: applicantName,
+      summary,
+      gradeFields,
+    });
+    revalidatePath(`/admin/applications/${existing.applicationId}`);
+  }
+  if (wroteProject && existing.projectId) {
+    await createRerunRun({
+      subject: "PROJECT",
+      projectId: existing.projectId,
+      companyName: applicantName,
+      summary,
+      gradeFields,
+    });
+  }
+  if (!wroteApplication && !wroteProject) {
+    await prisma.verificationRun.create({
+      data: {
+        subject: "COMPANY",
+        status: "DONE",
+        applicationId: existing.applicationId,
+        projectId: existing.projectId,
+        companyName: applicantName,
+        summary,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        ...gradeFields,
+      },
+    });
+  }
+  const status = saved?.status || existing.status;
+  await prisma.verificationEvent.create({
+    data: {
+      caseId,
+      actorId,
+      fromStatus: status,
+      toStatus: status,
+      summary,
+    },
+  });
+  revalidatePath(`/admin/verification/${caseId}`);
+  revalidatePath("/admin/verification");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/audit");
+  revalidatePath("/admin");
+  return summary;
+}
+
 export async function rerunGuidedChecks(formData: FormData) {
-  await requireVerificationAdmin();
+  const admin = await requireVerificationAdmin();
   const caseId = String(formData.get("caseId") || "");
   const back = `/admin/verification/${caseId}`;
-  try {
-    const existing = caseId ? await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { id: true } }) : null;
-    if (!existing) redirect(rerunChecksHref(caseId, "missing"));
-    await runLivePrefill(caseId);
-    revalidatePath(back);
-    revalidatePath("/admin/verification");
-    const linked = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { applicationId: true } });
-    if (linked?.applicationId) {
-      revalidatePath(`/admin/applications/${linked.applicationId}`);
-      revalidatePath("/admin/applications");
-    }
-    revalidatePath("/admin/audit");
-  } catch (error) {
-    unstable_rethrow(error);
-    console.error("re-run checks failed", caseId, error instanceof Error ? error.message : "error");
-    redirect(rerunChecksHref(caseId, "failed"));
-  }
-  redirect(rerunChecksHref(caseId, "done"));
+  const summary = await recordGuidedRerun(caseId, admin.id);
+  if (!summary) notFound();
+  redirect(`${back}?step=decision&notice=${encodeURIComponent(summary)}`);
 }
 
 export async function decideInviteReview(formData: FormData) {
@@ -280,14 +404,17 @@ export async function decideInviteReview(formData: FormData) {
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
-    redirect(`${back}&notice=${encodeURIComponent(`Invite code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`)}`);
+    const approvedNotice = `Referral code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`;
+    await rememberAdminNotice(`case:${caseId}`, approvedNotice);
+    redirect(`${back}&notice=${encodeURIComponent(approvedNotice)}`);
   }
   if (decision === "DECLINED") {
     await prisma.inviteRequest.update({ where: { id: record.inviteRequest.id }, data: { status: "DECLINED" } });
     await applyDecisionStatus({ caseId: record.id, decision, actorId: admin.id, actorName: admin.name });
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
-    redirect(`${back}&notice=${encodeURIComponent("Declined. This file is Rejected.")}`);
+    await rememberAdminNotice(`case:${caseId}`, "Declined");
+    redirect(`${back}&notice=${encodeURIComponent("Declined")}`);
   }
   await applyDecisionStatus({ caseId: record.id, decision: "NEEDS_INFO", actorId: admin.id, actorName: admin.name });
   if (note) {
@@ -297,5 +424,6 @@ export async function decideInviteReview(formData: FormData) {
     });
   }
   revalidatePath("/admin/verification");
+  await rememberAdminNotice(`case:${caseId}`, "Asked for more info. This file is Needs info.");
   redirect(`${back}&notice=${encodeURIComponent("Asked for more info. This file is Needs info.")}`);
 }

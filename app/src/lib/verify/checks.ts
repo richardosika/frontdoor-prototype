@@ -21,6 +21,7 @@ import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSa
 import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
+import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
@@ -688,36 +689,35 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
-/** A made-up token. Real firm words such as Keystone, Brambleton, and Construction stay readable. */
+/**
+ * A made-up company token. Strict signs only: no vowel, q not followed by u,
+ * the same letter three times, or five consonants in a row once h is ignored.
+ * A consonant pair or a q/x/z/j cluster is not enough. Those flags mark real
+ * surnames such as Schwartz, Herzka, and Hovnanian.
+ */
 export function tokenLooksGibberish(token: string): boolean {
   const word = token.toLowerCase();
   if (word.length < 4) return false;
   if (!/[aeiouy]/.test(word)) return true;
   if (/q(?!u)/.test(word)) return true;
   if (/(.)\1\1/.test(word)) return true;
-  if (word.length <= 9) {
-    const clusters = word.match(/[^aeiouy]{3,}/g) || [];
-    if (clusters.some((cluster) => /[qxzj]/.test(cluster))) return true;
-  }
-  // "th" and "ch" are ordinary English. "Northbridge" is not a made-up cluster.
   const withoutH = word.replace(/h/g, "");
   if (/[^aeiouy]{5,}/.test(withoutH)) return true;
-  // "vn" and the other pairs below do not occur inside an ordinary English word of this length.
-  if (word.length >= 6 && /vn|bv|zp|xz|zx|qv|jx|vx|wx|xk|zb|vq|vk|vp|vg|vc|vb|vm/.test(word)) return true;
   return false;
+}
+
+/** Person-name tokens that fail the strict company rule. This is a note, not a failing check. */
+export function personNameTokensLookMadeUp(name: string): boolean {
+  return name
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((token) => token.length >= 4 && !/^(jr|sr|ii|iii|iv)$/.test(token))
+    .some((token) => tokenLooksGibberish(token));
 }
 
 export function companyNameLooksReal(org: string): boolean {
   if (org.trim().length < 2 || /asdf|qwerty|testtest/i.test(org)) return false;
   return !companyPhraseTokens(org).some((token) => tokenLooksGibberish(token));
-}
-
-function personNameLooksReal(name: string): boolean {
-  const tokens = name
-    .toLowerCase()
-    .split(/[^a-z]+/)
-    .filter((token) => token.length >= 4 && !/^(jr|sr|ii|iii|iv)$/.test(token));
-  return tokens.every((token) => !tokenLooksGibberish(token));
 }
 
 export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
@@ -731,14 +731,18 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
     (firmToken === orgToken || orgToken.startsWith(firmToken));
   const nameOk = (parts.length >= 2 && facts.name.trim().length >= 5) || oneWordFirm;
   const orgReal = companyNameLooksReal(facts.org);
-  const personReal = personNameLooksReal(facts.name);
+  // Person names are not failed by the gibberish heuristic. A strict mash is an attention note and the points stay.
+  const personReal = true;
   const roleKnown = annualDuesCents(facts.role) >= 0;
   if (nameOk && orgReal && personReal && roleKnown) {
+    const madeUpPerson = personNameTokensLookMadeUp(facts.name);
     return check({
       key: "plausibility",
       status: "PASS",
       weight: 4,
-      finding: "The name, company, and role are filled in and readable.",
+      finding: madeUpPerson
+        ? "The name, company, and role are filled in and readable. The person name may not be real words. This note does not change the points."
+        : "The name, company, and role are filled in and readable.",
       source: "Local plausibility heuristic",
       url: "",
     });
@@ -816,7 +820,7 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN|AZ)\b/)?.[1];
+  const state = statedUsState(facts.location) || "";
   const portal = state ? registryPortal(state) : undefined;
   if (portal) {
     return check({
@@ -828,60 +832,8 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
       url: portal.portalUrl,
     });
   }
-  const links: Record<string, string> = {
-    NJ: "https://www.njportal.com/DOR/BusinessNameSearch/",
-    NY: "https://apps.dos.ny.gov/publicInquiry/",
-    DE: "https://icis.corp.delaware.gov/Ecorp/EntitySearch/NameSearch.aspx",
-    FL: "https://search.sunbiz.org/Inquiry/CorporationSearch/ByName",
-    TX: "https://mycpa.cpa.state.tx.us/coa/",
-    DC: "https://os.dc.gov/service/corporate-registration-search",
-    CA: "https://bizfileonline.sos.ca.gov/search/business",
-    IL: "https://www.ilsos.gov/departments/business_services/corp.html",
-    MA: "https://corp.sec.state.ma.us/corpweb/CorpSearch/CorpSearch.aspx",
-    WA: "https://ccfs.sos.wa.gov/",
-    GA: "https://ecorp.sos.ga.gov/BusinessSearch",
-    PA: "https://www.corporations.pa.gov/search/corpsearch",
-    CT: "https://service.ct.gov/business/s/onlinebusinesssearch",
-    MD: "https://egov.maryland.gov/businessexpress/entitysearch",
-    CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
-    VA: "https://cis.scc.virginia.gov/",
-    OR: "https://sos.oregon.gov/business/Pages/find.aspx",
-    IA: "https://sos.iowa.gov/search/business/search.aspx",
-    NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
-    TN: "https://sos.tn.gov/business-services/business-search",
-    AZ: "https://ecorp.azcc.gov/EntitySearch/Index",
-    AL: "https://arc-sos.state.al.us/CGI/CORPNAME.MBR/INPUT",
-    AK: "https://www.commerce.alaska.gov/cbp/main/search/entities",
-    AR: "https://www.sos.arkansas.gov/corps/search_corps.php",
-    HI: "https://hbe.ehawaii.gov/documents/search.html",
-    ID: "https://sosbiz.idaho.gov/search/business",
-    IN: "https://bsd.sos.in.gov/publicbusinesssearch",
-    KS: "https://www.sos.ks.gov/eforms/BusinessEntity/Search.aspx",
-    KY: "https://web.sos.ky.gov/ftsearch/",
-    LA: "https://coraweb.sos.la.gov/CommercialSearch/CommercialSearch.aspx",
-    ME: "https://apps.web.maine.gov/nei-sos-icrs/ICRS?MainPage=x",
-    MI: "https://cofs.lara.state.mi.us/SearchApi/Search/Search",
-    MN: "https://mblsportal.sos.state.mn.us/Business/Search",
-    MS: "https://corp.sos.ms.gov/corp/portal/c/page/corpBusinessIdSearch/portal.aspx",
-    MO: "https://bsd.sos.mo.gov/BusinessEntity/BESearch.aspx?SearchType=0",
-    MT: "https://biz.sosmt.gov/search/business",
-    NE: "https://www.nebraska.gov/sos/corp/corpsearch.cgi?nav=search",
-    NV: "https://esos.nv.gov/EntitySearch/OnlineEntitySearch",
-    NH: "https://quickstart.sos.nh.gov/online/BusinessInquire",
-    NM: "https://portal.sos.state.nm.us/BFS/online/CorporationBusinessSearch",
-    ND: "https://firststop.sos.nd.gov/search/business",
-    OH: "https://businesssearch.ohiosos.gov/",
-    OK: "https://www.sos.ok.gov/corp/corpInquiryFind.aspx",
-    RI: "https://business.sos.ri.gov/CorpWeb/CorpSearch/CorpSearch.aspx",
-    SC: "https://businessfilings.sc.gov/BusinessFiling/Entity/Search",
-    SD: "https://sosenterprise.sd.gov/BusinessServices/Business/FilingSearch.aspx",
-    UT: "https://businessregistration.utah.gov/EntitySearch/OnlineEntitySearch",
-    VT: "https://bizfilings.vermont.gov/online/BusinessInquire",
-    WV: "https://apps.sos.wv.gov/business/corporations/",
-    WI: "https://www.wdfi.org/apps/corpsearch/Search.aspx",
-    WY: "https://wyobiz.wyo.gov/Business/FilingSearch.aspx",
-  };
-  if (!state || !links[state]) {
+  const url = state ? stateRegistrySearchUrl(state) : "";
+  if (!state || !url) {
     return check({
       key: "business-registry",
       status: "NOT_RUN",
@@ -897,9 +849,9 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     key: "business-registry",
     status: "NOT_RUN",
     weight: 8,
-    finding: `Couldn't check for free. No free ${state} registry API. Open the state search and look up ${facts.org}.`,
+    finding: manualRegistryFinding(state, facts.org),
     source: "State registry",
-    url: links[state],
+    url,
   });
 }
 

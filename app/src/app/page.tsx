@@ -22,8 +22,11 @@ export default async function HomePage() {
           <p className="mt-10 text-xs leading-relaxed text-mut">
             {BRAND.name} does not offer securities, take subscriptions, or process payments. Raising posts are member-only notes, not an offer to sell.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
             <AdminEntryLink />
+            <a href="/help" className="underline decoration-brass">
+              Help
+            </a>
           </div>
         </div>
       </div>

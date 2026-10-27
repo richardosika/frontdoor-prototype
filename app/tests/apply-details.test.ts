@@ -35,6 +35,12 @@ describe("apply details gate", () => {
     expect(issues.map((issue) => issue.id)).toEqual(["apply-zip", "apply-phone"]);
   });
 
+  it("rejects a fake state and a zero ZIP", () => {
+    const issues = applyDetailsIssues({ ...READY, state: "ZZ", zip: "00000" });
+    expect(issues.find((issue) => issue.id === "apply-state")?.message).toBe("Enter a real two-letter US state.");
+    expect(issues.find((issue) => issue.id === "apply-zip")?.message).toBe("Enter a real ZIP code.");
+  });
+
   it("rejects a password shorter than 8 characters", () => {
     const issues = applyDetailsIssues({ ...READY, password: "short" });
     expect(issues.find((issue) => issue.id === "apply-password")?.message).toBe("Password must be at least 8 characters.");

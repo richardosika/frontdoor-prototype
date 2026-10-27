@@ -202,7 +202,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateApplication(input: ApplicationInput): string[] {
   const errors: string[] = [];
-  if (normalizeInviteCode(input.code).length < 4) errors.push("Enter the invite code a member shared with you.");
+  const referral = normalizeInviteCode(input.code);
+  if (referral && referral.length < 4) errors.push("That referral code is not valid.");
   if (!isRoleId(input.role)) errors.push("Pick the role that best describes you.");
   errors.push(...validatePersonName(input.firstName, input.lastName));
   if (!EMAIL.test(input.email.trim())) errors.push("Enter a valid email.");

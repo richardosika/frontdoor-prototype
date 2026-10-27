@@ -1,6 +1,9 @@
 import { EvidenceChip } from "@/components/evidence-chip";
 import { newsStoryChipLabel } from "@/lib/verify/news";
 import { rubricSections, type GradeReport, type Recommendation } from "@/lib/verify/grade";
+import { publicEvidenceHref } from "@/lib/evidence-link";
+import { shownRegistryCheck } from "@/lib/state-registry-search";
+import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
 
@@ -38,7 +41,7 @@ export function RecommendationChip({ recommendation }: { recommendation: string 
   );
 }
 
-export function ExecutiveSummary({ report, title = "Executive summary" }: { report: GradeReport; title?: string }) {
+export function ExecutiveSummary({ report, title = "Executive summary", role }: { report: GradeReport; title?: string; role?: string | null }) {
   const rubric = rubricSections();
   return (
     <section className={`${card} mt-4 p-4 md:p-6`}>
@@ -64,14 +67,14 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
         </div>
       ) : null}
       <div className="mt-5 space-y-4 text-sm leading-relaxed text-ink">
-        <SummaryBlock title="Applicant" body={report.summary.applicant} />
-        <SummaryBlock title="Company" body={report.summary.company} />
-        <SummaryBlock title="What checked out" body={report.summary.checkedOut} />
-        <SummaryBlock title="What did not check out" body={report.summary.didNotCheckOut} />
-        <SummaryBlock title="What could not be checked for free" body={report.summary.couldNotCheck} />
-        <SummaryBlock title="Recommendation" body={`${report.recommendation}. ${report.summary.reasoning} Next step: ${report.summary.nextStep}`} />
+        <SummaryBlock title="Applicant" body={reviewCopy(report.summary.applicant, role)} />
+        <SummaryBlock title="Company" body={reviewCopy(report.summary.company)} />
+        <SummaryBlock title="What checked out" body={reviewCopy(report.summary.checkedOut)} />
+        <SummaryBlock title="What did not check out" body={reviewCopy(report.summary.didNotCheckOut)} />
+        <SummaryBlock title="What could not be checked for free" body={reviewCopy(report.summary.couldNotCheck)} />
+        <SummaryBlock title="Recommendation" body={reviewCopy(`${report.recommendation}. ${report.summary.reasoning} Next step: ${report.summary.nextStep}`)} />
       </div>
-      {report.changeNote ? <p className="mt-4 text-xs leading-relaxed text-mut">Re-run note: {report.changeNote}</p> : null}
+      {report.changeNote ? <p className="mt-4 text-xs leading-relaxed text-mut">Re-run note: {reviewCopy(report.changeNote)}</p> : null}
       <div className="mt-6 border-t border-line pt-4">
         <h3 className={sectionLabel}>Needs your attention</h3>
         {report.attention.length === 0 ? <p className="mt-2 text-sm text-ink">Nothing doubtful is on this file.</p> : null}
@@ -82,9 +85,9 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
                 <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${severityTone(item.severity)}`}>
                   {item.severity}
                 </span>
-                <span className="font-serif text-base text-forest">{item.title}</span>
+                <span className="font-serif text-base text-forest">{reviewCopy(item.title)}</span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-ink">{item.detail}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(item.detail)}</p>
             </li>
           ))}
         </ul>
@@ -95,12 +98,12 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
           {report.categories.map((category) => (
             <li key={category.id} className="border-t border-line pt-3">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="font-serif text-base text-forest">{category.label}</span>
+                <span className="font-serif text-base text-forest">{reviewCopy(category.label)}</span>
                 <span className="shrink-0 text-sm text-ink">
                   {category.earned} / {category.possible}
                 </span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-ink">{category.reason}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(category.reason)}</p>
             </li>
           ))}
         </ul>
@@ -110,10 +113,10 @@ export function ExecutiveSummary({ report, title = "Executive summary" }: { repo
             {rubric.map((section) => (
               <div key={section.title}>
                 <h4 className="font-serif text-base text-forest">{section.title}</h4>
-                <p className="mt-1 text-sm leading-relaxed text-ink">{section.body}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink">{reviewCopy(section.body)}</p>
               </div>
             ))}
-            {report.caps.length ? <p className="text-sm text-ink">Caps on this file: {report.caps.join(" ")}</p> : null}
+            {report.caps.length ? <p className="text-sm text-ink">Caps on this file: {reviewCopy(report.caps.join(" "))}</p> : null}
           </div>
         </details>
       </div>
@@ -132,8 +135,12 @@ function SummaryBlock({ title, body }: { title: string; body: string }) {
 
 export function CheckTable({
   evidence,
+  location = "",
+  org = "",
 }: {
   evidence: { id: string; checkKey: string; status: string; finding: string; source: string; url: string; ranAt: Date }[];
+  location?: string;
+  org?: string;
 }) {
   return (
     <details className="mt-4">
@@ -150,27 +157,30 @@ export function CheckTable({
             </tr>
           </thead>
           <tbody>
-            {evidence.map((row) => (
+            {evidence.map((row) => {
+              const shown = shownRegistryCheck({ finding: row.finding, url: row.url, location, org });
+              return (
               <tr key={row.id} className="border-b border-line align-top">
-                <td className="py-2 pr-2">{row.checkKey}</td>
+                <td className="py-2 pr-2">{reviewCheckKey(row.checkKey)}</td>
                 <td className="py-2 pr-2">
                   <EvidenceLabel row={row} />
                 </td>
                 <td className="max-w-xs py-2 pr-2 break-words">
-                  {row.finding}
-                  {row.url ? (
+                  {reviewCopy(shown.finding)}
+                  {shown.url ? (
                     <>
                       {" "}
-                      <a className="underline decoration-brass" href={row.url} target="_blank" rel="noreferrer">
+                      <a className="underline decoration-brass" href={publicEvidenceHref(shown.url)} target="_blank" rel="noreferrer">
                         {row.checkKey === "news-story" ? "Open article" : "Link"}
                       </a>
                     </>
                   ) : null}
                 </td>
-                <td className="py-2 pr-2">{row.source}</td>
+                <td className="py-2 pr-2">{reviewCopy(row.source)}</td>
                 <td className="py-2">{formatAuditTime(row.ranAt)}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

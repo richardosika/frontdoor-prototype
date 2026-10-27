@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { Banner } from "@/components/banner";
+import { RevokeApprovalForm } from "@/components/decision-form";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { PaymentPanel } from "@/components/payment-admin";
 import { CheckTable, ExecutiveSummary, GradeMark } from "@/components/grade-summary";
 import { RunAndReload } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
+import { restoreAdminNotice } from "@/lib/admin-notice";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { adminDuesLine } from "@/lib/dues";
@@ -17,10 +19,22 @@ import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
-import { applyReviewSkips, companyFileBesideApplication, gradeComparisonLine, gradeFactsFromApplication, gradeForRun, parseGradeSnapshot } from "@/lib/verify/grade";
+import { approvalAttentionDetail, approvalAttentionTitle } from "@/lib/approval-warning";
+import { applyReviewSkips, companyFileBesideApplication, gradeComparisonLine, gradeFactsFromApplication, gradeForRun, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
+
+function withRegistryNote(report: GradeReport, location: string): GradeReport {
+  return {
+    ...report,
+    attention: report.attention.map((item) => ({
+      ...item,
+      title: approvalAttentionTitle(item.title, location),
+      detail: approvalAttentionDetail(item.title, item.detail, location),
+    })),
+  };
+}
 
 export default async function ApplicationDetailPage({
   params,
@@ -33,6 +47,12 @@ export default async function ApplicationDetailPage({
   await settleStuckRuns();
   const { id } = await params;
   const query = await searchParams;
+  await restoreAdminNotice({
+    scope: `application:${id}`,
+    pathname: `/admin/applications/${id}`,
+    step: query.step,
+    notice: query.notice,
+  });
   const application = await prisma.application.findUnique({
     where: { id },
     include: {
@@ -113,7 +133,11 @@ export default async function ApplicationDetailPage({
           {application.isTest ? <span className="text-xs uppercase tracking-wide text-brass">Test</span> : null}
         </div>
         {latestGrade ? <p className="mt-2 text-xs text-mut">{gradeComparisonLine(latestGrade, shownGrade)}</p> : null}
-        {latestGrade ? <ExecutiveSummary report={latestGrade} /> : <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>}
+        {latestGrade || shownGrade ? (
+          <ExecutiveSummary report={withRegistryNote((latestGrade || shownGrade) as GradeReport, application.location)} role={application.role} />
+        ) : (
+          <p className="mt-4 text-sm text-ink">No grade yet. Run verification to write the executive summary.</p>
+        )}
         <div className="mt-4">
           <Link href={`/admin/verification/${reviewCase.id}?step=${progress.current}`} className={`${btn} inline-flex min-h-11 items-center`}>
             Open the review
@@ -155,8 +179,10 @@ export default async function ApplicationDetailPage({
             <b>Submitted:</b> {formatAuditTime(application.createdAt)}
           </p>
           <p>
-            <b>Invite:</b> {application.inviteCode.code}
-            {application.inviteCode.note ? ` · ${application.inviteCode.note}` : ""}
+            <b>Referral code:</b>{" "}
+            {application.inviteCode
+              ? `${application.inviteCode.code}${application.inviteCode.note ? ` · ${application.inviteCode.note}` : ""}`
+              : "None"}
           </p>
           <p>
             <b>References:</b> {application.referenceEmails.length ? application.referenceEmails.join(", ") : "Not provided"}
@@ -207,9 +233,9 @@ export default async function ApplicationDetailPage({
         </section>
         <details className={`${card} mt-4 p-4`}>
           <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
-          <CheckSection title="Application checks" run={report} />
-          {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" /> : null}
-          <CheckSection title="Company checks" run={company} />
+          <CheckSection title="Application checks" run={report} location={application.location} org={application.org} />
+          {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" role={application.role} /> : null}
+          <CheckSection title="Company checks" run={company} location={application.location} org={application.org} />
         </details>
         <div className="mt-4">
           <RunAndReload
@@ -269,17 +295,20 @@ export default async function ApplicationDetailPage({
             ))}
           </ul>
         </section>
+        {application.status === "APPROVED" || application.status === "PAYMENT_DUE" ? (
+          <RevokeApprovalForm applicationId={application.id} />
+        ) : null}
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete applicant</h2>
           <p className="mt-2 text-sm text-ink">
-            Removes this application, its business card, outbox notices, and verification runs. It also removes the linked member account and the CRM person when those exist. An administrator account is left in place.
+            Removes this application, its verification case, business card, outbox notices, and verification runs. It also removes the linked member account and the CRM person when those exist. An administrator account is left in place.
           </p>
           <div className="mt-3">
             <RunAndReload
               className={btnOutline}
               label="Delete this applicant and all their data"
               pendingLabel="Deleting…"
-              confirmMessage={`Delete ${application.name}? This removes the application, verification runs, outbox notices, business card, linked member account, and CRM person. This cannot be undone.`}
+              confirmMessage={`Delete ${application.name}? This removes the application, the verification case, verification runs, outbox notices, business card, linked member account, and CRM person. This cannot be undone.`}
               run={deleteOneApplication.bind(null, application.id)}
             />
           </div>
@@ -292,8 +321,12 @@ export default async function ApplicationDetailPage({
 function CheckSection({
   title,
   run,
+  location = "",
+  org = "",
 }: {
   title: string;
+  location?: string;
+  org?: string;
   run?: {
     status: string;
     finishedAt: Date | null;
@@ -310,7 +343,7 @@ function CheckSection({
             {run.status}
             {run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}
           </p>
-          <CheckTable evidence={run.evidence} />
+          <CheckTable evidence={run.evidence} location={location} org={org} />
         </>
       ) : null}
     </section>

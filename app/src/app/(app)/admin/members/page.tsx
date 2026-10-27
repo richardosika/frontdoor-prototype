@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Banner } from "@/components/banner";
-import { VerifiedMark } from "@/components/badge";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { DemoChip, StatusChip } from "@/components/status-chip";
 import { card } from "@/components/ui";
@@ -10,7 +9,7 @@ import { isApprovedMember, isDemoRecord, personStageLabel, personStanding } from
 import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
-import { toPublicVerification } from "@/lib/verification";
+import { memberListVerificationLabel } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +25,7 @@ export default async function MembersAdminPage({
     orderBy: { name: "asc" },
     include: {
       ownedApplication: { select: { status: true, isTest: true } },
-      memberVerification: { include: { checks: { select: { result: true } } } },
+      memberVerification: { select: { status: true, expiresAt: true } },
     },
   });
   const rows = members
@@ -39,7 +38,8 @@ export default async function MembersAdminPage({
         isAdmin: member.isAdmin,
       });
       const demo = isDemoRecord({ isTest: member.isTest || member.ownedApplication?.isTest, email: member.email });
-      return { member, standing, demo };
+      const fileLabel = memberListVerificationLabel(member.memberVerification);
+      return { member, standing, demo, fileLabel };
     })
     .filter((row) => isApprovedMember(row.standing))
     .filter((row) => (hideDemo ? !row.demo : true));
@@ -63,7 +63,7 @@ export default async function MembersAdminPage({
         </p>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">No approved members{hideDemo ? " outside the demo set" : ""}.</p> : null}
         <ul className={`mt-4 divide-y divide-line ${card}`}>
-          {rows.map(({ member, standing, demo }) => (
+          {rows.map(({ member, standing, demo, fileLabel }) => (
             <li key={member.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                 <Link href={`/admin/members/${member.id}`} className="underline decoration-brass/40">
@@ -76,9 +76,9 @@ export default async function MembersAdminPage({
               <p className="mt-1 text-xs text-mut">
                 {roleShort(roleLabel(member.role))} · {member.org} · {paymentStatusLabel(member.paymentStatus)} · {personStageLabel(standing.stage)}
               </p>
-              <div className="mt-2">
-                <VerifiedMark view={toPublicVerification(member.memberVerification)} />
-              </div>
+              <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${fileLabel === "Verified" ? "text-brass" : "text-ink"}`}>
+                {fileLabel}
+              </p>
             </li>
           ))}
         </ul>

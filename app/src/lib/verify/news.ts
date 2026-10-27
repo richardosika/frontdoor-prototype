@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -106,6 +106,19 @@ export function cityPhrase(location: string): string {
   return raw.length >= 4 ? raw : "";
 }
 
+const STREETISH = /\d|\b(?:street|st|avenue|ave|road|rd|drive|dr|boulevard|blvd|lane|ln|plaza|place|pl|way|court|ct|terrace|ter)\b/i;
+
+/** City for a search query. A street in the first slot is left out so the query stays person plus company. */
+export function queryCity(location: string): string {
+  const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
+  for (const part of parts) {
+    if (STREETISH.test(part)) continue;
+    const cleaned = part.replace(/\b\d{5}(?:-\d{4})?\b/g, "").replace(/\b[A-Z]{2}\b/g, "").trim();
+    if (cleaned.length >= 3) return cleaned;
+  }
+  return "";
+}
+
 function wordsOf(value: string): string[] {
   return value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 2);
 }
@@ -170,7 +183,7 @@ export function instagramCompanyTag(org: string, person: string): string {
 export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = []): string[] {
   const person = personWithoutSuffix(stripQuotes(facts.applicantName));
   const company = stripQuotes(facts.org || facts.name);
-  const city = stripQuotes(cityPhrase(facts.location));
+  const city = stripQuotes(queryCity(facts.location));
   const term = companySearchTerm(company, person);
   const last = surnameForSearch(person);
   const queries: string[] = [];
@@ -197,7 +210,7 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
 export function gdeltQuery(facts: ApplicantFacts): string {
   const person = quote(personWithoutSuffix(facts.applicantName));
   const company = quote(facts.org || facts.name);
-  const city = quote(cityPhrase(facts.location));
+  const city = quote(queryCity(facts.location));
   const parts: string[] = [];
   if (person && person !== company) parts.push(person);
   if (company) parts.push(company);
@@ -571,11 +584,17 @@ export function ordinaryResults(text: string): boolean {
   return /\b(reos?|real estate owned|dividends?|downgrades?|earnings)\b/i.test(text);
 }
 
+/** A plaintiff-firm solicitation about the company. It is not a charge against the person. */
+export function plaintiffSolicitation(text: string): boolean {
+  return /lead plaintiff deadline|securities fraud class action|\bclass action\b/i.test(text);
+}
+
 function negativeKind(text: string): "hard" | "civil" | "none" {
   if (ordinaryResults(text)) return "none";
   if (NEWS_PERSON_HARD.test(text) && allegedNegative(text)) return "hard";
   if (civilDocket(text)) return "civil";
   if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
+  if (plaintiffSolicitation(text)) return "civil";
   return "none";
 }
 
@@ -605,9 +624,10 @@ export function judgeHeadline(
   const domain = facts.website ? domainBrand(facts.website) : "";
   const typed = companyPhraseTokens(companyName);
   const typedCompact = typed.join("");
-  if (domain && domain !== typedCompact && !typed.includes(domain)) aliases.push(domain);
+  if (domain && domain !== typedCompact && !typed.includes(domain) && !domainMatchesOrgStem(domain, companyName)) aliases.push(domain);
   const alias = company ? "" : mentionsBrandAlias(text, aliases);
-  const kind = negativeKind(text);
+  let kind = negativeKind(text);
+  if (kind === "hard" && !person && plaintiffSolicitation(text)) kind = "civil";
   return {
     tone: kind === "none" ? "neutral" : "negative",
     kind,

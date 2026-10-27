@@ -1,8 +1,8 @@
 import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
-import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, firmContainsApplicantName, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -829,7 +829,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     location: facts.location,
     aliases: brandAliases(facts.org, facts.website || ""),
   };
-  const searched = [person, facts.org, cityPhrase(facts.location)].filter(Boolean).map((part) => `"${part}"`).join(" ");
+  const place = queryCity(facts.location);
+  const searched = [person, facts.org, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
   const attempts: Attempt[] = [];
   const produced: CheckOutput[] = [];
   let flushed = 0;
@@ -985,7 +986,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
       const compact = pages.map((page) => page.text).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
       const brand = mentionsBrandAlias(pages.map((page) => `${page.text}\n${page.raw}`).join("\n"), queryFacts.aliases);
-      const aliasOnly = Boolean((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal));
+      const labelIsThisFirm = Boolean(label && domainMatchesOrgStem(label, facts.org));
+      const aliasOnly = Boolean(
+        !labelIsThisFirm && ((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal)),
+      );
       if (!pages.length && homeChallenge) {
         attempts.push(
           blockedAttempt(
@@ -1053,7 +1057,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const typedLinkedin = facts.linkedinUrl.trim();
   const discoveredLinkedin =
-    socials.find((item) => item.platform === "LinkedIn" && linkedinProfileMatchesPerson(item.url, person))?.url || "";
+    socials.find((item) => {
+      if (item.platform !== "LinkedIn") return false;
+      if (/linkedin\.com\/company\//i.test(item.url)) {
+        const slug = decodeURIComponent(item.url.match(/linkedin\.com\/company\/([^/?#]+)/i)?.[1] || "");
+        if (/^\d+$/.test(slug)) return true;
+        return linkedinCompanyMatchesOrg(item.url, facts.org);
+      }
+      return linkedinProfileMatchesPerson(item.url, person);
+    })?.url || "";
   const linkedinTargets = [typedLinkedin, discoveredLinkedin].filter((url, index, all) => url && all.indexOf(url) === index);
   if (!linkedinTargets.length) {
     attempts.push(
@@ -1090,6 +1102,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       const ownProfile = /linkedin\.com\/in\//i.test(url);
       const companyPage = /linkedin\.com\/company\//i.test(url);
+      if (companyPage && !linkedinCompanyMatchesOrg(url, facts.org)) {
+        continue;
+      }
       const selfNamedFirm = firmContainsApplicantName(facts.org, person);
       const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile || (companyPage && selfNamedFirm) });
       const selfNamedProfile = score.name && selfNamedFirm && (ownProfile || companyPage);
@@ -1110,6 +1125,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
       recorded = true;
       break;
+    }
+    if (!recorded) {
+      attempts.push({
+        key: "linkedin-fetch",
+        platform: "LinkedIn",
+        searched: linkedinTargets[0],
+        url: linkedinTargets[0].replace(/^http:\/\//i, "https://"),
+        outcome: "not-found",
+        score: emptyScore(),
+        detail: "The LinkedIn company page does not match this company.",
+      });
     }
   }
   flush();

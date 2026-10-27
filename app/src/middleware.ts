@@ -11,15 +11,21 @@ import {
   siteGateExempt,
   skipsMemberSession,
 } from "@/lib/site-gate";
+import { isKnownAppPath, missingPageDocument } from "@/lib/http-document";
+import { publicAbsoluteUrl } from "@/lib/public-origin";
 import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/legal", "/brand", "/pay", "/robots.txt", "/api/health", "/api/auth", "/api/request-invite", "/api/stripe", "/api/help"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/request-status", "/help", "/legal", "/brand", "/pay", "/robots.txt", "/api/health", "/api/auth", "/api/request-invite", "/api/request-to-join", "/api/stripe", "/api/help"];
 
 function withRobots(response: NextResponse) {
   response.headers.set("X-Robots-Tag", ROBOTS_TAG);
   return response;
+}
+
+function redirectPublic(req: NextRequest, pathname: string) {
+  return withRobots(NextResponse.redirect(publicAbsoluteUrl(pathname, req.headers)));
 }
 
 function siteGateDenied() {
@@ -40,27 +46,33 @@ const withSession = auth(async (req) => {
       }),
     );
   }
+  if (!isKnownAppPath(path)) {
+    return withRobots(
+      new NextResponse(missingPageDocument(loggedIn), {
+        status: 404,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+  }
   const adminEntry = adminEntryRedirect(path, loggedIn ? { isAdmin: Boolean(req.auth?.user?.isAdmin) } : null);
   if (path === "/admin/login") {
-    if (adminEntry) return withRobots(NextResponse.redirect(new URL(adminEntry, req.nextUrl)));
+    if (adminEntry) return redirectPublic(req, adminEntry);
     return withRobots(NextResponse.next());
   }
 
   const isPublic = path === "/" || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (!loggedIn && !isPublic) {
-    const url = new URL("/login", req.nextUrl);
+    const url = new URL(publicAbsoluteUrl("/login", req.headers));
     url.searchParams.set("next", path);
     return withRobots(NextResponse.redirect(url));
   }
 
   const entry = loggedIn ? loggedInPublicRedirect(path) : null;
-  if (entry) {
-    return withRobots(NextResponse.redirect(new URL(entry, req.nextUrl)));
-  }
+  if (entry) return redirectPublic(req, entry);
 
   if (path.startsWith("/admin") && !req.auth?.user?.isAdmin) {
-    return withRobots(NextResponse.redirect(new URL("/feed", req.nextUrl)));
+    return redirectPublic(req, "/feed");
   }
 
   return withRobots(NextResponse.next());

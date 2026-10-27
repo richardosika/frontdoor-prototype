@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { deleteVerificationCase } from "@/actions/owner";
+import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { GradeMark } from "@/components/grade-summary";
-import { card, chipOff, chipOn } from "@/components/ui";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
+import { btnOutline, card, chipOff, chipOn } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import {
@@ -18,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function VerificationQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; subject?: string; grade?: string; sort?: string }>;
+  searchParams: Promise<{ status?: string; subject?: string; grade?: string; sort?: string; error?: string; notice?: string }>;
 }) {
   await requireVerificationAdmin();
   const params = await searchParams;
@@ -30,6 +33,8 @@ export default async function VerificationQueuePage({
     orderBy: { updatedAt: "desc" },
     include: {
       user: { select: { name: true, org: true, location: true } },
+      application: { select: { name: true, org: true } },
+      inviteRequest: { select: { name: true, org: true } },
       project: { select: { name: true, location: true, year: true, user: { select: { name: true } } } },
     },
   });
@@ -83,6 +88,7 @@ export default async function VerificationQueuePage({
       <MobileTitle href="/admin" label="Admin" title="Verification" />
       <div className="mx-auto max-w-4xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Verification" />
+      <Banner error={params.error} notice={params.notice} />
       <p className="mt-1 text-sm text-ink">
         Verification files are the checklists for members and projects. The grade comes from the application file when one is linked. Members never see this queue, the grade, or the notes. {awaiting} awaiting review.
       </p>
@@ -116,18 +122,35 @@ export default async function VerificationQueuePage({
         {visible.length === 0 ? <li className="text-sm text-mut">Nothing in this view.</li> : null}
         {visible.map((item) => {
           const effective = effectiveVerificationStatus(item);
+          const title =
+            item.user?.name?.trim() ||
+            item.application?.name?.trim() ||
+            item.inviteRequest?.name?.trim() ||
+            item.project?.name?.trim() ||
+            labels.get(item.id) ||
+            "this case";
           return (
-            <li key={item.id}>
-              <Link href={`/admin/verification/${item.id}`} className={`${card} flex min-h-11 items-center justify-between gap-3 px-4 py-3`}>
+            <li key={item.id} className={`${card} flex min-h-11 items-center justify-between gap-3 px-4 py-3`}>
+              <Link href={`/admin/verification/${item.id}`} className="min-w-0 flex-1">
                 <span>
                   <b className="block text-sm">{labels.get(item.id)}</b>
                   <span className="text-xs text-mut">{item.subject === "MEMBER" ? "Member" : "Project"}</span>
                 </span>
-                <span className="flex flex-col items-end gap-1">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-brass">{verificationStatusLabel(effective)}</span>
-                  <GradeMark {...(gradeByUser.get(item.userId || "") || { letter: "" })} />
-                </span>
               </Link>
+              <span className="flex flex-col items-end gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-brass">{verificationStatusLabel(effective)}</span>
+                <GradeMark {...(gradeByUser.get(item.userId || "") || { letter: "" })} />
+              </span>
+              <form id={`delete-case-${item.id}`} action={deleteVerificationCase}>
+                <input type="hidden" name="caseId" value={item.id} />
+              </form>
+              <ConfirmSubmitButton
+                form={`delete-case-${item.id}`}
+                className={btnOutline}
+                message={`Delete the verification case for ${title}? This removes the checklist and the audit log on this file. The member, application, and request stay. This cannot be undone.`}
+              >
+                Delete case
+              </ConfirmSubmitButton>
             </li>
           );
         })}

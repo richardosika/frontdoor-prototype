@@ -5,6 +5,7 @@ import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { DemoChip } from "@/components/status-chip";
 import { PaymentPanel } from "@/components/payment-admin";
+import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
@@ -71,12 +72,16 @@ export default async function AdminMemberPage({
                   </button>
                 </form>
               )}
-              <form action={removeMember}>
+              <form id={`remove-member-${member.id}`} action={removeMember}>
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={btnOutline} type="submit">
-                  Remove member
-                </button>
               </form>
+              <ConfirmSubmitButton
+                form={`remove-member-${member.id}`}
+                className={btnOutline}
+                message={`Remove ${member.name}? This deletes the member account, the application, the CRM person, and the outbox notices for this email, including the application code, welcome, and payment receipt. This cannot be undone.`}
+              >
+                Remove member
+              </ConfirmSubmitButton>
             </div>
           )}
           <p>

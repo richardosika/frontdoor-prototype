@@ -4,7 +4,6 @@ import { DUES_BILLING_NOTE, DUES_LOCALES, DUES_SCHEDULE_SENTENCE, DUES_TABLE, du
 import { replacementTemplateBody, templateDef } from "@/lib/email-templates";
 import { clarifyAnnualDues } from "@/lib/help/store";
 import { paymentRenewalLabel, renewalInOneMonth } from "@/lib/payments";
-import { formatEtDate } from "@/lib/format";
 import { withRenewalLine } from "@/lib/mail";
 
 describe("monthly dues wording", () => {
@@ -64,12 +63,12 @@ describe("monthly dues wording", () => {
 
   it("names the renewal date on a payment letter", () => {
     const today = new Date("2026-10-25T16:00:00.000Z");
-    expect(paymentRenewalLabel(null, today)).toBe(`${formatEtDate(renewalInOneMonth(today))} if recorded today`);
-    expect(paymentRenewalLabel(renewalInOneMonth(today), today)).toBe("2026-11-25");
+    expect(paymentRenewalLabel(null, today)).toBe("November 25, 2026");
+    expect(paymentRenewalLabel(renewalInOneMonth(today), today)).toBe("November 25, 2026");
     const previous = templateDef("payment_due");
     expect(previous?.body).toContain("month to month");
     expect(previous?.body).toContain("{intro_amount}");
-    expect(previous?.body).toContain("{renewal_date}");
+    expect(previous?.body).toContain("Your first full-price payment would be on {renewal_date}.");
     expect(replacementTemplateBody("payment_due", previous?.body || "")).toBeNull();
     const old = "Hello {first_name},\n\nYour Private Floor dues of {dues_amount} still need attention. No card number is stored. You can try again here: {payment_link}\n\nThe fee stays flat and is not tied to a deal.\n\nRichard Osika, Founder";
     expect(replacementTemplateBody("dues_reminder", old)).toContain("{intro_amount}");

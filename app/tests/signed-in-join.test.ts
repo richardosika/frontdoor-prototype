@@ -19,7 +19,7 @@ describe("signed-in request to join", () => {
   });
 
   it("treats the request-to-join anchor and the apply page as join entries", () => {
-    expect(isSignedInJoinEntry("/feed", "#request-invite")).toBe(true);
+    expect(isSignedInJoinEntry("/feed", "#request-to-join")).toBe(true);
     expect(isSignedInJoinEntry("/", "#request-invite")).toBe(true);
     expect(isSignedInJoinEntry("/apply", "")).toBe(true);
     expect(isSignedInJoinEntry("/feed", "")).toBe(false);

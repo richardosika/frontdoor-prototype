@@ -1168,6 +1168,14 @@ export function gradeChecks(
       });
     }
   }
+  const plausibility = findCheck(checks, "plausibility");
+  if (plausibility?.status === "PASS" && /does not change the points/i.test(plausibility.finding)) {
+    pushAttention({
+      severity: "Low",
+      title: "Person name may not be real words",
+      detail: "The person name has a token with no vowel, a q not followed by u, a triple letter, or a long consonant run. This note does not change the points.",
+    });
+  }
   const phone = findCheck(checks, "phone-state");
   if (phone?.status === "INCONCLUSIVE" && /toll-free/i.test(phone.finding)) {
     pushAttention({

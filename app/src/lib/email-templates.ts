@@ -43,13 +43,13 @@ ${JOIN_CTA}
 
 A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
-Code: {invite_code}
+Referral code, optional: {invite_code}
 
 ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   },
   {
     key: "invite_received",
-    name: "Invite request received",
+    name: "Request received",
     subject: "Thank you for applying to Private Floor",
     body: `${APPLICATION_RECEIVED_TEMPLATE}
 
@@ -72,12 +72,10 @@ It expires in 15 minutes. Enter it on the application to continue.${SIGN}`,
     subject: "We have your Private Floor application",
     body: `${APPLICATION_RECEIVED_TEMPLATE}
 
-It is for {role} at {org}.
+Your request is for the {role} role at {org}.
 
 Follow it here
-{status_link}
-
-Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
+{status_link}${SIGN}`,
   },
   {
     key: "welcome",
@@ -85,12 +83,14 @@ Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
     subject: "Welcome to Private Floor",
     body: `Hello {first_name},
 
-Welcome to Private Floor. Your membership is active. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+Welcome to Private Floor. Your membership is active. ${MEMBERSHIP_PHRASE}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
 
 Sign in
 {login_link}
 
-A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.
+
+{note}${SIGN}`,
   },
   {
     key: "needs_info",
@@ -108,7 +108,7 @@ Reply
   {
     key: "approved",
     name: "Approved",
-    subject: "You're approved for Private Floor",
+    subject: "You're approved to Private Floor",
     body: `Hello {first_name},
 
 A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no monthly dues. Developers, investors and LPs, family offices, and lenders are free.
@@ -142,7 +142,7 @@ See the status
 
 A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
 
-Next charge date: {renewal_date}.
+Your first full-price payment would be on {renewal_date}.
 
 Pay membership dues
 {payment_link}
@@ -236,6 +236,18 @@ A Private Floor administrator reviews every application. The check uses public r
 Code: {invite_code}
 
 Some roles pay a flat annual fee, billed once a year and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. Nothing is charged on the application, and the fee is never based on a deal.${SIGN}`,
+    `Hello {first_name},
+
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
+
+A Private Floor administrator reviews every application. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Code: {invite_code}
+
+${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   ],
   invite_received: `Hello {first_name},
 
@@ -275,12 +287,38 @@ Follow it here
 {status_link}
 
 Nothing is charged at this step. If your role has annual dues, they are a flat fee, billed once a year, and due only after approval. General contractors: $2,400 per year. Brokers: $1,800 per year. Attorneys and advisors: $1,200 per year. Developers, investors and LPs, family offices, and lenders are free. The fee is never based on a deal.${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+It is for {role} at {org}.
+
+Follow it here
+{status_link}
+
+Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+Your request is for the {role} role at {org}.
+
+Follow it here
+{status_link}
+
+Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
   ],
-  welcome: `Hello {first_name},
+  welcome: [
+    `Hello {first_name},
 
 Welcome to Private Floor. Your membership is active. Sign in at {login_link}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
 
 A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+    `Hello {first_name},
+
+Welcome to Private Floor. Your membership is active. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+
+Sign in
+{login_link}
+
+A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+  ],
   needs_info: `Hello {first_name},
 
 Thank you for the application. A Private Floor administrator needs a little more before deciding.
@@ -372,6 +410,24 @@ View the decision
 {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
+
+Next charge date: {renewal_date}.
+
+Pay membership dues
+{payment_link}
+
+Until the first month is recorded, the floor stays on the payment page.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
   ],
   dues_reminder: [
     `Hello {first_name},
@@ -407,6 +463,18 @@ Billing: {billing_link}${SIGN}`,
   ],
 };
 
+const PREVIOUS_SUBJECTS: Partial<Record<TemplateKey, string[]>> = {
+  approved: ["You're invited to Private Floor", "You're approved for Private Floor"],
+  info: ["You're invited to Private Floor"],
+  payment_due: ["You're approved — annual dues are next"],
+};
+
+/** True when a stored subject is an older default that should be replaced. */
+export function staleTemplateSubject(key: string, subject: string): boolean {
+  if (!isTemplateKey(key)) return false;
+  return (PREVIOUS_SUBJECTS[key] ?? []).includes(subject);
+}
+
 /** The new default body when the stored letter is still the previous default. */
 export function replacementTemplateBody(key: string, current: string): string | null {
   if (!isTemplateKey(key)) return null;
@@ -438,12 +506,22 @@ export function dropEmptyLabelLines(source: string): string {
     .join("\n");
 }
 
+/**
+ * "CBRE Group, Inc." already ends a sentence. A following period would read "Inc..".
+ * An ellipsis ("...") is left as written.
+ */
+export function repairDoubledTerminalPeriod(text: string): string {
+  return text.replace(/(\p{L})\.\.(?!\.)/gu, "$1.");
+}
+
 /** Replaces {tokens}. Unknown tokens stay so a typo is visible. The founder sign-off is for bodies, not subjects. */
 export function renderTemplate(source: string, vars: Record<string, string>, options?: { signOff?: boolean }): string {
-  const rendered = source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
-    const value = vars[key.toLowerCase()];
-    return value === undefined ? match : value;
-  });
+  const rendered = repairDoubledTerminalPeriod(
+    source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
+      const value = vars[key.toLowerCase()];
+      return value === undefined ? match : value;
+    }),
+  );
   const trimmed = dropEmptyLabelLines(rendered).trim();
   if (options?.signOff === false) return trimmed;
   if (trimmed.includes(SIGN_OFF)) return trimmed;
@@ -456,7 +534,7 @@ export function sampleTemplateVars(): Record<string, string> {
     full_name: "Alex Rivera",
     role: "General Contractor",
     org: "Northline Builders",
-    status_link: "https://cornicio-mvp.onrender.com/apply/status/preview",
+    status_link: "https://cornicio-mvp.onrender.com/request-status/preview",
     payment_link: "https://cornicio-mvp.onrender.com/pay/preview",
     login_link: "https://cornicio-mvp.onrender.com/login",
     billing_link: "https://cornicio-mvp.onrender.com/settings",

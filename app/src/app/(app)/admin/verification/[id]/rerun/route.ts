@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { recordGuidedRerun } from "@/actions/verification";
 import { verificationActor } from "@/lib/current-user";
-import { runLivePrefill } from "@/lib/guided-prefill-db";
 import { prisma } from "@/lib/prisma";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { gateVerificationRequest } from "@/lib/verification";
@@ -21,15 +21,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     path: new URL(request.url).pathname,
     actor: actor ? { isAdmin: actor.isAdmin } : null,
   });
-  if (denied) return denied;
+  if (denied || !actor) return denied ?? new Response("Not found", { status: 404 });
 
   const { id } = await context.params;
   const existing = id ? await prisma.verificationCase.findUnique({ where: { id }, select: { id: true } }) : null;
   if (!existing) {
     return NextResponse.redirect(new URL(rerunChecksHref(id, "missing"), request.url), RERUN_STATUS);
   }
+  let notice = "";
   try {
-    await runLivePrefill(id);
+    const summary = await recordGuidedRerun(id, actor.id);
+    if (!summary) {
+      return NextResponse.redirect(new URL(rerunChecksHref(id, "missing"), request.url), RERUN_STATUS);
+    }
+    notice = summary;
   } catch (error) {
     console.error("re-run checks failed", id, error instanceof Error ? error.message : "error");
     return NextResponse.redirect(new URL(rerunChecksHref(id, "failed"), request.url), RERUN_STATUS);
@@ -42,5 +47,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     revalidatePath("/admin/applications");
   }
   revalidatePath("/admin/audit");
-  return NextResponse.redirect(new URL(rerunChecksHref(id, "done"), request.url), RERUN_STATUS);
+  const done = new URL(`/admin/verification/${id}`, request.url);
+  done.searchParams.set("step", "decision");
+  done.searchParams.set("notice", notice);
+  return NextResponse.redirect(done, RERUN_STATUS);
 }

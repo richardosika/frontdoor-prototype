@@ -1,8 +1,14 @@
 import { saveReviewStep } from "@/actions/review";
-import { DecisionForm, InviteDecisionForm } from "@/components/decision-form";
+import { DecisionForm, InviteDecisionForm, RevokeApprovalForm } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+import { approvalAttentionDetail, approvalAttentionTitle, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { decisionDialogBootstrap } from "@/lib/decision-dialog";
+import { verdictLabel } from "@/lib/application-status";
+import { publicEvidenceHref } from "@/lib/evidence-link";
+import { reviewCopy } from "@/lib/review-copy";
+import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
 import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
@@ -17,6 +23,10 @@ export function GuidedReview({
   notLegit,
   confirmLabel,
   mode = "application",
+  applicationStatus = null,
+  verdict = "",
+  role = "",
+  location = "",
   unverified = [],
   applicationGrade = null,
 }: {
@@ -29,6 +39,10 @@ export function GuidedReview({
   notLegit: boolean;
   confirmLabel: string;
   mode?: MemberReviewMode;
+  applicationStatus?: string | null;
+  verdict?: string;
+  role?: string;
+  location?: string;
   unverified?: string[];
   applicationGrade?: { letter: string; score: number } | null;
 }) {
@@ -39,6 +53,7 @@ export function GuidedReview({
 
   return (
     <section className="mt-4 rounded border border-line bg-paper p-4">
+      <script dangerouslySetInnerHTML={{ __html: decisionDialogBootstrap() }} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
       <h2 className="mt-1 font-serif text-2xl font-normal text-forest">
         Step {current.index} of {total}
@@ -75,6 +90,11 @@ export function GuidedReview({
           mode={mode}
           skipped={skipped}
           previous={previous}
+          applicationStatus={applicationStatus}
+          verdict={verdict}
+          steps={steps}
+          role={role}
+          location={location}
           unverified={unverified}
           applicationGrade={applicationGrade}
         />
@@ -92,10 +112,10 @@ export function GuidedReview({
             {current.findings.length === 0 ? <li className="text-sm text-mut">No automated result for this step.</li> : null}
             {current.findings.map((finding, index) => (
               <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{finding.source}</p>
-                <p className="mt-1 leading-relaxed text-ink">{finding.text}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
+                <p className="mt-1 leading-relaxed text-ink">{reviewCopy(finding.text)}</p>
                 {finding.url ? (
-                  <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={finding.url} target="_blank" rel="noreferrer">
+                  <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">
                     Open evidence
                   </a>
                 ) : null}
@@ -120,11 +140,11 @@ export function GuidedReview({
             </label>
             <label className="block">
               <span className={labelCls}>Evidence link</span>
-              <input name="evidenceUrl" className={field} defaultValue={current.saved?.evidenceUrl || current.prefill?.evidenceUrl || ""} placeholder="https://" />
+              <input name="evidenceUrl" className={field} defaultValue={publicEvidenceHref(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: current.saved?.evidenceUrl || current.prefill?.evidenceUrl || "", location }).url)} placeholder="https://" />
             </label>
             <label className="block">
               <span className={labelCls}>Note</span>
-              <textarea name="note" className={field} rows={6} defaultValue={current.saved?.note || current.prefill?.note || ""} placeholder="What was found, and what was not" />
+              <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: "", location }).finding)} placeholder="What was found, and what was not" />
             </label>
             <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
               Save & next
@@ -160,6 +180,11 @@ function DecisionStep({
   mode,
   skipped,
   previous,
+  applicationStatus,
+  verdict,
+  steps,
+  role,
+  location,
   unverified,
   applicationGrade,
 }: {
@@ -172,9 +197,35 @@ function DecisionStep({
   mode: MemberReviewMode;
   skipped: BuiltStep[];
   previous: ReviewStepId;
+  applicationStatus: string | null;
+  verdict: string;
+  steps: BuiltStep[];
+  role: string;
+  location: string;
   unverified: string[];
   applicationGrade: { letter: string; score: number } | null;
 }) {
+  const strongWarning = needsStrongApprovalWarning({
+    letter: grade?.letter,
+    recommendation: grade?.recommendation,
+    verdict,
+  });
+  const attention = (grade?.attention ?? []).map((item) => ({
+    ...item,
+    title: approvalAttentionTitle(item.title, location),
+    detail: approvalAttentionDetail(item.title, item.detail, location),
+  }));
+  const displayGrade = grade ? { ...grade, attention } : null;
+  const warningText = strongApprovalWarning({
+    letter: grade?.letter || "",
+    verdict: verdictLabel(verdict),
+    recommendation: grade?.recommendation || "",
+    items: unverifiedApprovalItems({
+      steps,
+      attention,
+    }),
+  });
+  const canRevoke = Boolean(applicationId) && (applicationStatus === "APPROVED" || applicationStatus === "PAYMENT_DUE");
   return (
     <div className="mt-4" id="decision-step">
       <h3 className="font-serif text-xl font-normal">Your decision</h3>
@@ -212,7 +263,7 @@ function DecisionStep({
         <p className="mt-3 text-sm text-ink">Nothing on the unverified list. A source corroborated this person.</p>
       )}
       {grade ? <p className="mt-3 text-sm text-ink">{gradeComparisonLine(grade, applicationGrade)}</p> : null}
-      {grade ? <ExecutiveSummary report={grade} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
+      {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
         <DecisionForm
           applicationId={applicationId}
@@ -220,12 +271,17 @@ function DecisionStep({
           notLegit={notLegit}
           confirmLabel={confirmLabel}
           paying={paying}
+          strongWarning={strongWarning}
+          warningText={reviewCopy(warningText)}
           unverified={unverified}
         />
       ) : null}
       {mode === "invite" ? <InviteDecisionForm caseId={caseId} unverified={unverified} /> : null}
       {mode === "closed" ? (
-        <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>
+        <>
+          <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>
+          {canRevoke ? <RevokeApprovalForm applicationId={applicationId} caseId={caseId} /> : null}
+        </>
       ) : null}
       <form action={saveReviewStep} className="mt-3">
         <input type="hidden" name="applicationId" value={applicationId} />

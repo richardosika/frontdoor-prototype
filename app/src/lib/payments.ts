@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { monthlyDuesCents } from "@/lib/dues";
-import { formatEtDate } from "@/lib/format";
+import { formatEtDate, formatLongEtDate } from "@/lib/format";
 
 export type DuesGroup = "free" | "gc" | "broker" | "advisor";
 
@@ -121,6 +121,5 @@ export const DUES_COVERS =
 
 /** Date of the next charge, shown on the payment page and in the payment-link email. */
 export function paymentRenewalLabel(renewalAt: Date | null, now = new Date()): string {
-  const date = formatEtDate(renewalAt ?? renewalInOneMonth(now));
-  return renewalAt ? date : `${date} if recorded today`;
+  return formatLongEtDate(renewalAt ?? renewalInOneMonth(now));
 }

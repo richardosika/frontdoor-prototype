@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSaysAddressInvalid, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, personNameTokensLookMadeUp, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
+import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
@@ -4487,7 +4487,8 @@ describe("batch 12 former names, registry links, geocoder misses, and missing co
   });
 
   it("flags an unregistered domain with no company evidence and scores it below a company-confirmed file", () => {
-    expect(tokenLooksGibberish("Throvnik")).toBe(true);
+    expect(tokenLooksGibberish("Throvnik")).toBe(false);
+    expect(tokenLooksGibberish("Qwvzn")).toBe(true);
     expect(tokenLooksGibberish("Blorptex")).toBe(false);
     expect(tokenLooksGibberish("Prologis")).toBe(false);
     expect(tokenLooksGibberish("Gilbane")).toBe(false);
@@ -4495,13 +4496,13 @@ describe("batch 12 former names, registry links, geocoder misses, and missing co
     expect(tokenLooksGibberish("Tishman")).toBe(false);
     expect(tokenLooksGibberish("Brambleton")).toBe(false);
     expect(tokenLooksGibberish("Keystone")).toBe(false);
-    expect(companyNameLooksReal("Throvnik Pellusar Capital LLC")).toBe(false);
+    expect(companyNameLooksReal("Throvnik Pellusar Capital LLC")).toBe(true);
     expect(companyNameLooksReal("Prologis")).toBe(true);
     expect(companyNameLooksReal("Gilbane Building Company")).toBe(true);
     expect(companyNameLooksReal("Fried Frank")).toBe(true);
-    const gibberishPerson = plausibilityCheck(facts({ name: "Throvnik Pellusar", applicantName: "Throvnik Pellusar", org: "CBRE Group" }));
-    expect(gibberishPerson.status).toBe("FAIL");
-    expect(gibberishPerson.finding.toLowerCase()).toContain("person name");
+    const readableSurname = plausibilityCheck(facts({ name: "Throvnik Pellusar", applicantName: "Throvnik Pellusar", org: "CBRE Group" }));
+    expect(readableSurname.status).toBe("PASS");
+    expect(readableSurname.finding.toLowerCase()).not.toContain("does not look like real words");
     const readablePerson = plausibilityCheck(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "CBRE Group" }));
     expect(readablePerson.status).toBe("PASS");
 
@@ -4989,5 +4990,123 @@ describe("self-reported website credit needs an outside source", () => {
     expect(gilbane.score - fake.score).toBeLessThan(15);
     expect(brinkwell.score).toBeLessThan(fake.score);
     expect(brinkwell.score).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("batch 12 surnames, aliases, and company pages", () => {
+  function rolePoints(name: string, org: string): number {
+    const applicant = facts({ name, applicantName: name, org });
+    return gradeChecks([plausibilityCheck(applicant)], applicant).categories.find((category) => category.id === "role")?.earned ?? -1;
+  }
+
+  it("passes real surnames and still fails a no-vowel company token", () => {
+    for (const [name, org] of [
+      ["Belinda Schwartz", "Herrick, Feinstein LLP"],
+      ["Ralph Herzka", "Meridian Capital Group"],
+      ["Chaim Katzman", "Gazit Group"],
+      ["Ara Hovnanian", "Hovnanian Enterprises"],
+      ["Moshe Schwartz", "Schwartz Realty LLC"],
+      ["Andrzej Duda", "Example Partners"],
+      ["Ilya Kravchenko", "Example Partners"],
+      ["Richard Osika", "Osika Construction"],
+      ["Zbigniew Example", "Example Partners"],
+      ["Yitzchak Example", "Example Partners"],
+    ] as const) {
+      const row = plausibilityCheck(facts({ name, applicantName: name, org }));
+      expect(row.status, `${name} / ${org}`).toBe("PASS");
+      expect(row.finding.toLowerCase()).not.toContain("does not look like real words");
+    }
+    expect(rolePoints("Belinda Schwartz", "Herrick, Feinstein LLP")).toBe(8);
+    expect(rolePoints("Ralph Herzka", "Meridian Capital Group")).toBe(8);
+    expect(rolePoints("Ara Hovnanian", "Hovnanian Enterprises")).toBe(8);
+    expect(companyNameLooksReal("Hovnanian Enterprises")).toBe(true);
+    expect(companyNameLooksReal("Schwartz Realty LLC")).toBe(true);
+
+    const companyMash = plausibilityCheck(facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "Blorptex Qwvzn Builders LLC" }));
+    expect(companyMash.status).toBe("FAIL");
+    expect(companyMash.finding.toLowerCase()).toContain("company name");
+    expect(plausibilityCheck(facts({ name: "Jane Roe", applicantName: "Jane Roe", org: "asdf" })).status).toBe("FAIL");
+    expect(tokenLooksGibberish("bcdf")).toBe(true);
+    expect(tokenLooksGibberish("Schwartz")).toBe(false);
+    expect(tokenLooksGibberish("Hovnanian")).toBe(false);
+
+    const personMash = plausibilityCheck(facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "CBRE Group" }));
+    expect(personMash.status).toBe("PASS");
+    expect(personNameTokensLookMadeUp("Nix Qwvzn")).toBe(true);
+    const noted = gradeChecks([personMash], facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "CBRE Group" }));
+    expect(noted.categories.find((category) => category.id === "role")?.earned).toBe(8);
+    expect(noted.attention.some((item) => item.title === "Person name may not be real words")).toBe(true);
+    expect(noted.letter).not.toBe("A");
+  });
+
+  it("does not treat twotreesny as a second brand, and keeps a street out of the person and company query", () => {
+    expect(domainMatchesOrgStem("twotreesny", "Two Trees Management")).toBe(true);
+    expect(domainMatchesOrgStem("twotreesnyc", "Two Trees Management")).toBe(true);
+    expect(brandAliases("Two Trees Management", "https://www.twotreesny.com")).not.toContain("twotreesny");
+    expect(queryCity("7 Jackson Walkway, Providence, RI 02903")).toBe("Providence");
+    expect(queryCity("250 Vesey St, New York, NY 10281")).toBe("New York");
+    expect(newsSearchQueries(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company", location: "7 Jackson Walkway, Providence, RI 02903" })).join(" ")).not.toMatch(/jackson|walkway/i);
+  });
+
+  it("treats a plaintiff-firm class-action solicitation as company-level attention", () => {
+    const headline = "Lead Plaintiff Deadline in Securities Fraud Class Action against Compass";
+    const judged = judgeHeadline(headline, {
+      name: "Robert Reffkin",
+      applicantName: "Robert Reffkin",
+      org: "Compass",
+      location: "New York, NY",
+    });
+    expect(judged.person).toBe(false);
+    expect(judged.company).toBe(true);
+    expect(judged.kind).toBe("civil");
+    const rows = classifyNews(
+      facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass", location: "New York, NY" }),
+      [{ title: headline, snippet: headline, url: "https://news.example/compass", source: "Example", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((row) => row.key === "news");
+    expect(news?.status).not.toBe("FAIL");
+    expect(news?.finding).toContain("Company-level litigation");
+    const graded = gradeChecks(rows, facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass" }));
+    expect(graded.caps.join(" ")).not.toMatch(/capped at F|capped at D/i);
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+  });
+
+  it("does not accept a sister LinkedIn company page from one shared token", async () => {
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/gilbane-building-company/", "Gilbane Building Company")).toBe(true);
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/gilbane-development-company/", "Gilbane Building Company")).toBe(false);
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/walker-dunlop/", "Walker & Dunlop")).toBe(true);
+    let webQuery = "";
+    const checks = await runPublicScreen(
+      facts({
+        name: "Alex Morgan",
+        applicantName: "Alex Morgan",
+        org: "Gilbane Building Company",
+        website: "https://www.gilbaneco.com/",
+        location: "7 Jackson Walkway, Providence, RI 02903",
+      }),
+      async (url) => {
+        if (url.includes("duckduckgo.com") || url.includes("bing.com")) {
+          webQuery = decodeURIComponent(url);
+          return { ok: false, status: 403, text: "" };
+        }
+        if (url.includes("gilbaneco.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: '<html><p>Gilbane Building Company</p><a href="https://www.linkedin.com/company/gilbane-development-company/">LinkedIn</a></html>',
+          };
+        }
+        if (url.includes("gilbane-development-company")) {
+          return { ok: true, status: 200, text: "<html><title>Gilbane Development Company | LinkedIn</title><p>Gilbane Development Company</p></html>" };
+        }
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    expect(webQuery.toLowerCase()).not.toContain("jackson");
+    expect(webQuery.toLowerCase()).toContain("gilbane");
+    const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+    expect(linkedin?.status).not.toBe("PASS");
+    expect(linkedin?.companyOnly).not.toBe(true);
   });
 });

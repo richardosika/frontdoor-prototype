@@ -5,7 +5,8 @@ import { CopyCode } from "@/components/copy-code";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
-import { activitySince, attentionItems, funnelCounts, mergeActivity, type ActivityRow } from "@/lib/admin-home";
+import { activitySince, attentionItems, funnelCounts, mergeActivity, plainActivityText, type ActivityRow } from "@/lib/admin-home";
+import { verdictLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { roleLabel } from "@/lib/roles";
@@ -120,7 +121,7 @@ export default async function AdminPage({
         id: `run-${row.id}`,
         at: row.createdAt.toISOString(),
         kind: "verification",
-        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${row.verdict}` : ""}${formatRunScores(row) ? ` · ${formatRunScores(row)}` : ""} · ${row.application?.name || "No application"}`,
+        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}${formatRunScores(row) ? ` · ${formatRunScores(row)}` : ""} · ${row.application?.name || "No application"}`,
         href: "/admin/audit",
       }),
     ),
@@ -144,7 +145,7 @@ export default async function AdminPage({
         {issuedCode ? (
           <CopyCode
             code={issuedCode.code}
-            caption={`Invite code for ${params.issuedFor || "this request"}. The information email is in the Outbox. Copy the code. Applicants are not emailed.`}
+            caption={`Referral code for ${params.issuedFor || "this request"}. The information email is in the Outbox. Copy the code. Applicants are not emailed.`}
           />
         ) : null}
       </div>
@@ -204,7 +205,7 @@ export default async function AdminPage({
             <li key={row.id} className="py-2">
               <Link href={row.href} className="block min-h-11">
                 <span className="text-xs text-mut">{formatAuditTime(new Date(row.at))}</span>
-                <span className="mt-0.5 block text-ink">{row.text}</span>
+                <span className="mt-0.5 block text-ink">{plainActivityText(row.text)}</span>
               </Link>
             </li>
           ))}
@@ -239,7 +240,7 @@ export default async function AdminPage({
       </section>
 
       <section className={`${card} mt-6 p-4`}>
-        <h2 className={sectionLabel}>Invite requests</h2>
+        <h2 className={sectionLabel}>Requests to join</h2>
         <p className="mt-1 text-sm text-ink">
           Issuing a code puts the information email in the Outbox. Copy the code. Applicants are not emailed.
         </p>
@@ -277,7 +278,7 @@ export default async function AdminPage({
                 <ConfirmSubmitButton
                   form={`delete-request-${request.id}`}
                   className={btnOutline}
-                  message={`Delete the invite request for ${request.name}? The CRM person stays.`}
+                  message={`Delete the request to join for ${request.name}? This also deletes the CRM person, the verification file, and the outbox notices for this request.`}
                 >
                   Delete request
                 </ConfirmSubmitButton>
@@ -289,7 +290,7 @@ export default async function AdminPage({
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className={`${card} p-4`}>
-          <h2 className={sectionLabel}>New invite code</h2>
+          <h2 className={sectionLabel}>New referral code</h2>
           <form action={createInvite} className="mt-3 space-y-2">
             <div>
               <label className={labelCls}>Code</label>
@@ -301,7 +302,7 @@ export default async function AdminPage({
             </div>
             <div>
               <label className={labelCls}>Note</label>
-              <input name="note" className={field} placeholder="Q4 founding invites" />
+              <input name="note" className={field} placeholder="Optional note" />
             </div>
             <button className={btn} type="submit">
               Create code
@@ -309,7 +310,7 @@ export default async function AdminPage({
           </form>
         </section>
         <section className={`${card} p-4`}>
-          <h2 className={sectionLabel}>Invite codes</h2>
+          <h2 className={sectionLabel}>Referral codes</h2>
           <ul className="mt-3 divide-y divide-line text-sm">
             {invites.map((invite) => (
               <li key={invite.id} className="py-2">
@@ -323,7 +324,7 @@ export default async function AdminPage({
                 <ConfirmSubmitButton
                   form={`delete-code-${invite.id}`}
                   className={`${btnOutline} mt-2`}
-                  message={`Delete invite code ${invite.code}? Codes that already have applications are kept until those applicants are deleted.`}
+                  message={`Delete referral code ${invite.code}? Codes that already have applications are kept until those applicants are deleted.`}
                 >
                   Delete code
                 </ConfirmSubmitButton>

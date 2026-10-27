@@ -4,7 +4,7 @@ These notes describe the product. They are not legal, tax, or investment advice.
 
 ## Signup
 
-Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. An applicant can use an invite code, then completes the application at Apply. The form asks for a real name, role, company, and location. A business card image is optional. Private Floor does not ask for a government ID, a Social Security number, or a date of birth. Two consent boxes start unchecked. Both must be checked before the application can be submitted. After submit, the applicant keeps a status link. The status page is where a reply goes if a Private Floor administrator asks for something more.
+Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. An applicant completes the application at Apply. A referral code is optional and is never required. The form asks for a real name, role, company, and location. A business card image is optional. Private Floor does not ask for a government ID, a Social Security number, or a date of birth. Two consent boxes start unchecked. Both must be checked before the application can be submitted. After submit, the applicant keeps a status link. The status page is where a reply goes if a Private Floor administrator asks for something more.
 
 ## Verification
 

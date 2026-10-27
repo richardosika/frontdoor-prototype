@@ -24,6 +24,12 @@ export function currentMonthlyCents(role: string, stored = 0): number {
   return stored;
 }
 
+/** Paid, waived, and free memberships show the active state. Everything else still needs a payment. */
+export function payPageState(status: string): "active" | "due" {
+  if (status === "PAID" || status === "WAIVED" || status === "NOT_REQUIRED") return "active";
+  return "due";
+}
+
 export function firstMonthCents(monthlyCents: number): number {
   if (monthlyCents <= 0) return 0;
   return Math.round(monthlyCents / 2);
@@ -52,8 +58,47 @@ export function offerLabel(monthlyCents: number): string {
 
 export const DUES_WAIVED = "Dues waived by an administrator.";
 
+export const FREE_MEMBERSHIP_LINE = "Free membership. No dues.";
+
+/**
+ * Applicant status page. Declined shows no money. A paid membership shows that it is active
+ * and, when known, the next charge date. Everyone else sees the offer.
+ */
+export function statusMembershipLine(input: {
+  status: string;
+  monthlyCents: number;
+  waived: boolean;
+  paymentStatus?: string | null;
+  renewalLabel?: string | null;
+}): string | null {
+  if (input.status === "DECLINED" || input.status === "REJECTED") return null;
+  if (input.paymentStatus === "PAID" || input.paymentStatus === "WAIVED") {
+    const when = input.paymentStatus === "PAID" && input.renewalLabel ? ` Next charge date ${input.renewalLabel}.` : "";
+    return `This membership is active.${when}`;
+  }
+  if (input.status === "APPROVED" || input.status === "PAYMENT_DUE") {
+    if (input.monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
+    if (input.waived) return `${offerLabel(input.monthlyCents)}. ${DUES_WAIVED}`;
+    return `${offerLabel(input.monthlyCents)}. ${DUES_DUE_NOW_NOTE}`;
+  }
+  return applicantDuesSentence(input.monthlyCents, input.waived);
+}
+
+/** Status-page dues line. A free role does not also say an administrator waived dues. */
+export function applicantDuesSentence(monthlyCents: number, waived: boolean): string {
+  if (monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
+  const offer = `${offerLabel(monthlyCents)}. ${DUES_BILLING_NOTE}`;
+  return waived ? `${offer} ${DUES_WAIVED}` : offer;
+}
+
 export const DUES_BILLING_NOTE =
   "Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Due only after approval. Flat, never based on a deal.";
+
+/** Same schedule, for someone already approved who still needs to pay. */
+export const DUES_DUE_NOW_NOTE = DUES_BILLING_NOTE.replace(
+  "Due only after approval.",
+  "Dues are due now to activate your membership.",
+);
 
 /** Same sentence as the billing note. Older imports still compile. */
 export const DUES_ANNUAL_NOTE = DUES_BILLING_NOTE;

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
-import { duesLabel } from "@/lib/dues";
-import { formatEtDate } from "@/lib/format";
+import { currentMonthlyCents, duesLabel, firstMonthCents, formatMoney } from "@/lib/dues";
+import { formatLongEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -41,7 +41,9 @@ export default async function AdminPaymentsPage() {
         </p>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">No payment records yet.</p> : null}
         <ul className="mt-4 space-y-3">
-          {rows.map((member) => (
+          {rows.map((member) => {
+            const monthly = currentMonthlyCents(member.role, member.duesCents);
+            return (
             <li key={member.id} className={`${card} p-4 text-sm ${needsMoney(member.paymentStatus) ? "border-brass" : ""}`}>
               <Link href={`/admin/members/${member.id}`} className="font-serif text-xl font-normal underline decoration-brass/40">
                 {member.name}
@@ -50,11 +52,12 @@ export default async function AdminPaymentsPage() {
                 {roleShort(roleLabel(member.role))} · {member.org}
               </p>
               <p className="mt-1 text-ink">
-                {paymentStatusLabel(member.paymentStatus)} · {duesLabel(member.duesCents)}
-                {member.renewalAt ? ` · renews ${formatEtDate(member.renewalAt)}` : ""}
+                {paymentStatusLabel(member.paymentStatus)} · First month {formatMoney(firstMonthCents(monthly))} · {duesLabel(monthly)}
+                {member.renewalAt ? ` · renews ${formatLongEtDate(member.renewalAt)}` : ""}
               </p>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </div>
