@@ -5,7 +5,7 @@ import { DuesLanguages } from "@/components/dues-languages";
 import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
-import { DUES_BILLING_NOTE, DUES_WAIVED, firstMonthCents, formatMoney, payPageState } from "@/lib/dues";
+import { DUES_DUE_NOW_NOTE, DUES_WAIVED, firstMonthCents, formatMoney, payPageState } from "@/lib/dues";
 import { formatLongEtDate } from "@/lib/format";
 import { DUES_COVERS, paymentRenewalLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
@@ -94,7 +94,7 @@ export function PayDues({
               <p className="mt-2 text-sm text-ink">Then {full} per month.</p>
             </>
           )}
-          <p className="mt-2 text-sm text-ink">{DUES_BILLING_NOTE}</p>
+          <p className="mt-2 text-sm text-ink">{DUES_DUE_NOW_NOTE}</p>
           <p className="mt-2 text-sm text-ink">{DUES_COVERS}</p>
           {status === "WAIVED" ? null : (
             <p className="mt-2 text-sm text-forest">
@@ -116,7 +116,7 @@ export function PayDues({
             Membership Dues and Refund Terms
           </Link>
         </p>
-        <DuesLanguages />
+        <DuesLanguages dueNow />
         {mode === "simulated" ? (
           <p className="mt-3 rounded border border-brass px-3 py-2 text-sm text-forest">
             TEST. Simulated payment. {BRAND.name} does not store a card number, and this button does not charge one.

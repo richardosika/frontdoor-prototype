@@ -294,7 +294,7 @@ export async function reviewApplication(formData: FormData) {
     });
   } else {
     await sendTemplate({
-      key: "approved",
+      key: "welcome",
       to: application.email,
       applicationId: application.id,
       vars: buildMailVars({

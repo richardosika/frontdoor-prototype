@@ -79,7 +79,7 @@ export function statusMembershipLine(input: {
   if (input.status === "APPROVED" || input.status === "PAYMENT_DUE") {
     if (input.monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
     if (input.waived) return `${offerLabel(input.monthlyCents)}. ${DUES_WAIVED}`;
-    return `${offerLabel(input.monthlyCents)}. Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Dues are due now to activate your membership. Flat, never based on a deal.`;
+    return `${offerLabel(input.monthlyCents)}. ${DUES_DUE_NOW_NOTE}`;
   }
   return applicantDuesSentence(input.monthlyCents, input.waived);
 }
@@ -93,6 +93,12 @@ export function applicantDuesSentence(monthlyCents: number, waived: boolean): st
 
 export const DUES_BILLING_NOTE =
   "Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Due only after approval. Flat, never based on a deal.";
+
+/** Same schedule, for someone already approved who still needs to pay. */
+export const DUES_DUE_NOW_NOTE = DUES_BILLING_NOTE.replace(
+  "Due only after approval.",
+  "Dues are due now to activate your membership.",
+);
 
 /** Same sentence as the billing note. Older imports still compile. */
 export const DUES_ANNUAL_NOTE = DUES_BILLING_NOTE;

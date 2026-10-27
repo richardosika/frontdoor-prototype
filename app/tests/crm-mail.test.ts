@@ -89,7 +89,8 @@ describe("email templates", () => {
     expect(crm).not.toMatch(/key:\s*"approved"/);
     expect(crm).not.toMatch(/key:\s*"payment_due"/);
     expect(decision).toMatch(/key:\s*"payment_due"/);
-    expect(decision).toMatch(/key:\s*"approved"/);
+    expect(decision).toMatch(/key:\s*"welcome"/);
+    expect(decision).not.toMatch(/key:\s*"approved"/);
   });
 
   it("keeps live mode on the test outbox", () => {

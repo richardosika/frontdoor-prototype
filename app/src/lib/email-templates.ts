@@ -83,12 +83,14 @@ Follow it here
     subject: "Welcome to Private Floor",
     body: `Hello {first_name},
 
-Welcome to Private Floor. Your membership is active. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+Welcome to Private Floor. Your membership is active. ${MEMBERSHIP_PHRASE}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
 
 Sign in
 {login_link}
 
-A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.
+
+{note}${SIGN}`,
   },
   {
     key: "needs_info",
@@ -302,11 +304,21 @@ Follow it here
 
 Nothing is charged at this step. ${DUES_SCHEDULE_SENTENCE}${SIGN}`,
   ],
-  welcome: `Hello {first_name},
+  welcome: [
+    `Hello {first_name},
 
 Welcome to Private Floor. Your membership is active. Sign in at {login_link}. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
 
 A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+    `Hello {first_name},
+
+Welcome to Private Floor. Your membership is active. The first-week checklist is on the feed: your profile, the directory, the guidelines, a post, and an introduction.
+
+Sign in
+{login_link}
+
+A Private Floor administrator is here if you need anything. Write to connect@privatefloorclub.com.${SIGN}`,
+  ],
   needs_info: `Hello {first_name},
 
 Thank you for the application. A Private Floor administrator needs a little more before deciding.
