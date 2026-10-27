@@ -102,7 +102,8 @@
     },
     {
       "id": "LR01",
-      "kind": "replay",
+      "kind": "qa",
+      "qaExpect": "firm",
       "label": "QA TestAF / Brookfield Properties",
       "segment": "Made-up person, real company. Company-exists evidence only. Not a rejection.",
       "name": "QA TestAF",
@@ -115,7 +116,8 @@
     },
     {
       "id": "LR02",
-      "kind": "replay",
+      "kind": "qa",
+      "qaExpect": "firm",
       "label": "QA TestAB / Skanska USA Building",
       "segment": "Made-up person, real company. usa.skanska.com redirects across hosts. A court no-record is inconclusive.",
       "name": "QA TestAB",
@@ -128,7 +130,8 @@
     },
     {
       "id": "LR03",
-      "kind": "replay",
+      "kind": "qa",
+      "qaExpect": "firm",
       "label": "QA TestAG / AECOM Tishman",
       "segment": "Made-up person, real company. Company confirmed, person not confirmed.",
       "name": "QA TestAG",
