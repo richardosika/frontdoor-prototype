@@ -1,6 +1,7 @@
 import { annualDuesCents } from "@/lib/dues";
 import { roleLabel } from "@/lib/roles";
 import { US_POSTAL_CODES, statedUsState } from "@/lib/verify/address";
+import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus, Verdict } from "@/lib/verify/types";
 
 /**
@@ -284,6 +285,29 @@ function withData(check: CheckOutput): boolean {
 
 export function corroboratingPasses(checks: CheckOutput[]): CheckOutput[] {
   return checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
+}
+
+function citedEvidence(finding: string): string {
+  const found = finding.match(/Found:\s*([\s\S]*?)\s+Name:/i);
+  if (found) return found[1];
+  return finding.replace(/Searched:\s*.*?\.\s*/i, " ").replace(/\sName:\s*(yes|no)\b[\s\S]*$/i, "");
+}
+
+/**
+ * An independent pass counts toward the grade either way. The team-page request
+ * stays up until one of those passes actually names the person and the company.
+ */
+export function namesPersonAndCompany(check: CheckOutput, facts: GradeFacts): boolean {
+  if (check.status !== "PASS" || !check.corroborates || check.selfReported || check.companyOnly) return false;
+  const scored = check.finding.match(/Name:\s*(yes|no)\b[\s\S]*?Company:\s*(yes|no)\b/i);
+  if (scored && (scored[1].toLowerCase() !== "yes" || scored[2].toLowerCase() !== "yes")) return false;
+  if (/names (?:this |both the |the )?person and (?:the )?company/i.test(check.finding)) return true;
+  const person = facts.applicantName || facts.name || "";
+  const org = facts.org || "";
+  if (!person || !org) return Boolean(scored);
+  const cited = citedEvidence(check.finding);
+  if (!cited.trim()) return Boolean(scored);
+  return mentionsPerson(cited, person, org) && mentionsCompany(cited, org, person);
 }
 
 function confidenceOf(checks: CheckOutput[]): Confidence {
@@ -676,12 +700,17 @@ function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeight
   return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");
 }
 
-function linkedinAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
+function linkedinAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, independent: boolean): Line {
   if (possible <= 0) {
     return award(Boolean(row?.status === "PASS" && !row.companyOnly), possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
   }
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
-  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  if (row?.status === "PASS" && row.companyOnly) {
+    if (!independent) {
+      return portionLine(0, possible, "The LinkedIn company page is company-only and no independent source tied the person to the company");
+    }
+    return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  }
   return award(row?.status === "PASS", possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
 }
 
@@ -747,13 +776,20 @@ function registryAward(row: CheckOutput | undefined, possible: number, mode: Gra
   );
 }
 
-function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number): Line {
+function applicationField(earned: boolean, possible: number, yes: string, no: string, independent: boolean): Line {
+  if (earned && !independent) {
+    return portionLine(0, possible, "No independent source tied the person to the company, so this application field earns no completeness credit");
+  }
+  return award(earned, possible, yes, no);
+}
+
+function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number, independent: boolean): Line {
   const row = findCheck(checks, "address");
-  if (!row) return award(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application");
+  if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
   if (row.status === "FAIL") return portionLine(0, possible, "address did not check out");
   if (row.status === "UNAVAILABLE") return { earned: 0, possible: 0, reason: "The address is not checkable." };
-  if (row.status === "PASS") return award(true, possible, "A location is on the application", "No location is on the application");
-  return award(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application");
+  if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
+  return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
 }
 
 function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
@@ -795,7 +831,7 @@ export function gradeChecks(
       "The LinkedIn link looks like a public profile",
       "No usable LinkedIn link was confirmed",
     ),
-    linkedinAward(linkedin, weights.identity["linkedin-fetch"], weightsMode),
+    linkedinAward(linkedin, weights.identity["linkedin-fetch"], weightsMode, independent),
   ]);
   const company = sumLines([
     websiteAward(checks, weights.company.website, weightsMode, independent),
@@ -834,12 +870,12 @@ export function gradeChecks(
   const statementOk = (facts.statement || "").trim().length >= 40;
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());
   const completeness = sumLines([
-    award(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application"),
-    locationAward(checks, facts, weights.completeness.location),
-    award(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application"),
-    award(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short"),
-    award(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded"),
-    award((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file"),
+    applicationField(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application", independent),
+    locationAward(checks, facts, weights.completeness.location, independent),
+    applicationField(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application", independent),
+    applicationField(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short", independent),
+    applicationField(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded", independent),
+    applicationField((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file", independent),
   ]);
 
   const categories: GradeCategory[] = [
@@ -947,14 +983,18 @@ export function gradeChecks(
   for (const check of conflicts) {
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
-  if (independentCount === 0) {
+  const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
+  if (!bothNamed) {
     const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
+    const weakHit = independentCount > 0;
     pushAttention({
       severity: "Medium",
       title: "Thin public record",
-      detail: selfReported
-        ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
-        : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
+      detail: weakHit
+        ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
+        : selfReported
+          ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
+          : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
     });
   } else if (independentCount < 2) {
     pushAttention({
@@ -1120,7 +1160,7 @@ function nextStepFor(input: { recommendation: Recommendation; checks: CheckOutpu
     return "Read the red banner. If you approve anyway, the decision form asks you to confirm, and that confirmation is written to the audit log.";
   }
   const asks: string[] = [];
-  if (input.recommendation === "NEEDS MORE INFO" && corroboratingPasses(input.checks).length === 0) {
+  if (input.recommendation === "NEEDS MORE INFO" && !corroboratingPasses(input.checks).some((check) => namesPersonAndCompany(check, input.facts))) {
     asks.push("request more info: ask for a team-page URL that names this person at this company");
   }
   if (!input.facts.cardUploaded && !input.facts.cardText?.trim()) asks.push("ask for a business card");

@@ -7,13 +7,13 @@ import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/v
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, neutralScreenNewsPass, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { civilDocket, classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, hostIsApplicant, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -152,7 +152,7 @@ describe("corroboration is independent of the applicant's own page", () => {
     );
     expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("EDGAR lists this exact company name");
     expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
-    expect(backed.score - alone.score).toBe(3 + 8);
+    expect(backed.score - alone.score).toBe(3 + 8 + 2 + 2);
     const differentFirm = assessEdgarMatch({
       org: "Terra Group",
       person: "David Martin",
@@ -273,7 +273,7 @@ describe("a neutral screen-news pass fills an inconclusive news check", () => {
       [...selfReported, row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company." })],
       facts({ phone: "212-555-0147", cardUploaded: true }),
     );
-    expect(backed.score - alone.score).toBe(8 + 4 + 3 + 2 + 8);
+    expect(backed.score - alone.score).toBe(8 + 4 + 3 + 2 + 8 + 2 + 2 + 2 + 1);
     expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("8 of 8");
     expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("4 of 4");
     const companyOnly = gradeChecks(
@@ -744,6 +744,7 @@ describe("EDGAR exact company names", () => {
     }
     expect(mentionsCompany("CBRE closed a Dallas sale", "CBRE")).toBe(true);
     expect(mentionsCompany("CBRE Group closed a Dallas sale", "CBRE Group")).toBe(true);
+    expect(mentionsCompany("CBRE CEO Bob Sulentic leads the firm", "CBRE Group", "Bob Sulentic")).toBe(true);
     expect(mentionsCompany("Unum Group raised its dividend", "CBRE Group")).toBe(false);
     expect(mentionsCompany("Unum Group raised its dividend", "Group")).toBe(false);
     expect(mentionsCompany("Madison Air Solutions won a contract", "Madison Realty Capital")).toBe(false);
@@ -787,6 +788,166 @@ describe("a third-party page that mentions the domain stays third-party", () => 
     const footprint = checks.find((check) => check.key === "web-footprint");
     expect(footprint?.selfReported).not.toBe(true);
     expect(footprint?.corroborates).toBe(true);
+  });
+
+  it("decides self-reported from the credited hit's own host", async () => {
+    const checks = await runPublicScreen(
+      facts({
+        name: "Harris Freidus",
+        applicantName: "Harris Freidus",
+        org: "Paul Weiss",
+        website: "https://www.paulweiss.com",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.includes("duckduckgo.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: [
+              `<a class="result__a" href="https://www.linkedin.com/in/harris-freidus">Harris Freidus of Paul Weiss in New York</a>`,
+              `<a class="result__a" href="https://www.paulweiss.com/professionals/harris-b-freidus">Harris Freidus of Paul Weiss</a>`,
+            ].join(""),
+          };
+        }
+        if (url.includes("paulweiss.com")) return { ok: true, status: 200, text: "<html><p>Paul Weiss is a law firm in New York.</p></html>" };
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    const search = checks.find((check) => check.key === "screen-web");
+    expect(search?.status).toBe("PASS");
+    expect(search?.selfReported).not.toBe(true);
+    expect(search?.corroborates).toBe(true);
+    const thirdPartyFootprint = checks.find((check) => check.key === "web-footprint");
+    expect(thirdPartyFootprint?.url).toContain("linkedin.com/in/harris-freidus");
+    expect(thirdPartyFootprint?.selfReported).not.toBe(true);
+    const ownOnly = await runPublicScreen(
+      facts({
+        name: "Harris Freidus",
+        applicantName: "Harris Freidus",
+        org: "Paul Weiss",
+        website: "https://www.paulweiss.com",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.includes("duckduckgo.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<a class="result__a" href="https://www.paulweiss.com/professionals/harris-b-freidus">Harris Freidus of Paul Weiss in New York</a>`,
+          };
+        }
+        if (url.includes("paulweiss.com")) return { ok: true, status: 200, text: "<html><p>Paul Weiss is a law firm in New York.</p></html>" };
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    const own = ownOnly.find((check) => check.key === "screen-web");
+    expect(own?.selfReported).toBe(true);
+    expect(own?.corroborates).not.toBe(true);
+  });
+});
+
+describe("a dropped screen check stays on the file", () => {
+  it("keeps a finished pass and marks the rows that never finished as unavailable", async () => {
+    const website = row({
+      key: "website",
+      status: "PASS",
+      corroborates: true,
+      finding: "Found: Jane Roe leads Zorblax Holdings in New York. Name: yes. Company: yes. City: yes. Confidence: high.",
+    });
+    let finish: (value: CheckOutput[] | null) => void = () => undefined;
+    const work = new Promise<CheckOutput[] | null>((resolve) => {
+      finish = resolve;
+    });
+    const dropped = await settleWithin(work, 30, null);
+    finish(null);
+    expect(dropped).toBeNull();
+    const filled = completeScreenRows([website]);
+    expect(filled.find((check) => check.key === "website")?.status).toBe("PASS");
+    for (const key of ["linkedin-fetch", "screen-web", "web-footprint", "screen-news", "screen-youtube"]) {
+      const missing = filled.find((check) => check.key === key);
+      expect(missing?.status).toBe("UNAVAILABLE");
+      expect(missing?.weight).toBe(0);
+      expect(missing?.finding.toLowerCase()).toContain("couldn't check");
+    }
+    const kept = gradeChecks(filled, facts());
+    const alone = gradeChecks([website], facts());
+    expect(kept.score).toBe(alone.score);
+    expect(scoreOf(filled)).toBe(scoreOf([website]));
+  });
+});
+
+describe("completeness and a company-only LinkedIn page need an independent source", () => {
+  it("withholds the application points and the company-only LinkedIn points until a source names the person", () => {
+    const filledIn = facts({ phone: "212-555-0147", website: "https://zorblax.example", cardUploaded: true, referenceCount: 1 });
+    const alone = gradeChecks([], filledIn);
+    const completeness = alone.categories.find((category) => category.id === "completeness");
+    expect(completeness?.earned).toBe(0);
+    expect(completeness?.reason).toContain("No independent source");
+    expect(completeness?.reason).not.toContain("(2 of 2)");
+    const linkedinOnly = gradeChecks(
+      [row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed. Name: no. Company: yes." })],
+      filledIn,
+    );
+    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("(0 of 4)");
+    expect(linkedinOnly.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
+    const news = row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." });
+    const backed = gradeChecks([news], filledIn);
+    expect(backed.categories.find((category) => category.id === "completeness")?.earned).toBe(10);
+    const linkedinBacked = gradeChecks(
+      [
+        news,
+        row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed. Name: no. Company: yes." }),
+      ],
+      filledIn,
+    );
+    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(linkedinBacked.score).toBeGreaterThan(linkedinOnly.score);
+  });
+});
+
+describe("an independent hit that does not name both still asks for a team page", () => {
+  const person = facts({ name: "Jay Neveloff", applicantName: "Jay Neveloff", org: "Kramer Levin Naftalis & Frankel LLP", location: "New York, NY" });
+
+  it("keeps the credit and shows the request when the cited text does not name both", () => {
+    const directory = row({
+      key: "screen-web",
+      status: "PASS",
+      corroborates: true,
+      finding: 'Searched: "Jay Neveloff" "Kramer Levin". Found: Jay Neveloff spoke on a panel. Name: yes. Company: no. City: yes. Confidence: medium.',
+    });
+    const youtube = row({
+      key: "screen-youtube",
+      status: "PASS",
+      corroborates: true,
+      finding: 'Searched: "Jay Neveloff" "Kramer Levin". Found: Jay Neveloff interview. Name: yes. Company: no. City: no. Confidence: low.',
+    });
+    const deal = row({
+      key: "news",
+      status: "PASS",
+      corroborates: true,
+      finding: 'Searched: "Jay Neveloff" "Kramer Levin". Found: Kramer Levin expands - The Real Deal Name: no. Company: yes. City: no. Confidence: low.',
+    });
+    expect(corroboratingPasses([directory, youtube, deal])).toHaveLength(3);
+    expect(namesPersonAndCompany(directory, person)).toBe(false);
+    expect(namesPersonAndCompany(youtube, person)).toBe(false);
+    expect(namesPersonAndCompany(deal, person)).toBe(false);
+    const graded = gradeChecks([directory, youtube, deal], person);
+    expect(graded.categories.find((category) => category.id === "footprint")?.reason).toContain("8 of 8");
+    expect(graded.attention.some((item) => item.title === "Thin public record" && /does not name both/i.test(item.detail) && /team-page/i.test(item.detail))).toBe(true);
+    expect(graded.summary.nextStep.toLowerCase()).toContain("team-page");
+    const named = row({
+      key: "screen-web",
+      status: "PASS",
+      corroborates: true,
+      finding: 'Searched: "Jay Neveloff" "Kramer Levin". Found: Jay A. Neveloff, Kramer Levin Naftalis & Frankel LLP, New York. Name: yes. Company: yes. City: yes. Confidence: high.',
+    });
+    expect(namesPersonAndCompany(named, person)).toBe(true);
+    const namedGrade = gradeChecks([named], person);
+    expect(namedGrade.attention.some((item) => /does not name both/i.test(item.detail))).toBe(false);
+    expect(namedGrade.attention.some((item) => item.title === "Only one independent source")).toBe(true);
+    const coverage = row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." });
+    expect(namesPersonAndCompany(coverage, person)).toBe(true);
   });
 });
 
@@ -961,6 +1122,7 @@ describe("team pages and the NY company list", () => {
     const skanskaSite = skanska.find((check) => check.key === "website");
     expect(skanskaSite?.status).toBe("UNAVAILABLE");
     expect(skanskaSite?.finding).toContain("blocked by site (403)");
+    expect(skanskaSite?.finding).toContain("team-page");
     expect(skanskaSite?.finding).not.toContain("Name: no");
   });
 
@@ -1235,7 +1397,8 @@ describe("QA follow-up scoring", () => {
     expect(company?.reason).toContain("self-reported and no independent source");
     expect(company?.reason).toContain("0 of 8");
     expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
-    expect(identity?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(identity?.reason).toContain("no independent source");
+    expect(identity?.reason).toContain("(0 of 4)");
     expect(graded.summary.checkedOut).toContain("company confirmed, person NOT confirmed");
     expect(graded.summary.company).toContain("company confirmed, person NOT confirmed");
     expect(graded.summary.company).not.toContain("No company website was confirmed");
@@ -1303,7 +1466,8 @@ describe("QA follow-up scoring", () => {
       expect(linkedin?.corroborates).toBe(false);
       const graded = gradeChecks(checks, applicant);
       expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
-      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("(2 of 4)");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("no independent source");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("(0 of 4)");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     }
   });
@@ -1511,7 +1675,13 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     });
     expect(city?.status).toBe("PASS");
     const cityGrade = gradeChecks([city!], facts({ location: "Newark, NJ" }));
-    expect(cityGrade.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
+    expect(cityGrade.categories.find((category) => category.id === "completeness")?.reason).toContain("No independent source");
+    expect(cityGrade.categories.find((category) => category.id === "completeness")?.reason).not.toContain("A location is on the application (2 of 2)");
+    const backedCity = gradeChecks(
+      [city!, row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." })],
+      facts({ location: "Newark, NJ" }),
+    );
+    expect(backedCity.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
   });
 
   it("fails a Census miss and leaves a geocoder timeout not checkable", async () => {
@@ -2174,6 +2344,9 @@ describe("batch 4 ordered company names", () => {
     expect(mentionsCompany("Douglas Durst leads the Durst Organization", "The Durst Organization")).toBe(true);
     expect(mentionsCompany("Ronald Tutor stays on at Tutor Perini's", "Tutor Perini Corporation")).toBe(true);
     expect(mentionsCompany("CBRE Group closed a Dallas sale", "CBRE Group")).toBe(true);
+    expect(mentionsCompany("CBRE CEO Bob Sulentic leads the firm", "CBRE Group", "Bob Sulentic")).toBe(true);
+    expect(mentionsCompany("The chairman of CBRE, Bob Sulentic, spoke", "CBRE Group", "Bob Sulentic")).toBe(true);
+    expect(mentionsCompany("Starwood Capital halts redemptions", "Starwood Property Trust", "Barry Sternlicht")).toBe(false);
     expect(mentionsCompany("Unum Group raised its dividend", "CBRE Group")).toBe(false);
   });
 });
