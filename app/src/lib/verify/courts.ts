@@ -1,9 +1,11 @@
-import { nameTokens, normalizeName } from "@/lib/verify/fuzzy";
+import { normalizeFirmName } from "@/lib/verify/edgar";
+import { normalizeName } from "@/lib/verify/fuzzy";
+import { parsePersonName } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const SEVERE = /\b(bankruptcy|fraud|indicted|ponzi)\b/i;
 
-type CourtHit = { caseName: string; snippet: string };
+type CourtHit = { caseName: string; caseNameFull: string; snippet: string };
 
 export function courtResults(payload: string): CourtHit[] | null {
   try {
@@ -13,6 +15,7 @@ export function courtResults(payload: string): CourtHit[] | null {
       const record = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
       return {
         caseName: String(record.caseName || record.case_name || ""),
+        caseNameFull: String(record.caseNameFull || record.case_name_full || ""),
         snippet: String(record.snippet || record.suitNature || ""),
       };
     });
@@ -21,17 +24,32 @@ export function courtResults(payload: string): CourtHit[] | null {
   }
 }
 
-function fullNameIn(text: string, name: string): boolean {
-  const tokens = nameTokens(name);
-  if (tokens.length < 2) return false;
+/** The words have to sit together. "Jeff" in one sentence and "Hines" in another is not the name. */
+function containsPhrase(text: string, phrase: string): boolean {
+  const parts = normalizeName(phrase).split(" ").filter((token) => token.length > 1);
+  if (!parts.length) return false;
+  if (parts.length === 1 && parts[0].length < 4) return false;
   const hay = normalizeName(text);
-  return tokens.every((token) => new RegExp(`\\b${token}\\b`).test(hay));
+  const body = parts.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  return new RegExp(`(?:^|\\s)${body}(?:\\s|$)`).test(hay);
 }
 
-function companyIn(text: string, org: string): boolean {
-  const phrase = normalizeName(org);
-  if (phrase.length < 5) return false;
-  return normalizeName(text).includes(phrase);
+function personPhrase(text: string, name: string): boolean {
+  const parsed = parsePersonName(name);
+  if (!parsed || parsed.given.length < 1 || !parsed.surname) return false;
+  const forward = `${parsed.given.join(" ")} ${parsed.surname}`;
+  const reversed = `${parsed.surname} ${parsed.given.join(" ")}`;
+  return containsPhrase(text, forward) || containsPhrase(text, reversed);
+}
+
+function companyPhrase(text: string, org: string): boolean {
+  const phrase = normalizeFirmName(org);
+  if (!phrase) return false;
+  return containsPhrase(text, phrase);
+}
+
+function recordFields(result: CourtHit): string[] {
+  return [result.caseName, result.caseNameFull, result.snippet].filter((field) => field.trim());
 }
 
 function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weight" | "url"> & { url?: string }): Omit<CheckOutput, "ranAt"> {
@@ -60,15 +78,19 @@ export function assessCourts(
   let nameHits = 0;
   let severeNearName = 0;
   let corroborated = 0;
+  let companyHits = 0;
   for (const result of results) {
-    const blob = `${result.caseName} ${result.snippet}`;
-    const named = fullNameIn(result.caseName, facts.name) || fullNameIn(result.snippet, facts.name);
-    if (!named) continue;
-    nameHits += 1;
+    const fields = recordFields(result);
+    const blob = fields.join(" ");
+    const named = fields.some((field) => personPhrase(field, facts.name));
+    const company = fields.some((field) => companyPhrase(field, facts.org));
+    if (!named && !company) continue;
+    if (named) nameHits += 1;
+    else companyHits += 1;
     const severe = SEVERE.test(blob);
-    if (!severe) continue;
+    if (!severe || !named) continue;
     severeNearName += 1;
-    if (companyIn(blob, facts.org)) corroborated += 1;
+    if (company) corroborated += 1;
   }
   if (corroborated > 0) {
     return courtRow({
@@ -87,6 +109,12 @@ export function assessCourts(
     return courtRow({
       status: "INCONCLUSIVE",
       finding: `CourtListener returned ${results.length} opinion(s). ${nameHits} mention the full name and none pair it with the company and a severe term.`,
+    });
+  }
+  if (companyHits > 0) {
+    return courtRow({
+      status: "INCONCLUSIVE",
+      finding: `CourtListener returned ${results.length} opinion(s). ${companyHits} name the company as a phrase and do not name this person. Separate name words were not counted.`,
     });
   }
   return courtRow({

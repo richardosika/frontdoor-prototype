@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "groundTruthNote": "QA 27 Oct 2026, 8:57 AM batch. CourtListener must match the full person name or the exact company phrase. EDGAR must not pass a parent, affiliate, or a different registrant. Person titles are not confirmed by Richard. Emails are Gmail so the email domain is not evidence.",
+    "defaults": {
+      "role": "DEVELOPER",
+      "phone": "",
+      "socialLinks": "",
+      "statement": "I invest in and operate commercial real estate and would like to meet other owners and operators.",
+      "inviteNote": "PF-BENCH-0000 · Benchmark invite code",
+      "linkedinUrl": "",
+      "location": "New York, NY",
+      "watchlist": "full"
+    }
+  },
+  "cases": [
+    {
+      "id": "QAP-HINES",
+      "kind": "real",
+      "label": "Hines / Jeff Hines (affiliate must not pass)",
+      "personAssumption": "Jeff Hines - assumed Hines executive; title unverified. HINES GLOBAL INCOME TRUST is an affiliate, not this company.",
+      "name": "Jeff Hines",
+      "email": "pf.bench.qap-hines@gmail.com",
+      "org": "Hines",
+      "website": "https://www.hines.com",
+      "linkedinUrl": "https://www.linkedin.com/company/hines/",
+      "location": "Houston, TX",
+      "role": "DEVELOPER"
+    },
+    {
+      "id": "QAP-CBRE",
+      "kind": "real",
+      "label": "CBRE Group / Robert Sulentic (must not match Unum)",
+      "personAssumption": "Robert Sulentic is assumed to be associated with CBRE Group. The person link is unverified. Unum Group is a different registrant.",
+      "name": "Robert Sulentic",
+      "email": "pf.bench.qap-cbre@gmail.com",
+      "org": "CBRE Group",
+      "website": "https://www.cbre.com",
+      "linkedinUrl": "https://www.linkedin.com/company/cbre/",
+      "location": "Dallas, TX",
+      "role": "BROKER"
+    },
+    {
+      "id": "QAP-KENNEDY",
+      "kind": "real",
+      "label": "Skanska USA / Richard Kennedy (court name must be a phrase)",
+      "personAssumption": "Richard Kennedy - skanska.com/us/en leadership; title unconfirmed by Richard. Separate words Richard and Kennedy are not a court hit.",
+      "name": "Richard Kennedy",
+      "email": "pf.bench.qap-kennedy@gmail.com",
+      "org": "Skanska USA",
+      "website": "https://www.usa.skanska.com",
+      "linkedinUrl": "https://www.linkedin.com/company/skanska/",
+      "location": "New York, NY",
+      "role": "GENERAL_CONTRACTOR"
+    }
+  ]
+}

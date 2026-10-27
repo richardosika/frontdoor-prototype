@@ -281,6 +281,57 @@ describe("courts", () => {
     expect(result.reviewFlag).toBe(true);
     expect(result.finding).toContain("Possible match, needs review");
   });
+
+  it("does not count separate name words as a court hit", () => {
+    const scattered = assessCourts(
+      JSON.stringify({
+        results: [
+          { caseName: "Jeff v. State", snippet: "Hines was the judge. Jeff filed a motion in another matter." },
+          { caseName: "Kennedy v. Richard", snippet: "Richard testified. Kennedy was counsel." },
+        ],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "Jeff Hines", org: "Skanska USA" }),
+    );
+    expect(scattered.status).toBe("PASS");
+    expect(scattered.finding).toContain("No record found");
+    expect(scattered.finding.toLowerCase()).not.toContain("mention the full name");
+    const companyWord = assessCourts(
+      JSON.stringify({
+        results: [{ caseName: "Campbell v. Hines", snippet: "Jeff filed a motion in another matter." }],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "Jeff Hines", org: "Hines" }),
+    );
+    expect(companyWord.status).toBe("INCONCLUSIVE");
+    expect(companyWord.finding).toContain("name the company");
+    expect(companyWord.finding.toLowerCase()).not.toContain("mention the full name");
+    const phrase = assessCourts(
+      JSON.stringify({
+        results: [{ caseName: "Gilley's Antique Mall and Jeff Hines v. Doug Sarver", snippet: "" }],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "Jeff Hines", org: "Hines" }),
+    );
+    expect(phrase.status).toBe("INCONCLUSIVE");
+    expect(phrase.finding).toContain("mention the full name");
+    const reversed = assessCourts(
+      JSON.stringify({ results: [{ caseName: "Hines, Jeff v. Sarver", snippet: "" }] }),
+      { ok: true, status: 200 },
+      facts({ name: "Jeff Hines", org: "Hines" }),
+    );
+    expect(reversed.finding).toContain("mention the full name");
+    const company = assessCourts(
+      JSON.stringify({
+        results: [{ caseName: "Skanska USA v. Owner", snippet: "Richard testified. Kennedy was counsel." }],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "Richard Kennedy", org: "Skanska USA" }),
+    );
+    expect(company.status).toBe("INCONCLUSIVE");
+    expect(company.finding).toContain("name the company");
+    expect(company.finding.toLowerCase()).not.toContain("mention the full name");
+  });
 });
 
 describe("hosts, urls, and source status", () => {

@@ -3151,15 +3151,27 @@ describe("thirteenth follow-up", () => {
       filingNames: ["SL Green (SLG) (CIK 0001040971)"],
     });
     expect(nameOnly.status).toBe("INCONCLUSIVE");
+    expect(nameOnly.status).not.toBe("PASS");
     expect(nameOnly.corroborates).toBe(false);
-    expect(nameOnly.finding.toLowerCase()).toContain("does not tie the person");
+    expect(nameOnly.companyOnly).not.toBe(true);
+    expect(nameOnly.finding.toLowerCase()).toContain("not an exact match");
+    expect(nameOnly.finding.toLowerCase()).toContain("not a pass");
     const graded = gradeChecks(
-      [row({ key: "edgar", status: nameOnly.status, weight: 6, corroborates: false, finding: nameOnly.finding, url: nameOnly.url })],
+      [row({ key: "edgar", status: nameOnly.status, weight: 6, corroborates: false, reviewFlag: true, finding: nameOnly.finding, url: nameOnly.url })],
       facts({ org: "SL Green", name: "Marc Holliday" }),
     );
     expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
-    const tied = assessEdgarMatch({
+    const shortName = assessEdgarMatch({
       org: "SL Green",
+      person: "Marc Holliday",
+      tickersOk: true,
+      companies: [{ title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" }],
+      filingNames: ["SL GREEN REALTY CORP (SLG) (CIK 0001040971)", "HOLLIDAY MARC"],
+    });
+    expect(shortName.status).not.toBe("PASS");
+    expect(shortName.corroborates).toBe(false);
+    const tied = assessEdgarMatch({
+      org: "SL Green Realty Corp",
       person: "Marc Holliday",
       tickersOk: true,
       companies: [{ title: "SL GREEN REALTY CORP", ticker: "SLG", cik: "1040971" }],
@@ -3547,5 +3559,71 @@ describe("qa october 27", () => {
     );
     expect(ownSite.categories.find((category) => category.id === "company")?.reason).toContain("0 of");
     expect(socialLinksFrom('<a href="http://www.linkedin.com/company/6346">in</a>')[0].url).toBe("https://www.linkedin.com/company/6346");
+  });
+
+  it("does not pass a parent, affiliate, or the wrong company on EDGAR", () => {
+    const unumOnly = assessEdgarMatch({
+      org: "CBRE Group",
+      person: "Robert Sulentic",
+      tickersOk: true,
+      companies: [{ title: "Unum Group", ticker: "UNM", cik: "5513" }],
+      filingNames: [["Unum Group (UNM) (CIK 0000005513)", "SULENTIC ROBERT E"]],
+    });
+    expect(unumOnly.status).not.toBe("PASS");
+    expect(unumOnly.corroborates).toBe(false);
+    expect(unumOnly.finding.toLowerCase()).not.toContain("unum group");
+    const wrongFiling = assessEdgarMatch({
+      org: "CBRE Group",
+      person: "Robert Sulentic",
+      tickersOk: true,
+      companies: [
+        { title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" },
+        { title: "Unum Group", ticker: "UNM", cik: "5513" },
+      ],
+      filingNames: [["Unum Group (UNM) (CIK 0000005513)", "SULENTIC ROBERT E"]],
+    });
+    expect(wrongFiling.status).not.toBe("PASS");
+    expect(wrongFiling.corroborates).toBe(false);
+    expect(wrongFiling.companyOnly).toBe(true);
+    expect(wrongFiling.finding).toContain("CBRE GROUP, INC.");
+    expect(wrongFiling.finding.toLowerCase()).toContain("does not tie the person");
+    expect(wrongFiling.finding.toLowerCase()).not.toContain("unum");
+    const exact = assessEdgarMatch({
+      org: "CBRE Group",
+      person: "Robert Sulentic",
+      tickersOk: true,
+      companies: [
+        { title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" },
+        { title: "Unum Group", ticker: "UNM", cik: "5513" },
+      ],
+      filingNames: [
+        ["Unum Group (UNM) (CIK 0000005513)", "SULENTIC ROBERT E"],
+        ["CBRE GROUP, INC. (CBRE) (CIK 0001138118)", "SULENTIC ROBERT E"],
+      ],
+    });
+    expect(exact.status).toBe("PASS");
+    expect(exact.corroborates).toBe(true);
+    expect(exact.finding).toContain("CBRE GROUP, INC.");
+    expect(exact.finding.toLowerCase()).not.toContain("unum");
+    const affiliate = assessEdgarMatch({
+      org: "Hines",
+      person: "Jeff Hines",
+      tickersOk: true,
+      companies: [{ title: "HINES GLOBAL INCOME TRUST, INC.", ticker: "HGIT", cik: "1585101" }],
+      filingNames: [["HINES GLOBAL INCOME TRUST, INC. (HGIT) (CIK 0001585101)", "HINES JEFF"]],
+    });
+    expect(affiliate.status).toBe("INCONCLUSIVE");
+    expect(affiliate.status).not.toBe("PASS");
+    expect(affiliate.corroborates).toBe(false);
+    expect(affiliate.reviewFlag).toBe(true);
+    expect(affiliate.finding).toContain("HINES GLOBAL INCOME TRUST");
+    expect(affiliate.finding.toLowerCase()).toContain("not a pass");
+    const affiliateGrade = gradeChecks(
+      [row({ key: "edgar", status: affiliate.status, weight: 6, corroborates: false, reviewFlag: true, finding: affiliate.finding })],
+      facts({ org: "Hines", name: "Jeff Hines" }),
+    );
+    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(affiliateGrade.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(affiliateGrade.letter).not.toBe("C");
   });
 });

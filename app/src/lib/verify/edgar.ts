@@ -191,28 +191,50 @@ export function companyFromDisplayName(name: string): EdgarCompany | null {
   return { title, ticker, cik };
 }
 
-export function filingNames(payload: string): string[] | null {
+/** One array per filing. Names from different filings are not one record. */
+export function filingNames(payload: string): string[][] | null {
   try {
     const parsed = JSON.parse(payload) as { hits?: { hits?: { _source?: { display_names?: unknown } }[] } };
     const hits = parsed.hits?.hits;
     if (!Array.isArray(hits)) return null;
-    const names: string[] = [];
+    const groups: string[][] = [];
     for (const hit of hits.slice(0, 30)) {
       const display = hit._source?.display_names;
       if (!Array.isArray(display)) continue;
-      for (const name of display) names.push(String(name));
+      const names = display.map((name) => String(name)).filter((name) => name.trim());
+      if (names.length) groups.push(names);
     }
-    return names;
+    return groups.length ? groups : null;
   } catch {
     return null;
   }
 }
 
-export function personOnFiling(names: string[], person: string, org: string): string {
-  const fromDisplay = names.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row));
-  const companyNamed = Boolean(matchEdgarCompany(fromDisplay, org)) || names.some((name) => edgarTitleFits(name, org));
-  if (!companyNamed) return "";
-  return names.find((name) => mentionsPerson(name, person)) || "";
+/** A flat list is one filing. A list of lists keeps each filing separate. */
+export function filingGroups(names: string[] | string[][]): string[][] {
+  if (!names.length) return [];
+  if (Array.isArray(names[0])) return (names as string[][]).filter((group) => group.length > 0);
+  return [names as string[]];
+}
+
+function sameFirmName(title: string, org: string): boolean {
+  const left = normalizeFirmName(org);
+  const right = normalizeFirmName(title);
+  return Boolean(left) && left === right;
+}
+
+/**
+ * The person counts only on a filing that also carries the exact company name.
+ * A person on a parent, affiliate, or different registrant does not tie this company.
+ */
+export function personOnFiling(names: string[] | string[][], person: string, org: string): string {
+  for (const group of filingGroups(names)) {
+    const companyHere = group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, org));
+    if (!companyHere) continue;
+    const hit = group.find((name) => mentionsPerson(name, person));
+    if (hit) return hit;
+  }
+  return "";
 }
 
 export function edgarCompanyUrl(cik: string): string {
@@ -224,16 +246,18 @@ export function assessEdgarMatch(input: {
   person: string;
   tickersOk: boolean;
   companies: EdgarCompany[];
-  filingNames: string[];
+  filingNames: string[] | string[][];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
+  const groups = filingGroups(input.filingNames);
+  const flat = groups.flat();
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
   const fromFiling = matchEdgarCompany(
-    input.filingNames.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
+    flat.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
     input.org,
   );
   const match = fromList || fromFiling;
-  const personLine = personOnFiling(input.filingNames, input.person, input.org);
-  if (!input.tickersOk && input.filingNames.length === 0) {
+  const personLine = personOnFiling(groups, input.person, input.org);
+  if (!input.tickersOk && flat.length === 0) {
     return {
       status: "UNAVAILABLE",
       corroborates: false,
@@ -250,7 +274,7 @@ export function assessEdgarMatch(input: {
         corroborates: false,
         reviewFlag: true,
         url: edgarCompanyUrl(partial.cik),
-        finding: `EDGAR lists ${titled}. That is a partial name match for a different firm, not the company on the application. It is inconclusive and does not corroborate. Needs review.`,
+        finding: `EDGAR lists ${titled}. That is a parent, affiliate, or partial name match for a different firm, not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass. Needs review.`,
       };
     }
     return {
@@ -261,6 +285,15 @@ export function assessEdgarMatch(input: {
     };
   }
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
+  if (!sameFirmName(match.title, input.org)) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      url: edgarCompanyUrl(match.cik),
+      finding: `EDGAR lists ${titled}, CIK ${match.cik}. A parent, affiliate, or different name is not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass.`,
+    };
+  }
   const personSentence = personLine ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.` : "";
   const personTied = Boolean(personLine);
   if (!personTied) {
@@ -322,17 +355,17 @@ export async function lookupEdgar(
   const personQuery = last ? `"${last}" "${distinctive}"` : "";
   const companyQuery = phrase ? `"${phrase}"` : "";
   const queries = [...new Set([personQuery, companyQuery].filter(Boolean))];
-  let names: string[] = [];
+  const groups: string[][] = [];
   for (const query of queries) {
     const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(query)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`;
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    if (filing.ok) names.push(...(filingNames(filing.text) || []));
+    if (filing.ok) groups.push(...(filingNames(filing.text) || []));
   }
   return assessEdgarMatch({
     org,
     person,
     tickersOk: Boolean(companies),
     companies: companies || [],
-    filingNames: names,
+    filingNames: groups,
   });
 }
