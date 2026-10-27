@@ -98,6 +98,20 @@ function foreignParenthetical(title: string, orgTokens: Set<string>): boolean {
   return false;
 }
 
+/** A shared distinctive word with a different filer. Not a match. Shown for review only. */
+function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
+  const required = firmTokens(org).filter((token) => token.length >= 4 && !isGenericFirmToken(token));
+  if (!required.length) return null;
+  let best: { row: EdgarCompany; shared: number } | null = null;
+  for (const row of rows) {
+    const titleTokens = new Set(firmTokens(row.title));
+    const shared = required.filter((token) => titleTokens.has(token)).length;
+    if (!shared) continue;
+    if (!best || shared > best.shared) best = { row, shared };
+  }
+  return best?.row ?? null;
+}
+
 /**
  * Exact normalized title first, so "SL Green Realty Corp" is SL GREEN REALTY CORP and not GREEN DOT.
  * A name made only of generic words, such as Group, is not a match.
@@ -200,7 +214,7 @@ export function assessEdgarMatch(input: {
   tickersOk: boolean;
   companies: EdgarCompany[];
   filingNames: string[];
-}): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
+}): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag"> {
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
   const fromFiling = matchEdgarCompany(
     input.filingNames.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
@@ -217,6 +231,17 @@ export function assessEdgarMatch(input: {
     };
   }
   if (!match) {
+    const partial = partialEdgarCandidate(input.companies, input.org);
+    if (partial) {
+      const titled = `${partial.title}${partial.ticker ? ` (${partial.ticker})` : ""}`;
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        reviewFlag: true,
+        url: edgarCompanyUrl(partial.cik),
+        finding: `EDGAR lists ${titled}. That is a partial name match for a different firm, not the company on the application. It is inconclusive and does not corroborate. Needs review.`,
+      };
+    }
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -267,7 +292,7 @@ export async function lookupEdgar(
   org: string,
   person: string,
   fetchText?: FetchText,
-): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates">> {
+): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag">> {
   const tokens = org.trim();
   if (!tokens) {
     return {

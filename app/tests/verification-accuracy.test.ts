@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessLocalAddress, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
@@ -2306,7 +2306,7 @@ describe("batch 6 name, redirect, and departure", () => {
     expect(denied?.finding).toContain("https://www.hsfkramer.example/");
     expect(denied?.finding).toContain("The new domain is hsfkramer.example");
     expect(denied?.url).toContain("hsfkramer.example");
-    expect(denied?.finding.toLowerCase()).not.toContain("alias");
+    expect(denied?.finding.toLowerCase()).toContain("review-only alias");
   });
 
   it("treats taking a step back as a departure and not current employment", () => {
@@ -2689,6 +2689,25 @@ describe("thirteenth follow-up", () => {
     expect(matchEdgarCompany(rows, "Terra Group")).toBeNull();
     expect(matchEdgarCompany(rows, "Extell Development Company")).toBeNull();
     expect(matchEdgarCompany(rows, "Avison Young")).toBeNull();
+    const partial = assessEdgarMatch({
+      org: "Terra Group",
+      person: "Pat Example",
+      tickersOk: true,
+      companies: rows,
+      filingNames: [],
+    });
+    expect(partial.status).toBe("INCONCLUSIVE");
+    expect(partial.corroborates).toBe(false);
+    expect(partial.reviewFlag).toBe(true);
+    expect(partial.finding).toContain("TERRA PROPERTY TRUST");
+    expect(partial.finding.toLowerCase()).toContain("does not corroborate");
+    const partialGrade = gradeChecks(
+      [row({ key: "edgar", status: partial.status, weight: 6, corroborates: false, reviewFlag: true, finding: partial.finding })],
+      facts({ org: "Terra Group", name: "Pat Example" }),
+    );
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(partialGrade.letter).not.toBe("C");
+    expect(partialGrade.recommendation.startsWith("APPROVE")).toBe(false);
     expect(matchEdgarCompany(rows, "SL Green")?.cik).toBe("1040971");
     expect(matchEdgarCompany(rows, "SL Green")?.ticker).not.toBe("GDOT");
     expect(matchEdgarCompany(rows, "CBRE Group")?.cik).toBe("1138118");
@@ -2738,5 +2757,10 @@ describe("thirteenth follow-up", () => {
     const footprint = screened.find((check) => check.key === "web-footprint");
     expect(footprint?.url || web?.url || "").not.toContain("bing.com/ck/");
     expect(`${web?.finding} ${footprint?.url || ""}`).toContain("news.example/vornado-roth");
+  });
+
+  it("abandons one slow check instead of holding the case", async () => {
+    const result = await settleWithin(new Promise<string>(() => undefined), 30, "timed out");
+    expect(result).toBe("timed out");
   });
 });

@@ -718,7 +718,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         } catch {
           domain = redirectedTo;
         }
-        renamed = ` The site redirected to ${redirectedTo}. The new domain is ${domain}.`;
+        renamed = ` The site redirected to ${redirectedTo}. The new domain is ${domain}. The new brand is a review-only alias and does not corroborate the company on the application.`;
       }
       const detail =
         home.status === 403

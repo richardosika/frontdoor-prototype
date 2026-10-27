@@ -127,6 +127,32 @@ function check(partial: Omit<CheckOutput, "ranAt"> & { ranAt?: string }): CheckO
   return { ranAt: new Date().toISOString(), ...partial };
 }
 
+/** One slow source returns unavailable. It does not hold the rest of the case. */
+export async function settleWithin<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function timedOut(key: string, source: string, weight: number): CheckOutput {
+  return check({
+    key,
+    status: "UNAVAILABLE",
+    weight,
+    finding: "This check timed out. The source could not be checked.",
+    source,
+    url: "",
+  });
+}
+
 function stripHtml(value: string): string {
   return value
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -827,9 +853,15 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const out: CheckOutput[] = [];
   const domain = domainOf(ctx.facts.email);
   if (domain && !DISPOSABLE.has(domain)) {
+    let mxTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       const dns = await import(/* webpackIgnore: true */ "node:dns/promises");
-      const records = await dns.resolveMx(domain);
+      const records = await Promise.race([
+        dns.resolveMx(domain),
+        new Promise<never>((_, reject) => {
+          mxTimer = setTimeout(() => reject(new Error("timeout")), 8_000);
+        }),
+      ]);
       out.push(
         check({
           key: "mx",
@@ -851,6 +883,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
           url: "",
         }),
       );
+    } finally {
+      if (mxTimer) clearTimeout(mxTimer);
     }
   } else {
     out.push(
@@ -876,16 +910,25 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const judged = assessRdap(rdapHost, { ok: false, status: 0, text: "" });
     if (judged) out.push(judged);
   } else if (rdapHost && !FREE_PROVIDERS.has(rdapHost) && !isIpHost(rdapHost)) {
-    const rdap = await pageText(fetchText, `https://rdap.org/domain/${rdapHost}`);
+    const rdap = await settleWithin(pageText(fetchText, `https://rdap.org/domain/${rdapHost}`), 20_000, { ok: false, status: 0, text: "" });
     const judged = assessRdap(rdapHost, rdap);
     if (judged) out.push(judged);
   }
-  out.push(...(await runPublicScreen(searchFacts, fetchText)));
+  out.push(
+    ...(await settleWithin(runPublicScreen(searchFacts, fetchText), 120_000, [
+      timedOut("website", "Company website", 8),
+      timedOut("web-footprint", "Web search", 8),
+    ])),
+  );
   const registryState = statedUsState(ctx.facts.location || "");
   const portal = registryState ? registryPortal(registryState) : undefined;
   if (portal) {
     const registryUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
-    const registryHttp = await fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" }));
+    const registryHttp = await settleWithin(fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+      ok: false,
+      status: 0,
+      text: "",
+    });
     const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp);
     out.push(
       check({
@@ -899,7 +942,12 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       }),
     );
   }
-  const edgar = await lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText);
+  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText), 40_000, {
+    status: "UNAVAILABLE" as const,
+    corroborates: false,
+    url: "https://www.sec.gov/edgar/search/",
+    finding: "EDGAR was blocked, timed out, or did not respond. This source could not be checked.",
+  });
   out.push(
     check({
       key: "edgar",
@@ -909,24 +957,37 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       source: "SEC EDGAR",
       url: edgar.url,
       corroborates: edgar.corroborates,
+      reviewFlag: edgar.reviewFlag,
     }),
   );
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
-  const court = await fetchText(courtUrl);
+  const court = await settleWithin(fetchText(courtUrl), 20_000, { ok: false, status: 0, text: "" });
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
   const companyQuery = searchFacts.org.trim();
   const registryHttp = companyQuery
-    ? await fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    ? await settleWithin(fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      })
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenCorporates(companyQuery, registryHttp)));
   const sanctionsQuery = ctx.facts.name.trim() || companyQuery;
   const sanctionsHttp = sanctionsQuery
-    ? await fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    ? await settleWithin(fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      })
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
   // Public screening always records web-footprint, including an explicit miss. The direct
   // webFootprintCheck helper is not a second production pass.
-  out.push(...(await newsChecks(searchFacts, fetchText)));
+  out.push(
+    ...(await settleWithin(newsChecks(searchFacts, fetchText), 45_000, [
+      timedOut("news", "News", 8),
+    ])),
+  );
   return out;
 }
 
