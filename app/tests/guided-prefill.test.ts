@@ -201,6 +201,7 @@ describe("free company and sanctions sources", () => {
     ]);
     expect(former.mark).toBe("CONCERN");
     expect(former.result).toBe("NEEDS_INFO");
+    expect(former.note).toContain("Could not confirm");
     expect(former.note).toContain("Needs review");
     expect(former.note).toContain("BPI Property Inc.");
     expect(former.note).toContain("former name");
@@ -219,16 +220,29 @@ describe("free company and sanctions sources", () => {
     expect(nameOnly.mark).toBe("CONCERN");
     expect(nameOnly.result).not.toBe("PASS");
 
-    const exact = suggestCompany(facts, [
+    const exact = suggestCompany(emptyPrefillFacts({ name: "Alex Morgan", org: "CBRE Group", website: "https://www.cbre.com/" }), [
+      row({
+        checkKey: "edgar",
+        status: "INCONCLUSIVE",
+        finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+        source: "SEC EDGAR",
+      }),
+    ]);
+    expect(exact.mark).toBe("PASS");
+    expect(exact.note).toContain("exact current-name match");
+
+    const owner = suggestCompany(facts, [
       row({
         checkKey: "edgar",
         status: "PASS",
-        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. Confirm it is the same firm.",
+        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. A Form 4 for this CIK names Sulentic Robert E as a reporting owner.",
         url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
         source: "SEC EDGAR",
         corroborates: true,
       }),
     ]);
-    expect(exact.mark).toBe("PASS");
+    expect(owner.mark).toBe("PASS");
+    expect(owner.note.toLowerCase()).toContain("reporting owner");
   });
 });

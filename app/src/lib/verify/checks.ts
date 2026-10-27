@@ -1179,10 +1179,10 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
   const bothDown = census.kind === "down" && nominatim.kind === "down";
   const bothMissed = census.kind === "none" && nominatim.kind === "none";
   const finding = bothDown
-    ? "The address could not be checked. The Census geocoder and OpenStreetMap Nominatim did not respond. This is not a pass and not a failure."
+    ? "Could not check. The Census geocoder and OpenStreetMap Nominatim did not respond. This is inconclusive. It is not a pass and not a failure."
     : bothMissed
-      ? "The address could not be checked. The Census geocoder and OpenStreetMap Nominatim returned no match. This is not a pass and not a failure."
-      : "The address could not be checked. A geocoder returned no match and the other did not respond. This is not a pass and not a failure.";
+      ? "Could not check. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure."
+      : "Could not check. A geocoder returned no match and the other did not respond. This is inconclusive. It is not a pass and not a failure.";
   return check({
     ...base,
     status: "UNAVAILABLE",

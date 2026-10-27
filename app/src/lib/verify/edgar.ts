@@ -502,6 +502,16 @@ export function assessEdgarMatch(input: {
     const tickerNote = tickerAccepted
       ? " The ticker matches the company name on the application, and the website domain stem is that ticker."
       : "";
+    const currentName = input.identity?.currentName || "";
+    if (currentName && sameFirmName(currentName, input.org)) {
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: edgarCompanyUrl(match.cik),
+        finding: `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match. It does not tie the person to the firm.`,
+      };
+    }
     return {
       status: "INCONCLUSIVE",
       corroborates: false,

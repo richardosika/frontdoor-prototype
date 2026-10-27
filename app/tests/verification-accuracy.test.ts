@@ -14,6 +14,7 @@ import { factsForSearch } from "@/lib/verify/qa-marker";
 import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -1709,11 +1710,12 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(seen.some((url) => url.includes("nominatim.openstreetmap.org"))).toBe(true);
     expect(missed?.status).toBe("UNAVAILABLE");
     expect(missed?.reviewFlag).not.toBe(true);
-    expect(missed?.finding.toLowerCase()).toContain("could not be checked");
+    expect(missed?.finding.toLowerCase()).toContain("could not check");
+    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
     expect(missed?.finding.toLowerCase()).not.toContain("address did not check out");
     const missedGrade = gradeChecks([missed!], facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }));
     expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
-    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not check");
     expect(missedGrade.attention.some((item) => item.title === "Address")).toBe(false);
 
     const down = await resolveAddressCheck({
@@ -1725,15 +1727,16 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
       },
     });
     expect(down?.status).toBe("UNAVAILABLE");
-    expect(down?.finding.toLowerCase()).toContain("could not be checked");
+    expect(down?.finding.toLowerCase()).toContain("could not check");
+    expect(down?.finding.toLowerCase()).toContain("inconclusive");
     expect(down?.finding.toLowerCase()).not.toContain("did not check out");
     const graded = gradeChecks([down!], facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }));
     const completeness = graded.categories.find((category) => category.id === "completeness");
-    expect(completeness?.reason.toLowerCase()).toContain("could not be checked");
+    expect(completeness?.reason.toLowerCase()).toContain("could not check");
     expect(completeness?.reason).not.toContain("address did not check out");
     expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
-    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not check");
 
     const matched = await resolveAddressCheck({
       facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
@@ -4454,9 +4457,10 @@ describe("batch 12 former names, registry links, geocoder misses, and missing co
       },
     });
     expect(missed?.status).toBe("UNAVAILABLE");
-    expect(missed?.finding.toLowerCase()).toContain("could not be checked");
+    expect(missed?.finding.toLowerCase()).toContain("could not check");
+    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
     const missedGrade = gradeChecks([missed!], facts({ location: "1 New York Plaza, New York, NY 10004" }));
-    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not check");
     expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address");
 
     const box = assessLocalAddress("P.O. Box 12, Phoenix, AZ 85001");
@@ -4561,5 +4565,238 @@ describe("batch 12 former names, registry links, geocoder misses, and missing co
     expect(fake.score).toBeLessThan(real.score);
     expect(real.categories.find((category) => category.id === "role")?.reason).toContain("8 of 8");
     expect(real.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person");
+  });
+});
+
+describe("company-only live QA fixtures", () => {
+  // Live grades on mvp bbd1072, company-only applicants: CBRE F38, Brookfield F44,
+  // AECOM Tishman F38, Prologis F38, Gilbane F44, Fried Frank F38, fake F36.
+  const liveBefore = {
+    cbre: 38,
+    brookfield: 44,
+    aecom: 38,
+    prologis: 38,
+    gilbane: 44,
+    fried: 38,
+    fake: 36,
+  };
+
+  function localPasses(): CheckOutput[] {
+    return [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member or a declined applicant." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up has no fraud-pattern phrasing." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst of applications." }),
+    ];
+  }
+
+  function registeredDomain(): CheckOutput {
+    return row({ key: "rdap", status: "PASS", finding: "A domain registration record responded.", source: "RDAP", url: "https://rdap.org/" });
+  }
+
+  function censusMiss(): CheckOutput {
+    return row({
+      key: "address",
+      status: "UNAVAILABLE",
+      finding: "Could not check. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure.",
+      source: "US Census Geocoder",
+    });
+  }
+
+  function companySite(url: string): CheckOutput {
+    return row({
+      key: "website",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url,
+      finding: "Company: yes. The company's own site names the company.",
+      source: "Company website",
+    });
+  }
+
+  function linkedinCompany(url: string): CheckOutput {
+    return row({
+      key: "linkedin-fetch",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url,
+      finding: "The LinkedIn company page confirms the company. Company confirmed, person not confirmed.",
+      source: "LinkedIn",
+    });
+  }
+
+  it("grades the six company-only firms and the fake without raising the fake", () => {
+    const person = "Alex Morgan";
+    const cbre = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "CBRE Group" })),
+        registeredDomain(),
+        censusMiss(),
+        row({
+          key: "website",
+          status: "UNAVAILABLE",
+          finding: "The company website could not be checked. The site blocked this agent.",
+          source: "Company website",
+        }),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "CBRE Group", website: "https://www.cbre.com/", location: "250 Vesey St, New York, NY 10281" }),
+    );
+    const brookfield = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Brookfield Properties" })),
+        registeredDomain(),
+        companySite("https://www.brookfieldproperties.com/"),
+        linkedinCompany("https://www.linkedin.com/company/brookfield-properties/"),
+        censusMiss(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          reviewFlag: true,
+          finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review. A former name is not an exact match and does not corroborate.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1680277",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/", location: "250 Vesey St, New York, NY 10281" }),
+    );
+    const aecom = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "AECOM Tishman" })),
+        registeredDomain(),
+        censusMiss(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          reviewFlag: true,
+          finding: "Parent match, needs review. EDGAR lists AECOM (ACM), CIK 868857. A parent or affiliate is not an exact match and is not a pass.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=868857",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "AECOM Tishman", location: "One New York Plaza, New York, NY 10004" }),
+    );
+    const prologis = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Prologis" })),
+        registeredDomain(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          finding: "EDGAR's current name for CIK 1045609 is PROLOGIS INC. That is an exact current-name match. It does not tie the person to the firm.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1045609",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "Prologis", website: "https://www.prologis.com/" }),
+    );
+    const gilbane = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Gilbane Building Company" })),
+        registeredDomain(),
+        companySite("https://www.gilbaneco.com/"),
+        linkedinCompany("https://www.linkedin.com/company/gilbane-building-company/"),
+        registryLinkCheck(facts({ location: "Providence, RI", org: "Gilbane Building Company" })),
+      ],
+      facts({ name: person, applicantName: person, org: "Gilbane Building Company", website: "https://www.gilbaneco.com/", location: "Providence, RI" }),
+    );
+    const fried = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Fried Frank" })),
+        registeredDomain(),
+      ],
+      facts({ name: person, applicantName: person, org: "Fried Frank", website: "https://www.friedfrank.com/" }),
+    );
+    const fakeFacts = facts({
+      name: "Throvnik Pellusar",
+      applicantName: "Throvnik Pellusar",
+      org: "Throvnik Pellusar Capital LLC",
+      location: "Phoenix, AZ",
+      website: "https://throvnik-pellusar.example",
+    });
+    const fake = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(fakeFacts),
+        row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "RDAP has no registration for throvnik-pellusar.example. domain is not registered.", source: "RDAP" }),
+        row({ key: "website", status: "FAIL", finding: "Searched: https://throvnik-pellusar.example. domain does not resolve.", source: "Company website" }),
+        row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name.", source: "SEC EDGAR" }),
+        registryLinkCheck(fakeFacts),
+      ],
+      fakeFacts,
+    );
+
+    const after = {
+      cbre: cbre.score,
+      brookfield: brookfield.score,
+      aecom: aecom.score,
+      prologis: prologis.score,
+      gilbane: gilbane.score,
+      fried: fried.score,
+      fake: fake.score,
+    };
+    expect(after).toEqual({ cbre: 38, brookfield: 44, aecom: 38, prologis: 38, gilbane: 44, fried: 38, fake: 28 });
+    expect(after.fake).toBeLessThan(liveBefore.fake);
+    for (const score of [after.cbre, after.brookfield, after.aecom, after.prologis, after.gilbane, after.fried]) {
+      expect(after.fake).toBeLessThan(score);
+      expect(score).toBeGreaterThanOrEqual(liveBefore.fake);
+    }
+    for (const report of [cbre, brookfield, aecom, prologis, gilbane, fried, fake]) {
+      expect(report.letter).toBe("F");
+      expect(report.recommendation).toBe("NEEDS MORE INFO");
+    }
+    expect(cbre.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(cbre.summary.didNotCheckOut.toLowerCase()).not.toContain("address");
+    expect(brookfield.summary.didNotCheckOut.toLowerCase()).not.toContain("vesey");
+    expect(aecom.summary.didNotCheckOut.toLowerCase()).not.toContain("plaza");
+    expect(brookfield.summary.company).toContain("BPI Property Inc.");
+    expect(brookfield.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(cbre.categories.find((category) => category.id === "company")?.reason).toContain("exact company name");
+    expect(fake.attention[0]?.title).toBe("Company could not be found");
+    expect(fake.categories.find((category) => category.id === "role")?.earned).toBe(0);
+    expect(cbre.categories.find((category) => category.id === "role")?.earned).toBe(8);
+
+    const prefill = emptyPrefillFacts({ name: person, org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" });
+    const brookfieldStep = suggestCompany(prefill, [
+      { checkKey: "website", status: "PASS", finding: "The company's own site names the company.", url: "https://www.brookfieldproperties.com/", source: "Company website" },
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review.", url: "https://www.sec.gov/edgar/browse/?CIK=1680277", source: "SEC EDGAR", reviewFlag: true },
+    ]);
+    expect(brookfieldStep.mark).toBe("CONCERN");
+    expect(brookfieldStep.note).toContain("Could not confirm");
+    expect(brookfieldStep.note).toContain("Needs review");
+    const cbreStep = suggestCompany(emptyPrefillFacts({ name: person, org: "CBRE Group" }), [
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.", url: "https://www.sec.gov/edgar/browse/?CIK=1138118", source: "SEC EDGAR" },
+    ]);
+    expect(cbreStep.mark).toBe("PASS");
+    const aecomStep = suggestCompany(emptyPrefillFacts({ name: person, org: "AECOM Tishman", website: "https://www.aecom.com/" }), [
+      { checkKey: "website", status: "PASS", finding: "The company's own site names the company.", url: "https://www.aecom.com/", source: "Company website" },
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "Parent match, needs review. EDGAR lists AECOM (ACM). A parent or affiliate is not an exact match.", url: "https://www.sec.gov/edgar/browse/?CIK=868857", source: "SEC EDGAR", reviewFlag: true },
+    ]);
+    expect(aecomStep.mark).toBe("CONCERN");
+    const ownerStep = suggestCompany(emptyPrefillFacts({ name: person, org: "CBRE Group" }), [
+      { checkKey: "edgar", status: "PASS", corroborates: true, finding: "A Form 4 for this CIK names Sulentic Robert E as a reporting owner.", url: "https://www.sec.gov/edgar/browse/?CIK=1138118", source: "SEC EDGAR" },
+    ]);
+    expect(ownerStep.mark).toBe("PASS");
   });
 });

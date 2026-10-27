@@ -864,7 +864,7 @@ function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: numbe
   if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
   if (row.status === "FAIL") return portionLine(0, possible, "The address did not check out");
   if (row.status === "UNAVAILABLE" || row.status === "INCONCLUSIVE") {
-    return { earned: 0, possible: 0, reason: "The address could not be checked. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
+    return { earned: 0, possible: 0, reason: "Could not check. The address is inconclusive. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
   }
   if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
   return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);

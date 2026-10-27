@@ -375,9 +375,16 @@ function suggestTrack(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggest
   return pack("track", mark, urls, found, missing);
 }
 
-function edgarNameOnlyOrFormer(item: EvidenceRow | undefined): boolean {
+/** A former name, an unconfirmed name-only hit, or a parent match. An exact current name or a person link does not block. */
+function edgarBlocksCompanyPass(item: EvidenceRow | undefined): boolean {
   if (!item) return false;
-  return /former name|name-only company match/i.test(item.finding || "");
+  const finding = item.finding || "";
+  if (/former name/i.test(finding)) return true;
+  if (/exact current-name match/i.test(finding)) return false;
+  if (item.status === "PASS" && (item.corroborates || /reporting owner/i.test(finding))) return false;
+  if (/name-only company match/i.test(finding)) return true;
+  if (/parent match|not an exact match/i.test(finding)) return true;
+  return false;
 }
 
 export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggestion {
@@ -388,18 +395,36 @@ export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): St
   const found: string[] = [];
   const missing: string[] = ["Email domain was not used as proof."];
   const urls: string[] = [];
-  const limited = edgarNameOnlyOrFormer(edgar);
-  const hit = [website, edgar, registry].find((item) => item?.status === "PASS" && sourced(item) && !(item === edgar && limited));
-  let mark: SuggestedMark = hit ? "PASS" : "COULDNT_VERIFY";
-  if (limited && mark === "PASS") mark = "CONCERN";
-  if (hit) {
-    found.push(hit.finding);
-    urls.push(hit.url);
+  const edgarLimited = edgarBlocksCompanyPass(edgar);
+  const exactCurrent = Boolean(edgar && /exact current-name match/i.test(edgar.finding || "") && !/former name/i.test(edgar.finding || ""));
+  const personLink = Boolean(edgar && edgar.status === "PASS" && (edgar.corroborates || /reporting owner/i.test(edgar.finding || "")));
+  const websiteHit = Boolean(website?.status === "PASS" && sourced(website));
+  const registryHit = Boolean(registry?.status === "PASS" && sourced(registry));
+  const edgarHit = Boolean(edgar?.status === "PASS" && sourced(edgar) && !edgarLimited);
+  let mark: SuggestedMark = "COULDNT_VERIFY";
+  if (personLink || exactCurrent || edgarHit || ((websiteHit || registryHit) && !edgarLimited)) mark = "PASS";
+  else if (edgarLimited) mark = "CONCERN";
+  if (personLink && edgar) {
+    found.push(edgar.finding);
+    urls.push(edgar.url);
+  } else if (exactCurrent && edgar) {
+    found.push(edgar.finding);
+    urls.push(edgar.url);
+  } else if (edgarHit && edgar) {
+    found.push(edgar.finding);
+    urls.push(edgar.url);
+  } else if (!edgarLimited && websiteHit && website) {
+    found.push(website.finding);
+    urls.push(website.url);
+  } else if (!edgarLimited && registryHit && registry) {
+    found.push(registry.finding);
+    urls.push(registry.url);
   }
-  if (limited && edgar) {
+  if (edgarLimited && !personLink && !exactCurrent && edgar) {
     if (!found.includes(edgar.finding)) found.push(edgar.finding);
     if (isHttpUrl(edgar.url)) urls.push(edgar.url);
-    missing.push("A name-only or former-name EDGAR hit needs review. It is not a pass.");
+    if (websiteHit && website && !found.includes(website.finding)) found.push(website.finding);
+    missing.push("Could not confirm. Needs review. A name-only or former-name EDGAR hit is not a pass unless a person-to-company link or an exact current-name match is on the file.");
   }
   if (website?.status === "FAIL" && sourced(website)) {
     mark = stricterMark(mark, "CONCERN");
@@ -415,7 +440,7 @@ export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): St
   if (stateRegistry && (stateRegistry.status === "NOT_RUN" || stateRegistry.status === "UNAVAILABLE" || !sourced(stateRegistry))) {
     missing.push(stateRegistry.finding || `The state registry ${COULD_NOT_VERIFY}.`);
     if (isHttpUrl(stateRegistry.url)) urls.push(stateRegistry.url);
-  } else if (!hit) {
+  } else if (mark === "COULDNT_VERIFY") {
     missing.push(`Company registries and the public site ${COULD_NOT_VERIFY}.`);
   }
   if (!facts.org.trim()) missing.push("No company name was on the file.");
