@@ -4,14 +4,14 @@ import { isReservedDomain } from "@/lib/verify/host";
 import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
-import { assessCourts } from "@/lib/verify/courts";
+import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
+import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
@@ -3138,7 +3138,7 @@ describe("thirteenth follow-up", () => {
     );
     expect(partial.finding.toLowerCase()).toContain("parent match, needs review");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("parent match, needs review");
-    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(partialGrade.letter).not.toBe("C");
     expect(partialGrade.recommendation.startsWith("APPROVE")).toBe(false);
@@ -3626,7 +3626,7 @@ describe("qa october 27", () => {
       [row({ key: "edgar", status: affiliate.status, weight: 6, corroborates: false, reviewFlag: true, finding: affiliate.finding })],
       facts({ org: "Hines", name: "Jeff Hines" }),
     );
-    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
     expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(affiliateGrade.recommendation.startsWith("APPROVE")).toBe(false);
     expect(affiliateGrade.letter).not.toBe("C");
@@ -3668,7 +3668,7 @@ describe("qa october 27", () => {
       );
       const reason = graded.categories.find((category) => category.id === "company")?.reason || "";
       expect(reason).toContain("parent match, needs review");
-      expect(reason).toContain("3 of 6");
+      expect(reason).toContain("0 of 6");
       expect(reason).not.toContain("6 of 6");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
       expect(graded.letter).not.toBe("C");
@@ -3914,5 +3914,254 @@ describe("batch 9 fixtures", () => {
     const graded = gradeChecks([row(none)], facts({ name: "QA TestAB", org: "Skanska USA Building" }));
     expect(graded.summary.checkedOut.toLowerCase()).not.toContain("courtlistener");
     expect(graded.summary.company.toLowerCase()).toContain("not a risk flag");
+  });
+});
+
+describe("batch 10 fixtures", () => {
+  const ibp = { title: "Installed Building Products, Inc.", ticker: "IBP", cik: "1580905" };
+
+  it("counts RXR on rxr.com, including a headline that says RXR CEO", () => {
+    expect(mentionsCompany("RXR CEO says", "RXR")).toBe(true);
+    const headline = judgeHeadline("RXR CEO Scott Rechler says the tower is open", {
+      name: "Scott Rechler",
+      applicantName: "Scott Rechler",
+      org: "RXR",
+      location: "New York, NY",
+      website: "https://www.rxr.com",
+    });
+    expect(headline.person).toBe(true);
+    expect(headline.company).toBe(true);
+    expect(headline.aliasOnly).toBe(false);
+    expect(socialSearchQuery("Scott Rechler", "RXR")).toContain("rxr");
+  });
+
+  it("does not treat Installed Building Products as the parent of STO Building Group", () => {
+    const sto = assessEdgarMatch({
+      org: "STO Building Group",
+      person: "Robert Mullen",
+      tickersOk: true,
+      companies: [ibp, { title: "BUILDING SYSTEMS INC", ticker: "", cik: "1" }],
+      filingNames: [],
+    });
+    expect(sto.finding).not.toContain("Installed Building");
+    expect(sto.finding).not.toContain("1580905");
+    expect(sto.finding.toLowerCase()).not.toContain("parent match");
+    expect(sto.reviewFlag).not.toBe(true);
+    expect(sto.corroborates).toBe(false);
+    const invented = assessEdgarMatch({
+      org: "ZZZ Building LLC",
+      person: "Pat Example",
+      tickersOk: true,
+      companies: [ibp],
+      filingNames: [],
+    });
+    expect(invented.finding).not.toContain("Installed Building");
+    expect(invented.finding.toLowerCase()).not.toContain("parent match");
+    expect(companySearchTerm("STO Building Group", "Robert Mullen")).toBe("sto building group");
+    expect(socialSearchQuery("Robert Mullen", "STO Building Group")).toBe('"Robert Mullen" "sto building group"');
+    expect(instagramCompanyTag("STO Building Group", "Robert Mullen")).not.toBe("building");
+  });
+
+  it("keeps Brookfield and AECOM as parent matches and awards points only when a page links the parent", () => {
+    const companies = [
+      { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
+      { title: "AECOM", ticker: "ACM", cik: "868857" },
+      ibp,
+    ];
+    const brookfield = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "Brian Kingston",
+      tickersOk: true,
+      companies,
+      filingNames: [],
+    });
+    const aecom = assessEdgarMatch({
+      org: "AECOM Tishman",
+      person: "Troy Rudd",
+      tickersOk: true,
+      companies,
+      filingNames: [],
+    });
+    for (const result of [brookfield, aecom]) {
+      expect(result.finding.toLowerCase()).toContain("parent match, needs review");
+      expect(result.status).not.toBe("PASS");
+      expect(result.corroborates).toBe(false);
+    }
+    expect(brookfield.finding).not.toContain("Installed Building");
+    const edgar = row({ key: "edgar", status: "INCONCLUSIVE", corroborates: false, reviewFlag: true, finding: brookfield.finding });
+    const unlinked = gradeChecks([edgar], facts({ org: "Brookfield Properties", name: "Brian Kingston" }));
+    expect(unlinked.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    const linked = gradeChecks(
+      [edgar, row({ key: "news", status: "PASS", corroborates: true, finding: "Brookfield Properties is a subsidiary of Brookfield Corp." })],
+      facts({ org: "Brookfield Properties", name: "Brian Kingston" }),
+    );
+    expect(linked.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    const sameNameOnly = gradeChecks(
+      [edgar, row({ key: "news", status: "PASS", corroborates: true, finding: "Brian Kingston leads Brookfield Properties." })],
+      facts({ org: "Brookfield Properties", name: "Brian Kingston" }),
+    );
+    expect(sameNameOnly.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+  });
+
+  it("counts a Lawdragon piece about Adam Leitman Bailey and does not search his name twice", () => {
+    const org = "Adam Leitman Bailey, P.C.";
+    const person = "Adam Leitman Bailey";
+    expect(firmContainsApplicantName(org, person)).toBe(true);
+    expect(personHit("Adam Leitman Bailey, P.C. represents owners", person, org, { ownFirm: true })).toBe("match");
+    expect(personHit("Lawdragon honors Adam Leitman Bailey", person, org)).toBe("match");
+    expect(personHit("Attorney Mark Adam Leitman Bailey", person, org)).toBe("none");
+    const lawdragon = judgeHeadline("Lawdragon honors Adam Leitman Bailey", {
+      name: person,
+      applicantName: person,
+      org,
+      location: "New York, NY",
+      website: "https://www.alblawfirm.com",
+    });
+    expect(lawdragon.person).toBe(true);
+    expect(lawdragon.company).toBe(true);
+    expect(lawdragon.aliasOnly).toBe(false);
+    expect(socialSearchQuery(person, org)).toBe('"Adam Leitman Bailey"');
+    expect(socialSearchQuery(person, org).match(/Adam Leitman Bailey/gi)).toHaveLength(1);
+    expect(instagramCompanyTag(org, person)).not.toBe("adamleitmanbailey");
+    expect(personHit("Joshua Stein, director of the Kansas City Jewish Chronicle", "Joshua Stein", "Joshua Stein PLLC")).toBe("none");
+  });
+
+  it("quotes Gilbane Building Company instead of the word building, and keeps Jr. in the court query", () => {
+    expect(companySearchTerm("Gilbane Building Company", "Thomas Gilbane Jr.")).toBe("gilbane building company");
+    expect(companySearchTerm("Gilbane Building Company", "Thomas Gilbane Jr.")).not.toBe("building");
+    expect(socialSearchQuery("Thomas Gilbane Jr.", "Gilbane Building Company")).toBe('"Thomas Gilbane" "gilbane building company"');
+    expect(instagramCompanyTag("Gilbane Building Company", "Thomas Gilbane Jr.")).not.toBe("building");
+    expect(courtSearchQuery("Thomas Gilbane Jr.")).toBe('"Thomas Gilbane Jr."');
+    expect(courtSearchQuery("Thomas Gilbane Junior")).toBe('"Thomas Gilbane Jr."');
+    expect(courtSearchQuery("Thomas Gilbane III")).toBe('"Thomas Gilbane III"');
+  });
+
+  it("does not list criminal captions when no opinion names the company", () => {
+    const courts = assessCourts(
+      JSON.stringify({
+        results: [
+          { caseName: "United States v. Robert Mullen", snippet: "The indictment names Robert Mullen." },
+          { caseName: "STATE of Louisiana v. Robert MULLEN", snippet: "" },
+        ],
+      }),
+      { ok: true, status: 200 },
+      facts({ name: "Robert Mullen", org: "STO Building Group" }),
+    );
+    expect(courts.status).toBe("INCONCLUSIVE");
+    expect(courts.weight).toBe(0);
+    expect(courts.corroborates).not.toBe(true);
+    expect(courts.finding).toMatch(/2 opinions name a person with this name; none name the company/);
+    expect(courts.finding).not.toContain("United States v");
+    expect(courts.finding).not.toContain("Louisiana");
+    expect(courts.finding.toLowerCase()).not.toContain("possible match");
+  });
+
+  it("matches Willy Walker to William on a Form 4 and skips Walker Harris's LinkedIn slug", async () => {
+    expect(mentionsPerson("Walker William M (CIK 0001503841)", "Willy Walker")).toBe(true);
+    expect(insiderSearchUrl("Walker", "1497770", "4")).toContain("ciks=0001497770");
+    expect(insiderSearchUrl("Walker", "1497770", "4")).toContain("%22Walker%22");
+    const edgar = assessEdgarMatch({
+      org: "Walker & Dunlop",
+      person: "Willy Walker",
+      website: "https://www.walkerdunlop.com",
+      tickersOk: true,
+      companies: [{ title: "WALKER & DUNLOP, INC.", ticker: "WD", cik: "1497770" }],
+      filingNames: [],
+      insiderNames: [["Walker William M (CIK 0001503841)"]],
+    });
+    expect(edgar.status).toBe("PASS");
+    expect(edgar.corroborates).toBe(true);
+    expect(edgar.finding).toContain("Walker William M");
+    expect(edgar.finding).toContain("1497770");
+    expect(linkedinProfileMatchesPerson("https://www.linkedin.com/in/walkerharris/", "Willy Walker")).toBe(false);
+    expect(linkedinProfileMatchesPerson("https://www.linkedin.com/in/william-walker/", "Willy Walker")).toBe(true);
+    expect(linkedinProfileMatchesPerson("https://www.linkedin.com/in/willywalker/", "Willy Walker")).toBe(true);
+    expect(linkedinProfileMatchesPerson("https://www.linkedin.com/in/walker-william/", "Willy Walker")).toBe(false);
+    expect(linkedinProfileMatchesPerson("https://www.linkedin.com/company/walker-dunlop/", "Willy Walker")).toBe(true);
+    const fetched: string[] = [];
+    const checks = await runPublicScreen(
+      facts({
+        name: "Willy Walker",
+        applicantName: "Willy Walker",
+        org: "Walker & Dunlop",
+        website: "https://www.walkerdunlop.com",
+        linkedinUrl: "",
+        location: "Bethesda, MD",
+      }),
+      async (url) => {
+        fetched.push(url);
+        if (url.includes("walkerdunlop.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<html><body><p>Willy Walker is chief executive of Walker & Dunlop.</p><a href="https://www.linkedin.com/in/walkerharris/">Walker Harris</a><a href="https://www.linkedin.com/in/william-walker/">William Walker</a></body></html>`,
+          };
+        }
+        if (url.includes("william-walker")) {
+          return { ok: true, status: 200, text: "William Walker chief executive of Walker & Dunlop" };
+        }
+        if (url.includes("walkerharris")) {
+          return { ok: true, status: 200, text: "Walker Harris SVP Co-Head of Multifamily at Walker & Dunlop" };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    expect(fetched.some((url) => url.includes("walkerharris"))).toBe(false);
+    const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+    expect(linkedin?.url || "").toContain("william-walker");
+    expect(linkedin?.url || "").not.toContain("walkerharris");
+    expect(linkedin?.corroborates).toBe(true);
+  });
+
+  it("keeps an unregistered fake at least 15 points under a corroborated short-brand file", () => {
+    const shared = ["email-syntax", "disposable-email", "role-address", "text-risk", "duplicate", "sanctions", "invite-source", "plausibility", "velocity"].map((key) =>
+      row({ key, status: "PASS", corroborates: false, finding: "pass" }),
+    );
+    const fake = gradeChecks(
+      [
+        ...shared,
+        row({ key: "website", status: "FAIL", reviewFlag: true, finding: "Searched: https://www.ormsleyvantage.com. domain does not resolve." }),
+        row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "domain is not registered." }),
+      ],
+      facts({
+        name: "Thaddeus Brinkwell",
+        applicantName: "Thaddeus Brinkwell",
+        org: "Ormsley Vantage Lending Partners LLC",
+        website: "https://www.ormsleyvantage.com",
+        role: "LENDER",
+      }),
+    );
+    const real = gradeChecks(
+      [
+        ...shared,
+        row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes." }),
+        row({ key: "rdap", status: "PASS", finding: "A domain record responded." }),
+        row({
+          key: "news",
+          status: "PASS",
+          corroborates: true,
+          finding: "A headline names the person and the company. RXR CEO Scott Rechler says the tower is open.",
+        }),
+        row({
+          key: "web-footprint",
+          status: "PASS",
+          corroborates: true,
+          finding: "A public web result names the person and the company. RXR CEO Scott Rechler says the tower is open.",
+        }),
+      ],
+      facts({
+        name: "Scott Rechler",
+        applicantName: "Scott Rechler",
+        org: "RXR",
+        website: "https://www.rxr.com",
+        role: "DEVELOPER",
+      }),
+    );
+    const company = fake.categories.find((category) => category.id === "company")?.reason || "";
+    expect(company).toContain("domain does not resolve");
+    expect(company).toContain("domain is not registered");
+    expect(fake.letter).toBe("F");
+    expect(fake.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(real.score - fake.score).toBeGreaterThanOrEqual(15);
   });
 });

@@ -1,6 +1,7 @@
 import { annualDuesCents } from "@/lib/dues";
 import { roleLabel } from "@/lib/roles";
 import { US_POSTAL_CODES, statedUsState } from "@/lib/verify/address";
+import { independentPageLinksParent } from "@/lib/verify/edgar";
 import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus, Verdict } from "@/lib/verify/types";
 
@@ -735,12 +736,16 @@ export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
   });
 }
 
-function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
+function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean, checks: CheckOutput[], org: string): Line {
   if (row?.status === "PASS") {
     return award(true, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
   }
   if (row && /parent match, needs review/i.test(row.finding)) {
-    return portionLine(companyOnlyPoints(possible), possible, "parent match, needs review");
+    const pages = checks
+      .filter((check) => check.key !== "edgar" && check.key !== "fixture-edgar" && !check.selfReported && check.status === "PASS")
+      .map((check) => check.finding);
+    const points = independentPageLinksParent(org, row.finding, pages) ? companyOnlyPoints(possible) : 0;
+    return portionLine(points, possible, "parent match, needs review");
   }
   // Exact normalized-name filer, not a different firm. Person credit stays off, so an
   // impersonation of a public registrant does not gain points unless something else
@@ -841,7 +846,7 @@ export function gradeChecks(
   ]);
   const company = sumLines([
     websiteAward(checks, weights.company.website, weightsMode, independent),
-    edgarAward(findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar"), weights.company.edgar, independent),
+    edgarAward(findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar"), weights.company.edgar, independent, checks, facts.org || ""),
     award(
       passed(card) && independent,
       weights.company["business-card"],

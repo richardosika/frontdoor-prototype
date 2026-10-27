@@ -75,11 +75,22 @@ export function courtNameParts(name: string): { given: string[]; surname: string
   return { given, surname };
 }
 
-/** Quoted "First Last". A single token is not a court query. */
+function courtSuffixLabel(name: string): string {
+  const last = name.trim().split(/\s+/).pop() || "";
+  const normalized = normalizeGenerationalSuffix(last);
+  if (!normalized) return "";
+  if (normalized === "jr") return "Jr.";
+  if (normalized === "sr") return "Sr.";
+  return normalized.toUpperCase();
+}
+
+/** Quoted "First Last", keeping Jr., Sr., or III so a different generation is not the query. */
 export function courtSearchQuery(name: string): string {
   const parsed = courtNameParts(name);
   if (!parsed) return "";
-  return `"${parsed.given.join(" ")} ${parsed.surname}"`;
+  const suffix = courtSuffixLabel(name);
+  const body = `${parsed.given.join(" ")} ${parsed.surname}`;
+  return suffix ? `"${body} ${suffix}"` : `"${body}"`;
 }
 
 function personPhrase(text: string, name: string): boolean {
@@ -132,6 +143,7 @@ export function assessCourts(
   let severeNearName = 0;
   let corroborated = 0;
   let companyHits = 0;
+  let companyNamed = false;
   const matchedCases: string[] = [];
   const severeCases: string[] = [];
   for (const result of results) {
@@ -140,6 +152,7 @@ export function assessCourts(
     const named = Boolean(quoted) && fields.some((field) => personPhrase(field, facts.name));
     const company = fields.some((field) => companyPhrase(field, facts.org));
     if (!named && !company) continue;
+    if (company) companyNamed = true;
     const label = (result.caseNameFull || result.caseName || result.snippet).replace(/\s+/g, " ").trim();
     if (named) {
       nameHits += 1;
@@ -152,11 +165,22 @@ export function assessCourts(
     if (company) corroborated += 1;
   }
   const listed = (names: string[]) => names.map((name) => `"${name}"`).join("; ");
+  const nameOnly = (count: number) => {
+    const opinions = count === 1 ? "opinion names" : "opinions name";
+    return `${count} ${opinions} a person with this name; none name the company. This is not a risk flag and not credit.`;
+  };
   if (corroborated > 0) {
     return courtRow({
       status: "INCONCLUSIVE",
       reviewFlag: true,
       finding: `Possible match, needs review. Exact name match: ${listed(severeCases) || listed(matchedCases)}. ${corroborated} CourtListener result(s) name this person and company near a severe term. This is not a failure and not an automatic decline.`,
+    });
+  }
+  if (nameHits > 0 && !companyNamed) {
+    return courtRow({
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      finding: nameOnly(nameHits),
     });
   }
   if (severeNearName > 0) {

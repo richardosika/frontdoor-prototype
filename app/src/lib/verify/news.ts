@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, isDistinctiveCompanyToken, isShortBrandToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -124,20 +124,24 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   if (!cleanedPerson || !phrase) return null;
   const seen = new Set(wordsOf(cleanedPerson));
   const words = phrase.split(/\s+/).filter(Boolean);
-  // "bk real estate" and "sl green realty" stay quoted in full. Do not reduce them to "advisors" or "green".
-  if (words.length >= 2 && words.some((word) => isShortBrandToken(bareToken(word)))) {
+  // "bk real estate", "sl green realty", and a one-word brand such as "rxr" stay quoted in full.
+  if (words.some((word) => isShortBrandToken(bareToken(word)))) {
     return `"${cleanedPerson}" "${words.join(" ")}"`;
   }
+  // The firm name is the person's name. Do not quote "Adam Leitman Bailey" a second time.
+  if (words.length && words.every((word) => seen.has(bareToken(word)))) return null;
   const kept = words.filter((word) => {
     const token = bareToken(word);
     return token.length >= 2 && !seen.has(token);
   });
-  const distinctive = kept.filter((word) => isDistinctiveCompanyToken(bareToken(word)));
+  const distinctive = kept.filter((word) => {
+    const token = bareToken(word);
+    return isDistinctiveCompanyToken(token) && !isStandaloneGenericQueryToken(token);
+  });
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
-  const phraseHasDistinctive = words.some((word) => isDistinctiveCompanyToken(bareToken(word)));
-  // "estate" alone is a generic leftover, not a firm. A full name that still contains the brand is kept.
-  if (!phraseHasDistinctive && words.length < 2) return null;
-  return `"${cleanedPerson}" "${phrase}"`;
+  // "building" alone is not the firm. Keep the whole name, including a short token and the surname.
+  if (words.length >= 2) return `"${cleanedPerson}" "${words.join(" ")}"`;
+  return null;
 }
 
 /** Quoted person-and-company query used by news, YouTube, and the other public searches. */
@@ -154,10 +158,13 @@ export function instagramCompanyTag(org: string, person: string): string {
   const surname = surnameForSearch(cleaned).toLowerCase();
   const tag = term.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const personWords = new Set(wordsOf(cleaned));
-  if (tag && tag !== surname && !personWords.has(tag)) return tag;
-  return companyPhraseTokens(stripQuotes(org))
-    .filter((word) => word !== surname && !personWords.has(word))
+  const personTag = cleaned.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (tag && tag !== surname && tag !== personTag && !personWords.has(tag) && !isStandaloneGenericQueryToken(tag)) return tag;
+  const fallback = companyPhraseTokens(stripQuotes(org))
+    .filter((word) => word !== surname && !personWords.has(word) && !isStandaloneGenericQueryToken(word) && !isGenericFirmToken(word))
     .join("");
+  if (!fallback || fallback === personTag) return "";
+  return fallback;
 }
 
 export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = []): string[] {

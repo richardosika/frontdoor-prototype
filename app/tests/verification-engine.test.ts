@@ -263,7 +263,9 @@ describe("courts", () => {
     expect(result.status).toBe("INCONCLUSIVE");
     expect(result.status).not.toBe("FAIL");
     expect(result.reviewFlag).toBeUndefined();
-    expect(result.finding).toContain("Possible match, needs review");
+    expect(result.finding).toMatch(/1 opinion names a person with this name; none name the company/);
+    expect(result.finding).not.toContain("In re Stephen Ross");
+    expect(result.finding.toLowerCase()).not.toContain("possible match");
   });
 
   it("flags a result that names the person, the company, and a severe term", () => {
@@ -331,8 +333,8 @@ describe("courts", () => {
       { ok: true, status: 200 },
       facts({ name: "Richard Kennedy", org: "Skanska USA" }),
     );
-    expect(middle.finding).toContain("Exact name match");
-    expect(middle.finding).toContain("Richard T. Kennedy v. State");
+    expect(middle.finding).toMatch(/1 opinion names a person with this name; none name the company/);
+    expect(middle.finding).not.toContain("Richard T. Kennedy v. State");
     const otherGiven = assessCourts(
       JSON.stringify({ results: [{ caseNameFull: "Douglas Richard Kennedy, Appellee", caseName: "Commonwealth v. Kennedy", snippet: "" }] }),
       { ok: true, status: 200 },
@@ -378,9 +380,10 @@ describe("courts", () => {
       { ok: true, status: 200 },
       facts({ name: "QA TestAF", org: "QA TestAF Holdings" }),
     );
-    expect(exactMadeUp.finding).toContain("Exact name match");
-    expect(exactMadeUp.finding).toContain("QA TestAF v. Builder");
+    expect(exactMadeUp.finding).toMatch(/1 opinion names a person with this name; none name the company/);
+    expect(exactMadeUp.finding).not.toContain("QA TestAF v. Builder");
     expect(courtSearchQuery("QA TestAF")).toBe('"QA TestAF"');
+    expect(courtSearchQuery("Thomas Gilbane Jr.")).toBe('"Thomas Gilbane Jr."');
     expect(courtSearchQuery("TestAF")).toBe("");
     expect(courtSearchQuery("QA")).toBe("");
   });

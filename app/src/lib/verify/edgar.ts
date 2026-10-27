@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -138,14 +138,28 @@ function foreignParenthetical(title: string, orgTokens: Set<string>): boolean {
  * Pacific Health Care Organization is not the LeFrak Organization.
  * Terra Property Trust still matches Terra, because "terra" is the whole distinctive name and the title adds other words.
  */
+/**
+ * Distinctive tokens for a parent guess, including a short brand such as STO, RXR, or JLL.
+ * "building" and the other standalone generics do not qualify, so one shared generic word is not a parent.
+ */
+function parentRequiredTokens(org: string): string[] {
+  return firmTokens(org).filter((token) => {
+    if (isGenericFirmToken(token) || isStandaloneGenericQueryToken(token)) return false;
+    return isShortBrandToken(token) || token.length >= 4;
+  });
+}
+
 function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
-  const required = firmTokens(org).filter((token) => token.length >= 4 && !isGenericFirmToken(token));
-  if (!required.length) return null;
+  const required = parentRequiredTokens(org);
+  // The first distinctive token has to be in the filer. "building" alone is not STO Building Group.
+  const first = required[0];
+  if (!first) return null;
   const orgTokens = new Set(firmTokens(org));
   let best: EdgarCompany | null = null;
   for (const row of rows) {
     const titleTokens = firmTokens(row.title);
     const titleSet = new Set(titleTokens);
+    if (!titleSet.has(first)) continue;
     if (!required.every((token) => titleSet.has(token))) continue;
     const extra =
       foreignParenthetical(row.title, orgTokens) ||
@@ -164,7 +178,7 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
  */
 function shorterParentCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
   const orgTokens = firmTokens(org);
-  const orgDistinctive = orgTokens.filter((token) => isDistinctiveCompanyToken(token));
+  const orgDistinctive = orgTokens.filter((token) => isDistinctiveCompanyToken(token) && !isStandaloneGenericQueryToken(token));
   if (!orgDistinctive.length || orgTokens.length < 2) return null;
   const orgSet = new Set(orgTokens);
   const meaningful = (tokens: string[]) => tokens.filter((token) => token.length >= 3);
@@ -202,6 +216,48 @@ function personNamedWithFirm(names: string[] | string[][], person: string, firm:
     if (group.some((name) => mentionsPerson(name, person))) return true;
   }
   return false;
+}
+
+function listedParent(finding: string): { title: string; ticker: string } {
+  const listed = finding.match(/EDGAR lists (.+?), CIK/i)?.[1] || "";
+  const ticker = listed.match(/\(([A-Za-z0-9.-]+)\)\s*$/)?.[1] || "";
+  const title = listed.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\/[a-z]{2}\/?/gi, " ").replace(/\s+/g, " ").trim();
+  return { title, ticker };
+}
+
+function pageHasNeedle(page: string, needle: string): boolean {
+  if (needle.includes(" ")) return page.toLowerCase().includes(needle.toLowerCase());
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i").test(page);
+}
+
+/**
+ * A parent row earns points only when some other page names the parent as its own firm.
+ * "Brookfield Corp" or the ticker BN links Brookfield Properties to that filer.
+ * The shared first word alone does not. Installed Building Products does not link STO.
+ */
+export function independentPageLinksParent(org: string, edgarFinding: string, pages: string[]): boolean {
+  const { title, ticker } = listedParent(edgarFinding);
+  if (!title) return false;
+  const orgTokens = new Set(firmTokens(org));
+  const orgNorm = normalizeFirmName(org);
+  const cleaned = title.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const needles: string[] = [];
+  const symbol = ticker.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const orgCompact = orgNorm.replace(/\s+/g, "");
+  if (symbol.length >= 2 && symbol !== orgCompact) needles.push(symbol);
+  for (const token of firmTokens(title)) {
+    if (token.length < 4 || isGenericFirmToken(token) || isStandaloneGenericQueryToken(token)) continue;
+    if (!orgTokens.has(token)) needles.push(token);
+  }
+  const words = cleaned.split(" ").filter(Boolean);
+  const extraWord = words.some((word) => word.length >= 3 && !orgTokens.has(word) && !isStandaloneGenericQueryToken(word));
+  if (cleaned && extraWord && cleaned !== orgNorm && !orgNorm.startsWith(`${cleaned} `) && !cleaned.startsWith(`${orgNorm} `)) {
+    needles.push(cleaned);
+  }
+  const unique = [...new Set(needles)];
+  if (!unique.length) return false;
+  return pages.some((page) => unique.some((needle) => pageHasNeedle(page, needle)));
 }
 
 function parentMatchResult(

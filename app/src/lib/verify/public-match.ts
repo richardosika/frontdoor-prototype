@@ -1,7 +1,9 @@
 const NICKNAMES: Record<string, string[]> = {
   richard: ["richard", "rich"],
   robert: ["robert", "bob", "rob"],
-  william: ["william", "bill", "will"],
+  william: ["william", "bill", "will", "willy"],
+  willy: ["willy", "william", "bill", "will"],
+  will: ["will", "william", "bill", "willy"],
   james: ["james", "jim"],
   michael: ["michael", "mike"],
   christopher: ["christopher", "chris"],
@@ -203,6 +205,25 @@ export function isShortBrandToken(token: string): boolean {
   return token.length >= 2 && token.length <= 3 && !isGenericFirmToken(token);
 }
 
+/**
+ * Words that show up in too many firm names to be a search or a parent match by themselves.
+ * "building" is one of them. "toll" and "sto" are not.
+ */
+const STANDALONE_QUERY_GENERIC = new Set([
+  "building",
+  "construction",
+  "development",
+  "properties",
+  "realty",
+  "holdings",
+  "partners",
+  "capital",
+]);
+
+export function isStandaloneGenericQueryToken(token: string): boolean {
+  return STANDALONE_QUERY_GENERIC.has(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -227,9 +248,40 @@ export function companySearchTerm(org: string, person = ""): string {
   const shortAt = phrase.findIndex((token) => isShortBrandToken(token) && !names.has(token));
   if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
-  const distinctive = brand.filter((token) => !names.has(token));
+  const distinctive = brand.filter((token) => !names.has(token) && !isStandaloneGenericQueryToken(token));
+  // "building" alone is not Gilbane Building Company. Quote the whole name, including a short token.
   if (distinctive.length) return distinctive.join(" ");
   return phrase.join(" ");
+}
+
+/**
+ * A discovered LinkedIn URL counts when it is a company page, or an /in/ slug
+ * whose given name (or nickname) appears before the surname. "walkerharris" is
+ * Walker Harris, not Willy Walker. A URL the applicant typed is not decided here.
+ */
+export function linkedinProfileMatchesPerson(url: string, person: string): boolean {
+  if (/linkedin\.com\/company\//i.test(url)) return true;
+  const slug = decodeURIComponent(url.match(/linkedin\.com\/in\/([^/?#]+)/i)?.[1] || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  if (!slug) return false;
+  const parsed = parsePersonName(person);
+  if (!parsed?.given.length || !parsed.surname) return false;
+  const surname = parsed.surname.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (surname.length < 2) return false;
+  const first = parsed.given[0].toLowerCase();
+  const givens = new Set([first, ...(NICKNAMES[first] || [])].map((item) => item.toLowerCase().replace(/[^a-z0-9]/g, "")));
+  for (const given of givens) {
+    if (given.length < 2) continue;
+    let from = 0;
+    while (from < slug.length) {
+      const at = slug.indexOf(given, from);
+      if (at < 0) break;
+      if (slug.indexOf(surname, at + given.length) >= 0) return true;
+      from = at + 1;
+    }
+  }
+  return false;
 }
 
 const ALIAS_STOP = new Set(["www", "com", "home", "index", "welcome", "official"]);
@@ -426,7 +478,15 @@ export function firmContainsApplicantName(org: string, person: string): boolean 
 
 const NAME_TITLES = new Set(["attorney", "lawyer", "counsel", "esq", "mr", "mrs", "ms", "dr", "hon"]);
 
-/** "Mark Joshua Stein" is a different person. "Attorney Joshua Stein" is still this person. */
+/**
+ * A third-party page can name a self-named lawyer when the full name is more than a given name and a surname.
+ * "Adam Leitman Bailey" is that name. "Joshua Stein" is a common pair and stays inside the company span
+ * unless the page is the firm's own site. "Mark Joshua Stein" is still a different person.
+ */
+function thirdPartySelfNamedCounts(_text: string, _org: string, parsed: ParsedPersonName): boolean {
+  return parsed.given.length >= 2;
+}
+
 function otherGivenImmediatelyBefore(text: string, matchStart: number, parsed: ParsedPersonName): boolean {
   const previous = text.slice(0, matchStart).match(/([A-Za-z][A-Za-z'-]*)\s+$/);
   if (!previous) return false;
@@ -451,11 +511,12 @@ export function personHit(text: string, name: string, org = "", options?: { ownF
   if (!parsed || parsed.given.length < 1) return "none";
   const companyRanges = org ? companySpanRanges(text, org) : [];
   const ownFirm = Boolean(options?.ownFirm) && firmContainsApplicantName(org, name);
+  const thirdPartyFirm = !options?.ownFirm && firmContainsApplicantName(org, name) && thirdPartySelfNamedCounts(text, org, parsed);
   const spans = orderedNameSpans(text, parsed).filter((span) => {
     const inside = companyRanges.some((range) => span.surnameStart >= range.start && span.surnameStart < range.end);
     if (!inside) return true;
-    if (!ownFirm) return false;
-    return !otherGivenImmediatelyBefore(text, span.matchStart, parsed);
+    if (otherGivenImmediatelyBefore(text, span.matchStart, parsed)) return false;
+    return ownFirm || thirdPartyFirm;
   });
   if (!spans.length) return "none";
   if (!parsed.suffix) return "match";

@@ -2,7 +2,7 @@ import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, firmContainsApplicantName, leftTheCompany, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, firmContainsApplicantName, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -1052,7 +1052,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const socials = socialLinksFrom(pages.map((page) => page.raw).join("\n"));
 
   const typedLinkedin = facts.linkedinUrl.trim();
-  const discoveredLinkedin = socials.find((item) => item.platform === "LinkedIn")?.url || "";
+  const discoveredLinkedin =
+    socials.find((item) => item.platform === "LinkedIn" && linkedinProfileMatchesPerson(item.url, person))?.url || "";
   const linkedinTargets = [typedLinkedin, discoveredLinkedin].filter((url, index, all) => url && all.indexOf(url) === index);
   if (!linkedinTargets.length) {
     attempts.push(
