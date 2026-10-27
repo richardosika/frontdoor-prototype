@@ -237,6 +237,40 @@ export function assessLocalAddress(location: string): LocalAddress {
   return { kind: "pass", parsed, geocode };
 }
 
+/** Last-token abbreviations expanded before a geocoder call. "St" and "Street" are the same street. */
+const STREET_SUFFIX_FULL: Record<string, string> = {
+  st: "Street",
+  ave: "Avenue",
+  rd: "Road",
+  dr: "Drive",
+  blvd: "Boulevard",
+  ln: "Lane",
+  ct: "Court",
+  pl: "Place",
+  ter: "Terrace",
+  hwy: "Highway",
+  pkwy: "Parkway",
+  cir: "Circle",
+};
+
+export function expandStreetSuffix(street: string): string {
+  const cleaned = street.replace(/\./g, "").replace(/\s+/g, " ").trim();
+  const parts = cleaned.split(" ").filter(Boolean);
+  if (!parts.length) return cleaned;
+  const full = STREET_SUFFIX_FULL[parts[parts.length - 1].toLowerCase()];
+  if (!full) return cleaned;
+  parts[parts.length - 1] = full;
+  return parts.join(" ");
+}
+
+/** Spelled-out suffix first, then the applicant's own form when it differs. "St" and "Street" are both tried. */
+export function streetGeocodeForms(street: string): string[] {
+  const cleaned = street.replace(/\./g, "").replace(/\s+/g, " ").trim();
+  const expanded = expandStreetSuffix(cleaned);
+  if (expanded.toLowerCase() === cleaned.toLowerCase()) return [cleaned];
+  return [expanded, cleaned];
+}
+
 export function censusGeocodeUrl(parsed: ParsedAddress): string {
   const params = new URLSearchParams({
     street: parsed.street,
@@ -249,12 +283,103 @@ export function censusGeocodeUrl(parsed: ParsedAddress): string {
   return `https://geocoding.geo.census.gov/geocoder/locations/address?${params.toString()}`;
 }
 
-export function assessCensusBody(text: string): "match" | "none" | "unreadable" {
+/**
+ * Keyless fallback. Census address ranges omit some real buildings
+ * (250 Vesey Street, New York, NY 10281 returns no Census match).
+ */
+export function nominatimGeocodeUrl(parsed: ParsedAddress): string {
+  const params = new URLSearchParams({
+    format: "json",
+    addressdetails: "1",
+    limit: "5",
+    countrycodes: "us",
+    street: parsed.street,
+    city: parsed.city,
+    state: parsed.state,
+    postalcode: parsed.zip.slice(0, 5),
+  });
+  return `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+}
+
+function houseNumber(street: string): string {
+  return street.match(/^\d+/)?.[0] || "";
+}
+
+function streetName(street: string): string {
+  return expandStreetSuffix(street)
+    .toLowerCase()
+    .replace(/^\d+\s+/, "")
+    .replace(/\s+(?:street|avenue|road|drive|boulevard|lane|court|place|terrace|highway|parkway|circle)$/, "")
+    .trim();
+}
+
+function censusRowAgrees(match: unknown, parsed: ParsedAddress): boolean {
+  if (!match || typeof match !== "object") return false;
+  const row = match as {
+    matchedAddress?: string;
+    addressComponents?: { fromAddress?: string; toAddress?: string; state?: string; zip?: string };
+  };
+  const number = houseNumber(parsed.street);
+  const zip5 = parsed.zip.slice(0, 5);
+  const components = row.addressComponents;
+  if (components) {
+    const state = (components.state || "").toUpperCase();
+    if (state && state !== parsed.state) return false;
+    const zip = (components.zip || "").slice(0, 5);
+    if (zip5 && zip && zip !== zip5) return false;
+    const from = Number(components.fromAddress);
+    const to = Number(components.toAddress);
+    const wanted = Number(number);
+    if (number && Number.isFinite(from) && Number.isFinite(to) && Number.isFinite(wanted)) {
+      return wanted >= Math.min(from, to) && wanted <= Math.max(from, to);
+    }
+    if (number && components.fromAddress) return String(components.fromAddress) === number;
+  }
+  const matched = (row.matchedAddress || "").toUpperCase();
+  if (!matched) return false;
+  if (number && !new RegExp(`\\b${number}\\b`).test(matched)) return false;
+  if (!matched.includes(parsed.state.toUpperCase())) return false;
+  if (zip5 && !matched.includes(zip5)) return false;
+  return true;
+}
+
+export function assessCensusBody(text: string, parsed?: ParsedAddress): "match" | "none" | "unreadable" {
   try {
-    const parsed = JSON.parse(text) as { result?: { addressMatches?: unknown } };
-    const matches = parsed.result?.addressMatches;
+    const body = JSON.parse(text) as { result?: { addressMatches?: unknown } };
+    const matches = body.result?.addressMatches;
     if (!Array.isArray(matches)) return "unreadable";
-    return matches.length > 0 ? "match" : "none";
+    if (!matches.length) return "none";
+    if (!parsed) return "match";
+    return matches.some((match) => censusRowAgrees(match, parsed)) ? "match" : "none";
+  } catch {
+    return "unreadable";
+  }
+}
+
+export function assessNominatimBody(text: string, parsed: ParsedAddress): "match" | "none" | "unreadable" {
+  try {
+    const rows = JSON.parse(text) as unknown;
+    if (!Array.isArray(rows)) return "unreadable";
+    if (!rows.length) return "none";
+    const number = houseNumber(parsed.street);
+    const wantedStreet = streetName(parsed.street);
+    const zip5 = parsed.zip.slice(0, 5);
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const address = (row as { address?: Record<string, string> }).address;
+      if (!address) continue;
+      const house = String(address.house_number || "");
+      if (number && house !== number) continue;
+      const resultState = stateCodeFromToken(String(address.state || ""));
+      if (resultState !== parsed.state) continue;
+      const post = String(address.postcode || "").slice(0, 5);
+      if (zip5 && post && post !== zip5) continue;
+      const road = streetName(String(address.road || ""));
+      if (wantedStreet && road && road !== wantedStreet) continue;
+      if (wantedStreet && !road) continue;
+      return "match";
+    }
+    return "none";
   } catch {
     return "unreadable";
   }

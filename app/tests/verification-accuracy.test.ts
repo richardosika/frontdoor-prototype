@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessLocalAddress, statedUsState, zipMatchesState } from "@/lib/verify/address";
+import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
 import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
@@ -897,7 +897,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       [row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed. Name: no. Company: yes." })],
       filledIn,
     );
-    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
     expect(linkedinOnly.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
     const news = row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." });
     const backed = gradeChecks([news], filledIn);
@@ -909,7 +909,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       ],
       filledIn,
     );
-    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
     expect(linkedinBacked.score).toBeGreaterThan(linkedinOnly.score);
   });
 });
@@ -1368,7 +1368,7 @@ describe("website text survives the size cap", () => {
         }),
       );
       expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(4);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person self-reported");
       expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
     }
   });
@@ -1403,11 +1403,11 @@ describe("QA follow-up scoring", () => {
     const graded = gradeChecks(checks, applicant);
     const company = graded.categories.find((category) => category.id === "company");
     const identity = graded.categories.find((category) => category.id === "identity");
-    expect(company?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
+    expect(company?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
     expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
-    expect(identity?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
-    expect(graded.summary.checkedOut).toContain("company confirmed, person NOT confirmed");
-    expect(graded.summary.company).toContain("company confirmed, person NOT confirmed");
+    expect(identity?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+    expect(graded.summary.checkedOut).toContain("Company confirmed, person not confirmed");
+    expect(graded.summary.company).toContain("Company confirmed, person not confirmed");
     expect(graded.summary.company).not.toContain("No company website was confirmed");
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     expect(["D", "F"]).toContain(graded.letter);
@@ -1472,8 +1472,8 @@ describe("QA follow-up scoring", () => {
       expect(linkedin?.companyOnly).toBe(true);
       expect(linkedin?.corroborates).toBe(false);
       const graded = gradeChecks(checks, applicant);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
-      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     }
   });
@@ -1690,20 +1690,30 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(backedCity.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
   });
 
-  it("fails a Census miss and leaves a geocoder timeout not checkable", async () => {
+  it("leaves a geocoder miss and a geocoder timeout inconclusive", async () => {
+    const seen: string[] = [];
     const missed = await resolveAddressCheck({
       facts: facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }),
       watchlist: [],
       network: true,
       fetchText: async (url) => {
-        expect(url).toContain("geocoding.geo.census.gov");
+        seen.push(url);
         expect(url).not.toContain("googleapis");
         expect(url).not.toContain("usps.com");
+        if (url.includes("nominatim.openstreetmap.org")) return { ok: true, status: 200, text: "[]" };
+        expect(url).toContain("geocoding.geo.census.gov");
         return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
       },
     });
-    expect(missed?.status).toBe("FAIL");
-    expect(missed?.finding.toLowerCase()).toContain("address did not check out");
+    expect(seen.some((url) => url.includes("geocoding.geo.census.gov"))).toBe(true);
+    expect(seen.some((url) => url.includes("nominatim.openstreetmap.org"))).toBe(true);
+    expect(missed?.status).toBe("INCONCLUSIVE");
+    expect(missed?.reviewFlag).not.toBe(true);
+    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
+    expect(missed?.finding.toLowerCase()).not.toContain("address did not check out");
+    const missedGrade = gradeChecks([missed!], facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }));
+    expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(missedGrade.attention.some((item) => item.title === "Address")).toBe(false);
 
     const down = await resolveAddressCheck({
       facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
@@ -1713,11 +1723,12 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
         throw new Error("timeout");
       },
     });
-    expect(down?.status).toBe("UNAVAILABLE");
+    expect(down?.status).toBe("INCONCLUSIVE");
     expect(down?.finding.toLowerCase()).toContain("not checkable");
+    expect(down?.finding.toLowerCase()).toContain("inconclusive");
     const graded = gradeChecks([down!], facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }));
     const completeness = graded.categories.find((category) => category.id === "completeness");
-    expect(completeness?.reason).toContain("The address is not checkable.");
+    expect(completeness?.reason.toLowerCase()).toContain("inconclusive");
     expect(completeness?.reason).not.toContain("address did not check out");
     expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
@@ -3138,7 +3149,7 @@ describe("thirteenth follow-up", () => {
       facts({ org: "Terra Group", name: "Pat Example" }),
     );
     expect(partial.finding.toLowerCase()).toContain("parent match, needs review");
-    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("parent match, needs review");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("Parent match, needs review");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(partialGrade.letter).not.toBe("C");
@@ -3668,7 +3679,7 @@ describe("qa october 27", () => {
         facts({ org: "Brookfield Properties" }),
       );
       const reason = graded.categories.find((category) => category.id === "company")?.reason || "";
-      expect(reason).toContain("parent match, needs review");
+      expect(reason).toContain("Parent match, needs review");
       expect(reason).toContain("0 of 6");
       expect(reason).not.toContain("6 of 6");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
@@ -4168,7 +4179,7 @@ describe("batch 10 fixtures", () => {
       [row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes." })],
       facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com" }),
     );
-    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person self-reported");
     expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
     expect(companyOnlySite.letter).toBe("F");
     expect(companyOnlySite.recommendation.startsWith("APPROVE")).toBe(false);
@@ -4202,5 +4213,106 @@ describe("batch 10 fixtures", () => {
     expect(linkedin?.url || "").toContain("/company/");
     expect(linkedin?.corroborates).not.toBe(true);
     expect(linkedin?.selfReported).toBe(true);
+  });
+});
+
+describe("batch 11 report wording and Vesey Street", () => {
+  const brookfieldFinding =
+    "EDGAR lists Brookfield Properties, Inc., CIK 1680277. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.";
+
+  it("says one thing about a name-only EDGAR hit and a discovered LinkedIn company page", () => {
+    const graded = gradeChecks(
+      [
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          corroborates: false,
+          source: "SEC EDGAR",
+          finding: brookfieldFinding,
+        }),
+        row({
+          key: "linkedin-format",
+          status: "INCONCLUSIVE",
+          finding: "No LinkedIn URL was provided.",
+          source: "Local URL check",
+        }),
+        row({
+          key: "linkedin-fetch",
+          status: "PASS",
+          companyOnly: true,
+          corroborates: false,
+          source: "LinkedIn",
+          url: "https://www.linkedin.com/company/brookfield-properties/",
+          finding: "The LinkedIn company page names Brookfield Properties. Company: yes. Name: no.",
+        }),
+      ],
+      facts({
+        name: "QA-TEST Bravo",
+        applicantName: "QA-TEST Bravo",
+        org: "Brookfield Properties",
+        location: "250 Vesey St, New York, NY 10281",
+        linkedinUrl: "",
+        website: "https://www.brookfieldproperties.com",
+      }),
+    );
+    const text = graded.plainText;
+    expect(graded.summary.company).toContain("Brookfield Properties, Inc.");
+    expect(graded.summary.company).toContain("CIK 1680277");
+    expect(graded.summary.company.toLowerCase()).toContain("name-only company match is inconclusive");
+    expect(graded.summary.couldNotCheck).not.toContain("SEC EDGAR came back without a usable match");
+    expect(text).not.toContain("came back without a usable match");
+    expect(graded.summary.checkedOut).toContain("The LinkedIn company page confirms the company.");
+    expect(graded.summary.checkedOut).toContain("Company confirmed, person not confirmed");
+    expect(text).not.toContain("LinkedIn link came back without a usable match");
+    expect(graded.attention.some((item) => item.title === "No LinkedIn URL")).toBe(false);
+    expect(graded.summary.couldNotCheck).toContain("No LinkedIn URL was on the application.");
+    expect(graded.summary.couldNotCheck).toContain("A LinkedIn company page was still found");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain(
+      "EDGAR lists this exact company name. A name-only match is inconclusive",
+    );
+    expect(text).not.toMatch(/(?:^|[.!?]\s+)(?:company confirmed|address did not|domain does not|did not check out)/);
+  });
+
+  it("passes 250 Vesey Street when Nominatim matches and Census does not", async () => {
+    expect(streetGeocodeForms("250 Vesey St")).toEqual(["250 Vesey Street", "250 Vesey St"]);
+    expect(expandStreetSuffix("4600 Silver Hill Rd.")).toBe("4600 Silver Hill Road");
+    const nominatim = JSON.stringify([
+      {
+        address: {
+          house_number: "250",
+          road: "Vesey Street",
+          city: "New York",
+          state: "New York",
+          postcode: "10281",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(nominatim, { street: "250 Vesey St", city: "New York", state: "NY", zip: "10281" })).toBe("match");
+    const urls: string[] = [];
+    const address = await resolveAddressCheck({
+      facts: facts({ location: "250 Vesey St, New York, NY 10281" }),
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        urls.push(url);
+        if (url.includes("nominatim.openstreetmap.org")) {
+          expect(decodeURIComponent(url).replace(/\+/g, " ")).toContain("250 Vesey Street");
+          expect(url).toContain("postalcode=10281");
+          return { ok: true, status: 200, text: nominatim };
+        }
+        expect(url).toContain("geocoding.geo.census.gov");
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(urls.filter((url) => url.includes("geocoding.geo.census.gov")).length).toBeGreaterThan(0);
+    expect(address?.status).toBe("PASS");
+    expect(address?.finding).toContain("OpenStreetMap Nominatim matched this street address");
+    expect(address?.finding).toContain("The Census geocoder returned no match");
+    const graded = gradeChecks([address!], facts({ location: "250 Vesey St, New York, NY 10281" }));
+    expect(graded.summary.checkedOut).toContain("OpenStreetMap Nominatim matched this street address");
+    expect(graded.summary.couldNotCheck.toLowerCase()).not.toContain("nominatim matched");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(graded.attention.some((item) => /address did not check out/i.test(item.detail))).toBe(false);
   });
 });

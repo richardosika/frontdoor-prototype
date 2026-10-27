@@ -3,7 +3,16 @@ import { normalizeInviteCode } from "@/lib/domain";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
-import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
+import {
+  assessCensusBody,
+  assessLocalAddress,
+  assessNominatimBody,
+  censusGeocodeUrl,
+  nominatimGeocodeUrl,
+  statedUsState,
+  streetGeocodeForms,
+  type ParsedAddress,
+} from "@/lib/verify/address";
 import { isReservedDomain, registrableHost } from "@/lib/verify/host";
 import { companyPhraseTokens, isDistinctiveCompanyToken, isShortBrandToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -1061,7 +1070,7 @@ export function strongFixtureChecks(): CheckOutput[] {
   ];
 }
 
-const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder when a street is present";
+const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder, then OpenStreetMap Nominatim, when a street is present";
 
 export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutput | null> {
   const local = assessLocalAddress(ctx.facts.location || "");
@@ -1089,54 +1098,68 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
       finding,
     });
   }
-  const url = censusGeocodeUrl(local.parsed);
-  try {
-    const http = await ctx.fetchText(url);
-    if (!http.ok) {
-      return check({
-        ...base,
-        status: "UNAVAILABLE",
-        url,
-        corroborates: false,
-        finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
-      });
-    }
-    const judged = assessCensusBody(http.text);
-    if (judged === "match") {
-      return check({
-        ...base,
-        status: "PASS",
-        url,
-        corroborates: false,
-        finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
-      });
-    }
-    if (judged === "none") {
-      return check({
-        ...base,
-        status: "FAIL",
-        url,
-        reviewFlag: true,
-        corroborates: false,
-        finding: "The address did not check out. The Census geocoder returned no match for this street.",
-      });
-    }
+  const forms = streetGeocodeForms(local.parsed.street);
+  const census = await askGeocoder(ctx, forms, local.parsed, "census");
+  if (census.kind === "match") {
     return check({
       ...base,
-      status: "UNAVAILABLE",
-      url,
+      status: "PASS",
+      url: census.url,
       corroborates: false,
-      finding: "The address is not checkable. The Census geocoder did not return a readable result. This is not a pass and not a failure.",
-    });
-  } catch {
-    return check({
-      ...base,
-      status: "UNAVAILABLE",
-      url,
-      corroborates: false,
-      finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+      finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
     });
   }
+  const nominatim = await askGeocoder(ctx, forms, local.parsed, "nominatim");
+  if (nominatim.kind === "match") {
+    const censusNote = census.kind === "none" ? "The Census geocoder returned no match. " : "The Census geocoder did not respond. ";
+    return check({
+      ...base,
+      status: "PASS",
+      url: nominatim.url,
+      corroborates: false,
+      finding: `${censusNote}OpenStreetMap Nominatim matched this street address. The state and ZIP also check out.`,
+    });
+  }
+  const url = nominatim.url || census.url;
+  const bothDown = census.kind === "down" && nominatim.kind === "down";
+  const bothMissed = census.kind === "none" && nominatim.kind === "none";
+  const finding = bothDown
+    ? "The address is not checkable. The Census geocoder and OpenStreetMap Nominatim did not respond. This is inconclusive. It is not a pass and not a failure."
+    : bothMissed
+      ? "The address was not confirmed. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure."
+      : "The address was not confirmed. A geocoder returned no match and the other did not respond. This is inconclusive. It is not a pass and not a failure.";
+  return check({
+    ...base,
+    status: "INCONCLUSIVE",
+    url,
+    corroborates: false,
+    finding,
+  });
+}
+
+async function askGeocoder(
+  ctx: CheckContext,
+  forms: string[],
+  parsed: ParsedAddress,
+  source: "census" | "nominatim",
+): Promise<{ kind: "match"; url: string } | { kind: "none"; url: string } | { kind: "down"; url: string }> {
+  let lastUrl = "";
+  let sawNone = false;
+  for (const street of forms) {
+    const addressed = { ...parsed, street };
+    const url = source === "census" ? censusGeocodeUrl(addressed) : nominatimGeocodeUrl(addressed);
+    lastUrl = url;
+    try {
+      const http = await ctx.fetchText?.(url);
+      if (!http?.ok) continue;
+      const judged = source === "census" ? assessCensusBody(http.text, parsed) : assessNominatimBody(http.text, parsed);
+      if (judged === "match") return { kind: "match", url };
+      if (judged === "none") sawNone = true;
+    } catch {
+      continue;
+    }
+  }
+  return sawNone ? { kind: "none", url: lastUrl } : { kind: "down", url: lastUrl };
 }
 
 export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {

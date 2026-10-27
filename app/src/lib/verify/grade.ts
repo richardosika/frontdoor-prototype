@@ -398,7 +398,16 @@ export function dedupeSourceLines(lines: string[]): string[] {
 }
 
 function joinSentences(lines: string[]): string {
-  return dedupeSourceLines(lines).join(" ");
+  return capitalizeSentences(dedupeSourceLines(lines).join(" "));
+}
+
+/** First letter of each sentence. Abbreviations such as "St." and "Jr." stay as written. */
+export function capitalizeSentences(text: string): string {
+  return text.replace(/(^|[.!?]\s+)([a-z])/g, (full, lead: string, letter: string, offset: number, source: string) => {
+    const before = source.slice(0, offset + lead.length).trimEnd();
+    if (/\b(?:St|Jr|Sr|Inc|Dr|Mr|Mrs|Ms|Ltd|Co|U\.S|vs)\.$/i.test(before)) return full;
+    return lead + letter.toUpperCase();
+  });
 }
 
 function passSentence(check: CheckOutput): string | null {
@@ -413,10 +422,12 @@ function passSentence(check: CheckOutput): string | null {
       return `The email is a personal address, not a shared inbox (${source}).`;
     case "phone-state":
       return `The phone area code fits the state on the application (${source}).`;
+    case "address":
+      return check.finding.endsWith(".") ? check.finding : `${check.finding}.`;
     case "linkedin-format":
       return `The LinkedIn link looks like a public profile (${source}).`;
     case "linkedin-fetch":
-      if (check.companyOnly) return `The LinkedIn company page confirms the company. company confirmed, person NOT confirmed (${source}). A logged-in page was not opened.`;
+      if (check.companyOnly) return `The LinkedIn company page confirms the company. Company confirmed, person not confirmed (${source}). A logged-in page was not opened.`;
       return `A public LinkedIn page included the person's name (${source}). A logged-in page was not opened.`;
     case "duplicate":
       return `This email is not already a member and does not match a declined application (${source}).`;
@@ -434,7 +445,7 @@ function passSentence(check: CheckOutput): string | null {
       return `The other social links are full web addresses (${source}). Those pages were not opened.`;
     case "website":
     case "fixture-website":
-      if (check.companyOnly) return `The company's own site confirms the company. company confirmed, person NOT confirmed (${source}).`;
+      if (check.companyOnly) return `The company's own site confirms the company. Company confirmed, person not confirmed (${source}).`;
       return `A public web page included the person or the company name (${source}).`;
     case "edgar":
     case "fixture-edgar":
@@ -495,16 +506,16 @@ function failSentence(check: CheckOutput): string | null {
     return `The phone area code does not match the state on the application (${source}).`;
   }
   if ((check.key === "website" || check.key === "rdap") && /domain does not resolve/i.test(check.finding)) {
-    return `domain does not resolve (${source}).`;
+    return `The domain does not resolve (${source}).`;
   }
   if (check.key === "rdap" && /not registered/i.test(check.finding)) {
     return `This domain is not registered (${source}).`;
   }
   if (check.key === "rdap" && /did not check out/i.test(check.finding)) {
-    return `did not check out (${source}).`;
+    return `The domain did not check out (${source}).`;
   }
   if (check.key === "address") {
-    return `address did not check out (${source}).`;
+    return `The address did not check out (${source}).`;
   }
   if (check.key === "website" && check.status === "FAIL") {
     return `The website responded, but the person and company names were not on the home page, the about page, or the team page (${source}).`;
@@ -535,16 +546,28 @@ function failSentence(check: CheckOutput): string | null {
   return null;
 }
 
-function uncheckedSentence(check: CheckOutput): string | null {
+function linkedinPageFound(checks: CheckOutput[]): CheckOutput | undefined {
+  const fetched = checks.find((check) => check.key === "linkedin-fetch" && check.status === "PASS");
+  return fetched;
+}
+
+function uncheckedSentence(check: CheckOutput, checks: CheckOutput[]): string | null {
   if (check.key === "news-story" || check.key === "email-provider" || check.key === "mx") return null;
   if (check.status !== "INCONCLUSIVE" && check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE") return null;
   if (check.key === "invite-source") {
     if (check.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(check.finding)) return "No referral was supplied.";
     return "The referral could not be matched.";
   }
-  if (check.key === "address" && check.status === "UNAVAILABLE") {
-    return "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.";
+  if (check.key === "address" && (check.status === "UNAVAILABLE" || check.status === "INCONCLUSIVE")) {
+    return check.finding;
   }
+  if (check.key === "linkedin-format" && /no linkedin url/i.test(check.finding)) {
+    const fetched = linkedinPageFound(checks);
+    if (fetched?.companyOnly) return "No LinkedIn URL was on the application. A LinkedIn company page was still found and is reported with what checked out.";
+    if (fetched) return "No LinkedIn URL was on the application. A public LinkedIn page was still found and is reported with what checked out.";
+    return "No LinkedIn URL was on the application. That is not a failure.";
+  }
+  if ((check.key === "edgar" || check.key === "fixture-edgar") && check.companyOnly && !check.reviewFlag) return null;
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
@@ -628,7 +651,7 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const evidence: string[] = [`${org} is the company named on the application.`];
   const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (website?.status === "PASS" && website.companyOnly) {
-    evidence.push(`The company's own site names the company. company confirmed, person NOT confirmed (${website.source}).`);
+    evidence.push(`The company's own site names the company. Company confirmed, person not confirmed (${website.source}).`);
   } else if (website?.status === "PASS") {
     evidence.push(`A public page included the person or the company name (${website.source}).`);
   } else if (website?.status === "UNAVAILABLE") {
@@ -643,8 +666,8 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
   } else if (edgar && /parent match, needs review/i.test(edgar.finding)) {
     evidence.push(edgar.finding);
-  } else if (edgar?.companyOnly && !edgar.reviewFlag) {
-    evidence.push(`EDGAR lists this exact company name (${edgar.source}). It does not tie the person to the firm.`);
+  } else if (edgar?.status === "INCONCLUSIVE" && edgar.companyOnly && !edgar.reviewFlag) {
+    evidence.push(edgar.finding.endsWith(".") ? edgar.finding : `${edgar.finding}.`);
   } else {
     evidence.push("No EDGAR filing was confirmed.");
   }
@@ -696,13 +719,13 @@ function portionLine(earned: number, possible: number, reason: string): Line {
 function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode, independent: boolean): Line {
   const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
-  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
-  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "The domain does not resolve");
+  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
   if (row?.status === "PASS" && row.selfReported && !independent) {
     // The company's own site named the company. That is company-exists credit.
     // The person on that same page stays self-reported and earns the other half only after an independent tie.
     if (/Company:\s*yes/i.test(row.finding)) {
-      return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person self-reported");
+      return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person self-reported");
     }
     return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
   }
@@ -715,7 +738,7 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
   }
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
   if (row?.status === "PASS" && row.companyOnly) {
-    return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+    return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
   }
   if (row?.status === "PASS" && row.selfReported && !independent) {
     return portionLine(0, possible, "The applicant's own LinkedIn profile is self-reported and no independent source tied the person to the company");
@@ -755,8 +778,9 @@ function edgarAward(row: CheckOutput | undefined, possible: number, independent:
   // Exact normalized-name filer, not a different firm. Person credit stays off, so an
   // impersonation of a public registrant does not gain points unless something else
   // already ties that person to the company.
-  if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag && independent) {
-    return portionLine(companyOnlyPoints(possible), possible, "EDGAR lists this exact company name. It does not tie the person");
+  if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag) {
+    const points = independent ? companyOnlyPoints(possible) : 0;
+    return portionLine(points, possible, "EDGAR lists this exact company name. A name-only match is inconclusive and does not tie the person");
   }
   return award(false, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
 }
@@ -772,9 +796,9 @@ function phoneAward(row: CheckOutput | undefined, possible: number, independent:
 }
 
 function rdapAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
-  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
-  if (row?.status === "FAIL" && /not registered/i.test(row.finding)) return portionLine(0, possible, "domain is not registered");
-  if (row?.status === "FAIL" && /did not check out/i.test(row.finding)) return portionLine(0, possible, "did not check out");
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "The domain does not resolve");
+  if (row?.status === "FAIL" && /not registered/i.test(row.finding)) return portionLine(0, possible, "The domain is not registered");
+  if (row?.status === "FAIL" && /did not check out/i.test(row.finding)) return portionLine(0, possible, "The domain did not check out");
   if (row?.status === "UNAVAILABLE" && /couldn't check for free/i.test(row.finding)) return unavailableLine(possible, "RDAP couldn't check for free", mode);
   return award(passed(row), possible, "A domain record responded", "No domain record was confirmed");
 }
@@ -802,8 +826,10 @@ function applicationField(earned: boolean, possible: number, yes: string, no: st
 function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number, independent: boolean): Line {
   const row = findCheck(checks, "address");
   if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
-  if (row.status === "FAIL") return portionLine(0, possible, "address did not check out");
-  if (row.status === "UNAVAILABLE") return { earned: 0, possible: 0, reason: "The address is not checkable." };
+  if (row.status === "FAIL") return portionLine(0, possible, "The address did not check out");
+  if (row.status === "UNAVAILABLE" || row.status === "INCONCLUSIVE") {
+    return { earned: 0, possible: 0, reason: "The address is inconclusive. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
+  }
   if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
   return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
 }
@@ -895,12 +921,12 @@ export function gradeChecks(
   ]);
 
   const categories: GradeCategory[] = [
-    { id: "identity", label: CATEGORY_LABELS.identity, ...identity, reason: `${identity.earned} of ${identity.possible}. ${identity.reason} Email domain and mail-server records earn no points.` },
-    { id: "company", label: CATEGORY_LABELS.company, ...company, reason: `${company.earned} of ${company.possible}. ${company.reason}` },
-    { id: "footprint", label: CATEGORY_LABELS.footprint, ...footprint, reason: `${footprint.earned} of ${footprint.possible}. ${footprint.reason}` },
-    { id: "risk", label: CATEGORY_LABELS.risk, ...risk, reason: `${risk.earned} of ${risk.possible}. ${risk.reason}` },
-    { id: "role", label: CATEGORY_LABELS.role, ...role, reason: `${role.earned} of ${role.possible}. ${role.reason}` },
-    { id: "completeness", label: CATEGORY_LABELS.completeness, ...completeness, reason: `${completeness.earned} of ${completeness.possible}. ${completeness.reason}` },
+    { id: "identity", label: CATEGORY_LABELS.identity, ...identity, reason: capitalizeSentences(`${identity.earned} of ${identity.possible}. ${identity.reason} Email domain and mail-server records earn no points.`) },
+    { id: "company", label: CATEGORY_LABELS.company, ...company, reason: capitalizeSentences(`${company.earned} of ${company.possible}. ${company.reason}`) },
+    { id: "footprint", label: CATEGORY_LABELS.footprint, ...footprint, reason: capitalizeSentences(`${footprint.earned} of ${footprint.possible}. ${footprint.reason}`) },
+    { id: "risk", label: CATEGORY_LABELS.risk, ...risk, reason: capitalizeSentences(`${risk.earned} of ${risk.possible}. ${risk.reason}`) },
+    { id: "role", label: CATEGORY_LABELS.role, ...role, reason: capitalizeSentences(`${role.earned} of ${role.possible}. ${role.reason}`) },
+    { id: "completeness", label: CATEGORY_LABELS.completeness, ...completeness, reason: capitalizeSentences(`${completeness.earned} of ${completeness.possible}. ${completeness.reason}`) },
   ];
 
   const earnedPoints = Math.max(0, Math.min(100, categories.reduce((sum, category) => sum + category.earned, 0)));
@@ -956,7 +982,7 @@ export function gradeChecks(
 
   const checked = checks.map(passSentence).filter((line): line is string => Boolean(line));
   const failed = checks.map(failSentence).filter((line): line is string => Boolean(line));
-  const unchecked = checks.map(uncheckedSentence).filter((line): line is string => Boolean(line));
+  const unchecked = checks.map((check) => uncheckedSentence(check, checks)).filter((line): line is string => Boolean(line));
   const storyCount = checks.filter((check) => check.key === "news-story").length;
   if (storyCount) {
     unchecked.push(
@@ -968,7 +994,7 @@ export function gradeChecks(
   const attention: AttentionItem[] = [];
   const pushAttention = (item: AttentionItem) => {
     if (attention.some((existing) => existing.title === item.title)) return;
-    attention.push(item);
+    attention.push({ ...item, detail: capitalizeSentences(item.detail) });
   };
   for (const check of hardChecks) {
     pushAttention({ severity: "High", title: labelFor(check.key), detail: failSentence(check) || check.finding });
@@ -977,14 +1003,14 @@ export function gradeChecks(
     pushAttention({
       severity: "High",
       title: `${labelFor(check.key)}: possible match, verify`,
-      detail: failSentence(check) || "Possible match, verify. Do not treat this as a confirmed fact.",
+      detail: capitalizeSentences(failSentence(check) || "Possible match, verify. Do not treat this as a confirmed fact."),
     });
   }
   for (const check of checks.filter(isAmbiguousNews)) {
     pushAttention({
       severity: "High",
       title: "News headline may be a different person",
-      detail: `Possible match, verify. ${check.finding} The match is a name only. This file does not say this person did what the headline describes.`,
+      detail: capitalizeSentences(`Possible match, verify. ${check.finding} The match is a name only. This file does not say this person did what the headline describes.`),
     });
   }
   for (const check of checks) {
@@ -993,11 +1019,11 @@ export function gradeChecks(
     pushAttention({
       severity: "Medium",
       title: `${labelFor(check.key)}: possible match, verify`,
-      detail: `Possible match, verify. ${check.finding} This may be a different person with the same name.`,
+      detail: capitalizeSentences(`Possible match, verify. ${check.finding} This may be a different person with the same name.`),
     });
   }
   for (const check of conflicts) {
-    pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
+    pushAttention({ severity: "Medium", title: labelFor(check.key), detail: capitalizeSentences(failSentence(check) || check.finding) });
   }
   const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
   const companyConfirmed = checks.some(
@@ -1010,7 +1036,7 @@ export function gradeChecks(
       severity: "Medium",
       title: "Thin public record",
       detail: companyConfirmed
-        ? "company confirmed, person not confirmed. Request more info. A free source confirmed the company. Nothing tied this person to that company. This is not a rejection and not an approval. Ask for a team-page URL."
+        ? "Company confirmed, person not confirmed. Request more info. A free source confirmed the company. Nothing tied this person to that company. This is not a rejection and not an approval. Ask for a team-page URL."
         : weakHit
           ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
           : selfReported
@@ -1064,6 +1090,8 @@ export function gradeChecks(
   const importantMissing = ["website", "edgar", "courts", "web-footprint", "news", "sanctions", "linkedin-fetch", "business-registry"].filter((key) => {
     const check = findCheck(checks, key);
     if (!check) return key !== "linkedin-fetch" || Boolean(facts.linkedinUrl?.trim());
+    if (key === "edgar" && check.companyOnly && !check.reviewFlag) return false;
+    if (key === "linkedin-fetch" && check.status === "PASS") return false;
     return check.status === "INCONCLUSIVE" || check.status === "NOT_RUN" || check.status === "UNAVAILABLE";
   });
   if (importantMissing.length) {
@@ -1076,8 +1104,8 @@ export function gradeChecks(
   if (!facts.website?.trim()) {
     pushAttention({ severity: "Low", title: "No company website on the application", detail: "Ask for the company site if you need one. A private email is allowed and is not scored as a key signal." });
   }
-  if (!facts.linkedinUrl?.trim()) {
-    pushAttention({ severity: "Low", title: "No LinkedIn URL", detail: "A public profile link would give you something else to open. Its absence is not a failure." });
+  if (!facts.linkedinUrl?.trim() && !linkedinPageFound(checks)) {
+    pushAttention({ severity: "Low", title: "No LinkedIn URL", detail: "No LinkedIn URL was on the application. That is not a failure." });
   }
   if (!facts.cardUploaded && !facts.cardText?.trim()) {
     pushAttention({ severity: "Low", title: "No business card", detail: "The card is optional. You can ask for one before you decide." });
@@ -1110,7 +1138,7 @@ export function gradeChecks(
     recommendation = "APPROVE WITH CONDITIONS";
   } else recommendation = "NEEDS MORE INFO";
 
-  const reasoning = reasoningFor({
+  const reasoning = capitalizeSentences(reasoningFor({
     recommendation,
     letter,
     score,
@@ -1120,10 +1148,10 @@ export function gradeChecks(
     hard: hardChecks.length > 0,
     review: reviewRed.length > 0,
     companyConfirmed: companyConfirmed && !bothNamed,
-  });
-  const nextStep = nextStepFor({ recommendation, checks, facts, paying });
+  }));
+  const nextStep = capitalizeSentences(nextStepFor({ recommendation, checks, facts, paying }));
   const summary: ExecutiveSections = {
-    applicant: applicantSection(facts, options?.subject || "APPLICATION"),
+    applicant: capitalizeSentences(applicantSection(facts, options?.subject || "APPLICATION")),
     company: companySection(checks, facts),
     checkedOut: checked.length ? joinSentences(checked) : "Nothing in the checks that ran confirmed a fact about this person or company.",
     didNotCheckOut: failed.length ? joinSentences(failed) : "Nothing in the checks that ran showed a direct conflict.",
@@ -1176,7 +1204,7 @@ function reasoningFor(input: {
     return `${grade} Something on the file might be this person, and it might be someone else. I recommend you get more information before you approve. I am not treating that hit as fact.`;
   }
   if (input.recommendation === "NEEDS MORE INFO" && input.companyConfirmed) {
-    return `${grade} company confirmed, person not confirmed. Request more info. The company showed up on a free source. Nothing tied this person to that company. This is not a rejection and not an approval.`;
+    return `${grade} Company confirmed, person not confirmed. Request more info. The company showed up on a free source. Nothing tied this person to that company. This is not a rejection and not an approval.`;
   }
   if (input.recommendation === "NEEDS MORE INFO") {
     return `${grade} The file is too thin, or too many sources came back empty, for me to recommend approval. Empty sources were not counted in their favor.`;
