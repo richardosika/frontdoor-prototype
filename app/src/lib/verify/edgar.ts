@@ -98,18 +98,29 @@ function foreignParenthetical(title: string, orgTokens: Set<string>): boolean {
   return false;
 }
 
-/** A shared distinctive word with a different filer. Not a match. Shown for review only. */
+/**
+ * A different filer that contains every distinctive word of this firm.
+ * One shared word is not enough: Granite Ridge is not Quillfeather Ridge, and
+ * Pacific Health Care Organization is not the LeFrak Organization.
+ * Terra Property Trust still matches Terra, because "terra" is the whole distinctive name and the title adds other words.
+ */
 function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
   const required = firmTokens(org).filter((token) => token.length >= 4 && !isGenericFirmToken(token));
   if (!required.length) return null;
-  let best: { row: EdgarCompany; shared: number } | null = null;
+  const orgTokens = new Set(firmTokens(org));
+  let best: EdgarCompany | null = null;
   for (const row of rows) {
-    const titleTokens = new Set(firmTokens(row.title));
-    const shared = required.filter((token) => titleTokens.has(token)).length;
-    if (!shared) continue;
-    if (!best || shared > best.shared) best = { row, shared };
+    const titleTokens = firmTokens(row.title);
+    const titleSet = new Set(titleTokens);
+    if (!required.every((token) => titleSet.has(token))) continue;
+    const extra =
+      foreignParenthetical(row.title, orgTokens) ||
+      titleTokens.some((token) => !orgTokens.has(token));
+    if (!extra) continue;
+    best = row;
+    break;
   }
-  return best?.row ?? null;
+  return best;
 }
 
 /**

@@ -487,12 +487,23 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   }
   // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
   // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.
-  void person;
-  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && brandMention(text, distinctive[0], phrase, org)) return true;
+  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && brandMention(text, distinctive[0], phrase, org, person)) return true;
   return false;
 }
 
-function brandMention(text: string, brand: string, phrase: string[], org: string): boolean {
+/** "Vornado's Steve" is this firm. "Starwood's SREIT" is a different product. */
+function nextIsPersonName(word: string, person: string): boolean {
+  const lower = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!lower || !person.trim()) return false;
+  for (const name of alternatePersonNames(person)) {
+    for (const part of name.toLowerCase().split(/\s+/)) {
+      if (part === lower) return true;
+    }
+  }
+  return false;
+}
+
+function brandMention(text: string, brand: string, phrase: string[], org: string, person: string): boolean {
   if (!companyTokenHit(text, brand) || surnameOnly(text, brand, org)) return false;
   const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?:'s)?(?![A-Za-z0-9-])`, "gi"));
@@ -504,7 +515,11 @@ function brandMention(text: string, brand: string, phrase: string[], org: string
     const lower = word.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!lower || phrase.includes(lower) || LEGAL.has(lower)) return true;
     // "Vornado stock" is this firm. "Madison Air" and "Starwood Capital" name a different one.
-    if (word[0] === word[0].toUpperCase()) continue;
+    // A capitalized next word is a different firm, unless it is this person's name: "Vornado's Steve Roth".
+    if (word[0] === word[0].toUpperCase()) {
+      if (nextIsPersonName(word, person)) return true;
+      continue;
+    }
     if (isGenericFirmToken(lower)) continue;
     return true;
   }

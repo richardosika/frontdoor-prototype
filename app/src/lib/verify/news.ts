@@ -20,8 +20,9 @@ export const NEWS_COMPANY_CIVIL =
  * A civil caption such as "Zumba v. Sciame Construction".
  * The parties stay capitalized so "profits vs last year" is not a docket.
  */
+/** "Zumba v. Sciame" is a docket. "Mamdani vs. Ken Griffin" is a debate, not a caption. */
 const CIVIL_DOCKET =
-  /\b[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,6}\s+[vV](?:[sS]\.?|\.)\s+[A-Z]/;
+  /\b[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,6}\s+[vV]\.?\s+[A-Z]/;
 
 export function civilDocket(text: string): boolean {
   return CIVIL_DOCKET.test(text);
@@ -310,13 +311,24 @@ export function classifyNews(
       .filter((item) => withinNewsWindow(item.publishedAt, now))
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
-        const blob = `${item.title} ${item.snippet}`;
-        const judged = judgeHeadline(blob, {
+        const factsForJudge = {
           name: personName,
           applicantName: personName,
           org: companyName,
           location: facts.location,
-        });
+        };
+        const blob = `${item.title} ${item.snippet}`;
+        const fromTitle = judgeHeadline(item.title, factsForJudge);
+        const fromBlob = judgeHeadline(blob, factsForJudge);
+        // The title decides whether this is litigation. A dividend headline stays ordinary
+        // when the snippet happens to contain the word lawsuit.
+        const judged = {
+          ...fromBlob,
+          tone: fromTitle.tone,
+          kind: fromTitle.kind,
+          departed: fromTitle.departed || fromBlob.departed,
+          foreclosureOnly: fromTitle.foreclosureOnly,
+        };
         if (!judged.person && !judged.company && !judged.suffixMismatch) return [];
         return [{ ...item, ...judged }];
       }),

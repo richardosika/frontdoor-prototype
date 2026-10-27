@@ -134,16 +134,21 @@ function preservedStructuredText(html: string): string {
   const decoded = html.replace(/\\\//g, "/").replace(/\\"/g, '"');
   const paths: string[] = [];
   const seen = new Set<string>();
-  for (const match of decoded.matchAll(/"(?:url|href|permalink|path)"\s*:\s*"([^"]+)"/g)) {
-    const value = match[1].trim();
+  for (const match of decoded.matchAll(/"(?:url|href|permalink|path|slug)"\s*:\s*"([^"]+)"/g)) {
+    let value = match[1].trim();
     if (value.length < 2 || value.length > 240 || seen.has(value)) continue;
-    if (!value.startsWith("/") && !/^https?:\/\//i.test(value)) continue;
+    if (!value.startsWith("/") && !/^https?:\/\//i.test(value)) {
+      if (/^[a-z0-9][a-z0-9./_-]*\/[a-z0-9._-]+$/i.test(value)) value = `/${value}`;
+      else continue;
+    }
     if (/\.(?:js|mjs|css|png|jpe?g|gif|svg|webp|ico|woff2?)(?:$|\?)/i.test(value)) continue;
     seen.add(value);
     paths.push(value);
-    if (paths.length >= 60) break;
   }
-  for (const value of paths) lines.push(`"url":"${value}"`);
+  // A bio path such as /w/james-nelson can sit after dozens of service URLs. Keep those first.
+  const rank = (value: string) => (/\/w\/|leadership|executive|\/people\/|\/team\/|\/bio\/|professionals|attorneys|our-team|our-people/i.test(value) ? 0 : /about|staff|lawyer/i.test(value) ? 1 : 2);
+  paths.sort((left, right) => rank(left) - rank(right));
+  for (const value of paths.slice(0, 60)) lines.push(`"url":"${value}"`);
   return lines.join("\n");
 }
 

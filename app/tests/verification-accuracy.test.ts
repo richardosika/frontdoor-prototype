@@ -8,7 +8,7 @@ import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, dedupeSourceLines, gradeChecks, gradeComparisonLine, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
+import { civilDocket, classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
@@ -2627,6 +2627,8 @@ describe("thirteenth follow-up", () => {
     expect(card.reviewFlag).not.toBe(true);
     expect(companyNameLooksReal("Meister Seelig & Schuster PLLC")).toBe(true);
     expect(plausibilityCheck(facts({ name: "Stephen Meister", org: "Meister Seelig & Schuster PLLC" })).status).toBe("PASS");
+    expect(companyNameLooksReal("Northbridge Meridian Holdings LLC")).toBe(true);
+    expect(plausibilityCheck(facts({ name: "Oleg Logunov", org: "Northbridge Meridian Holdings LLC" })).status).toBe("PASS");
     expect(companyNameLooksReal("Blorptex Qwvzn")).toBe(false);
   });
 
@@ -2635,7 +2637,11 @@ describe("thirteenth follow-up", () => {
     expect(mentionsCompany(headline, "Vornado Realty Trust")).toBe(true);
     expect(mentionsCompany("Starwood Capital halts redemptions", "Starwood Property Trust")).toBe(false);
     expect(mentionsCompany("Starwood Property sold a loan", "Starwood Property Trust")).toBe(true);
-    expect(mentionsCompany("Inside Starwood's SREIT", "Starwood Property Trust")).toBe(false);
+    expect(mentionsCompany("Inside Starwood's SREIT", "Starwood Property Trust", "Barry Sternlicht")).toBe(false);
+    expect(mentionsCompany("Starwood's Barry Sternlicht on U.S. tariff policy", "Starwood Property Trust", "Barry Sternlicht")).toBe(true);
+    expect(mentionsCompany("Vornado's Steve Roth BREAKS SILENCE on Mamdani vs. Ken Griffin", "Vornado Realty Trust", "Steven Roth")).toBe(true);
+    expect(civilDocket("Marco Antonio Zumba v. Sciame Construction")).toBe(true);
+    expect(civilDocket("Vornado's Steve Roth BREAKS SILENCE on Mamdani vs. Ken Griffin")).toBe(false);
     const news = classifyNews(
       facts({ name: "Steven Roth", applicantName: "Steven Roth", org: "Vornado Realty Trust", location: "New York, NY" }),
       [{
@@ -2663,7 +2669,7 @@ describe("thirteenth follow-up", () => {
       facts({ name: "Ivan Kaufman", applicantName: "Ivan Kaufman", org: "Arbor Realty Trust", location: "New York, NY" }),
       [{
         title,
-        snippet: "The quarter covered REO and the dividend.",
+        snippet: "The quarter covered REO and the dividend. A later paragraph mentions a lawsuit.",
         url: "https://seekingalpha.com/arbor-reo",
         source: "Seeking Alpha",
         publishedAt: "2026-06-01T15:00:00.000Z",
@@ -2700,6 +2706,24 @@ describe("thirteenth follow-up", () => {
     expect(partial.corroborates).toBe(false);
     expect(partial.reviewFlag).toBe(true);
     expect(partial.finding).toContain("TERRA PROPERTY TRUST");
+    const loose = assessEdgarMatch({
+      org: "The LeFrak Organization",
+      person: "Richard LeFrak",
+      tickersOk: true,
+      companies: [{ title: "PACIFIC HEALTH CARE ORGANIZATION INC", ticker: "PFHO", cik: "1041657" }],
+      filingNames: [],
+    });
+    expect(loose.finding).not.toContain("PACIFIC");
+    expect(loose.reviewFlag).not.toBe(true);
+    const ridge = assessEdgarMatch({
+      org: "Quillfeather Ridge Holdings LLC",
+      person: "Marisol Quentin-Vale",
+      tickersOk: true,
+      companies: [{ title: "GRANITE RIDGE RESOURCES, INC.", ticker: "GRNT", cik: "1928446" }],
+      filingNames: [],
+    });
+    expect(ridge.finding).not.toContain("GRANITE");
+    expect(ridge.reviewFlag).not.toBe(true);
     expect(partial.finding.toLowerCase()).toContain("does not corroborate");
     const partialGrade = gradeChecks(
       [row({ key: "edgar", status: partial.status, weight: 6, corroborates: false, reviewFlag: true, finding: partial.finding })],
@@ -2757,6 +2781,32 @@ describe("thirteenth follow-up", () => {
     const footprint = screened.find((check) => check.key === "web-footprint");
     expect(footprint?.url || web?.url || "").not.toContain("bing.com/ck/");
     expect(`${web?.finding} ${footprint?.url || ""}`).toContain("news.example/vornado-roth");
+  });
+
+  it("keeps a bio path that sits after a long list of service URLs", () => {
+    const fillers = Array.from({ length: 70 }, (_, index) => `{"url":"/markets/office-${index}"}`).join("");
+    const html = `<html><script>${fillers}{"url":"/w/james-nelson"}</script><p>Avison Young</p></html>`;
+    const page = prepareFetchedText(html, 180_000);
+    expect(surnamePageUrls(page, "https://www.avisonyoung.us/", "Nelson")).toContain("https://www.avisonyoung.us/w/james-nelson");
+  });
+
+  it("does not treat a debate headline as a different person", () => {
+    const silence = classifyNews(
+      facts({ name: "Steven Roth", applicantName: "Steven Roth", org: "Vornado Realty Trust", location: "New York, NY" }),
+      [{
+        title: "Vornado's Steve Roth BREAKS SILENCE on Mamdani vs. Ken Griffin",
+        snippet: "",
+        url: "https://news.example/roth-silence",
+        source: "Example",
+        publishedAt: "2026-05-05T15:00:00.000Z",
+        provider: "Google News",
+      }],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    expect(silence[0].status).toBe("PASS");
+    expect(silence[0].reviewFlag).not.toBe(true);
+    expect(silence[0].finding.toLowerCase()).not.toContain("without the company");
   });
 
   it("abandons one slow check instead of holding the case", async () => {

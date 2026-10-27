@@ -666,11 +666,13 @@ export function tokenLooksGibberish(token: string): boolean {
   if (!/[aeiouy]/.test(word)) return true;
   if (/q(?!u)/.test(word)) return true;
   if (/(.)\1\1/.test(word)) return true;
-  if (/[^aeiouy]{5,}/.test(word)) return true;
   if (word.length <= 9) {
     const clusters = word.match(/[^aeiouy]{3,}/g) || [];
     if (clusters.some((cluster) => /[qxzj]/.test(cluster))) return true;
   }
+  // "th" and "ch" are ordinary English. "Northbridge" is not a made-up cluster.
+  const withoutH = word.replace(/h/g, "");
+  if (/[^aeiouy]{5,}/.test(withoutH)) return true;
   return false;
 }
 
