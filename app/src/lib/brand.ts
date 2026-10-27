@@ -9,6 +9,7 @@ export const BRAND = {
   formation: "a New Jersey limited liability company [to be formed]",
   address: "299 Market Street, Saddle Brook, NJ 07663",
   contactEmail: "connect@privatefloorclub.com",
+  contactPhone: "800-399-3745",
   owner: "Richard Osika",
 } as const;
 

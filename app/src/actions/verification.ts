@@ -14,7 +14,7 @@ import {
 } from "@/lib/verification-db";
 import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
 import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
-import { rerunFinishedSummary, rerunGradeFields } from "@/lib/rerun-audit";
+import { rerunApplicantName, rerunFinishedSummary, rerunGradeFields } from "@/lib/rerun-audit";
 import { parseGradeSnapshot } from "@/lib/verify/grade";
 import type { Prisma } from "@prisma/client";
 import { checkResultLabel, isVerificationStatus, verificationStatusLabel } from "@/lib/verification";
@@ -230,49 +230,125 @@ export async function startGuidedReview(formData: FormData) {
   redirect(`/admin/verification/${record.id}?step=identity`);
 }
 
+async function createRerunRun(input: {
+  subject: "APPLICATION" | "PROJECT";
+  applicationId?: string;
+  projectId?: string;
+  companyName: string;
+  summary: string;
+  gradeFields: {
+    score?: number;
+    gradeLetter?: string;
+    gradeScore?: number;
+    gradeConfidence?: string;
+    recommendation?: string;
+    gradeSnapshot?: Prisma.InputJsonValue;
+  };
+}) {
+  const previous = await prisma.verificationRun.findFirst({
+    where: input.applicationId
+      ? { applicationId: input.applicationId, subject: "APPLICATION" }
+      : { projectId: input.projectId, subject: "PROJECT" },
+    orderBy: { createdAt: "desc" },
+    include: { evidence: true },
+  });
+  await prisma.verificationRun.create({
+    data: {
+      subject: input.subject,
+      status: "DONE",
+      applicationId: input.applicationId,
+      projectId: input.projectId,
+      companyName: input.companyName,
+      summary: input.summary,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      ...input.gradeFields,
+      evidence: previous
+        ? {
+            create: previous.evidence.map((row) => ({
+              checkKey: row.checkKey,
+              status: row.status,
+              weight: row.weight,
+              finding: row.finding,
+              source: row.source,
+              url: row.url,
+              ranAt: row.ranAt,
+              hardFlag: row.hardFlag,
+              reviewFlag: row.reviewFlag,
+              corroborates: row.corroborates,
+            })),
+          }
+        : undefined,
+    },
+  });
+}
+
 export async function rerunGuidedChecks(formData: FormData) {
   const admin = await requireVerificationAdmin();
   const caseId = String(formData.get("caseId") || "");
   const back = `/admin/verification/${caseId}`;
   const existing = await prisma.verificationCase.findUnique({
     where: { id: caseId },
-    select: { id: true, status: true, applicationId: true, projectId: true },
+    select: {
+      id: true,
+      status: true,
+      applicationId: true,
+      projectId: true,
+      application: { select: { name: true } },
+      user: { select: { name: true } },
+      inviteRequest: { select: { name: true } },
+      project: { select: { name: true } },
+    },
   });
   if (!existing) notFound();
   await runLivePrefill(caseId);
   const saved = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { gradeSnapshot: true, status: true } });
   const grade = parseGradeSnapshot(saved?.gradeSnapshot);
   const summary = rerunFinishedSummary(grade);
-  if (grade) {
-    const data = {
-      ...rerunGradeFields(grade),
-      gradeSnapshot: grade as unknown as Prisma.InputJsonValue,
+  const applicantName = rerunApplicantName({
+    applicationName: existing.application?.name,
+    memberName: existing.user?.name,
+    requestName: existing.inviteRequest?.name,
+    projectName: existing.project?.name,
+  });
+  const gradeFields = grade
+    ? { ...rerunGradeFields(grade), gradeSnapshot: grade as unknown as Prisma.InputJsonValue }
+    : {};
+  const wroteApplication = Boolean(grade && existing.applicationId);
+  const wroteProject = Boolean(grade && existing.projectId);
+  if (wroteApplication && existing.applicationId) {
+    await createRerunRun({
+      subject: "APPLICATION",
+      applicationId: existing.applicationId,
+      companyName: applicantName,
       summary,
-      finishedAt: new Date(),
-    };
-    if (existing.applicationId) {
-      const updated = await prisma.verificationRun.updateMany({
-        where: { applicationId: existing.applicationId, subject: "APPLICATION" },
-        data,
-      });
-      if (updated.count === 0) {
-        await prisma.verificationRun.create({
-          data: { ...data, subject: "APPLICATION", status: "DONE", applicationId: existing.applicationId, startedAt: new Date() },
-        });
-      }
-      revalidatePath(`/admin/applications/${existing.applicationId}`);
-    }
-    if (existing.projectId) {
-      const updated = await prisma.verificationRun.updateMany({
-        where: { projectId: existing.projectId },
-        data,
-      });
-      if (updated.count === 0) {
-        await prisma.verificationRun.create({
-          data: { ...data, subject: "PROJECT", status: "DONE", projectId: existing.projectId, startedAt: new Date() },
-        });
-      }
-    }
+      gradeFields,
+    });
+    revalidatePath(`/admin/applications/${existing.applicationId}`);
+  }
+  if (wroteProject && existing.projectId) {
+    await createRerunRun({
+      subject: "PROJECT",
+      projectId: existing.projectId,
+      companyName: applicantName,
+      summary,
+      gradeFields,
+    });
+  }
+  if (!wroteApplication && !wroteProject) {
+    await prisma.verificationRun.create({
+      data: {
+        subject: "COMPANY",
+        status: "DONE",
+        applicationId: existing.applicationId,
+        projectId: existing.projectId,
+        companyName: applicantName,
+        summary,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        ...gradeFields,
+      },
+    });
   }
   const status = saved?.status || existing.status;
   await prisma.verificationEvent.create({
@@ -281,13 +357,6 @@ export async function rerunGuidedChecks(formData: FormData) {
       actorId: admin.id,
       fromStatus: status,
       toStatus: status,
-      summary,
-    },
-  });
-  await prisma.moderationEvent.create({
-    data: {
-      actorId: admin.id,
-      action: "RERUN_CHECKS",
       summary,
     },
   });

@@ -6,7 +6,7 @@ import { Logo } from "@/components/logo";
 import { btn, btnOutline } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { DUES_BILLING_NOTE, DUES_WAIVED, firstMonthCents, formatMoney, payPageState } from "@/lib/dues";
-import { formatEtDate } from "@/lib/format";
+import { formatLongEtDate } from "@/lib/format";
 import { DUES_COVERS, paymentRenewalLabel } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
 
@@ -52,13 +52,13 @@ export function PayDues({
             {error ? <p className="mt-3 text-sm text-brass">{error}</p> : null}
             {notice ? <p className="mt-3 text-sm text-forest">{notice}</p> : null}
             <p className="mt-4 text-sm text-forest">
-              This membership is active{renewalAt ? `. Next charge date ${formatEtDate(renewalAt)}` : ""}.
+              This membership is active{renewalAt ? `. Next charge date ${formatLongEtDate(renewalAt)}` : ""}.
               {status === "WAIVED" ? ` ${DUES_WAIVED}` : ""}
             </p>
             {cancelled ? (
               <p className="mt-2 text-sm text-forest">
                 Cancellation is recorded.
-                {renewalAt && status === "PAID" ? ` Access continues through ${formatEtDate(renewalAt)}.` : " Nothing further is scheduled."}
+                {renewalAt && status === "PAID" ? ` Access continues through ${formatLongEtDate(renewalAt)}.` : " Nothing further is scheduled."}
               </p>
             ) : null}
             <Link href={signedIn ? "/feed" : "/login"} className={`${btn} mt-4`}>
@@ -106,7 +106,7 @@ export function PayDues({
           {cancelled ? (
             <p className="mt-2 text-sm text-forest">
               Cancellation is recorded.
-              {renewalAt && status === "PAID" ? ` Access continues through ${formatEtDate(renewalAt)}.` : " Nothing further is scheduled."}
+              {renewalAt && status === "PAID" ? ` Access continues through ${formatLongEtDate(renewalAt)}.` : " Nothing further is scheduled."}
             </p>
           ) : null}
           <p className="mt-2 text-sm text-ink">Until the first month is recorded, the rest of the floor stays closed.</p>

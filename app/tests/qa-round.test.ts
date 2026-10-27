@@ -322,9 +322,11 @@ describe("QA fixes that stay outside grading", () => {
     const verification = readFileSync(path.join(ROOT, "actions/verification.ts"), "utf8");
     expect(verification).toContain("rerunFinishedSummary");
     expect(verification).toContain("rerunGradeFields");
-    expect(verification).toContain("verificationRun.updateMany");
-    expect(verification).toContain("moderationEvent.create");
-    expect(verification).toContain('action: "RERUN_CHECKS"');
+    expect(verification).toContain("verificationRun.create");
+    expect(verification).toContain("rerunApplicantName");
+    const rerun = verification.slice(verification.indexOf("export async function rerunGuidedChecks"));
+    expect(rerun).not.toContain("moderationEvent.create");
+    expect(rerun).not.toContain("verificationRun.updateMany");
     expect(readFileSync(path.join(ROOT, "app/(app)/admin/audit/page.tsx"), "utf8")).toContain("auditRunScore");
     const applyStatus = readFileSync(path.join(ROOT, "components/application-status.tsx"), "utf8");
     const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");

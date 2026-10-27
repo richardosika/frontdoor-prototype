@@ -79,6 +79,15 @@ export function verificationStatusLabel(status: string): string {
   return VERIFICATION_STATUSES.find((item) => item.id === status)?.label ?? status;
 }
 
+/** Admin members list. The word follows the file, including Verified when that is the stored status. */
+export function memberListVerificationLabel(
+  file: { status: string; expiresAt: Date | null } | null,
+  now = new Date(),
+): string {
+  if (!file || !isVerificationStatus(file.status)) return "Not started";
+  return verificationStatusLabel(effectiveVerificationStatus({ status: file.status, expiresAt: file.expiresAt }, now));
+}
+
 /** The file status follows the decision. Approve, request more info, and decline each set one status. */
 export function statusForDecision(decision: "APPROVED" | "DECLINED" | "NEEDS_INFO"): VerificationStatus {
   if (decision === "APPROVED") return "VERIFIED";

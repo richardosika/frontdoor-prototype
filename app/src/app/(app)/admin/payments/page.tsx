@@ -3,7 +3,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { currentMonthlyCents, duesLabel, firstMonthCents, formatMoney } from "@/lib/dues";
-import { formatEtDate } from "@/lib/format";
+import { formatLongEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -53,7 +53,7 @@ export default async function AdminPaymentsPage() {
               </p>
               <p className="mt-1 text-ink">
                 {paymentStatusLabel(member.paymentStatus)} · First month {formatMoney(firstMonthCents(monthly))} · {duesLabel(monthly)}
-                {member.renewalAt ? ` · renews ${formatEtDate(member.renewalAt)}` : ""}
+                {member.renewalAt ? ` · renews ${formatLongEtDate(member.renewalAt)}` : ""}
               </p>
             </li>
             );

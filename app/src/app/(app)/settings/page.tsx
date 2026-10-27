@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { DUES_BILLING_NOTE, currentMonthlyCents, firstMonthCents, formatMoney } from "@/lib/dues";
-import { formatAuditTime, formatEtDate } from "@/lib/format";
+import { formatAuditTime, formatLongEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
@@ -147,7 +147,7 @@ function Receipt({
       </p>
       <p>{receiptLine(user.paymentMode)}</p>
       <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>
-      <p>Next full-price charge {user.renewalAt ? formatEtDate(user.renewalAt) : "not set"}. A reminder goes out before that charge.</p>
+      <p>Next full-price charge {user.renewalAt ? formatLongEtDate(user.renewalAt) : "not set"}. A reminder goes out before that charge.</p>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { applicationReceivedMessage } from "@/lib/applicant-copy";
 import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
 import { BRAND } from "@/lib/brand";
 import { currentMonthlyCents, statusMembershipLine } from "@/lib/dues";
-import { formatEtDate } from "@/lib/format";
+import { formatLongEtDate } from "@/lib/format";
 
 export function ApplicationStatus({
   application,
@@ -35,7 +35,7 @@ export function ApplicationStatus({
     monthlyCents: application.duesCents > 0 ? currentMonthlyCents(application.role, application.duesCents) : 0,
     waived: application.duesWaived,
     paymentStatus: application.user?.paymentStatus,
-    renewalLabel: application.user?.renewalAt ? formatEtDate(application.user.renewalAt) : null,
+    renewalLabel: application.user?.renewalAt ? formatLongEtDate(application.user.renewalAt) : null,
   });
 
   return (

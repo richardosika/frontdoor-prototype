@@ -31,6 +31,7 @@ export default async function AuditPage() {
         score: true,
         gradeLetter: true,
         gradeScore: true,
+        companyName: true,
         createdAt: true,
         application: { select: { name: true } },
       },
@@ -62,7 +63,7 @@ export default async function AuditPage() {
               <li key={row.id} className="py-2">
                 {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
                 {row.verdict ? ` · ${row.verdict}` : ""}
-                {grade ? ` · ${grade}` : ""} · {row.application?.name || "No application"}
+                {grade ? ` · ${grade}` : ""} · {row.application?.name || row.companyName || "No application"}
               </li>
               );
             })}

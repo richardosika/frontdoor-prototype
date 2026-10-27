@@ -17,7 +17,7 @@ import { verificationDenial } from "@/lib/verification";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/request-status", "/legal", "/brand", "/pay", "/robots.txt", "/api/health", "/api/auth", "/api/request-invite", "/api/request-to-join", "/api/stripe", "/api/help"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/confirm", "/invite-status", "/request-status", "/help", "/legal", "/brand", "/pay", "/robots.txt", "/api/health", "/api/auth", "/api/request-invite", "/api/request-to-join", "/api/stripe", "/api/help"];
 
 function withRobots(response: NextResponse) {
   response.headers.set("X-Robots-Tag", ROBOTS_TAG);

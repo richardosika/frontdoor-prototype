@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser, requireAccount, requireAdmin } from "@/lib/current-user";
-import { formatEtDate } from "@/lib/format";
+import { formatLongEtDate } from "@/lib/format";
 import { mailDuesAmounts } from "@/lib/dues";
 import { firstName } from "@/lib/email-templates";
 import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
@@ -286,7 +286,7 @@ export async function cancelMembership(formData: FormData) {
   }
   const through =
     account.paymentStatus === "PAID" && account.renewalAt
-      ? `Access continues through ${formatEtDate(account.renewalAt)}. No further charge is scheduled after that date.`
+      ? `Access continues through ${formatLongEtDate(account.renewalAt)}. No further charge is scheduled after that date.`
       : "Nothing further will be charged.";
   await sendNotice({
     intendedTo: account.email,
