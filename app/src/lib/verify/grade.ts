@@ -662,10 +662,13 @@ function portionLine(earned: number, possible: number, reason: string): Line {
   return { earned, possible, reason: `${reason} (${earned} of ${possible}).` };
 }
 
-function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode): Line {
+function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode, independent: boolean): Line {
   const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
   if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "PASS" && row.selfReported && !independent) {
+    return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
+  }
   if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
   return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");
 }
@@ -697,9 +700,12 @@ export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
   });
 }
 
-function phoneAward(row: CheckOutput | undefined, possible: number): Line {
+function phoneAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
   if (row?.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) {
     return { earned: 0, possible: 0, reason: "The phone is toll-free, so the area code is not applicable." };
+  }
+  if (row?.status === "PASS" && !independent) {
+    return portionLine(0, possible, "The phone area code is self-reported and no independent source tied the person to the company");
   }
   return award(passed(row), possible, "The phone area code fits the state", "The phone area code was not confirmed against the state");
 }
@@ -767,7 +773,7 @@ export function gradeChecks(
     award(passed(findCheck(checks, "email-syntax")), weights.identity["email-syntax"], "The email address is well formed", "The email address is missing or not well formed"),
     award(passed(findCheck(checks, "disposable-email")), weights.identity["disposable-email"], "The email domain is not disposable", "The disposable-email check did not pass"),
     award(passed(findCheck(checks, "role-address")), weights.identity["role-address"], "The email is not a shared inbox", "The shared-inbox check did not pass"),
-    phoneAward(findCheck(checks, "phone-state"), weights.identity["phone-state"]),
+    phoneAward(findCheck(checks, "phone-state"), weights.identity["phone-state"], independent),
     award(
       passed(findCheck(checks, "linkedin-format")) && (linkedinPerson || independent),
       weights.identity["linkedin-format"],
@@ -777,9 +783,14 @@ export function gradeChecks(
     linkedinAward(linkedin, weights.identity["linkedin-fetch"], weightsMode),
   ]);
   const company = sumLines([
-    websiteAward(checks, weights.company.website, weightsMode),
+    websiteAward(checks, weights.company.website, weightsMode, independent),
     award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
-    award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
+    award(
+      passed(card) && independent,
+      weights.company["business-card"],
+      "The business card matches the name and company",
+      "No matching business card was confirmed",
+    ),
     rdapAward(findCheck(checks, "rdap"), weights.company.rdap, weightsMode),
     registryAward(findCheck(checks, "business-registry"), weights.company["business-registry"], weightsMode),
   ]);
@@ -927,8 +938,8 @@ export function gradeChecks(
       severity: "Medium",
       title: "Thin public record",
       detail: selfReported
-        ? "The applicant's own website or card is one self-reported source. No independent source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean."
-        : "No free source tied this person to this company. The grade stays below a C, and a thin file should not be read as clean.",
+        ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
+        : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
     });
   } else if (independentCount < 2) {
     pushAttention({
@@ -1094,6 +1105,9 @@ function nextStepFor(input: { recommendation: Recommendation; checks: CheckOutpu
     return "Read the red banner. If you approve anyway, the decision form asks you to confirm, and that confirmation is written to the audit log.";
   }
   const asks: string[] = [];
+  if (input.recommendation === "NEEDS MORE INFO" && corroboratingPasses(input.checks).length === 0) {
+    asks.push("request more info: ask for a team-page URL that names this person at this company");
+  }
   if (!input.facts.cardUploaded && !input.facts.cardText?.trim()) asks.push("ask for a business card");
   if (!input.facts.linkedinUrl?.trim()) asks.push("ask for a LinkedIn URL");
   if ((input.facts.referenceCount || 0) === 0) asks.push("ask for a reference");

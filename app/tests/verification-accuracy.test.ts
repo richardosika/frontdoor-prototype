@@ -120,9 +120,9 @@ describe("corroboration is independent of the applicant's own page", () => {
       }),
       referenceCount: 1,
     });
-    expect(graded.score).toBeGreaterThanOrEqual(70);
-    expect(graded.letter).toBe("D");
-    expect(graded.caps.some((line) => line.startsWith("Capped at D"))).toBe(true);
+    expect(graded.score).toBeLessThan(70);
+    expect(["D", "F"]).toContain(graded.letter);
+    expect(graded.letter).not.toBe("C");
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     expect(graded.attention.some((item) => /one self-reported source/i.test(item.detail) && /stays below a C/i.test(item.detail))).toBe(true);
     const identity = graded.categories.find((category) => category.id === "identity");
@@ -220,6 +220,45 @@ describe("a neutral screen-news pass fills an inconclusive news check", () => {
     expect(neutralScreenNewsPass([litigation, neutral])).toBe(true);
     expect(footprintEarned([litigation, neutral]) - footprintEarned([litigation])).toBe(8);
     expect(corroboratingPasses([litigation, neutral])).toHaveLength(0);
+  });
+
+  it("withholds self-reported website, card, and phone points until an independent source exists", () => {
+    const selfReported = [
+      row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "The applicant's own page names the person and the company." }),
+      row({ key: "business-card", status: "PASS", selfReported: true, corroborates: false, finding: "The card names the person and the company." }),
+      row({ key: "phone-state", status: "PASS", finding: "The area code fits the state." }),
+      row({ key: "social-links", status: "PASS", finding: "The social links are full web addresses." }),
+    ];
+    const alone = gradeChecks(selfReported, facts({ phone: "212-555-0147", cardUploaded: true }));
+    const company = alone.categories.find((category) => category.id === "company");
+    const identity = alone.categories.find((category) => category.id === "identity");
+    const footprint = alone.categories.find((category) => category.id === "footprint");
+    expect(company?.reason).toContain("self-reported and no independent source");
+    expect(company?.reason).toContain("0 of 8");
+    expect(company?.reason).toContain("0 of 4");
+    expect(identity?.reason).toContain("The phone area code is self-reported");
+    expect(identity?.reason).toContain("(0 of 3)");
+    expect(footprint?.reason).toContain("0 of 2");
+    const backed = gradeChecks(
+      [...selfReported, row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company." })],
+      facts({ phone: "212-555-0147", cardUploaded: true }),
+    );
+    expect(backed.score - alone.score).toBe(8 + 4 + 3 + 2 + 8);
+    expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("8 of 8");
+    expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("4 of 4");
+    const companyOnly = gradeChecks(
+      [row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" })],
+      facts(),
+    );
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    const dead = gradeChecks(
+      [row({ key: "website", status: "FAIL", selfReported: true, finding: "domain does not resolve" })],
+      facts(),
+    );
+    expect(dead.categories.find((category) => category.id === "company")?.reason).toContain("domain does not resolve");
+    expect(alone.recommendation).toBe("NEEDS MORE INFO");
+    expect(alone.summary.nextStep.toLowerCase()).toContain("request more info");
+    expect(alone.attention.some((item) => /request more info/i.test(item.detail) && /team-page/i.test(item.detail))).toBe(true);
   });
 
   it("ignores a company-level or same-source screen-news row, and does not override a failed news check", () => {
@@ -1058,7 +1097,8 @@ describe("website text survives the size cap", () => {
           location: "Hackensack, NJ",
         }),
       );
-      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(8);
+      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("self-reported and no independent source");
     }
   });
 });
@@ -1092,7 +1132,8 @@ describe("QA follow-up scoring", () => {
     const graded = gradeChecks(checks, applicant);
     const company = graded.categories.find((category) => category.id === "company");
     const identity = graded.categories.find((category) => category.id === "identity");
-    expect(company?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
+    expect(company?.reason).toContain("self-reported and no independent source");
+    expect(company?.reason).toContain("0 of 8");
     expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
     expect(identity?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
     expect(graded.summary.checkedOut).toContain("company confirmed, person NOT confirmed");
@@ -1110,7 +1151,15 @@ describe("QA follow-up scoring", () => {
       facts({ org: "Turner Construction Company" }),
     );
     expect(personMatch.categories.find((category) => category.id === "company")?.earned).toBe(8);
-    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    const companyOnlyWithNews = gradeChecks(
+      [
+        row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "One headline names the person and the company." }),
+      ],
+      facts({ org: "Turner Construction Company" }),
+    );
+    expect(companyOnlyWithNews.categories.find((category) => category.id === "company")?.earned).toBe(4);
     expect(companyOnly.recommendation.startsWith("APPROVE")).toBe(false);
   });
 
@@ -1153,7 +1202,7 @@ describe("QA follow-up scoring", () => {
       expect(linkedin?.companyOnly).toBe(true);
       expect(linkedin?.corroborates).toBe(false);
       const graded = gradeChecks(checks, applicant);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("(4 of 8)");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
       expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("(2 of 4)");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     }
