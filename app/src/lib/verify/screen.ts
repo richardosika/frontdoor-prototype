@@ -507,9 +507,27 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   };
 }
 
+/** The result page itself is on the applicant's domain. A mention of that domain in the snippet is not enough. */
+export function hostIsApplicant(href: string, ownHost: string): boolean {
+  if (!ownHost || !/^https?:\/\//i.test(href)) return false;
+  let host = "";
+  try {
+    host = new URL(href).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return false;
+  }
+  const own = ownHost.replace(/^www\./, "").toLowerCase();
+  return host === own || host.endsWith(`.${own}`);
+}
+
+function resultPageOnOwnSite(attempt: Attempt, ownHost: string): boolean {
+  if (!ownHost) return false;
+  const hrefs = [attempt.url, ...(attempt.linkedUrl || "").split(/\s+/)];
+  return hrefs.some((href) => hostIsApplicant(href, ownHost));
+}
+
 function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
-  const blob = `${attempt.url} ${attempt.detail} ${attempt.linkedUrl || ""}`.toLowerCase();
-  const ownSite = Boolean(attempt.selfReported) || Boolean(ownHost && blob.includes(ownHost));
+  const ownSite = Boolean(attempt.selfReported) || attempt.key === "website" || resultPageOnOwnSite(attempt, ownHost);
   const judged = findingFor({ ...attempt, selfReported: ownSite || attempt.selfReported });
   return {
     key: attempt.key,
@@ -1184,7 +1202,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         if (isLinkedInDirectory(href)) return false;
         const page = canonicalPage(href);
         if (credited.has(page)) return false;
-        if (ownHost && page.includes(ownHost)) return false;
+        if (hostIsApplicant(href, ownHost)) return false;
         return true;
       });
     const alreadyCredited = attempts.find(
@@ -1238,8 +1256,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 /** The applicant's own site is one self-reported source. It cannot also be the public web footprint. */
 function attemptOnOwnSite(attempt: Attempt, ownHost: string): boolean {
   if (attempt.selfReported || attempt.key === "website") return true;
-  const blob = `${attempt.url} ${attempt.detail} ${attempt.linkedUrl || ""}`.toLowerCase();
-  return Boolean(ownHost && blob.includes(ownHost));
+  return resultPageOnOwnSite(attempt, ownHost);
 }
 
 function rank(score: MatchScore): number {

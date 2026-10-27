@@ -13,7 +13,7 @@ import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registr
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { fallbackTeamUrls, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { fallbackTeamUrls, hostIsApplicant, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -683,6 +683,41 @@ describe("EDGAR exact company names", () => {
     expect(mentionsCompany("A toll road closed for repairs", "Toll")).toBe(false);
     expect(mentionsCompany("Bristol council meets on Tuesday", "Bristol Development")).toBe(false);
     expect(mentionsCompany("Bristol Development breaks ground", "Bristol Development")).toBe(true);
+  });
+});
+
+describe("a third-party page that mentions the domain stays third-party", () => {
+  it("does not mark a LinkedIn result self-reported because the snippet names the company domain", async () => {
+    expect(hostIsApplicant("https://www.linkedin.com/in/harris-freidus", "paulweiss.com")).toBe(false);
+    expect(hostIsApplicant("https://www.paulweiss.com/professionals/harris-b-freidus", "paulweiss.com")).toBe(true);
+    const checks = await runPublicScreen(
+      facts({
+        name: "Harris Freidus",
+        applicantName: "Harris Freidus",
+        org: "Paul Weiss",
+        website: "https://www.paulweiss.com",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.includes("duckduckgo.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<a class="result__a" href="https://www.linkedin.com/in/harris-freidus">Harris Freidus of Paul Weiss, paulweiss.com, New York</a>`,
+          };
+        }
+        if (url.includes("paulweiss.com")) return { ok: true, status: 200, text: "<html><p>Paul Weiss is a law firm in New York.</p></html>" };
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    const search = checks.find((check) => check.key === "screen-web");
+    expect(search?.status).toBe("PASS");
+    expect(search?.selfReported).not.toBe(true);
+    expect(search?.corroborates).toBe(true);
+    expect(search?.finding).toContain("paulweiss.com");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.selfReported).not.toBe(true);
+    expect(footprint?.corroborates).toBe(true);
   });
 });
 
