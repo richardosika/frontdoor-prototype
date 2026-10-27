@@ -6,14 +6,15 @@ import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { classifyFetchError, fetchLimits, looksLikeHtml, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { civilDocket, classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
+import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { applyReviewSkips, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { alignNewsRows, civilDocket, classifyNews, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { companySearchTerm, distinctiveCompanyTokens, isDistinctiveCompanyToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
-import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
@@ -510,6 +511,11 @@ describe("low-risk check fixes", () => {
     expect(phoneStateCheck(facts({ phone: "818-555-0100", location: "Los Angeles, CA" })).status).toBe("PASS");
     expect(phoneStateCheck(facts({ phone: "310-555-0199", location: "Los Angeles, CA" })).status).toBe("PASS");
     expect(phoneStateCheck(facts({ phone: "512-555-0199", location: "Austin, TX" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "312-555-0100", location: "Chicago, IL" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "415-555-0100", location: "San Francisco, CA" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "713-555-0100", location: "Houston, TX" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "401-555-0100", location: "Providence, RI" })).status).toBe("PASS");
+    expect(phoneStateCheck(facts({ phone: "305-555-0100", location: "Miami, FL" })).status).toBe("PASS");
     const tollFree = phoneStateCheck(facts({ phone: "800-555-0100", location: "Newark, NJ" }));
     expect(tollFree.status).toBe("INCONCLUSIVE");
     expect(tollFree.reviewFlag).toBeUndefined();
@@ -3273,5 +3279,255 @@ describe("thirteenth follow-up", () => {
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("timed out");
     expect(graded.summary.couldNotCheck.toLowerCase()).toContain("timed out");
     expect(graded.summary.couldNotCheck.toLowerCase()).not.toContain("did not check out");
+  });
+});
+
+describe("qa october 27", () => {
+  it("treats a site brand as a review alias and still matches the legal name", () => {
+    const html = `<html><title>JLL | Commercial Real Estate</title><meta property="og:site_name" content="JLL"><script type="application/ld+json">{"@type":"Organization","name":"JLL"}</script><body><p>JLL advises owners.</p></body></html>`;
+    expect(domainBrand("https://www.jll.com")).toBe("jll");
+    expect(pageBrandNames(html)).toContain("JLL");
+    const aliases = brandAliases("Jones Lang LaSalle", "https://www.jll.com", html);
+    expect(aliases).toContain("jll");
+    expect(mentionsBrandAlias("JLL advises owners.", aliases)).toBe("jll");
+    expect(mentionsBrandAlias("a jolly page", aliases)).toBe("");
+    expect(mentionsCompany("JLL advises owners.", "Jones Lang LaSalle")).toBe(false);
+    expect(mentionsCompany("Jones Lang LaSalle advises owners.", "Jones Lang LaSalle")).toBe(true);
+    expect(mentionsCompany("Starwood Capital", "Starwood Property Trust")).toBe(false);
+    const alias = scorePublicText("JLL advises owners.", { name: "Christian Ulbrich", org: "Jones Lang LaSalle", location: "Chicago, IL", aliases });
+    expect(alias.company).toBe(false);
+    expect(alias.alias).toBe("jll");
+  });
+
+  it("searches the full company name and the brand alias, not one leftover word", () => {
+    const jll = facts({
+      name: "Christian Ulbrich",
+      applicantName: "Christian Ulbrich",
+      org: "Jones Lang LaSalle",
+      website: "https://www.jll.com",
+      location: "Chicago, IL",
+    });
+    const queries = newsSearchQueries(jll);
+    expect(queries[0]).toContain("jones lang lasalle");
+    expect(queries.join(" ")).toContain('"jll"');
+    expect(queries.some((query) => /"real"$|"estate"$/.test(query))).toBe(false);
+    expect(socialSearchQuery("Hessam Nadji", "Marcus & Millichap")).toContain("marcus millichap");
+    expect(socialSearchQuery("Hessam Nadji", "Marcus & Millichap")).not.toBe('"Hessam Nadji" "marcus"');
+    expect(socialSearchQuery("Hamid Moghadam", "Prologis")).toContain("prologis");
+    expect(companySearchTerm("Hines", "Jeff Hines")).toBe("hines");
+    const hinesFirm = companySearchTerm("Hines Interests Limited Partnership", "Jeff Hines");
+    expect(hinesFirm.split(" ").length).toBeGreaterThan(1);
+    expect(hinesFirm).not.toBe("interests");
+  });
+
+  it("accepts a one-word company and does not score the company file below the application without a reason", () => {
+    expect(plausibilityCheck(facts({ name: "Prologis", org: "Prologis" })).status).toBe("PASS");
+    expect(plausibilityCheck(facts({ name: "Hines", org: "Hines" })).status).toBe("PASS");
+    expect(plausibilityCheck(facts({ name: "Hines", org: "Hines" })).finding).not.toContain("looks incomplete");
+    const gibberish = plausibilityCheck(facts({ name: "Qwvzn", org: "Qwvzn" }));
+    expect(gibberish.status).toBe("FAIL");
+    expect(gibberish.finding).toContain("does not look like real words");
+    const application = gradeChecks(
+      [row({ key: "plausibility", status: "PASS", weight: 8, finding: "The name, company, and role are filled in and readable." })],
+      facts({ name: "Hamid Moghadam", org: "Prologis" }),
+    );
+    const company = gradeChecks(
+      [row({ key: "plausibility", status: "FAIL", weight: 8, finding: "The name or company looks incomplete. Read the application before you decide." })],
+      facts({ name: "Prologis", org: "Prologis" }),
+    );
+    expect(company.score).toBeLessThan(application.score);
+    const held = companyFileBesideApplication(company, application);
+    expect(held?.score).toBe(application.score);
+    expect(held?.letter).toBe(application.letter);
+    expect(held?.changeNote).toContain("same inputs do not lower the company file");
+    const conflict = gradeChecks(
+      [row({ key: "sanctions", status: "FAIL", weight: 20, finding: "Watchlist name match on Prologis." })],
+      facts({ name: "Prologis", org: "Prologis" }),
+    );
+    const stated = companyFileBesideApplication(conflict, application);
+    expect(stated?.score).toBe(conflict.score);
+    expect(stated?.score).toBeLessThan(application.score);
+    expect(stated?.changeNote).toContain("Watchlist name match on Prologis");
+  });
+
+  it("shows the same headline on the news row and the news screen", () => {
+    const matched = alignNewsRows([
+      row({ key: "news", status: "INCONCLUSIVE", finding: "A headline names the person or the company. Prologis expands in Houston." }),
+      row({ key: "screen-news", status: "INCONCLUSIVE", finding: "Searched: news. No result found that names this person and this company. Company: no." }),
+    ]);
+    const screen = matched.find((check) => check.key === "screen-news");
+    expect(screen?.finding).toContain("Prologis expands in Houston");
+    expect(screen?.finding).not.toContain("Company: no");
+    expect(screen?.corroborates).not.toBe(true);
+    const scored = alignNewsRows([
+      row({ key: "news", status: "INCONCLUSIVE", finding: "No data found. None of the headlines named this person or company." }),
+      row({
+        key: "screen-news",
+        status: "INCONCLUSIVE",
+        url: "https://news.example/hines",
+        finding: "Searched: news. Found: Jeff Hines leads Hines. Name: yes. Company: yes. City: no. Confidence: high.",
+      }),
+    ]);
+    const news = scored.find((check) => check.key === "news");
+    expect(news?.status).toBe("PASS");
+    expect(news?.corroborates).toBe(true);
+    expect(news?.finding).toContain("Jeff Hines leads Hines");
+    const alias = classifyNews(
+      facts({
+        name: "Christian Ulbrich",
+        applicantName: "Christian Ulbrich",
+        org: "Jones Lang LaSalle",
+        website: "https://www.jll.com",
+        location: "Chicago, IL",
+      }),
+      [
+        {
+          title: "JLL names Christian Ulbrich",
+          snippet: "JLL",
+          url: "https://news.example/jll",
+          source: "Example",
+          publishedAt: "2026-07-18T00:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+      NOW,
+    );
+    const summary = alias.find((check) => check.key === "news");
+    expect(summary?.status).not.toBe("PASS");
+    expect(summary?.corroborates).not.toBe(true);
+    expect(summary?.reviewFlag).toBe(true);
+    expect(summary?.finding).toContain("JLL names Christian Ulbrich");
+    expect(summary?.finding.toLowerCase()).toContain("not corroboration");
+    const judged = judgeHeadline("JLL names Christian Ulbrich", {
+      name: "Christian Ulbrich",
+      org: "Jones Lang LaSalle",
+      location: "Chicago, IL",
+      website: "https://www.jll.com",
+    });
+    expect(judged.aliasOnly).toBe(true);
+    expect(judged.company).toBe(false);
+  });
+
+  it("follows a cross-host redirect, names a blocked check, and opens a LinkedIn company id over https", async () => {
+    expect(nextRedirectUrl("https://www.usa.skanska.com/", 301, "https://www.skanska.com/us/en/")).toBe("https://www.skanska.com/us/en/");
+    expect(nextRedirectUrl("http://www.linkedin.com/company/6346", 302, "http://www.linkedin.com/company/prologis")).toBe(
+      "https://www.linkedin.com/company/prologis",
+    );
+    const redirected = await runPublicScreen(
+      facts({
+        name: "Richard Kennedy",
+        applicantName: "Richard Kennedy",
+        org: "Skanska USA",
+        website: "https://www.usa.skanska.com",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.includes("skanska.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: "<html><title>Skanska</title><body><p>Skanska USA builds in New York. Richard Kennedy leads the company.</p></body></html>",
+            url: "https://www.skanska.com/us/en/",
+          };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const landed = redirected.find((check) => check.key === "website");
+    expect(landed?.finding).toContain("https://www.skanska.com/us/en/");
+    expect(landed?.finding).not.toContain("did not respond");
+    expect(landed?.finding).toContain("Name: yes");
+    expect(landed?.finding).toContain("Company: yes");
+
+    const blocked = await runPublicScreen(
+      facts({ website: "https://www.prologis.com", org: "Prologis", name: "Hamid Moghadam", applicantName: "Hamid Moghadam" }),
+      async (url) => (url.includes("prologis.com") ? { ok: false, status: 405, text: "" } : { ok: false, status: 404, text: "" }),
+    );
+    const denied = blocked.find((check) => check.key === "website");
+    expect(denied?.status).toBe("UNAVAILABLE");
+    expect(denied?.finding).toContain("blocked the check");
+    expect(denied?.finding).not.toContain("did not respond");
+
+    const seen: string[] = [];
+    const linked = await runPublicScreen(
+      facts({
+        org: "Prologis",
+        name: "Hamid Moghadam",
+        applicantName: "Hamid Moghadam",
+        website: "https://www.prologis.com",
+        location: "San Francisco, CA",
+      }),
+      async (url) => {
+        seen.push(url);
+        if (url.includes("prologis.com")) {
+          return { ok: true, status: 200, text: '<html><body>Prologis <a href="http://www.linkedin.com/company/6346">LinkedIn</a></body></html>' };
+        }
+        if (url.includes("/company/6346")) {
+          return { ok: true, status: 200, text: '<html><link rel="canonical" href="https://www.linkedin.com/company/prologis"><body>Prologis</body></html>' };
+        }
+        if (url.includes("/company/prologis")) return { ok: true, status: 200, text: "<html><body>Prologis</body></html>" };
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    expect(linkedinCompanyFollow("http://www.linkedin.com/company/6346", '<a href="https://www.linkedin.com/company/prologis">Prologis</a>')).toBe(
+      "https://www.linkedin.com/company/prologis",
+    );
+    expect(seen.some((url) => url.startsWith("http://"))).toBe(false);
+    expect(seen.some((url) => url.includes("https://www.linkedin.com/company/prologis"))).toBe(true);
+    const page = linked.find((check) => check.key === "linkedin-fetch");
+    expect(page?.url).toContain("/company/prologis");
+    expect(page?.finding).not.toContain("blocked automated access");
+  });
+
+  it("passes a loaded OFAC clear with the list date and replaces stored checks on a re-run", () => {
+    const clear = sanctionsCheck(facts(), [{ name: "Other Person", location: "" }], "2026-10-27T12:00:00.000Z");
+    expect(clear.status).toBe("PASS");
+    expect(clear.finding).toContain("OFAC list loaded 2026-10-27");
+    const missing = sanctionsCheck(facts(), []);
+    expect(missing.status).toBe("NOT_RUN");
+    expect(missing.finding.toLowerCase()).toContain("not checked");
+    expect(missing.finding.toLowerCase()).toContain("not a pass");
+    const next = gradeChecks([row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR lists Prologis, Inc. (PLD), CIK 1045609." })], facts());
+    const note = noteAfterRerun(null, { letter: "F", score: 44 }, next);
+    expect(note).not.toContain("First graded run");
+    expect(note).toContain("stored checks were replaced");
+    const rows = evidenceRowsForRun("run-1", [row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR lists Prologis, Inc. (PLD), CIK 1045609." })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].runId).toBe("run-1");
+    expect(rows[0].finding).toContain("Prologis, Inc. (PLD)");
+    expect(rows[0].finding).toContain("CIK 1045609");
+    const listed = assessEdgarMatch({
+      org: "Prologis, Inc.",
+      person: "Hamid Moghadam",
+      tickersOk: true,
+      companies: [{ title: "PROLOGIS INC", ticker: "PLD", cik: "1045609" }],
+      filingNames: ["Hamid Moghadam"],
+    });
+    expect(listed.finding).toContain("PROLOGIS INC");
+    expect(listed.finding).toContain("CIK 1045609");
+  });
+
+  it("keeps the earlier live-app failures from reading as a pass", async () => {
+    const zero = await resolveAddressCheck({ facts: facts({ location: "0 Nowhere Lane, NY 10001" }), watchlist: [], network: false });
+    expect(zero?.status).toBe("FAIL");
+    const graded = gradeChecks(
+      [
+        zero!,
+        plausibilityCheck(facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "Blorptex Qwvzn Builders LLC" })),
+        row({ key: "website", status: "FAIL", weight: 8, finding: "domain does not resolve" }),
+        row({ key: "rdap", status: "FAIL", weight: 2, reviewFlag: true, finding: "The domain is not registered." }),
+      ],
+      facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "Blorptex Qwvzn Builders LLC", location: "0 Nowhere Lane, NY 10001" }),
+    );
+    expect(graded.summary.didNotCheckOut).not.toMatch(/^Nothing/);
+    expect(graded.summary.didNotCheckOut.toLowerCase()).toContain("not registered");
+    expect(graded.categories.find((category) => category.id === "completeness")?.reason).toContain("0 of 2");
+    const ownSite = gradeChecks(
+      [row({ key: "website", status: "PASS", weight: 8, companyOnly: true, selfReported: true, corroborates: false, finding: "Company: yes" })],
+      facts(),
+    );
+    expect(ownSite.categories.find((category) => category.id === "company")?.reason).toContain("0 of");
+    expect(socialLinksFrom('<a href="http://www.linkedin.com/company/6346">in</a>')[0].url).toBe("https://www.linkedin.com/company/6346");
   });
 });

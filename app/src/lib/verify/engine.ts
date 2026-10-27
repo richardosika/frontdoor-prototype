@@ -46,6 +46,7 @@ export async function executeVerificationRun(runId: string, options?: { network?
     const ctx: CheckContext = {
       facts,
       watchlist: watch.entries,
+      watchlistFetchedAt: watch.fetchedAt,
       network,
       fetchText: fetchForChecks,
     };

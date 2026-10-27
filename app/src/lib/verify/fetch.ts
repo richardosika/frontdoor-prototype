@@ -243,6 +243,20 @@ async function readBody(response: Response, timeoutMs: number): Promise<string> 
   }
 }
 
+/** The next hop for a 301, 302, 303, 307, or 308. An http location is requested as https. */
+export function nextRedirectUrl(current: string, status: number, location: string | null): string {
+  if (![301, 302, 303, 307, 308].includes(status) || !location?.trim()) return "";
+  try {
+    const next = new URL(location.trim(), current);
+    if (next.protocol === "http:") next.protocol = "https:";
+    if (next.protocol !== "https:") return "";
+    const target = next.toString();
+    return target === current ? "" : target;
+  } catch {
+    return "";
+  }
+}
+
 async function fetchOnce(
   url: string,
   timeoutMs: number,
@@ -260,25 +274,44 @@ async function fetchOnce(
   lastByHost.set(host, Date.now());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const wiki = host.endsWith("wikipedia.org") || host.endsWith("wikimedia.org") || host.endsWith("wikidata.org");
-  const news = host === "news.google.com" || (host.endsWith("bing.com") && url.includes("/news"));
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        "user-agent": userAgentFor(host),
-        accept: wiki
-          ? "application/json"
-          : news
-            ? "application/rss+xml, application/xml, text/xml, */*"
-            : "text/html,application/json,text/csv,*/*",
-        ...(wiki ? { "api-user-agent": USER_AGENT } : {}),
-      },
-    });
+    const seen = new Set<string>();
+    let current = url;
+    let response: Response | null = null;
+    for (let hop = 0; hop < 6; hop += 1) {
+      if (seen.has(current)) break;
+      seen.add(current);
+      let hopHost = host;
+      try {
+        hopHost = new URL(current).host;
+      } catch {
+        break;
+      }
+      const hopWiki = hopHost.endsWith("wikipedia.org") || hopHost.endsWith("wikimedia.org") || hopHost.endsWith("wikidata.org");
+      const hopNews = hopHost === "news.google.com" || (hopHost.endsWith("bing.com") && current.includes("/news"));
+      response = await fetch(current, {
+        signal: controller.signal,
+        redirect: "manual",
+        headers: {
+          "user-agent": userAgentFor(hopHost),
+          accept: hopWiki
+            ? "application/json"
+            : hopNews
+              ? "application/rss+xml, application/xml, text/xml, */*"
+              : "text/html,application/json,text/csv,*/*",
+          ...(hopWiki ? { "api-user-agent": USER_AGENT } : {}),
+        },
+      });
+      const next = nextRedirectUrl(current, response.status, response.headers.get("location"));
+      if (!next) break;
+      void response.body?.cancel().catch(() => undefined);
+      current = next;
+      lastByHost.set(new URL(current).host, Date.now());
+    }
+    if (!response) return { ok: false, status: 0, text: "", url: current };
     const cap = options?.maxChars ?? fetchLimits(url).maxChars;
     const text = prepareFetchedText(await readBody(response, timeoutMs), cap);
-    return { ok: response.ok, status: response.status, text, url: response.url || url };
+    return { ok: response.ok, status: response.status, text, url: current };
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
   } finally {

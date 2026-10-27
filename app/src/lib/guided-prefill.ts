@@ -270,7 +270,7 @@ function suggestSanctions(evidence: EvidenceRow[]): StepSuggestion {
     urls.push(sanctions.url);
     mark = "PASS";
   } else {
-    missing.push(sanctions?.finding || `The OFAC list ${COULD_NOT_VERIFY}.`);
+    missing.push(sanctions?.finding || "OFAC was not checked. This is not a pass.");
     if (sanctions && isHttpUrl(sanctions.url)) urls.push(sanctions.url);
   }
 
@@ -281,16 +281,14 @@ function suggestSanctions(evidence: EvidenceRow[]): StepSuggestion {
   } else if (opensanctions?.status === "PASS" && sourced(opensanctions)) {
     found.push(opensanctions.finding);
     urls.push(opensanctions.url);
-  } else {
-    missing.push(opensanctions?.finding || `OpenSanctions ${COULD_NOT_VERIFY}.`);
-    if (opensanctions && isHttpUrl(opensanctions.url)) urls.push(opensanctions.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
+  } else if (opensanctions) {
+    missing.push(opensanctions.finding || `OpenSanctions was not checked.`);
+    if (isHttpUrl(opensanctions.url)) urls.push(opensanctions.url);
   }
 
   if (courts && (courts.status === "UNAVAILABLE" || courts.status === "NOT_RUN" || !sourced(courts))) {
-    missing.push(courts.finding || `Litigation dockets ${COULD_NOT_VERIFY}.`);
+    missing.push(courts.finding || `Litigation dockets were not checked.`);
     if (isHttpUrl(courts.url)) urls.push(courts.url);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
   } else if (courts?.reviewFlag) {
     mark = stricterMark(mark, "CONCERN");
     found.push(courts.finding);
@@ -298,9 +296,8 @@ function suggestSanctions(evidence: EvidenceRow[]): StepSuggestion {
   } else if (courts && sourced(courts)) {
     found.push(courts.finding);
     urls.push(courts.url);
-  } else {
-    missing.push(`Litigation dockets ${COULD_NOT_VERIFY}.`);
-    if (mark === "PASS") mark = "COULDNT_VERIFY";
+  } else if (!courts) {
+    missing.push("Litigation dockets were not checked.");
   }
 
   return pack("sanctions", mark, urls, found, missing);

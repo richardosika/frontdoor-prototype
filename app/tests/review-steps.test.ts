@@ -46,6 +46,27 @@ describe("guided review steps", () => {
   it("does not describe an unconfirmed check as verified", () => {
     expect(publicFinding("INCONCLUSIVE", "SEC EDGAR returned a hit")).toMatch(/^Not confirmed\./);
     expect(publicFinding("NOT_RUN", "No search ran")).toMatch(/^Not confirmed\./);
+    expect(publicFinding("NOT_RUN", "OFAC was not checked. This is not a pass.")).toContain("not checked");
+    expect(displayCheckStatus("NOT_PROVIDED", "OFAC was not checked. This is not a pass.")).toBe("Not checked");
+    const unloaded = buildReviewSteps({
+      evidence: [{ checkKey: "sanctions", status: "NOT_RUN", finding: "OFAC was not checked. This is not a pass.", source: "OFAC", url: "https://ofac.treasury.gov/sanctions-list-service" }],
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+    });
+    expect(unloaded.find((step) => step.id === "risk")?.status).toBe("NOT_CHECKED");
+    const cleared = buildReviewSteps({
+      evidence: [
+        { checkKey: "sanctions", status: "PASS", finding: "No name matched the OFAC list loaded 2026-10-27.", source: "OFAC", url: "https://ofac.treasury.gov/sanctions-list-service" },
+        { checkKey: "duplicate", status: "PASS", finding: "No duplicate.", source: "Records", url: "" },
+        { checkKey: "text-risk", status: "PASS", finding: "No risk phrasing.", source: "Local", url: "" },
+        { checkKey: "velocity", status: "PASS", finding: "No burst.", source: "Local", url: "" },
+      ],
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+    });
+    expect(cleared.find((step) => step.id === "risk")?.status).toBe("PASS");
     expect(publicFinding("PASS", "The company site names them.")).toBe("The company site names them.");
     expect(publicFinding("INCONCLUSIVE", "SEC EDGAR returned a hit")).not.toMatch(/checked out/i);
   });

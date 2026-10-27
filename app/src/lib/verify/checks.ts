@@ -5,10 +5,10 @@ import { assessCourts } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
 import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
 import { isReservedDomain, registrableHost } from "@/lib/verify/host";
-import { companyPhraseTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { companyPhraseTokens, isDistinctiveCompanyToken, isShortBrandToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
-import { newsChecks } from "@/lib/verify/news";
+import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
@@ -119,6 +119,8 @@ export type WatchlistEntry = { name: string; location: string; dob?: string; ali
 export type CheckContext = {
   facts: ApplicantFacts;
   watchlist: WatchlistEntry[];
+  /** When the OFAC list was loaded. A pass names this date. */
+  watchlistFetchedAt?: Date | string | null;
   network: boolean;
   fetchText?: (url: string, init?: { userAgent?: string }) => Promise<{ ok: boolean; status: number; text: string }>;
 };
@@ -436,7 +438,14 @@ export function duplicateCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
-export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[]): CheckOutput {
+function ofacListDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[], fetchedAt?: Date | string | null): CheckOutput {
   const realLoaded = watchlist.length > 0;
   const lists = [...TEST_WATCHLIST, ...watchlist];
   let best = { score: 0, entry: null as WatchlistEntry | null, field: "" };
@@ -454,16 +463,19 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
         key: "sanctions",
         status: "NOT_RUN",
         weight: 10,
-        finding: "No OFAC watchlist was loaded, so this check did not run. The local test name is not a loaded list and is not a pass.",
+        finding: "OFAC was not checked. No list was loaded. This is not a pass.",
         source: "OFAC SDN cache",
         url: "https://ofac.treasury.gov/sanctions-list-service",
       });
     }
+    const date = ofacListDate(fetchedAt);
     return check({
       key: "sanctions",
       status: "PASS",
       weight: 10,
-      finding: "No corroborated sanctions or watchlist name match on the OFAC list that was loaded.",
+      finding: date
+        ? `No name matched the OFAC list loaded ${date}.`
+        : "No name matched the OFAC list that was loaded. The list date was not recorded.",
       source: "OFAC SDN cache",
       url: "https://ofac.treasury.gov/sanctions-list-service",
     });
@@ -689,7 +701,15 @@ export function companyNameLooksReal(org: string): boolean {
 }
 
 export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
-  const nameOk = facts.name.trim().split(/\s+/).length >= 2 && facts.name.trim().length >= 5;
+  const parts = facts.name.trim().split(/\s+/).filter(Boolean);
+  const firmToken = parts.length === 1 ? parts[0].toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  const orgToken = facts.org.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const oneWordFirm =
+    parts.length === 1 &&
+    companyNameLooksReal(facts.org) &&
+    (isDistinctiveCompanyToken(firmToken) || isShortBrandToken(firmToken)) &&
+    (firmToken === orgToken || orgToken.startsWith(firmToken));
+  const nameOk = (parts.length >= 2 && facts.name.trim().length >= 5) || oneWordFirm;
   const orgReal = companyNameLooksReal(facts.org);
   const roleKnown = annualDuesCents(facts.role) >= 0;
   if (nameOk && orgReal && roleKnown) {
@@ -1121,7 +1141,7 @@ export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     phoneStateCheck(ctx.facts),
     textRiskCheck(ctx.facts),
     duplicateCheck(ctx.facts),
-    sanctionsCheck(ctx.facts, ctx.watchlist),
+    sanctionsCheck(ctx.facts, ctx.watchlist, ctx.watchlistFetchedAt),
     linkedinFormatCheck(ctx.facts),
     cardConsistencyCheck(ctx.facts),
     inviteCheck(ctx.facts),
@@ -1133,5 +1153,5 @@ export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const address = await resolveAddressCheck(ctx);
   const remote = await networkChecks(ctx);
   const fixture = ctx.facts.testProfile === "strong" && !ctx.network ? strongFixtureChecks() : [];
-  return [...local, ...(address ? [address] : []), ...remote, ...fixture];
+  return alignNewsRows([...local, ...(address ? [address] : []), ...remote, ...fixture]);
 }

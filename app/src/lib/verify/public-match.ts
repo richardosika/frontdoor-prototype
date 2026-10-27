@@ -232,6 +232,90 @@ export function companySearchTerm(org: string, person = ""): string {
   return phrase.join(" ");
 }
 
+const ALIAS_STOP = new Set(["www", "com", "home", "index", "welcome", "official"]);
+
+/** The site's own brand label. jll.com is "jll". A generic label such as "usa" is not a brand. */
+export function domainBrand(website: string): string {
+  const raw = website.trim();
+  if (!raw) return "";
+  try {
+    const host = new URL(raw.startsWith("http") ? raw : `https://${raw}`).hostname.replace(/^www\./, "").toLowerCase();
+    const label = (host.split(".")[0] || "").replace(/[^a-z0-9]/g, "");
+    if (label.length < 2 || label.length > 24) return "";
+    if (isGenericFirmToken(label) || ALIAS_STOP.has(label)) return "";
+    return label;
+  } catch {
+    return "";
+  }
+}
+
+function decodeBrand(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Title, og:site_name, and schema.org Organization name. These are brand strings, not evidence. */
+export function pageBrandNames(html: string): string[] {
+  const names: string[] = [];
+  const title = html.match(/<title[^>]*>([^<]{1,160})<\/title>/i)?.[1] || "";
+  const head = decodeBrand(title).split(/\s*[|–—]\s*|\s+-\s+/)[0]?.trim() || "";
+  if (head && head.length <= 48 && head.split(/\s+/).length <= 6) names.push(head);
+  const og =
+    html.match(/<meta\b[^>]*property=["']og:site_name["'][^>]*>/i)?.[0] ||
+    html.match(/<meta\b[^>]*name=["']og:site_name["'][^>]*>/i)?.[0] ||
+    "";
+  const ogContent = og.match(/content=["']([^"']+)["']/i)?.[1];
+  if (ogContent) names.push(decodeBrand(ogContent));
+  for (const block of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const parsed = JSON.parse(block[1]) as unknown;
+      const nodes = Array.isArray(parsed) ? parsed : [parsed];
+      for (const node of nodes) {
+        if (!node || typeof node !== "object") continue;
+        const record = node as { "@type"?: string | string[]; name?: unknown };
+        const type = Array.isArray(record["@type"]) ? record["@type"].join(" ") : String(record["@type"] || "");
+        if (/organization|corporation|localbusiness/i.test(type) && typeof record.name === "string") names.push(record.name.trim());
+      }
+    } catch {
+      // A broken script is not a brand.
+    }
+  }
+  return names;
+}
+
+/**
+ * Short brands for this applicant's own site. The legal name is not an alias.
+ * An alias hit is a review flag. It does not corroborate.
+ */
+export function brandAliases(org: string, website: string, html = ""): string[] {
+  const legal = new Set(companyPhraseTokens(org));
+  const legalCompact = companyPhraseTokens(org).join("");
+  const out: string[] = [];
+  const add = (value: string) => {
+    const compact = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (compact.length < 2 || compact.length > 24) return;
+    if (legal.has(compact) || compact === legalCompact) return;
+    if (isGenericFirmToken(compact) || ALIAS_STOP.has(compact)) return;
+    if (mentionsCompany(value, org)) return;
+    if (!out.includes(compact)) out.push(compact);
+  };
+  add(domainBrand(website));
+  for (const name of pageBrandNames(html)) add(name);
+  return out;
+}
+
+/** The alias that appears as its own word. "jll" does not match inside another word. */
+export function mentionsBrandAlias(text: string, aliases: string[]): string {
+  for (const alias of aliases) {
+    if (alias && wordHit(text, alias)) return alias;
+  }
+  return "";
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

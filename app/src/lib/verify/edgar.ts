@@ -269,14 +269,14 @@ export function assessEdgarMatch(input: {
       corroborates: false,
       companyOnly: true,
       url: edgarCompanyUrl(match.cik),
-      finding: `EDGAR lists ${titled}. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+      finding: `EDGAR lists ${titled}, CIK ${match.cik}. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
     };
   }
   return {
     status: "PASS",
     corroborates: true,
     url: edgarCompanyUrl(match.cik),
-    finding: `EDGAR lists ${titled}. Confirm it is the same firm.${personSentence}`,
+    finding: `EDGAR lists ${titled}, CIK ${match.cik}. Confirm it is the same firm.${personSentence}`,
   };
 }
 

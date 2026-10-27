@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { companyPhraseTokens, companySearchTerm, isDistinctiveCompanyToken, isShortBrandToken, leftTheCompany, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, isDistinctiveCompanyToken, isShortBrandToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -96,6 +96,9 @@ type Classified = NewsItem & {
   suffixMismatch: boolean;
   /** A foreclosure headline is company-level review. It does not cap the grade. */
   foreclosureOnly: boolean;
+  /** The headline uses a brand alias and not the legal name. Review only. */
+  aliasOnly: boolean;
+  alias: string;
 };
 
 export function cityPhrase(location: string): string {
@@ -157,7 +160,7 @@ export function instagramCompanyTag(org: string, person: string): string {
     .join("");
 }
 
-export function newsSearchQueries(facts: ApplicantFacts): string[] {
+export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = []): string[] {
   const person = personWithoutSuffix(stripQuotes(facts.applicantName));
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
@@ -172,7 +175,16 @@ export function newsSearchQueries(facts: ApplicantFacts): string[] {
     if (lastQuery) queries.push(lastQuery);
   }
   if (company && city && normalizeName(city) !== normalizeName(company)) queries.push(`"${company}" "${city}"`);
-  return [...new Set(queries)].slice(0, 3);
+  const extras = [...aliases];
+  const domain = domainBrand(facts.website || "");
+  if (domain) extras.push(domain);
+  const termWords = new Set(term.toLowerCase().split(/\s+/));
+  for (const alias of [...new Set(extras.map((item) => item.toLowerCase()))]) {
+    if (!alias || termWords.has(alias)) continue;
+    const query = personCompanyQuery(person, alias) || (person ? `"${person}" "${alias}"` : `"${alias}"`);
+    if (query && !queries.includes(query)) queries.push(query);
+  }
+  return [...new Set(queries)].slice(0, 4);
 }
 
 export function gdeltQuery(facts: ApplicantFacts): string {
@@ -316,6 +328,8 @@ export function classifyNews(
           applicantName: personName,
           org: companyName,
           location: facts.location,
+          website: facts.website,
+          aliases: brandAliases(companyName, facts.website || ""),
         };
         const blob = `${item.title} ${item.snippet}`;
         const fromTitle = judgeHeadline(item.title, factsForJudge);
@@ -328,8 +342,10 @@ export function classifyNews(
           kind: fromTitle.kind,
           departed: fromTitle.departed || fromBlob.departed,
           foreclosureOnly: fromTitle.foreclosureOnly,
+          aliasOnly: !fromTitle.company && !fromBlob.company && (fromTitle.aliasOnly || fromBlob.aliasOnly),
+          alias: fromTitle.alias || fromBlob.alias,
         };
-        if (!judged.person && !judged.company && !judged.suffixMismatch) return [];
+        if (!judged.person && !judged.company && !judged.suffixMismatch && !judged.aliasOnly) return [];
         return [{ ...item, ...judged }];
       }),
   ).sort(byImportance);
@@ -474,14 +490,24 @@ function newsSummary(
       ...base,
       status: "PASS",
       corroborates: true,
-      finding: `Neutral coverage names this person and company. Query-echo headlines were ignored. ${feeds}`.trim(),
+      finding: `Neutral coverage names this person and company. ${deciding?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  const aliasItem = items.find((item) => item.aliasOnly && !item.company);
+  if (aliasItem) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      corroborates: false,
+      finding: `A headline uses the brand ${aliasItem.alias || "alias"} and not the legal name. Needs review. This is not corroboration. ${aliasItem.title} ${feeds}`.replace(/\s+/g, " ").trim(),
     };
   }
   if (items.length) {
     return {
       ...base,
       status: "INCONCLUSIVE",
-      finding: `A headline names the person or the company, without a negative term tying them together. ${feeds}`.trim(),
+      finding: `A headline names the person or the company. ${deciding?.title || ""} ${feeds}`.replace(/\s+/g, " ").trim(),
     };
   }
   return {
@@ -561,13 +587,17 @@ export function foreclosureOnly(text: string): boolean {
  */
 export function judgeHeadline(
   text: string,
-  facts: { name: string; applicantName?: string; org: string; location: string },
+  facts: { name: string; applicantName?: string; org: string; location: string; website?: string; aliases?: string[] },
 ): Omit<Classified, keyof NewsItem> {
   const personName = (facts.applicantName || facts.name).trim();
   const companyName = facts.org.trim();
   const hit = personName ? personHit(text, personName, companyName) : "none";
   const person = hit === "match";
   const company = Boolean(companyName) && textHasCompany(text, companyName, personName);
+  const aliases = [...(facts.aliases || [])];
+  const domain = facts.website ? domainBrand(facts.website) : "";
+  if (domain) aliases.push(domain);
+  const alias = company ? "" : mentionsBrandAlias(text, aliases);
   const kind = negativeKind(text);
   return {
     tone: kind === "none" ? "neutral" : "negative",
@@ -578,7 +608,68 @@ export function judgeHeadline(
     departed: person && company && leftTheCompany(text, companyName),
     suffixMismatch: hit === "suffix-mismatch",
     foreclosureOnly: kind === "civil" && foreclosureOnly(text),
+    aliasOnly: Boolean(alias),
+    alias,
   };
+}
+
+/**
+ * The news row and the news screen have to tell the same story.
+ * A headline that one of them matched is shown on both. An alias stays a review flag.
+ */
+export function alignNewsRows(checks: CheckOutput[]): CheckOutput[] {
+  const news = checks.find((row) => row.key === "news");
+  const screen = checks.find((row) => row.key === "screen-news");
+  if (!news || !screen) return checks;
+  const newsMatched = /headline names|Neutral coverage names|uses the brand/i.test(news.finding);
+  const newsEmpty = /No data found|None of the headlines named/i.test(news.finding);
+  const screenEmpty = /no match found|No result found/i.test(screen.finding);
+  const screenCompanyNo = /Company: no/.test(screen.finding);
+  const screenShowsMatch = /Company: yes|Company: alias/.test(screen.finding);
+  if (newsMatched && (screenEmpty || screenCompanyNo) && !screenShowsMatch) {
+    return checks.map((row) =>
+      row.key !== "screen-news"
+        ? row
+        : {
+            ...row,
+            status: news.status === "FAIL" ? "FAIL" : "INCONCLUSIVE",
+            url: news.url || row.url,
+            corroborates: false,
+            reviewFlag: news.reviewFlag,
+            finding: `Searched: ${row.finding.match(/Searched: ([^.]+)/)?.[1] || "news"}. ${news.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  const screenBoth = /Name: yes/.test(screen.finding) && /Company: yes/.test(screen.finding);
+  const headline = screen.finding.match(/Found: ([^.]{8,180})/)?.[1] || "";
+  if (screenBoth && newsEmpty) {
+    return checks.map((row) =>
+      row.key !== "news"
+        ? row
+        : {
+            ...row,
+            status: "PASS",
+            corroborates: true,
+            url: screen.url || row.url,
+            finding: `Neutral coverage names this person and company. ${headline} ${row.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  if (newsEmpty && /Found:|uses the brand|Company: alias/.test(screen.finding)) {
+    return checks.map((row) =>
+      row.key !== "news"
+        ? row
+        : {
+            ...row,
+            status: "INCONCLUSIVE",
+            corroborates: false,
+            reviewFlag: screen.reviewFlag || row.reviewFlag,
+            url: screen.url || row.url,
+            finding: `A headline names the person or the company. ${screen.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  return checks;
 }
 
 function feedSentence(responded: string[], blocked: string[]): string {

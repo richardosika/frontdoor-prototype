@@ -79,14 +79,26 @@ describe("guided review prefill", () => {
     expect(sourced.note.toLowerCase()).not.toContain("couldn't verify for free");
   });
 
-  it("keeps a sanctions clear from counting as a pass when litigation could not be checked", () => {
+  it("keeps an OFAC clear as a pass when litigation could not be checked", () => {
     const suggestion = suggestOne("sanctions", emptyPrefillFacts({ name: "Ada Lopez", org: "Lopez Homes" }), [
-      row({ checkKey: "sanctions", status: "PASS", finding: "No corroborated sanctions match.", url: OFAC, source: "OFAC" }),
+      row({ checkKey: "sanctions", status: "PASS", finding: "No name matched the OFAC list loaded 2026-10-27.", url: OFAC, source: "OFAC" }),
       row({ checkKey: "courts", status: "UNAVAILABLE", finding: "CourtListener was blocked.", url: "https://www.courtlistener.com/", source: "CourtListener" }),
     ]);
-    expect(suggestion.mark).toBe("COULDNT_VERIFY");
+    expect(suggestion.mark).toBe("PASS");
+    expect(suggestion.result).toBe("PASS");
     expect(suggestion.note).toContain(OFAC);
-    expect(suggestion.note.toLowerCase()).toContain("couldn't verify for free");
+    expect(suggestion.note).toContain("2026-10-27");
+    expect(suggestion.note.toLowerCase()).not.toContain("not a pass");
+  });
+
+  it("says OFAC was not checked and does not call that a pass", () => {
+    const suggestion = suggestOne("sanctions", emptyPrefillFacts({ name: "Ada Lopez", org: "Lopez Homes" }), [
+      row({ checkKey: "sanctions", status: "NOT_RUN", finding: "OFAC was not checked. No list was loaded. This is not a pass.", url: OFAC, source: "OFAC" }),
+    ]);
+    expect(suggestion.mark).not.toBe("PASS");
+    expect(suggestion.result).not.toBe("PASS");
+    expect(suggestion.note.toLowerCase()).toContain("not checked");
+    expect(suggestion.note.toLowerCase()).toContain("not a pass");
   });
 
   it("fails a corroborated sanctions hit and never calls it a pass", () => {

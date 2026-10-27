@@ -193,6 +193,7 @@ export function displayCheckStatus(result: string, note: string): "Pass" | "Conc
   if (result === "PASS") return "Pass";
   if (result === "FAIL") return "Fail";
   if (result === "NEEDS_INFO") return "Concern";
+  if (result === "NOT_PROVIDED" && /not checked/i.test(note)) return "Not checked";
   if (result === "NOT_PROVIDED") return "Couldn't verify";
   return "Not checked";
 }
@@ -201,6 +202,7 @@ export function publicFinding(status: string, finding: string): string {
   const text = finding.trim();
   if (status === "PASS") return text || "This check passed.";
   if (status === "FAIL") return text || "This check did not pass.";
+  if (status === "NOT_RUN" && /not checked/i.test(text)) return text;
   if (status === "UNAVAILABLE") {
     if (/couldn't check for free|could not be checked|could not be verified for free|couldn't verify for free/i.test(text)) return text;
     return text ? `${text} Couldn't check for free.` : "Couldn't check for free.";
@@ -261,6 +263,10 @@ export function buildReviewSteps(input: {
     let status = statusFromSuggestion(prefill.mark);
     const saved = input.saved.steps[id] || null;
     if (saved) status = saved.status;
+    if (id === "risk" && !saved && status === "COULDNT_VERIFY") {
+      const sanctionsRow = input.evidence.find((row) => row.checkKey === "sanctions");
+      if (!sanctionsRow || sanctionsRow.status === "NOT_RUN") status = "NOT_CHECKED";
+    }
     const findings = rows.map((row) => ({
       source: row.source || "Check",
       status: row.status,

@@ -2,7 +2,7 @@ import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
-import { alternatePersonNames, distinctiveCompanyTokens, leftTheCompany, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, leftTheCompany, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -27,6 +27,8 @@ export type MatchScore = {
   confidence: MatchConfidence;
   suffixMismatch?: boolean;
   departure?: boolean;
+  /** A brand alias matched. The legal name did not. Review only. */
+  alias?: string;
 };
 
 type FetchText = (
@@ -57,12 +59,13 @@ type Attempt = {
 
 const COMPANY_ONLY = "company confirmed, person NOT confirmed";
 
-export function scorePublicText(text: string, facts: { name: string; org: string; location: string }): MatchScore {
+export function scorePublicText(text: string, facts: { name: string; org: string; location: string; aliases?: string[] }): MatchScore {
   const hay = text.toLowerCase();
   const hit = personHit(text, facts.name, facts.org);
   const suffixMismatch = hit === "suffix-mismatch";
   const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
+  const alias = company ? "" : mentionsBrandAlias(text, facts.aliases || []);
   const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org);
   const currentName = name && !departure;
   const city = cityPhrase(facts.location).toLowerCase();
@@ -70,8 +73,8 @@ export function scorePublicText(text: string, facts: { name: string; org: string
   let confidence: MatchConfidence = "none";
   if (currentName && company) confidence = "high";
   else if ((currentName && cityHit) || (company && cityHit)) confidence = "medium";
-  else if (currentName || company || suffixMismatch) confidence = "low";
-  return { name: currentName, company, city: cityHit, confidence, suffixMismatch, departure };
+  else if (currentName || company || suffixMismatch || alias) confidence = "low";
+  return { name: currentName, company, city: cityHit, confidence, suffixMismatch, departure, alias: alias || undefined };
 }
 
 export function emptyScore(): MatchScore {
@@ -411,7 +414,7 @@ export function socialLinksFrom(html: string): { platform: string; url: string }
   const seen = new Set<string>();
   for (const pattern of patterns) {
     for (const match of html.matchAll(pattern.re)) {
-      const url = match[0];
+      const url = match[0].replace(/^http:\/\//i, "https://");
       if (seen.has(url)) continue;
       seen.add(url);
       out.push({ platform: pattern.platform, url });
@@ -432,8 +435,18 @@ function strong(score: MatchScore): boolean {
   return score.confidence === "high" || (score.confidence === "medium" && score.name);
 }
 
+/** http://www.linkedin.com/company/6346 is requested as https, then the named company page. */
+export function linkedinCompanyFollow(url: string, html: string): string {
+  const secure = url.replace(/^http:\/\//i, "https://");
+  if (!/\/company\/\d+\/?$/i.test(secure)) return secure;
+  const canonical = html.match(/https?:\/\/(?:www\.)?linkedin\.com\/company\/[a-z][a-z0-9\-_%&.]+/i)?.[0] || "";
+  if (!canonical || /\/company\/\d+\/?$/i.test(canonical)) return secure;
+  return canonical.replace(/^http:\/\//i, "https://");
+}
+
 function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean; reviewFlag?: boolean } {
-  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${attempt.score.company ? "yes" : "no"}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
+  const companyWord = attempt.score.alias && !attempt.score.company ? `alias (${attempt.score.alias})` : attempt.score.company ? "yes" : "no";
+  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${companyWord}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
   if (attempt.outcome === "dead") {
     return {
       status: "FAIL",
@@ -484,12 +497,13 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
       finding: `Searched: ${attempt.searched}. ${redirectNote} This may no longer be at the company on the application. The page reads as an announced departure. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
-  if (attempt.aliasOnly) {
+  if (attempt.aliasOnly || (attempt.score.alias && !attempt.score.company)) {
+    const brand = attempt.score.alias || "alias";
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
       reviewFlag: true,
-      finding: `Searched: ${attempt.searched}. ${redirectNote} The new brand is a review-only alias and does not corroborate the company on the application. ${scoreLine}`.replace(/\s+/g, " ").trim(),
+      finding: `Searched: ${attempt.searched}. ${redirectNote} The page uses the brand ${brand} and not the legal name. The new brand is a review-only alias and does not corroborate the company on the application. Needs review. An alias hit is not corroboration. ${scoreLine}`.replace(/\s+/g, " ").trim(),
     };
   }
   // Name plus city is not a person-to-company link. "Larry Silverstein" in New York does not corroborate Toll Brothers.
@@ -590,6 +604,23 @@ async function pull(
     return await fetchText(url, init);
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
+  }
+}
+
+/** Any redirect that changes the host or the path. www and the bare host are the same site. */
+function finalLanding(requested: string, response: { url?: string }): string {
+  const landed = response.url?.trim() || "";
+  if (!landed) return "";
+  try {
+    const from = new URL(requested);
+    const to = new URL(landed);
+    const hostOf = (host: string) => host.replace(/^www\./, "").toLowerCase();
+    const sameHost = hostOf(from.hostname) === hostOf(to.hostname);
+    const samePath = from.pathname.replace(/\/$/, "") === to.pathname.replace(/\/$/, "");
+    if (sameHost && samePath) return "";
+    return landed;
+  } catch {
+    return "";
   }
 }
 
@@ -788,7 +819,12 @@ export function completeScreenRows(present: CheckOutput[]): CheckOutput[] {
 
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
-  const queryFacts = { name: person, org: facts.org, location: facts.location };
+  let queryFacts: { name: string; org: string; location: string; aliases: string[] } = {
+    name: person,
+    org: facts.org,
+    location: facts.location,
+    aliases: brandAliases(facts.org, facts.website || ""),
+  };
   const searched = [person, facts.org, cityPhrase(facts.location)].filter(Boolean).map((part) => `"${part}"`).join(" ");
   const attempts: Attempt[] = [];
   const produced: CheckOutput[] = [];
@@ -868,14 +904,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       } else {
         const detail =
           home.status === 403
-            ? `blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
-            : blockedBySite
-              ? `blocked by site, ask applicant for a team-page URL${renamed}`
-              : `The company website did not respond.${renamed}`;
+            ? `blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
+            : home.status === 405
+              ? `blocked the check (405). blocked by site, ask applicant for a team-page URL${renamed}`
+              : blockedBySite
+                ? `blocked by site, ask applicant for a team-page URL${renamed}`
+                : `The company website did not respond.${renamed}`;
         attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
       }
     } else {
-      const redirectedTo = crossDomainLanding(homeUrl, home);
+      const crossDomain = crossDomainLanding(homeUrl, home);
+      const redirectedTo = finalLanding(homeUrl, home) || crossDomain;
       if (redirectedTo) homeUrl = redirectedTo;
       const homeChallenge = isBotChallenge(home.text);
       if (!homeChallenge) pages.push({ url: homeUrl, text: visible(home.text), raw: home.text });
@@ -930,13 +969,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           }
         }
       }
+      queryFacts = { ...queryFacts, aliases: brandAliases(facts.org, website || homeUrl, pages.map((page) => page.raw).join("\n")) };
       const best = pages
         .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
-      const label = redirectedTo ? hostLabel(redirectedTo) : "";
+      const label = crossDomain ? hostLabel(crossDomain) : "";
       const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
       const compact = pages.map((page) => page.text).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const aliasOnly = Boolean(redirectedTo && !mentionsOriginal && label.length >= 4 && compact.includes(label));
+      const brand = mentionsBrandAlias(pages.map((page) => `${page.text}\n${page.raw}`).join("\n"), queryFacts.aliases);
+      const aliasOnly = Boolean((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal));
       if (!pages.length && homeChallenge) {
         attempts.push(
           blockedAttempt(
@@ -958,19 +999,20 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           ),
         );
       } else if (aliasOnly) {
+        const score = best?.score || emptyScore();
         attempts.push({
           key: "website",
           platform: "Company website",
           searched: website,
-          url: redirectedTo || homeUrl,
+          url: redirectedTo || best?.url || homeUrl,
           outcome: "found",
-          score: best?.score || emptyScore(),
+          score: { ...score, alias: score.alias || brand || undefined },
           detail: "a page on the company site",
           selfReported: true,
           redirectedTo,
           aliasOnly: true,
         });
-      } else if (best && best.score.confidence !== "none") {
+      } else if (best && best.score.confidence !== "none" && !(best.score.alias && !best.score.company)) {
         attempts.push({
           key: "website",
           platform: "Company website",
@@ -1016,10 +1058,20 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     );
   } else {
     let recorded = false;
-    for (const url of linkedinTargets) {
-      const linked = await pull(fetchText, url);
+    for (const rawUrl of linkedinTargets) {
+      let url = rawUrl.replace(/^http:\/\//i, "https://");
+      let linked = await pull(fetchText, url);
+      const followed = linkedinCompanyFollow(url, linked.text);
+      if (followed !== url) {
+        const named = await pull(fetchText, followed);
+        if (!linkedinBlocked(named.status, named.text, queryFacts)) {
+          url = followed;
+          linked = named;
+        }
+      }
       if (linkedinBlocked(linked.status, linked.text, queryFacts)) {
-        if (!recorded && url === linkedinTargets[linkedinTargets.length - 1]) {
+        const lastTarget = linkedinTargets[linkedinTargets.length - 1].replace(/^http:\/\//i, "https://");
+        if (!recorded && url.replace(/^http:\/\//i, "https://") === lastTarget) {
           attempts.push(
             blockedAttempt("linkedin-fetch", "LinkedIn", url, url, "LinkedIn blocked automated access. blocked by site."),
           );
@@ -1174,7 +1226,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   attempts.push(...platformResults);
   flush();
 
-  const newsQueries = newsSearchQueries(facts).slice(0, 2);
+  const allNews = newsSearchQueries(facts);
+  const newsQueries = allNews.filter((_, index) => index < 2 || index >= 3).slice(0, 3);
   const searchedNews = newsQueries.join(" | ") || `${person} ${facts.org}`;
   let newsBlocked = 0;
   let newsResponded = 0;
@@ -1196,9 +1249,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     let decided: { title: string; url: string; score: MatchScore; kind: "hard" | "civil" | "none"; foreclosureOnly: boolean; rank: number } | null = null;
     for (const story of titles) {
       if (isLinkedInDirectory(story.title)) continue;
-      const judged = judgeHeadline(story.title, queryFacts);
-      if (!judged.person && !judged.company) continue;
+      const judged = judgeHeadline(story.title, { ...queryFacts, website: facts.website, aliases: queryFacts.aliases });
+      if (!judged.person && !judged.company && !judged.aliasOnly) continue;
       const score = scorePublicText(story.title, queryFacts);
+      if (judged.aliasOnly && !score.company) score.alias = judged.alias || score.alias;
       const importance = headlineImportance(judged);
       const articleUrl = story.url || newsUrl;
       if (!decided || importance < decided.rank) {

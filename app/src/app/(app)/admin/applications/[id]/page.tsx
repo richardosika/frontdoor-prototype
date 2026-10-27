@@ -17,7 +17,7 @@ import { settleStuckRuns } from "@/lib/verify/queue";
 import { formatAuditTime } from "@/lib/format";
 import { splitMemberReply } from "@/lib/statement";
 import { prisma } from "@/lib/prisma";
-import { applyReviewSkips, gradeComparisonLine, gradeFactsFromApplication, gradeForRun, parseGradeSnapshot } from "@/lib/verify/grade";
+import { applyReviewSkips, companyFileBesideApplication, gradeComparisonLine, gradeFactsFromApplication, gradeForRun, parseGradeSnapshot } from "@/lib/verify/grade";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,10 @@ export default async function ApplicationDetailPage({
   const company = application.runs.find((run) => run.subject === "COMPANY");
   const facts = gradeFactsFromApplication(application);
   const grade = gradeForRun(report, facts);
-  const companyGrade = gradeForRun(company, { ...facts, name: application.org, applicantName: application.name });
+  const companyGrade = companyFileBesideApplication(
+    gradeForRun(company, { ...facts, name: application.org, applicantName: application.name }),
+    grade,
+  );
   const card = application.businessCard;
   const cardOnFile = Boolean(card && !card.deletedAt && card.sizeBytes > 0);
   const progress = parseReviewProgress(application.reviewProgress);

@@ -5,7 +5,7 @@ import { MEMBER_CHECKS, PROJECT_CHECKS } from "@/lib/verification";
 import { ensureVerificationCase } from "@/lib/verification-db";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { fetchForChecks } from "@/lib/verify/fetch";
-import { gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { gradeChecks, gradePlainText, noteAfterRerun, parseGradeSnapshot, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
@@ -23,6 +23,23 @@ async function rememberSources(caseId: string, rows: EvidenceRow[]): Promise<voi
     where: { id: caseId },
     data: { sourceSnapshot: rows },
   });
+}
+
+/** Rows written onto a run when checks are replaced. The previous EDGAR line does not stay. */
+export function evidenceRowsForRun(runId: string, checks: CheckOutput[]) {
+  return checks.map((check) => ({
+    runId,
+    checkKey: check.key,
+    status: check.status as EvidenceStatus,
+    weight: check.weight,
+    finding: check.finding,
+    source: check.source,
+    url: check.url,
+    ranAt: Number.isNaN(new Date(check.ranAt).getTime()) ? new Date() : new Date(check.ranAt),
+    hardFlag: Boolean(check.hardFlag),
+    reviewFlag: Boolean(check.reviewFlag),
+    corroborates: Boolean(check.corroborates),
+  }));
 }
 
 function asEvidence(checks: CheckOutput[]): EvidenceRow[] {
@@ -338,6 +355,7 @@ export async function runLivePrefill(caseId: string): Promise<void> {
   const ctx: CheckContext = {
     facts: loaded.applicant,
     watchlist: watch.entries,
+    watchlistFetchedAt: watch.fetchedAt,
     network: !loaded.applicant.testProfile,
     fetchText: fetchForChecks,
   };
@@ -356,11 +374,16 @@ export async function runLivePrefill(caseId: string): Promise<void> {
       select: { id: true, gradeLetter: true, gradeScore: true, gradeSnapshot: true },
     });
     const previous = parseGradeSnapshot(run?.gradeSnapshot);
+    const stored = run?.gradeLetter && typeof run.gradeScore === "number" ? { letter: run.gradeLetter, score: run.gradeScore } : null;
     if (previous) atApplication = { letter: previous.letter, score: previous.score };
-    else if (run?.gradeLetter && typeof run.gradeScore === "number") atApplication = { letter: run.gradeLetter, score: run.gradeScore };
-    grade = { ...grade, changeNote: gradeChangeNote(previous, grade) };
+    else if (stored) atApplication = stored;
+    grade = { ...grade, changeNote: noteAfterRerun(previous, stored, grade) };
     grade.plainText = gradePlainText(grade);
     if (run) {
+      await prisma.verificationEvidence.deleteMany({ where: { runId: run.id } });
+      if (checks.length) {
+        await prisma.verificationEvidence.createMany({ data: evidenceRowsForRun(run.id, checks) });
+      }
       await prisma.verificationRun.update({
         where: { id: run.id },
         data: {
@@ -384,7 +407,7 @@ export async function runLivePrefill(caseId: string): Promise<void> {
     mode: "refresh",
     audit: true,
     summary: grade
-      ? rerunAuditSummary(grade, atApplication)
+      ? `${rerunAuditSummary(grade, atApplication)} Stored checks were replaced.`
       : "Re-ran checks. No grade was stored.",
   });
 }

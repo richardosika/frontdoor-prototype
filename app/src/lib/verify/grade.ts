@@ -1268,6 +1268,49 @@ export function rerunAuditSummary(
   return `Re-ran checks. Latest check: grade ${latest.letter} ${latest.score}. Grade at application was ${prior}.`;
 }
 
+/**
+ * The company file is the same application with the company name in the name field.
+ * It is not scored below the application unless a new conflict says why.
+ */
+export function companyFileBesideApplication(company: GradeReport | null, application: GradeReport | null): GradeReport | null {
+  if (!company || !application || company.score >= application.score) return company;
+  const stated = company.summary.didNotCheckOut;
+  const sameMiss = stated === application.summary.didNotCheckOut;
+  const empty = /^Nothing\b/i.test(stated);
+  const incomplete = /looks incomplete/i.test(stated);
+  if (!sameMiss && stated && !empty && !incomplete) {
+    return {
+      ...company,
+      changeNote: `${company.changeNote} Company file is ${company.letter} ${company.score}, below the application grade ${application.letter} ${application.score}, because ${stated}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  const lifted: GradeReport = { ...company, letter: application.letter, score: application.score };
+  return {
+    ...lifted,
+    changeNote: `Company file kept the application grade ${application.letter} ${application.score}. The same inputs do not lower the company file.`,
+    plainText: gradePlainText(lifted),
+  };
+}
+
+/** A re-run that already has a grade does not say this is the first graded run. */
+export function noteAfterRerun(
+  previous: GradeReport | null,
+  stored: { letter: string; score: number } | null,
+  next: GradeReport,
+): string {
+  if (previous) {
+    const note = gradeChangeNote(previous, next);
+    return note.startsWith("First graded run") ? `Re-ran checks. Grade is ${next.letter} ${next.score}. The stored checks were replaced.` : note;
+  }
+  if (stored && stored.letter) {
+    if (stored.letter === next.letter && stored.score === next.score) {
+      return `Re-ran checks. Grade stays ${next.letter} ${next.score}. The stored checks were replaced.`;
+    }
+    return `Grade moved from ${stored.letter} (${stored.score}) to ${next.letter} (${next.score}). The stored checks were replaced.`;
+  }
+  return gradeChangeNote(null, next);
+}
+
 export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeReport, "letter" | "score" | "recommendation" | "confidence" | "attention" | "banner">): string {
   if (!previous) return "First graded run. Nothing earlier to compare.";
   const changes: string[] = [];
