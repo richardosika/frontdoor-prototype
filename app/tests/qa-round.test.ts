@@ -166,10 +166,12 @@ describe("QA fixes that stay outside grading", () => {
     const removal = readFileSync(path.join(ROOT, "lib/remove-member.ts"), "utf8");
     expect(removal).toContain("application.deleteMany");
     expect(removal).toContain("crmPerson.deleteMany");
-    const requestDelete = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
+    const requestDelete = readFileSync(path.join(ROOT, "lib/delete-join-request.ts"), "utf8");
     expect(requestDelete).toContain("verificationCase.deleteMany");
     expect(requestDelete).toContain("deleteOutboxTied");
     expect(requestDelete).toContain("crmPerson.deleteMany");
+    expect(readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8")).toContain("deleteJoinRequest");
+    expect(readFileSync(path.join(ROOT, "actions/crm.ts"), "utf8")).toContain("deleteJoinRequest");
     expect(removal).toContain("deleteOutboxTied");
   });
 
@@ -344,8 +346,11 @@ describe("QA fixes that stay outside grading", () => {
     expect(statusMembershipLine({ status: "PAYMENT_DUE", monthlyCents: 14_900, waived: false })).toContain("Dues are due now to activate your membership.");
 
     const decision = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
-    expect(decision.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(decision.indexOf('role="dialog"'));
+    const dialogHost = readFileSync(path.join(ROOT, "components/decision-dialog-host.tsx"), "utf8");
+    expect(dialogHost.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(dialogHost.indexOf('role="dialog"'));
+    expect(decision).not.toContain('name="acknowledgeGrade"');
     expect(decision).toContain("The confirmation box is in the approval dialog.");
+    expect(readFileSync(path.join(ROOT, "components/guided-review.tsx"), "utf8")).toContain('variant={mode === "invite" ? "invite" : "application"}');
     const owner = readFileSync(path.join(ROOT, "actions/owner.ts"), "utf8");
     const cleanup = owner.slice(owner.indexOf("export async function deleteApplicantRecords"));
     expect(cleanup).toContain("verificationCase.deleteMany");
@@ -363,7 +368,9 @@ describe("QA fixes that stay outside grading", () => {
     const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");
     expect(applyStatus).toContain("statusMembershipLine");
     expect(applyStatus).not.toContain("applicantDuesSentence");
-    expect(requestStatus).toContain("statusMembershipLine");
+    expect(requestStatus).not.toContain("statusMembershipLine");
+    expect(requestStatus).toContain("requestReceivedMessage");
+    expect(requestStatus).not.toContain("Application received");
     expect(requestStatus).toContain("ApplicationStatus");
     expect(publicStatusPath("abc")).toBe("/request-status/abc");
     const oldLetter = reviewNotice("https://cornicio-mvp.onrender.com/apply/status/abc");

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   APPLICATION_CODE_LENGTH,
@@ -8,7 +10,7 @@ import {
   showTestCodeRequested,
   verificationCodeForScreen,
 } from "@/lib/application-code";
-import { applicationReceivedMessage, APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO } from "@/lib/applicant-copy";
+import { applicationReceivedMessage, APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO, requestReceivedMessage } from "@/lib/applicant-copy";
 import { validateApplication } from "@/lib/domain";
 import { duplicateJoinMessage, validateInviteRequest } from "@/lib/invite-request";
 import { formatAddress, validatePhone } from "@/lib/person-fields";
@@ -67,16 +69,23 @@ describe("applicant details", () => {
   });
 
   it("uses warm invite status wording", () => {
-    expect(INVITE_STATUS_COPY.PENDING.title).toBe("Application received");
-    expect(INVITE_STATUS_COPY.PENDING.body).toContain("We've got your application");
-    expect(INVITE_STATUS_COPY.PENDING.body).toContain("We're glad you want to be part of this.");
+    expect(INVITE_STATUS_COPY.PENDING.title).toBe("Request received");
+    expect(INVITE_STATUS_COPY.PENDING.body).toContain("We've got your request to join");
+    expect(INVITE_STATUS_COPY.PENDING.body).toContain("A private network where every member is personally reviewed");
+    expect(INVITE_STATUS_COPY.PENDING.body).not.toMatch(/invite|founding|limited|\$|dues|price/i);
+    expect(requestReceivedMessage("Ada Lovelace")).toContain("Thank you, Ada. We've got your request to join.");
     expect(applicationReceivedMessage("Ada Lovelace")).toBe(
       "Thank you, Ada. We've got your application. A member of the Private Floor team will personally review it, usually within a few days. We'll email you as soon as there's news. We're glad you want to be part of this.",
     );
     expect(INVITE_STATUS_COPY.PENDING.body).not.toContain("has not issued a code");
     expect(INVITE_STATUS_COPY.ISSUED.body).not.toMatch(/invite/i);
     expect(INVITE_STATUS_COPY.ISSUED.body).toContain("email you about the next step");
-    expect(INVITE_STATUS_COPY.DECLINED.title).toBe("Thank you for applying");
+    expect(INVITE_STATUS_COPY.DECLINED.title).toBe("Thank you for your request to join");
+    expect(INVITE_STATUS_COPY.DECLINED.body).not.toMatch(/application|invite|\$|dues|price/i);
+    const statusPage = readFileSync(path.resolve(__dirname, "../src/app/request-status/view/[token]/page.tsx"), "utf8");
+    expect(statusPage).toContain("requestReceivedMessage");
+    expect(statusPage).not.toContain("statusMembershipLine");
+    expect(statusPage).not.toContain("Application received");
   });
 
   it("blocks a second request to join while an account, application, or open request exists", () => {

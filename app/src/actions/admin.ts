@@ -19,7 +19,7 @@ import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
 import { sendNotice } from "@/lib/notices";
 import { notifyAdmins } from "@/lib/notify";
-import { deleteOutboxTied } from "@/lib/remove-member";
+import { deleteJoinRequest } from "@/lib/delete-join-request";
 import { reviewCopy } from "@/lib/review-copy";
 import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
 import { needsStrongApprovalWarning } from "@/lib/approval-warning";
@@ -616,21 +616,7 @@ export async function deleteInviteRequest(formData: FormData) {
   const requestId = String(formData.get("requestId") || "");
   const request = await prisma.inviteRequest.findUnique({ where: { id: requestId } });
   if (!request) redirect("/admin?error=That+request+was+not+found");
-  await prisma.$transaction(async (tx) => {
-    await tx.verificationCase.deleteMany({ where: { inviteRequestId: request.id } });
-    await deleteOutboxTied(tx, [request.email], {
-      tokens: [request.statusToken, `/request-status/${request.statusToken}`],
-    });
-    await tx.crmPerson.deleteMany({
-      where: {
-        OR: [
-          { inviteRequestId: request.id },
-          { email: request.email, applicationId: null, userId: null },
-        ],
-      },
-    });
-    await tx.inviteRequest.delete({ where: { id: request.id } });
-  });
+  await deleteJoinRequest(request);
   await prisma.moderationEvent.create({
     data: {
       actorId: admin.id,
@@ -640,6 +626,23 @@ export async function deleteInviteRequest(formData: FormData) {
   });
   revalidatePath("/admin");
   redirect("/admin?notice=Request+deleted");
+}
+
+export async function deleteOutboxNotice(formData: FormData) {
+  const admin = await requireAdmin();
+  const noticeId = String(formData.get("noticeId") || "");
+  const notice = noticeId ? await prisma.outboxNotice.findUnique({ where: { id: noticeId } }) : null;
+  if (!notice) redirect("/admin/outbox?error=That+notice+was+not+found");
+  await prisma.outboxNotice.delete({ where: { id: notice.id } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "DELETE_OUTBOX_NOTICE",
+      summary: `${admin.name} deleted an Outbox notice to ${notice.intendedTo}. ${notice.templateKey || notice.subject}`.slice(0, 500),
+    },
+  });
+  revalidatePath("/admin/outbox");
+  redirect("/admin/outbox?notice=Notice+deleted");
 }
 
 export async function deleteInviteCode(formData: FormData) {

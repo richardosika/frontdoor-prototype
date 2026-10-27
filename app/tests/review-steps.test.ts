@@ -145,6 +145,7 @@ describe("guided review steps", () => {
     expect(approveConfirmMessage({ dues: "Approve this person?", unverified: unverifiedPersonItems(evidence) })).toContain(
       "Unverified: person-to-company link",
     );
+    expect(approveConfirmMessage({ dues: "Approve this person?", unverified: [], failed: ["Address"] })).toContain("Failed: Address");
     expect(unverifiedPersonItems([...evidence, { checkKey: "news", status: "PASS", corroborates: true }])).toEqual([]);
   });
 });

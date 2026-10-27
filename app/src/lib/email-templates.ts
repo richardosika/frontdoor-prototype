@@ -1,4 +1,4 @@
-import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+import { APPLICATION_RECEIVED_TEMPLATE, REQUEST_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
 import { DUES_SCHEDULE_SENTENCE } from "@/lib/dues";
 import { JOIN_CTA, MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 
@@ -50,8 +50,8 @@ ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   {
     key: "invite_received",
     name: "Request received",
-    subject: "Thank you for applying to Private Floor",
-    body: `${APPLICATION_RECEIVED_TEMPLATE}
+    subject: "Thank you for your request to join",
+    body: `${REQUEST_RECEIVED_TEMPLATE}
 
 Check your status
 {status_link}
@@ -249,7 +249,8 @@ Code: {invite_code}
 
 ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
   ],
-  invite_received: `Hello {first_name},
+  invite_received: [
+    `Hello {first_name},
 
 Thank you for applying to Private Floor.
 
@@ -259,6 +260,13 @@ Check your status
 {status_link}
 
 Richard Osika, Founder, Private Floor Club`,
+    `${APPLICATION_RECEIVED_TEMPLATE}
+
+Check your status
+{status_link}
+
+Richard Osika, Founder, Private Floor Club`,
+  ],
   application_thanks: [
     `Hello {first_name},
 
@@ -467,6 +475,7 @@ const PREVIOUS_SUBJECTS: Partial<Record<TemplateKey, string[]>> = {
   approved: ["You're invited to Private Floor", "You're approved for Private Floor"],
   info: ["You're invited to Private Floor"],
   payment_due: ["You're approved — annual dues are next"],
+  invite_received: ["Thank you for applying to Private Floor"],
 };
 
 /** True when a stored subject is an older default that should be replaced. */

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { APPLICATION_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
+import { APPLICATION_RECEIVED_TEMPLATE, REQUEST_RECEIVED_TEMPLATE } from "@/lib/applicant-copy";
 import { TEMPLATE_DEFS, templateDef } from "@/lib/email-templates";
 import { JOIN_CTA, MEMBERSHIP_PHRASE, MEMBERSHIP_SHORT } from "@/lib/membership-copy";
 
@@ -66,8 +66,9 @@ describe("membership wording", () => {
     expect(info?.body).toContain(JOIN_CTA);
     expect(info?.body.toLowerCase()).not.toContain("invited");
     const thanks = templateDef("invite_received");
-    expect(thanks?.subject).toBe("Thank you for applying to Private Floor");
-    expect(thanks?.body).toContain(APPLICATION_RECEIVED_TEMPLATE);
+    expect(thanks?.subject).toBe("Thank you for your request to join");
+    expect(thanks?.body).toContain(REQUEST_RECEIVED_TEMPLATE);
+    expect(thanks?.body).not.toContain(APPLICATION_RECEIVED_TEMPLATE);
     expect(templateDef("application_thanks")?.body).toContain(APPLICATION_RECEIVED_TEMPLATE);
   });
 });

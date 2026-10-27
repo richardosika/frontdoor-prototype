@@ -76,9 +76,12 @@ describe("PF Tester October 27 batch", () => {
     expect(queue).toContain("pf-decision-queue");
     expect(queue).toContain("pf-step-save");
     const form = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
-    expect(form).toContain("data-decision-closing");
-    expect(form).toContain("claimDecisionReplay");
-    expect(form).toContain("Saving this step. Approval sends when that finishes.");
+    const host = readFileSync(path.join(ROOT, "components/decision-dialog-host.tsx"), "utf8");
+    expect(host).toContain("data-decision-closing");
+    expect(host).toContain("claimDecisionReplay");
+    expect(host).toContain("Saving this step. Approval sends when that finishes.");
+    expect(readFileSync(path.join(ROOT, "components/shell.tsx"), "utf8")).toContain("DecisionDialogHost");
+    expect(form).not.toContain("<dialog");
     const oldNote = "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.";
     for (const code of [
       "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -130,11 +133,14 @@ describe("PF Tester October 27 batch", () => {
 
   it("keeps the approval checkbox outside the server form and restores a dropped Declined notice", () => {
     const form = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
-    expect(form.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(form.indexOf('role="dialog"'));
-    expect(form.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(form.indexOf("</form>"));
+    const host = readFileSync(path.join(ROOT, "components/decision-dialog-host.tsx"), "utf8");
+    expect(host.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(host.indexOf('role="dialog"'));
+    expect(form).not.toContain('name="acknowledgeGrade"');
+    expect(host).not.toContain("<form");
     expect(form).toContain('type="button" data-decision-open="APPROVED"');
     expect(form).toContain("sessionStorage");
     expect(form).not.toContain("createPortal");
+    expect(host).not.toContain("createPortal");
     const action = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
     const succeed = action.slice(action.indexOf("const succeed"), action.indexOf("const decision ="));
     expect(succeed).toContain("rememberAdminNotice");

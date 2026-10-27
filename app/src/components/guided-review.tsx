@@ -1,5 +1,5 @@
 import { saveReviewStep } from "@/actions/review";
-import { DecisionForm, InviteDecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
+import { DecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { StepSaveForm } from "@/components/step-save-form";
@@ -265,9 +265,9 @@ function DecisionStep({
       )}
       {grade ? <p className="mt-3 text-sm text-ink">{gradeComparisonLine(grade, applicationGrade)}</p> : null}
       {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
-      {mode === "application" && applicationId ? (
+      {(mode === "application" && applicationId) || mode === "invite" ? (
         <DecisionForm
-          applicationId={applicationId}
+          applicationId={applicationId || ""}
           caseId={caseId}
           notLegit={notLegit}
           confirmLabel={confirmLabel}
@@ -275,9 +275,10 @@ function DecisionStep({
           strongWarning={strongWarning}
           warningText={reviewCopy(warningText)}
           unverified={unverified}
+          failed={itemLists.failed}
+          variant={mode === "invite" ? "invite" : "application"}
         />
       ) : null}
-      {mode === "invite" ? <InviteDecisionForm caseId={caseId} unverified={unverified} /> : null}
       {mode === "closed" ? (
         <>
           <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>

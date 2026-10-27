@@ -79,7 +79,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
     <form id="request-to-join" onSubmit={onSubmit} className="mt-6 scroll-mt-6 grid gap-2 rounded border border-brass bg-cream p-4">
       <span id="request-invite" className="absolute -left-[9999px]" />
       <h2 className="font-serif text-2xl font-normal">Request to join</h2>
-      <p className="text-sm text-ink">No code yet. A Private Floor administrator reviews every application. You will hear from us by email.</p>
+      <p className="text-sm text-ink">No code yet. A Private Floor administrator reviews every request to join. You will hear from us by email.</p>
       <label className="absolute -left-[9999px]" aria-hidden="true">
         Website
         <input name="website" tabIndex={-1} autoComplete="off" />

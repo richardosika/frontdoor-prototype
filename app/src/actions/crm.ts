@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { safeAdminBack } from "@/lib/admin-home";
 import { requireAdmin } from "@/lib/current-user";
 import { ensureCrmPerson, recordCrmEvent } from "@/lib/crm";
+import { deleteJoinRequest } from "@/lib/delete-join-request";
 import { crmStage, isDecisionStage, stageOverride } from "@/lib/crm-stage";
 import { isTemplateKey, sampleTemplateVars } from "@/lib/email-templates";
 import { buildMailVars, ensureTemplates, sendTemplate, sendTemplateTest } from "@/lib/mail";
@@ -258,6 +259,26 @@ export async function deleteCrmPerson(formData: FormData) {
   const personId = String(formData.get("personId") || "");
   const person = await prisma.crmPerson.findUnique({ where: { id: personId } });
   if (!person) redirect("/admin/crm?error=That+person+was+not+found");
+  const requestOnly = !person.applicationId && !person.userId;
+  const request = requestOnly
+    ? person.inviteRequestId
+      ? await prisma.inviteRequest.findUnique({ where: { id: person.inviteRequestId } })
+      : await prisma.inviteRequest.findFirst({ where: { email: person.email }, orderBy: { createdAt: "desc" } })
+    : null;
+  if (request) {
+    await deleteJoinRequest(request);
+    await prisma.moderationEvent.create({
+      data: {
+        actorId: admin.id,
+        action: "DELETE_CRM_PERSON",
+        summary: `${admin.name} deleted the CRM person ${person.name} <${person.email}> and the linked request to join.`,
+      },
+    });
+    revalidatePath("/admin/crm");
+    revalidatePath("/admin");
+    revalidatePath("/admin/verification");
+    redirect("/admin/crm?notice=CRM+person+deleted.+The+linked+request+to+join+was+deleted+too.");
+  }
   await prisma.crmPerson.delete({ where: { id: person.id } });
   await prisma.moderationEvent.create({
     data: {

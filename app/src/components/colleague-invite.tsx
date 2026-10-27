@@ -4,7 +4,7 @@ import { useState } from "react";
 import { confirmApplicationCode, sendApplicationCode } from "@/actions/apply";
 import { CopyCode } from "@/components/copy-code";
 import { btn, field } from "@/components/ui";
-import { applicationReceivedMessage, INVITE_REQUEST_THANKS_TITLE } from "@/lib/applicant-copy";
+import { INVITE_REQUEST_THANKS_TITLE, requestReceivedMessage } from "@/lib/applicant-copy";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
 import { ROLES } from "@/lib/roles";
 
@@ -94,12 +94,12 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       {done ? (
         <div className="mt-3 rounded border border-brass bg-brass-soft px-3 py-3">
           <p className="font-serif text-lg">{INVITE_REQUEST_THANKS_TITLE}</p>
-          <p className="mt-1 text-xs leading-relaxed text-ink">{applicationReceivedMessage(thanksName)}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink">{requestReceivedMessage(thanksName)}</p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
           <p className="text-xs text-ink">
-            Ask for a colleague to be reviewed. A referral code is optional. A Private Floor administrator reviews every application. They will hear from us by email.
+            Ask for a colleague to be reviewed. A referral code is optional. A Private Floor administrator reviews every request to join. They will hear from us by email.
           </p>
           <label className="absolute -left-[9999px]" aria-hidden="true">
             Website

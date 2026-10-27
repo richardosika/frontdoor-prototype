@@ -62,7 +62,9 @@ describe("email templates", () => {
       first_name: "Ada",
       status_link: "https://cornicio-mvp.onrender.com/invite-status/preview",
     });
-    expect(rendered).toContain("Thank you, Ada. We've got your application.");
+    expect(rendered).toContain("Thank you, Ada. We've got your request to join.");
+    expect(rendered).toContain("A private network where every member is personally reviewed");
+    expect(rendered.toLowerCase()).not.toContain("we've got your application");
     expect(rendered).toContain("Check your status");
     expect(rendered).toContain("https://cornicio-mvp.onrender.com/invite-status/preview");
     expect(rendered).toContain("Richard Osika, Founder, Private Floor Club");

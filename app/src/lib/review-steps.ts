@@ -44,12 +44,13 @@ export function unverifiedPersonItems(evidence: { checkKey: string; status: stri
   return personTied ? [] : ["person-to-company link"];
 }
 
-export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[] }): string {
+export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[]; failed?: string[] }): string {
   const extra = input.extra ? ` ${input.extra}` : "";
+  const failed = input.failed?.length ? ` Failed: ${input.failed.join(", ")}.` : "";
   const unverified = input.unverified.length
     ? ` Unverified: ${input.unverified.join(", ")}. A company that exists is not the same as this applicant being connected to it.`
     : "";
-  return `${input.dues}${extra}${unverified}`;
+  return `${input.dues}${extra}${failed}${unverified}`;
 }
 
 export type BuiltStep = {

@@ -97,7 +97,7 @@ export async function postJoinRequest(request: Request): Promise<Response> {
   const statusUrl = `${await appBaseUrl()}${statusPath}`;
   try {
     await sendTemplate({
-      key: "application_thanks",
+      key: "invite_received",
       to: email,
       vars: buildMailVars({
         name,

@@ -3,10 +3,8 @@ import { redirect } from "next/navigation";
 import { ApplicationStatus } from "@/components/application-status";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
-import { applicationReceivedMessage, INVITE_STATUS_COPY } from "@/lib/applicant-copy";
-import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-status";
+import { INVITE_STATUS_COPY, requestReceivedMessage } from "@/lib/applicant-copy";
 import { BRAND } from "@/lib/brand";
-import { monthlyDuesCents, statusMembershipLine } from "@/lib/dues";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
 
@@ -16,7 +14,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
   const { token } = await params;
   const request = await prisma.inviteRequest.findUnique({
     where: { statusToken: token },
-    select: { name: true, status: true, role: true },
+    select: { name: true, status: true },
   });
   if (!request) {
     const application = await prisma.application.findUnique({
@@ -26,16 +24,8 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
     if (application) return <ApplicationStatus application={application} />;
     redirect(`${await appBaseUrl()}/request-status/${encodeURIComponent(token)}`);
   }
-  const pending = request.status === "PENDING";
-  const status = request.status === "DECLINED" ? "DECLINED" : "IN_REVIEW";
-  const copy = pending ? memberStatusCopy("IN_REVIEW") : INVITE_STATUS_COPY[request.status];
-  const shownBody = copy.body.includes("{first_name}") ? applicationReceivedMessage(request.name) : copy.body;
-  const monthly = monthlyDuesCents(request.role);
-  const membershipLine = statusMembershipLine({
-    status,
-    monthlyCents: monthly,
-    waived: false,
-  });
+  const copy = INVITE_STATUS_COPY[request.status];
+  const shownBody = copy.body.includes("{first_name}") ? requestReceivedMessage(request.name) : copy.body;
 
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
@@ -48,13 +38,6 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
           <p className="mt-2 font-serif text-lg">{request.name}</p>
           <p className="mt-1 text-sm text-ink">{shownBody}</p>
-          <div className="mt-4 rounded border border-line bg-cream p-3 text-sm">
-            <p>
-              <b>Membership status.</b> {applicationStatusLabel(status)}
-            </p>
-            {status === "IN_REVIEW" ? <p className="mt-1">Verification in progress.</p> : null}
-            {membershipLine ? <p className="mt-1">{membershipLine}</p> : null}
-          </div>
           <Link href="/apply" className={`${btn} mt-4 w-full`}>
             Back to apply
           </Link>

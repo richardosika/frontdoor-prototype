@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { BRAND, noticeTestRecipient } from "@/lib/brand";
 import { reviewNotice } from "@/lib/review-copy";
 import { recordCrmEvent } from "@/lib/crm";
@@ -76,12 +77,22 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
     summary: `${input.templateKey || "notice"} · ${subject}`,
     sourceKey: `outbox:${row.id}`,
   });
-  await sendStoredNotice(row.id, {
+  const delivery = {
     intendedTo: input.intendedTo,
     subject,
     text: body,
     to: target.to,
-  });
+  };
+  // Resend can take several seconds. The on-screen code waits on this function, so the copy goes out after the response.
+  try {
+    after(() => {
+      void sendStoredNotice(row.id, delivery);
+    });
+  } catch (error) {
+    console.error("Could not defer the test email");
+    console.error(error instanceof Error ? error.message : "error");
+    await sendStoredNotice(row.id, delivery);
+  }
   return { id: row.id, deliveredTo: target.to };
 }
 

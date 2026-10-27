@@ -172,17 +172,35 @@ export default async function CrmPersonPage({
         </section>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete CRM person</h2>
-          <p className="mt-2 text-sm text-ink">Removes this CRM person, their notes, and their timeline. The member account and application stay.</p>
-          <form id="delete-crm" action={deleteCrmPerson} className="mt-3">
-            <input type="hidden" name="personId" value={person.id} />
-            <ConfirmSubmitButton
-              form="delete-crm"
-              className={btnOutline}
-              message={`Delete the CRM record for ${person.name}? Notes and timeline events go with it. The member account and application stay.`}
-            >
-              Delete CRM person
-            </ConfirmSubmitButton>
-          </form>
+          {person.inviteRequest && !person.applicationId && !person.userId ? (
+            <>
+              <p className="mt-2 text-sm text-ink">Removes this CRM person and the linked request to join, including the verification file. Home, then Requests to join, then Delete request does the same thing.</p>
+              <form id="delete-crm" action={deleteCrmPerson} className="mt-3">
+                <input type="hidden" name="personId" value={person.id} />
+                <ConfirmSubmitButton
+                  form="delete-crm"
+                  className={btnOutline}
+                  message={`Delete the CRM record for ${person.name}? This also deletes the request to join, the verification file, and the outbox notices for this request.`}
+                >
+                  Delete CRM person
+                </ConfirmSubmitButton>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-sm text-ink">Removes this CRM person, their notes, and their timeline. The member account and application stay.</p>
+              <form id="delete-crm" action={deleteCrmPerson} className="mt-3">
+                <input type="hidden" name="personId" value={person.id} />
+                <ConfirmSubmitButton
+                  form="delete-crm"
+                  className={btnOutline}
+                  message={`Delete the CRM record for ${person.name}? Notes and timeline events go with it. The member account and application stay.`}
+                >
+                  Delete CRM person
+                </ConfirmSubmitButton>
+              </form>
+            </>
+          )}
         </section>
       </div>
     </div>

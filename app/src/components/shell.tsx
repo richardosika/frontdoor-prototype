@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import { AdminMark } from "@/components/admin-mark";
 import { Avatar } from "@/components/avatar";
+import { DecisionDialogHost } from "@/components/decision-dialog-host";
 import { Logo } from "@/components/logo";
 import { tierLabel } from "@/lib/format";
 
@@ -42,6 +43,8 @@ export function Shell({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    <>
+    <DecisionDialogHost />
     <div className="min-h-dvh bg-cream text-forest md:grid md:grid-cols-[84px_minmax(0,1fr)] lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="hidden border-r border-brass bg-forest bg-gradient-to-b from-white/[0.02] to-black/10 text-paper md:flex md:flex-col md:gap-1 md:px-3 md:py-6 lg:px-4 lg:py-7">
         <Link href="/feed" className="mb-8 flex items-center justify-center px-1 lg:justify-start lg:px-2">
@@ -233,5 +236,6 @@ export function Shell({
         </div>
       ) : null}
     </div>
+    </>
   );
 }
