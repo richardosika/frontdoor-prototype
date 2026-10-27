@@ -1089,8 +1089,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         continue;
       }
       const ownProfile = /linkedin\.com\/in\//i.test(url);
-      const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile });
-      const selfNamedProfile = ownProfile && score.name && firmContainsApplicantName(facts.org, person);
+      const companyPage = /linkedin\.com\/company\//i.test(url);
+      const selfNamedFirm = firmContainsApplicantName(facts.org, person);
+      const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile || (companyPage && selfNamedFirm) });
+      const selfNamedProfile = score.name && selfNamedFirm && (ownProfile || companyPage);
       const blockedTyped = typedLinkedin && typedLinkedin !== url;
       attempts.push({
         key: "linkedin-fetch",

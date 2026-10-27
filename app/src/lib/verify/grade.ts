@@ -699,6 +699,11 @@ function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeight
   if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
   if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
   if (row?.status === "PASS" && row.selfReported && !independent) {
+    // The company's own site named the company. That is company-exists credit.
+    // The person on that same page stays self-reported and earns the other half only after an independent tie.
+    if (/Company:\s*yes/i.test(row.finding)) {
+      return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person self-reported");
+    }
     return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
   }
   return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");

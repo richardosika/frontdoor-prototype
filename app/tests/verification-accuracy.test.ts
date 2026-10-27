@@ -1367,8 +1367,9 @@ describe("website text survives the size cap", () => {
           location: "Hackensack, NJ",
         }),
       );
-      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("self-reported and no independent source");
+      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(4);
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
     }
   });
 });
@@ -4163,5 +4164,43 @@ describe("batch 10 fixtures", () => {
     expect(fake.letter).toBe("F");
     expect(fake.recommendation.startsWith("APPROVE")).toBe(false);
     expect(real.score - fake.score).toBeGreaterThanOrEqual(15);
+    const companyOnlySite = gradeChecks(
+      [row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes." })],
+      facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com" }),
+    );
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(companyOnlySite.letter).toBe("F");
+    expect(companyOnlySite.recommendation.startsWith("APPROVE")).toBe(false);
+  });
+
+  it("treats a self-named firm's LinkedIn company page as self-reported", async () => {
+    const checks = await runPublicScreen(
+      facts({
+        name: "Adam Leitman Bailey",
+        applicantName: "Adam Leitman Bailey",
+        org: "Adam Leitman Bailey, P.C.",
+        website: "https://www.alblawfirm.com",
+        linkedinUrl: "",
+        location: "New York, NY",
+      }),
+      async (url) => {
+        if (url.includes("alblawfirm.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<html><body><a href="https://www.linkedin.com/company/adam-leitman-bailey-p.c./">Adam Leitman Bailey, P.C.</a></body></html>`,
+          };
+        }
+        if (url.includes("linkedin.com/company/")) {
+          return { ok: true, status: 200, text: "Adam Leitman Bailey, P.C. New York real estate attorneys" };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+    expect(linkedin?.url || "").toContain("/company/");
+    expect(linkedin?.corroborates).not.toBe(true);
+    expect(linkedin?.selfReported).toBe(true);
   });
 });
