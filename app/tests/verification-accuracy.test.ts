@@ -3439,6 +3439,24 @@ describe("qa october 27", () => {
     expect(landed?.finding).not.toContain("did not respond");
     expect(landed?.finding).toContain("Name: yes");
     expect(landed?.finding).toContain("Company: yes");
+    const blockedAfterRedirect = await runPublicScreen(
+      facts({
+        name: "Richard Kennedy",
+        applicantName: "Richard Kennedy",
+        org: "Skanska USA",
+        website: "https://www.usa.skanska.com",
+        location: "New York, NY",
+      }),
+      async (url) =>
+        url.includes("usa.skanska.com")
+          ? { ok: false, status: 403, text: "", url: "https://www.skanska.com/us/en/" }
+          : { ok: false, status: 404, text: "" },
+    );
+    const afterRedirect = blockedAfterRedirect.find((check) => check.key === "website");
+    expect(afterRedirect?.status).toBe("UNAVAILABLE");
+    expect(afterRedirect?.finding).toContain("blocked the check (403)");
+    expect(afterRedirect?.finding).toContain("https://www.skanska.com/us/en/");
+    expect(afterRedirect?.finding).not.toContain("did not respond");
 
     const blocked = await runPublicScreen(
       facts({ website: "https://www.prologis.com", org: "Prologis", name: "Hamid Moghadam", applicantName: "Hamid Moghadam" }),

@@ -876,16 +876,20 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
     } else if (accessBlocked(home.status, home.text, homeUrl) && home.status !== 404) {
       const blockedBySite = home.status === 202 || home.status === 401 || home.status === 403 || home.status === 405 || home.status === 999;
-      const redirectedTo = crossDomainLanding(homeUrl, home);
+      const crossDomain = crossDomainLanding(homeUrl, home);
+      const redirectedTo = finalLanding(homeUrl, home) || crossDomain;
       let renamed = "";
       if (redirectedTo) {
-        let domain = redirectedTo;
-        try {
-          domain = new URL(redirectedTo).hostname.replace(/^www\./, "");
-        } catch {
-          domain = redirectedTo;
+        renamed = ` The site redirected to ${redirectedTo}.`;
+        if (crossDomain) {
+          let domain = redirectedTo;
+          try {
+            domain = new URL(redirectedTo).hostname.replace(/^www\./, "");
+          } catch {
+            domain = redirectedTo;
+          }
+          renamed += ` The new domain is ${domain}. The new brand is a review-only alias and does not corroborate the company on the application.`;
         }
-        renamed = ` The site redirected to ${redirectedTo}. The new domain is ${domain}. The new brand is a review-only alias and does not corroborate the company on the application.`;
       }
       const rescued = renamed
         ? null

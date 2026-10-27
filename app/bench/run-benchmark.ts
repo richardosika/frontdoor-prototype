@@ -87,7 +87,7 @@ async function download(url: string, dest: string): Promise<{ ok: boolean; statu
   }
 }
 
-async function loadOfac(): Promise<{ entries: WatchlistEntry[]; sdnCsv: string; note: string }> {
+async function loadOfac(): Promise<{ entries: WatchlistEntry[]; sdnCsv: string; note: string; fetchedAt: Date | null }> {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const sdnPath = path.join(CACHE_DIR, "sdn.csv");
   const altPath = path.join(CACHE_DIR, "alt.csv");
@@ -105,7 +105,8 @@ async function loadOfac(): Promise<{ entries: WatchlistEntry[]; sdnCsv: string; 
   const altCsv = fs.existsSync(altPath) ? fs.readFileSync(altPath, "utf8") : "";
   const entries = sdnCsv.length > 1000 ? parseWatchlists(sdnCsv, altCsv) : [];
   notes.push(`${entries.length} watchlist entries parsed (same parser as the app's refreshWatchlist)`);
-  return { entries, sdnCsv, note: notes.join("; ") };
+  const fetchedAt = fs.existsSync(sdnPath) ? new Date(fs.statSync(sdnPath).mtimeMs) : null;
+  return { entries, sdnCsv, note: notes.join("; "), fetchedAt };
 }
 
 /** "LOGUNOV, Oleg" -> { ent, name: "Oleg Logunov" } using the real downloaded sdn.csv. */
@@ -373,7 +374,7 @@ async function main() {
     console.log(`[case] ${c.id} ${c.label}`);
     let record: Record<string, unknown>;
     try {
-      const ctx: CheckContext = { facts, watchlist, network: true, fetchText: fetchForChecks };
+      const ctx: CheckContext = { facts, watchlist, watchlistFetchedAt: ofac.fetchedAt, network: true, fetchText: fetchForChecks };
       const report = scoreReport(await withTimeout(collectChecks(ctx), CASE_TIMEOUT_MS));
       const grade = gradeChecks(report.checks, facts, { gradedAt: new Date().toISOString(), subject: "APPLICATION" });
       const ev = evaluate({ ...c, watchlist: c.watchlist }, grade, report.checks);
