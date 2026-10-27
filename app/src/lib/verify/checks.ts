@@ -12,7 +12,7 @@ import { newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
-import { runPublicScreen } from "@/lib/verify/screen";
+import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
   "mailinator.com",
@@ -923,12 +923,16 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const judged = assessRdap(rdapHost, rdap);
     if (judged) out.push(judged);
   }
-  out.push(
-    ...(await settleWithin(runPublicScreen(searchFacts, fetchText), 120_000, [
-      timedOut("website", "Company website", 8),
-      timedOut("web-footprint", "Web search", 8),
-    ])),
-  );
+  const screenSink: CheckOutput[] = [];
+  let screenRows: CheckOutput[] | null = null;
+  try {
+    const pending: Promise<CheckOutput[] | null> = runPublicScreen(searchFacts, fetchText, screenSink);
+    screenRows = await settleWithin(pending, 120_000, null);
+  } catch {
+    screenRows = null;
+  }
+  // A finished row stays. A row the timeout dropped is unavailable, not a miss and not a failure.
+  out.push(...completeScreenRows(screenRows ?? screenSink.slice()));
   const registryState = statedUsState(ctx.facts.location || "");
   const portal = registryState ? registryPortal(registryState) : undefined;
   if (portal) {

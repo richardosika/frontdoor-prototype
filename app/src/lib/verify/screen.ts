@@ -44,6 +44,8 @@ type Attempt = {
   detail: string;
   selfReported?: boolean;
   linkedUrl?: string;
+  /** Other matched snippets. They can feed the footprint. They do not decide whether this hit is self-reported. */
+  moreUrls?: string;
   /** Final URL after a redirect onto a different registrable host. www and the bare host are the same. */
   redirectedTo?: string;
   /** The landed brand is not the company on the application. Review only. It does not corroborate. */
@@ -551,8 +553,10 @@ export function hostIsApplicant(href: string, ownHost: string): boolean {
 
 function resultPageOnOwnSite(attempt: Attempt, ownHost: string): boolean {
   if (!ownHost) return false;
-  const hrefs = [attempt.url, ...(attempt.linkedUrl || "").split(/\s+/)];
-  return hrefs.some((href) => hostIsApplicant(href, ownHost));
+  // One hit, one host. The result link decides. A later snippet, or a domain mentioned beside that link, does not.
+  const linked = (attempt.linkedUrl || "").split(/\s+/).filter((href) => /^https?:\/\//i.test(href));
+  if (linked.length) return hostIsApplicant(linked[0], ownHost);
+  return hostIsApplicant(attempt.url, ownHost);
 }
 
 function toCheck(attempt: Attempt, ownHost = ""): CheckOutput {
@@ -740,14 +744,67 @@ async function personPageFromSitemap(
   return best;
 }
 
-export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput[]> {
+export const PUBLIC_SCREEN_KEYS = [
+  "website",
+  "linkedin-fetch",
+  "screen-x",
+  "screen-facebook",
+  "screen-instagram",
+  "screen-youtube",
+  "screen-tiktok",
+  "screen-news",
+  "screen-web",
+  "web-footprint",
+] as const;
+
+const SCREEN_SOURCE: Record<(typeof PUBLIC_SCREEN_KEYS)[number], string> = {
+  website: "Company website",
+  "linkedin-fetch": "LinkedIn",
+  "screen-x": "X",
+  "screen-facebook": "Facebook",
+  "screen-instagram": "Instagram",
+  "screen-youtube": "YouTube",
+  "screen-tiktok": "TikTok",
+  "screen-news": "Google News",
+  "screen-web": "Web search",
+  "web-footprint": "Web search",
+};
+
+/** A screen row that never finished is unavailable. A row that already finished stays as it was. */
+export function completeScreenRows(present: CheckOutput[]): CheckOutput[] {
+  const have = new Set(present.map((row) => row.key));
+  const dropped = PUBLIC_SCREEN_KEYS.filter((key) => !have.has(key)).map((key) => ({
+    key,
+    status: "UNAVAILABLE" as const,
+    weight: 0,
+    finding: "Couldn't check. This check timed out or was dropped before it finished.",
+    source: SCREEN_SOURCE[key],
+    url: "",
+    ranAt: new Date().toISOString(),
+    corroborates: false,
+  }));
+  return [...present, ...dropped];
+}
+
+export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
   const queryFacts = { name: person, org: facts.org, location: facts.location };
   const searched = [person, facts.org, cityPhrase(facts.location)].filter(Boolean).map((part) => `"${part}"`).join(" ");
   const attempts: Attempt[] = [];
+  const produced: CheckOutput[] = [];
+  let flushed = 0;
 
   let website = facts.website.trim();
   if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
+  const ownHost = applicantHost(website);
+  const flush = () => {
+    while (flushed < attempts.length) {
+      const row = toCheck(attempts[flushed], ownHost);
+      produced.push(row);
+      sink?.push(row);
+      flushed += 1;
+    }
+  };
   const pages: { url: string; text: string; raw: string }[] = [];
   if (!website) {
     attempts.push({
@@ -940,6 +997,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
     }
   }
+  flush();
 
   const socials = socialLinksFrom(pages.map((page) => page.raw).join("\n"));
 
@@ -988,6 +1046,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       break;
     }
   }
+  flush();
 
   const shortQuery = socialSearchQuery(person, facts.org);
   const companyTag = instagramCompanyTag(facts.org, person);
@@ -1113,6 +1172,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }),
   );
   attempts.push(...platformResults);
+  flush();
 
   const newsQueries = newsSearchQueries(facts).slice(0, 2);
   const searchedNews = newsQueries.join(" | ") || `${person} ${facts.org}`;
@@ -1181,6 +1241,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       detail: "no match found",
     });
   }
+  flush();
 
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
@@ -1243,7 +1304,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         outcome: "found",
         score: hit.score,
         detail: hit.text.slice(0, 180),
-        linkedUrl: matched.flatMap((item) => item.hrefs).join(" "),
+        linkedUrl: hit.hrefs.join(" "),
+        moreUrls: matched.slice(1).flatMap((item) => item.hrefs).join(" "),
       });
     } else {
       attempts.push({
@@ -1258,7 +1320,6 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
-  const ownHost = applicantHost(website);
   if (!attempts.some((item) => item.key === "web-footprint")) {
     const credited = new Set(
       attempts.filter((item) => item.outcome === "found" && item.key !== "web-footprint").map((item) => canonicalPage(item.url)),
@@ -1266,7 +1327,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     const webHit = attempts.find(
       (item) => item.key === "screen-web" && item.outcome === "found" && item.score.name && item.score.company && !attemptOnOwnSite(item, ownHost),
     );
-    const fresh = (webHit?.linkedUrl || "")
+    const fresh = `${webHit?.linkedUrl || ""} ${webHit?.moreUrls || ""}`
       .split(/\s+/)
       .map((href) => unwrapResultUrl(href))
       .find((href) => {
@@ -1322,7 +1383,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
 
-  return attempts.map((attempt) => toCheck(attempt, ownHost));
+  flush();
+  return produced;
 }
 
 /** The applicant's own site is one self-reported source. It cannot also be the public web footprint. */
