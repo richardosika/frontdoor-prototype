@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
+import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSaysAddressInvalid, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
+import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
@@ -1690,7 +1690,7 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(backedCity.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
   });
 
-  it("leaves a geocoder miss and a geocoder timeout inconclusive", async () => {
+  it("leaves a geocoder miss and a geocoder timeout as could not check", async () => {
     const seen: string[] = [];
     const missed = await resolveAddressCheck({
       facts: facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }),
@@ -1707,12 +1707,13 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     });
     expect(seen.some((url) => url.includes("geocoding.geo.census.gov"))).toBe(true);
     expect(seen.some((url) => url.includes("nominatim.openstreetmap.org"))).toBe(true);
-    expect(missed?.status).toBe("INCONCLUSIVE");
+    expect(missed?.status).toBe("UNAVAILABLE");
     expect(missed?.reviewFlag).not.toBe(true);
-    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
+    expect(missed?.finding.toLowerCase()).toContain("could not be checked");
     expect(missed?.finding.toLowerCase()).not.toContain("address did not check out");
     const missedGrade = gradeChecks([missed!], facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }));
     expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
     expect(missedGrade.attention.some((item) => item.title === "Address")).toBe(false);
 
     const down = await resolveAddressCheck({
@@ -1723,16 +1724,16 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
         throw new Error("timeout");
       },
     });
-    expect(down?.status).toBe("INCONCLUSIVE");
-    expect(down?.finding.toLowerCase()).toContain("not checkable");
-    expect(down?.finding.toLowerCase()).toContain("inconclusive");
+    expect(down?.status).toBe("UNAVAILABLE");
+    expect(down?.finding.toLowerCase()).toContain("could not be checked");
+    expect(down?.finding.toLowerCase()).not.toContain("did not check out");
     const graded = gradeChecks([down!], facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }));
     const completeness = graded.categories.find((category) => category.id === "completeness");
-    expect(completeness?.reason.toLowerCase()).toContain("inconclusive");
+    expect(completeness?.reason.toLowerCase()).toContain("could not be checked");
     expect(completeness?.reason).not.toContain("address did not check out");
     expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
-    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("not checkable");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
 
     const matched = await resolveAddressCheck({
       facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
@@ -4314,5 +4315,251 @@ describe("batch 11 report wording and Vesey Street", () => {
     expect(graded.summary.couldNotCheck.toLowerCase()).not.toContain("nominatim matched");
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
     expect(graded.attention.some((item) => /address did not check out/i.test(item.detail))).toBe(false);
+  });
+});
+
+describe("batch 12 former names, registry links, geocoder misses, and missing companies", () => {
+  const brookfieldIdentity = {
+    currentName: "BPI Property Inc.",
+    formerNames: ["BP US REIT LLC", "Brookfield Properties, Inc."],
+  };
+  const brookfieldCompanies = [{ title: "Brookfield Properties, Inc.", ticker: "", cik: "1680277" }];
+
+  it("treats a former EDGAR name as needs review, shows both names, and does not suggest Pass", () => {
+    const payload = JSON.stringify({
+      name: "BPI Property Inc.",
+      formerNames: [
+        { name: "BP US REIT LLC" },
+        { name: "Brookfield Properties, Inc." },
+      ],
+    });
+    expect(parseSubmissionsIdentity(payload)?.currentName).toBe("BPI Property Inc.");
+    expect(submissionsUrl("1680277")).toBe("https://data.sec.gov/submissions/CIK0001680277.json");
+    expect(matchedNameIsFormer("Brookfield Properties", "Brookfield Properties, Inc.", brookfieldIdentity)).toBe(true);
+    expect(matchedNameIsFormer("CBRE Group", "CBRE GROUP INC", { currentName: "CBRE GROUP INC", formerNames: [] })).toBe(false);
+    expect(matchedNameIsFormer("BPI Property Inc.", "BPI Property Inc.", brookfieldIdentity)).toBe(false);
+
+    const former = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "QA Test Person",
+      tickersOk: true,
+      companies: brookfieldCompanies,
+      filingNames: [],
+      identity: brookfieldIdentity,
+    });
+    expect(former.status).toBe("INCONCLUSIVE");
+    expect(former.reviewFlag).toBe(true);
+    expect(former.companyOnly).not.toBe(true);
+    expect(former.corroborates).toBe(false);
+    expect(former.finding).toContain("BPI Property Inc.");
+    expect(former.finding).toContain("Brookfield Properties, Inc.");
+    expect(former.finding).toContain("1680277");
+    expect(former.finding.toLowerCase()).toContain("former name");
+    expect(former.finding.toLowerCase()).toContain("needs review");
+
+    const graded = gradeChecks(
+      [
+        row({ key: "edgar", status: former.status, reviewFlag: true, finding: former.finding, url: former.url, source: "SEC EDGAR" }),
+        row({
+          key: "website",
+          status: "PASS",
+          companyOnly: true,
+          selfReported: true,
+          url: "https://www.brookfieldproperties.com/",
+          finding: "Company: yes. The company's own site names the company.",
+          source: "Company website",
+        }),
+        plausibilityCheck(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Brookfield Properties" })),
+      ],
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" }),
+    );
+    expect(graded.summary.company).toContain("BPI Property Inc.");
+    expect(graded.summary.company).toContain("former name");
+    expect(graded.summary.company).not.toContain("No EDGAR filing was confirmed");
+    const company = graded.categories.find((category) => category.id === "company");
+    expect(company?.reason).toContain("0 of 6");
+    expect(company?.reason.toLowerCase()).toContain("former");
+    expect(companyCouldNotBeFound(graded ? [
+      row({ key: "website", status: "PASS", companyOnly: true, finding: "Company: yes", url: "https://www.brookfieldproperties.com/" }),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: former.finding }),
+    ] : [])).toBe(false);
+
+    const current = assessEdgarMatch({
+      org: "CBRE Group",
+      person: "QA Test Person",
+      tickersOk: true,
+      companies: [{ title: "CBRE GROUP INC", ticker: "CBRE", cik: "1138118" }],
+      filingNames: [],
+      identity: { currentName: "CBRE GROUP INC", formerNames: ["CBRE CORP"] },
+    });
+    expect(current.finding).toContain("CBRE GROUP INC");
+    expect(current.finding).toContain("1138118");
+    expect(current.finding.toLowerCase()).not.toContain("former name");
+    expect(current.companyOnly).toBe(true);
+  });
+
+  it("uses the Arizona registry sentence and a state link for Rhode Island", () => {
+    const rhodeIsland = registryLinkCheck(facts({ location: "Providence, RI", org: "Gilbane Building Company" }));
+    expect(rhodeIsland.status).toBe("NOT_RUN");
+    expect(rhodeIsland.url).toBe("https://business.sos.ri.gov/CorpWeb/CorpSearch/CorpSearch.aspx");
+    expect(rhodeIsland.finding).toContain("Couldn't check for free. No free RI registry API. Open the state search and look up Gilbane Building Company.");
+    expect(rhodeIsland.finding).not.toContain("No stable free registry API");
+    expect(rhodeIsland.finding).not.toContain("Search the secretary of state manually");
+    const arizona = registryLinkCheck(facts({ location: "Phoenix, Arizona", org: "Desert Builders" }));
+    expect(arizona.finding).toContain("No free AZ registry API. Open the state search and look up Desert Builders.");
+    expect(arizona.url).toBe("https://ecorp.azcc.gov/EntitySearch/Index");
+    for (const state of ["AL", "OH", "WY", "RI"]) {
+      const link = registryLinkCheck(facts({ location: `Capital City, ${state}`, org: "Sample Builders" }));
+      expect(link.url).toMatch(/^https:\/\//);
+      expect(link.finding).toContain(`No free ${state} registry API`);
+    }
+  });
+
+  it("does not list a geocoder miss as a failure, and still fails a placeholder or an explicit invalid address", async () => {
+    const plaza = JSON.stringify([
+      {
+        address: {
+          building: "One New York Plaza",
+          house_number: "1",
+          road: "Water Street",
+          city: "New York",
+          state: "New York",
+          postcode: "10004",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(plaza, { street: "One New York Plaza", city: "New York", state: "NY", zip: "10004" })).toBe("match");
+    const wrongPlaza = JSON.stringify([
+      {
+        address: {
+          house_number: "1",
+          road: "Kingsbridge Plaza",
+          city: "City of Mount Vernon",
+          state: "New York",
+          postcode: "10550",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(wrongPlaza, { street: "1 New York Plaza", city: "New York", state: "NY", zip: "10004" })).toBe("none");
+    expect(geocoderSaysAddressInvalid(JSON.stringify({ result: { addressMatches: [] } }))).toBe(false);
+    expect(geocoderSaysAddressInvalid("The address is invalid.")).toBe(true);
+
+    const missed = await resolveAddressCheck({
+      facts: facts({ location: "1 New York Plaza, New York, NY 10004" }),
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        if (url.includes("nominatim")) return { ok: true, status: 200, text: wrongPlaza };
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.finding.toLowerCase()).toContain("could not be checked");
+    const missedGrade = gradeChecks([missed!], facts({ location: "1 New York Plaza, New York, NY 10004" }));
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not be checked");
+    expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address");
+
+    const box = assessLocalAddress("P.O. Box 12, Phoenix, AZ 85001");
+    expect(box.kind).toBe("invalid");
+    if (box.kind === "invalid") expect(box.finding.toLowerCase()).toContain("p.o. box");
+    const nowhere = await resolveAddressCheck({
+      facts: facts({ location: "0 Nowhere Lane, New York, NY 10001" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(nowhere?.status).toBe("FAIL");
+    expect(nowhere?.finding.toLowerCase()).toContain("did not check out");
+
+    const invalid = await resolveAddressCheck({
+      facts: facts({ location: "9 Main Street, Newark, NJ 07102" }),
+      watchlist: [],
+      network: true,
+      fetchText: async () => ({ ok: true, status: 200, text: "This address is invalid." }),
+    });
+    expect(invalid?.status).toBe("FAIL");
+    expect(invalid?.finding.toLowerCase()).toContain("did not check out");
+    expect(invalid?.finding.toLowerCase()).toContain("invalid");
+  });
+
+  it("flags an unregistered domain with no company evidence and scores it below a company-confirmed file", () => {
+    expect(tokenLooksGibberish("Throvnik")).toBe(true);
+    expect(tokenLooksGibberish("Blorptex")).toBe(false);
+    expect(tokenLooksGibberish("Prologis")).toBe(false);
+    expect(tokenLooksGibberish("Gilbane")).toBe(false);
+    expect(tokenLooksGibberish("Brookfield")).toBe(false);
+    expect(tokenLooksGibberish("Tishman")).toBe(false);
+    expect(tokenLooksGibberish("Brambleton")).toBe(false);
+    expect(tokenLooksGibberish("Keystone")).toBe(false);
+    expect(companyNameLooksReal("Throvnik Pellusar Capital LLC")).toBe(false);
+    expect(companyNameLooksReal("Prologis")).toBe(true);
+    expect(companyNameLooksReal("Gilbane Building Company")).toBe(true);
+    expect(companyNameLooksReal("Fried Frank")).toBe(true);
+    const gibberishPerson = plausibilityCheck(facts({ name: "Throvnik Pellusar", applicantName: "Throvnik Pellusar", org: "CBRE Group" }));
+    expect(gibberishPerson.status).toBe("FAIL");
+    expect(gibberishPerson.finding.toLowerCase()).toContain("person name");
+    const readablePerson = plausibilityCheck(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "CBRE Group" }));
+    expect(readablePerson.status).toBe("PASS");
+
+    const fakeFacts = facts({
+      name: "Throvnik Pellusar",
+      applicantName: "Throvnik Pellusar",
+      org: "Throvnik Pellusar Capital LLC",
+      location: "Phoenix, AZ",
+      website: "https://throvnik-pellusar.example",
+    });
+    const fakeChecks = [
+      plausibilityCheck(fakeFacts),
+      row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "RDAP has no registration for throvnik-pellusar.example. domain is not registered. This counts against the company.", source: "RDAP" }),
+      row({ key: "website", status: "FAIL", finding: "Searched: https://throvnik-pellusar.example. domain does not resolve.", source: "Company website" }),
+      row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name.", source: "SEC EDGAR" }),
+      registryLinkCheck(fakeFacts),
+    ];
+    expect(companyCouldNotBeFound(fakeChecks)).toBe(true);
+    expect(companyExistsEvidence(fakeChecks)).toBe(false);
+    const fake = gradeChecks(fakeChecks, fakeFacts);
+    expect(fake.attention[0]?.title).toBe("Company could not be found");
+    expect(fake.attention[0]?.severity).toBe("High");
+    expect(fake.banner || "").toContain("Company could not be found");
+    expect(fake.summary.company).toContain("Company could not be found");
+    const fakeRole = fake.categories.find((category) => category.id === "role");
+    expect(fakeRole?.reason).toContain("Company could not be found (0 of 8)");
+    expect(fakeRole?.reason).not.toContain("8 of 8");
+    expect(fake.summary.checkedOut.toLowerCase()).not.toContain("filled in and can be read");
+
+    const realFacts = facts({
+      name: "Alex Morgan",
+      applicantName: "Alex Morgan",
+      org: "CBRE Group",
+      website: "https://www.cbre.com/",
+    });
+    const realChecks = [
+      plausibilityCheck(realFacts),
+      row({
+        key: "website",
+        status: "PASS",
+        companyOnly: true,
+        selfReported: true,
+        url: "https://www.cbre.com/",
+        finding: "Company: yes. The company's own site names the company.",
+        source: "Company website",
+      }),
+      row({
+        key: "edgar",
+        status: "INCONCLUSIVE",
+        companyOnly: true,
+        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.",
+        source: "SEC EDGAR",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+      }),
+    ];
+    expect(companyExistsEvidence(realChecks)).toBe(true);
+    expect(companyCouldNotBeFound(realChecks)).toBe(false);
+    const real = gradeChecks(realChecks, realFacts);
+    expect(real.attention.some((item) => item.title === "Company could not be found")).toBe(false);
+    expect(real.banner || "").not.toContain("Company could not be found");
+    expect(real.recommendation).toBe("NEEDS MORE INFO");
+    expect(fake.score).toBeLessThan(real.score);
+    expect(real.categories.find((category) => category.id === "role")?.reason).toContain("8 of 8");
+    expect(real.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person");
   });
 });

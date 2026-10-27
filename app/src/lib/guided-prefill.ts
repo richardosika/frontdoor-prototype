@@ -375,6 +375,11 @@ function suggestTrack(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggest
   return pack("track", mark, urls, found, missing);
 }
 
+function edgarNameOnlyOrFormer(item: EvidenceRow | undefined): boolean {
+  if (!item) return false;
+  return /former name|name-only company match/i.test(item.finding || "");
+}
+
 export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): StepSuggestion {
   const website = row(evidence, "website");
   const edgar = row(evidence, "edgar");
@@ -383,11 +388,18 @@ export function suggestCompany(facts: PrefillFacts, evidence: EvidenceRow[]): St
   const found: string[] = [];
   const missing: string[] = ["Email domain was not used as proof."];
   const urls: string[] = [];
-  const hit = [website, edgar, registry].find((item) => item?.status === "PASS" && sourced(item));
+  const limited = edgarNameOnlyOrFormer(edgar);
+  const hit = [website, edgar, registry].find((item) => item?.status === "PASS" && sourced(item) && !(item === edgar && limited));
   let mark: SuggestedMark = hit ? "PASS" : "COULDNT_VERIFY";
+  if (limited && mark === "PASS") mark = "CONCERN";
   if (hit) {
     found.push(hit.finding);
     urls.push(hit.url);
+  }
+  if (limited && edgar) {
+    if (!found.includes(edgar.finding)) found.push(edgar.finding);
+    if (isHttpUrl(edgar.url)) urls.push(edgar.url);
+    missing.push("A name-only or former-name EDGAR hit needs review. It is not a pass.");
   }
   if (website?.status === "FAIL" && sourced(website)) {
     mark = stricterMark(mark, "CONCERN");

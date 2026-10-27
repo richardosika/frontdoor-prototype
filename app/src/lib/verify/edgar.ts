@@ -106,6 +106,43 @@ export function padCik(cik: string): string {
   return digits ? digits.padStart(10, "0") : "";
 }
 
+export type EdgarFilerIdentity = {
+  currentName: string;
+  formerNames: string[];
+};
+
+export function submissionsUrl(cik: string): string {
+  return `https://data.sec.gov/submissions/CIK${padCik(cik)}.json`;
+}
+
+/** Current legal name and former names from the SEC submissions JSON. */
+export function parseSubmissionsIdentity(text: string): EdgarFilerIdentity | null {
+  try {
+    const body = JSON.parse(text) as { name?: unknown; formerNames?: unknown };
+    const currentName = String(body.name || "").trim();
+    if (!currentName) return null;
+    const formerNames = Array.isArray(body.formerNames)
+      ? body.formerNames
+          .map((row) => (row && typeof row === "object" ? String((row as { name?: unknown }).name || "").trim() : ""))
+          .filter(Boolean)
+      : [];
+    return { currentName, formerNames };
+  } catch {
+    return null;
+  }
+}
+
+/** The ticker title or the typed org is a former name, and the current name is a different entity. */
+export function matchedNameIsFormer(org: string, matchedTitle: string, identity: EdgarFilerIdentity): boolean {
+  const current = normalizeFirmName(identity.currentName);
+  const wanted = [normalizeFirmName(org), normalizeFirmName(matchedTitle)].filter(Boolean);
+  if (!current || wanted.some((name) => name === current)) return false;
+  return identity.formerNames.some((former) => {
+    const normalized = normalizeFirmName(former);
+    return Boolean(normalized) && wanted.some((name) => name === normalized);
+  });
+}
+
 /** Forms 3, 4, and 5 for one CIK. The surname is quoted so a shared token is not the whole search. */
 export function insiderSearchUrl(surname: string, cik: string, form: string): string {
   const padded = padCik(cik);
@@ -404,6 +441,7 @@ export function assessEdgarMatch(input: {
   filingNames: string[] | string[][];
   website?: string;
   insiderNames?: string[] | string[][];
+  identity?: EdgarFilerIdentity | null;
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   const groups = filingGroups(input.filingNames);
   const flat = groups.flat();
@@ -435,6 +473,15 @@ export function assessEdgarMatch(input: {
     };
   }
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
+  if (input.identity && matchedNameIsFormer(input.org, match.title, input.identity)) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      url: edgarCompanyUrl(match.cik),
+      finding: `EDGAR's current name for CIK ${match.cik} is ${input.identity.currentName}. ${titled} is a former name. Needs review. A former name is not an exact match and does not corroborate.`,
+    };
+  }
   if (!sameFirmName(match.title, input.org) && !tickerAccepted) {
     return {
       status: "INCONCLUSIVE",
@@ -521,6 +568,11 @@ export async function lookupEdgar(
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
     if (filing.ok) groups.push(...(filingNames(filing.text) || []));
   }
+  let identity: EdgarFilerIdentity | null = null;
+  if (listed?.cik) {
+    const submissions = await fetchImpl(submissionsUrl(listed.cik)).catch(() => ({ ok: false, status: 0, text: "" }));
+    if (submissions.ok) identity = parseSubmissionsIdentity(submissions.text);
+  }
   const insiderNames: string[][] = [];
   if (listed?.cik && last.length >= 3) {
     const forms = await Promise.all(
@@ -541,5 +593,6 @@ export async function lookupEdgar(
     filingNames: groups,
     website,
     insiderNames,
+    identity,
   });
 }

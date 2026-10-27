@@ -8,6 +8,7 @@ import {
   assessLocalAddress,
   assessNominatimBody,
   censusGeocodeUrl,
+  geocoderSaysAddressInvalid,
   nominatimGeocodeUrl,
   statedUsState,
   streetGeocodeForms,
@@ -701,12 +702,22 @@ export function tokenLooksGibberish(token: string): boolean {
   // "th" and "ch" are ordinary English. "Northbridge" is not a made-up cluster.
   const withoutH = word.replace(/h/g, "");
   if (/[^aeiouy]{5,}/.test(withoutH)) return true;
+  // "vn" and the other pairs below do not occur inside an ordinary English word of this length.
+  if (word.length >= 6 && /vn|bv|zp|xz|zx|qv|jx|vx|wx|xk|zb|vq|vk|vp|vg|vc|vb|vm/.test(word)) return true;
   return false;
 }
 
 export function companyNameLooksReal(org: string): boolean {
   if (org.trim().length < 2 || /asdf|qwerty|testtest/i.test(org)) return false;
   return !companyPhraseTokens(org).some((token) => tokenLooksGibberish(token));
+}
+
+function personNameLooksReal(name: string): boolean {
+  const tokens = name
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((token) => token.length >= 4 && !/^(jr|sr|ii|iii|iv)$/.test(token));
+  return tokens.every((token) => !tokenLooksGibberish(token));
 }
 
 export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
@@ -720,8 +731,9 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
     (firmToken === orgToken || orgToken.startsWith(firmToken));
   const nameOk = (parts.length >= 2 && facts.name.trim().length >= 5) || oneWordFirm;
   const orgReal = companyNameLooksReal(facts.org);
+  const personReal = personNameLooksReal(facts.name);
   const roleKnown = annualDuesCents(facts.role) >= 0;
-  if (nameOk && orgReal && roleKnown) {
+  if (nameOk && orgReal && personReal && roleKnown) {
     return check({
       key: "plausibility",
       status: "PASS",
@@ -739,7 +751,9 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
     reviewFlag: true,
     finding: gibberish
       ? "The company name does not look like real words."
-      : "The name or company looks incomplete. Read the application before you decide.",
+      : !personReal
+        ? "The person name does not look like real words."
+        : "The name or company looks incomplete. Read the application before you decide.",
     source: "Local plausibility heuristic",
     url: "",
   });
@@ -836,13 +850,45 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
     TN: "https://sos.tn.gov/business-services/business-search",
     AZ: "https://ecorp.azcc.gov/EntitySearch/Index",
+    AL: "https://arc-sos.state.al.us/CGI/CORPNAME.MBR/INPUT",
+    AK: "https://www.commerce.alaska.gov/cbp/main/search/entities",
+    AR: "https://www.sos.arkansas.gov/corps/search_corps.php",
+    HI: "https://hbe.ehawaii.gov/documents/search.html",
+    ID: "https://sosbiz.idaho.gov/search/business",
+    IN: "https://bsd.sos.in.gov/publicbusinesssearch",
+    KS: "https://www.sos.ks.gov/eforms/BusinessEntity/Search.aspx",
+    KY: "https://web.sos.ky.gov/ftsearch/",
+    LA: "https://coraweb.sos.la.gov/CommercialSearch/CommercialSearch.aspx",
+    ME: "https://apps.web.maine.gov/nei-sos-icrs/ICRS?MainPage=x",
+    MI: "https://cofs.lara.state.mi.us/SearchApi/Search/Search",
+    MN: "https://mblsportal.sos.state.mn.us/Business/Search",
+    MS: "https://corp.sos.ms.gov/corp/portal/c/page/corpBusinessIdSearch/portal.aspx",
+    MO: "https://bsd.sos.mo.gov/BusinessEntity/BESearch.aspx?SearchType=0",
+    MT: "https://biz.sosmt.gov/search/business",
+    NE: "https://www.nebraska.gov/sos/corp/corpsearch.cgi?nav=search",
+    NV: "https://esos.nv.gov/EntitySearch/OnlineEntitySearch",
+    NH: "https://quickstart.sos.nh.gov/online/BusinessInquire",
+    NM: "https://portal.sos.state.nm.us/BFS/online/CorporationBusinessSearch",
+    ND: "https://firststop.sos.nd.gov/search/business",
+    OH: "https://businesssearch.ohiosos.gov/",
+    OK: "https://www.sos.ok.gov/corp/corpInquiryFind.aspx",
+    RI: "https://business.sos.ri.gov/CorpWeb/CorpSearch/CorpSearch.aspx",
+    SC: "https://businessfilings.sc.gov/BusinessFiling/Entity/Search",
+    SD: "https://sosenterprise.sd.gov/BusinessServices/Business/FilingSearch.aspx",
+    UT: "https://businessregistration.utah.gov/EntitySearch/OnlineEntitySearch",
+    VT: "https://bizfilings.vermont.gov/online/BusinessInquire",
+    WV: "https://apps.sos.wv.gov/business/corporations/",
+    WI: "https://www.wdfi.org/apps/corpsearch/Search.aspx",
+    WY: "https://wyobiz.wyo.gov/Business/FilingSearch.aspx",
   };
   if (!state || !links[state]) {
     return check({
       key: "business-registry",
       status: "NOT_RUN",
       weight: 8,
-      finding: "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.",
+      finding: state
+        ? `Couldn't check for free. No free ${state} registry API. Open the state search and look up ${facts.org}.`
+        : "Couldn't check for free. No free registry API for this location. Open the state search and look up the company.",
       source: "State registry",
       url: "",
     });
@@ -1120,17 +1166,26 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
       finding: `${censusNote}OpenStreetMap Nominatim matched this street address. The state and ZIP also check out.`,
     });
   }
+  if (census.kind === "invalid" || nominatim.kind === "invalid") {
+    return check({
+      ...base,
+      status: "FAIL",
+      url: nominatim.url || census.url,
+      corroborates: false,
+      finding: "The address did not check out. The geocoder said this address is invalid.",
+    });
+  }
   const url = nominatim.url || census.url;
   const bothDown = census.kind === "down" && nominatim.kind === "down";
   const bothMissed = census.kind === "none" && nominatim.kind === "none";
   const finding = bothDown
-    ? "The address is not checkable. The Census geocoder and OpenStreetMap Nominatim did not respond. This is inconclusive. It is not a pass and not a failure."
+    ? "The address could not be checked. The Census geocoder and OpenStreetMap Nominatim did not respond. This is not a pass and not a failure."
     : bothMissed
-      ? "The address was not confirmed. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure."
-      : "The address was not confirmed. A geocoder returned no match and the other did not respond. This is inconclusive. It is not a pass and not a failure.";
+      ? "The address could not be checked. The Census geocoder and OpenStreetMap Nominatim returned no match. This is not a pass and not a failure."
+      : "The address could not be checked. A geocoder returned no match and the other did not respond. This is not a pass and not a failure.";
   return check({
     ...base,
-    status: "INCONCLUSIVE",
+    status: "UNAVAILABLE",
     url,
     corroborates: false,
     finding,
@@ -1142,7 +1197,7 @@ async function askGeocoder(
   forms: string[],
   parsed: ParsedAddress,
   source: "census" | "nominatim",
-): Promise<{ kind: "match"; url: string } | { kind: "none"; url: string } | { kind: "down"; url: string }> {
+): Promise<{ kind: "match"; url: string } | { kind: "none"; url: string } | { kind: "invalid"; url: string } | { kind: "down"; url: string }> {
   let lastUrl = "";
   let sawNone = false;
   for (const street of forms) {
@@ -1152,6 +1207,7 @@ async function askGeocoder(
     try {
       const http = await ctx.fetchText?.(url);
       if (!http?.ok) continue;
+      if (geocoderSaysAddressInvalid(http.text)) return { kind: "invalid", url };
       const judged = source === "census" ? assessCensusBody(http.text, parsed) : assessNominatimBody(http.text, parsed);
       if (judged === "match") return { kind: "match", url };
       if (judged === "none") sawNone = true;

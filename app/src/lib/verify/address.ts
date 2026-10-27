@@ -233,6 +233,12 @@ export function assessLocalAddress(location: string): LocalAddress {
       finding: "The address did not check out. The street number has to be 1 or higher.",
     };
   }
+  if (/\b(?:p\.?\s*o\.?\s*box|post\s+office\s+box)\b/i.test(`${parsed.street} ${parsed.city}`)) {
+    return {
+      kind: "invalid",
+      finding: "The address did not check out. A P.O. box is not a street address.",
+    };
+  }
   const geocode = Boolean(parsed.street && parsed.city && parsed.state && parsed.zip);
   return { kind: "pass", parsed, geocode };
 }
@@ -343,6 +349,12 @@ function censusRowAgrees(match: unknown, parsed: ParsedAddress): boolean {
   return true;
 }
 
+/** An empty match list is a miss. Only an explicit invalid-address message is a failure. */
+export function geocoderSaysAddressInvalid(text: string): boolean {
+  if (/"addressMatches"\s*:/.test(text)) return false;
+  return /invalid address|address is invalid|not a valid address/i.test(text);
+}
+
 export function assessCensusBody(text: string, parsed?: ParsedAddress): "match" | "none" | "unreadable" {
   try {
     const body = JSON.parse(text) as { result?: { addressMatches?: unknown } };
@@ -375,8 +387,11 @@ export function assessNominatimBody(text: string, parsed: ParsedAddress): "match
       const post = String(address.postcode || "").slice(0, 5);
       if (zip5 && post && post !== zip5) continue;
       const road = streetName(String(address.road || ""));
-      if (wantedStreet && road && road !== wantedStreet) continue;
-      if (wantedStreet && !road) continue;
+      const building = String(address.building || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const roadAgrees = Boolean(wantedStreet && road && road === wantedStreet);
+      const buildingAgrees = Boolean(wantedStreet && building && (building === wantedStreet || building.includes(wantedStreet)));
+      if (wantedStreet && !roadAgrees && !buildingAgrees) continue;
+      if (wantedStreet && !road && !building) continue;
       return "match";
     }
     return "none";

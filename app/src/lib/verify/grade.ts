@@ -527,6 +527,7 @@ function failSentence(check: CheckOutput): string | null {
     return `The email looks like a shared inbox (${source}).`;
   }
   if (check.key === "plausibility" && check.status === "FAIL") {
+    if (/person name does not look like real words/i.test(check.finding)) return `The person name does not look like real words (${source}).`;
     if (/does not look like real words/i.test(check.finding)) return `The company name does not look like real words (${source}).`;
     return `The name or company looks incomplete (${source}).`;
   }
@@ -646,9 +647,39 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   return `${requestOnly} ${name} applied as a ${role} at ${org}, ${location}. ${quoteStatement(facts.statement)} ${invite}`.trim();
 }
 
+function domainUnregisteredOrDead(checks: CheckOutput[]): boolean {
+  const rdap = findCheck(checks, "rdap");
+  const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  const rdapDead = Boolean(rdap && rdap.status === "FAIL" && /not registered|does not resolve/i.test(rdap.finding));
+  const webDead = Boolean(website && website.status === "FAIL" && /does not resolve|not registered/i.test(website.finding));
+  return rdapDead || webDead;
+}
+
+/** A loading site, a registry hit, or an EDGAR exact current-name match. A former name is not a match. */
+export function companyExistsEvidence(checks: CheckOutput[]): boolean {
+  const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  if (website?.status === "PASS") return true;
+  if (website && website.status === "FAIL" && !/does not resolve|not registered|did not check out/i.test(website.finding)) return true;
+  const registry = findCheck(checks, "business-registry");
+  if (registry?.status === "PASS") return true;
+  const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
+  if (!edgar || /former name/i.test(edgar.finding)) return false;
+  if (edgar.status === "PASS") return true;
+  if (edgar.companyOnly && !edgar.reviewFlag && /name-only company match|exact company name/i.test(edgar.finding)) return true;
+  return false;
+}
+
+/** Unregistered or non-resolving domain, and nothing confirmed the company. */
+export function companyCouldNotBeFound(checks: CheckOutput[]): boolean {
+  return domainUnregisteredOrDead(checks) && !companyExistsEvidence(checks);
+}
+
 function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const org = facts.org?.trim() || facts.name?.trim() || "The company";
   const evidence: string[] = [`${org} is the company named on the application.`];
+  if (companyCouldNotBeFound(checks)) {
+    evidence.push("Company could not be found. The domain is not registered or does not resolve, and no free source confirmed this company.");
+  }
   const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (website?.status === "PASS" && website.companyOnly) {
     evidence.push(`The company's own site names the company. Company confirmed, person not confirmed (${website.source}).`);
@@ -664,6 +695,8 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
   if (edgar?.status === "PASS") {
     evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
+  } else if (edgar && /former name/i.test(edgar.finding)) {
+    evidence.push(edgar.finding);
   } else if (edgar && /parent match, needs review/i.test(edgar.finding)) {
     evidence.push(edgar.finding);
   } else if (edgar?.status === "INCONCLUSIVE" && edgar.companyOnly && !edgar.reviewFlag) {
@@ -765,6 +798,9 @@ export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
 }
 
 function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean, checks: CheckOutput[], org: string): Line {
+  if (row && /former name/i.test(row.finding)) {
+    return portionLine(0, possible, "A former EDGAR name is not an exact match and needs review");
+  }
   if (row?.status === "PASS") {
     return award(true, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
   }
@@ -828,7 +864,7 @@ function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: numbe
   if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
   if (row.status === "FAIL") return portionLine(0, possible, "The address did not check out");
   if (row.status === "UNAVAILABLE" || row.status === "INCONCLUSIVE") {
-    return { earned: 0, possible: 0, reason: "The address is inconclusive. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
+    return { earned: 0, possible: 0, reason: "The address could not be checked. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
   }
   if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
   return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
@@ -906,7 +942,9 @@ export function gradeChecks(
     award(passed(findCheck(checks, "velocity")), weights.risk.velocity, "There was no burst of applications", "The repeat-application check did not pass"),
   ]);
   const role = sumLines([
-    award(passed(findCheck(checks, "plausibility")), weights.role.plausibility, "The name, company, and role are readable", "The name, company, or role is not readable"),
+    companyCouldNotBeFound(checks)
+      ? portionLine(0, weights.role.plausibility, "Company could not be found")
+      : award(passed(findCheck(checks, "plausibility")), weights.role.plausibility, "The name, company, and role are readable", "The name, company, or role is not readable"),
     inviteAward(findCheck(checks, "invite-source"), weights.role["invite-source"], weightsMode, facts),
   ]);
   const statementOk = (facts.statement || "").trim().length >= 40;
@@ -980,7 +1018,11 @@ export function gradeChecks(
     applyCap(CAP_RULES.thinCorroboration, "fewer than two independent sources tied this person to this company");
   }
 
-  const checked = checks.map(passSentence).filter((line): line is string => Boolean(line));
+  const missingCompany = companyCouldNotBeFound(checks);
+  const checked = checks
+    .filter((check) => !(missingCompany && check.key === "plausibility"))
+    .map(passSentence)
+    .filter((line): line is string => Boolean(line));
   const failed = checks.map(failSentence).filter((line): line is string => Boolean(line));
   const unchecked = checks.map((check) => uncheckedSentence(check, checks)).filter((line): line is string => Boolean(line));
   const storyCount = checks.filter((check) => check.key === "news-story").length;
@@ -996,6 +1038,15 @@ export function gradeChecks(
     if (attention.some((existing) => existing.title === item.title)) return;
     attention.push({ ...item, detail: capitalizeSentences(item.detail) });
   };
+  if (missingCompany) {
+    banners.push("Company could not be found. The domain is not registered or does not resolve, and no free source confirmed the company.");
+    pushAttention({
+      severity: "High",
+      title: "Company could not be found",
+      detail:
+        "The domain is not registered or does not resolve, and no free source confirmed the company. A site that loads, a state registry hit, or an EDGAR exact current-name match would confirm the company. A former name does not. This file is not company-confirmed.",
+    });
+  }
   for (const check of hardChecks) {
     pushAttention({ severity: "High", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
