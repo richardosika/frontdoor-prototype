@@ -17,7 +17,7 @@ const SIGN_RE = /^Richard Osika,\s*Founder\b/i;
 const CODE_RE = /\bcode is\s+(\d{4})\b/i;
 
 const FOOTER_LINE = `${BRAND.legalName}, ${BRAND.address} · ${BRAND.contactPhone} · ${BRAND.contactEmail}`;
-const FOOTER_NOTE = "Private Floor does not offer securities or process payments through the platform.";
+const FOOTER_NOTE = "Private Floor does not offer securities or take investments.";
 export const RECEIPT_SUBJECT = "Private Floor payment receipt";
 export const RECEIPT_FOOTER_NOTE = "Membership dues only. Private Floor does not offer securities or take investments.";
 

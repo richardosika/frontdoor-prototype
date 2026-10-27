@@ -26,6 +26,7 @@ export type MemberReview = {
   applicationStatus: string | null;
   verdict: string;
   mode: MemberReviewMode;
+  location: string;
 };
 
 function rowsFromSnapshot(value: unknown): StepEvidence[] {
@@ -140,5 +141,6 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
     applicationStatus: application?.status || null,
     verdict,
     mode: open ? "application" : invitePending ? "invite" : "closed",
+    location: application?.location || invite?.location || user?.location || "",
   };
 }

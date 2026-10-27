@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { ADMIN_INTROS } from "@/lib/membership-copy";
 import { displayCheckStatus } from "@/lib/review-steps";
 import { CHECK_RESULTS, VERIFICATION_STATUSES, checkResultLabel, verificationCaseHeading, verificationStatusLabel } from "@/lib/verification";
+import { restoreAdminNotice } from "@/lib/admin-notice";
 import { applyReviewSkips, parseGradeSnapshot } from "@/lib/verify/grade";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,12 @@ export default async function VerificationCasePage({
   await requireVerificationAdmin();
   const { id } = await params;
   const query = await searchParams;
+  await restoreAdminNotice({
+    scope: `case:${id}`,
+    pathname: `/admin/verification/${id}`,
+    step: query.step,
+    notice: query.notice,
+  });
   await prepareGuidedCase(id);
   const record = await prisma.verificationCase.findUnique({
     where: { id },
@@ -219,6 +226,7 @@ export default async function VerificationCasePage({
             applicationStatus={memberReview.applicationStatus}
             verdict={memberReview.verdict}
             role={record.application?.role || record.user?.role || record.inviteRequest?.role || ""}
+            location={memberReview.location}
           />
         </div>
       ) : null}

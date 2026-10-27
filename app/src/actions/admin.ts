@@ -13,7 +13,7 @@ import { notify } from "@/lib/notify";
 import { canPromoteTierFromVouch } from "@/lib/verification";
 import { applyDecisionStatus, noteApplicationReferences, reviewVouchOnChecklist } from "@/lib/verification-db";
 import { issueInviteCodeForRequest } from "@/lib/invite-issue";
-import { OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
+import { OPEN_APPLICATION_STATUSES, verdictLabel } from "@/lib/application-status";
 import { annualDuesCents, mailDuesAmounts } from "@/lib/dues";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { noticeTestRecipient } from "@/lib/brand";
@@ -25,6 +25,7 @@ import { decisionNoticeText, parseGradeSnapshot, type GradeReport } from "@/lib/
 import { needsStrongApprovalWarning } from "@/lib/approval-warning";
 import { paymentRenewalLabel, paymentRequired } from "@/lib/payments";
 import { roleLabel } from "@/lib/roles";
+import { rememberAdminNotice } from "@/lib/admin-notice";
 import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
 
@@ -60,8 +61,12 @@ export async function reviewApplication(formData: FormData) {
       revalidatePath(`/admin/verification/${linked.id}`);
       revalidatePath("/admin/verification");
     }
-    if (reviewPath) redirect(`${reviewPath}?step=decision&notice=${encodeURIComponent(notice)}`);
-    redirect(`/admin/applications/${applicationId}?notice=${encodeURIComponent(notice)}`);
+    const destination = reviewPath
+      ? `${reviewPath}?step=decision&notice=${encodeURIComponent(notice)}`
+      : `/admin/applications/${applicationId}?notice=${encodeURIComponent(notice)}`;
+    const scope = reviewPath && caseId ? `case:${caseId}` : `application:${applicationId}`;
+    await rememberAdminNotice(scope, notice);
+    redirect(destination);
   };
   const decision = String(formData.get("decision") || "");
   const internalNote = String(formData.get("note") || "").trim().slice(0, 500);
@@ -114,7 +119,7 @@ export async function reviewApplication(formData: FormData) {
         data: {
           actorId: admin.id,
           action: latest?.verdict === "NOT_LEGIT" ? "APPROVE_NOT_LEGIT" : "APPROVE_DESPITE_GRADE",
-          summary: `${admin.name} approved ${application.name} (${application.email}) despite grade ${gradeLetter || "ungraded"}, verdict ${latest?.verdict || "none"}, recommendation ${recommendation || "none"}.`,
+          summary: `${admin.name} approved ${application.name} (${application.email}) despite grade ${gradeLetter || "ungraded"}, ${latest?.verdict ? verdictLabel(latest.verdict) : "no verdict"}, recommendation ${recommendation || "none"}.`,
         },
       });
     }

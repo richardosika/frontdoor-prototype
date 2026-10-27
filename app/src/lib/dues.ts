@@ -76,6 +76,11 @@ export function statusMembershipLine(input: {
     const when = input.paymentStatus === "PAID" && input.renewalLabel ? ` Next charge date ${input.renewalLabel}.` : "";
     return `This membership is active.${when}`;
   }
+  if (input.status === "APPROVED" || input.status === "PAYMENT_DUE") {
+    if (input.monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
+    if (input.waived) return `${offerLabel(input.monthlyCents)}. ${DUES_WAIVED}`;
+    return `${offerLabel(input.monthlyCents)}. Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Dues are due now to activate your membership. Flat, never based on a deal.`;
+  }
   return applicantDuesSentence(input.monthlyCents, input.waived);
 }
 

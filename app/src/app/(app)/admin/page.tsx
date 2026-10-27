@@ -5,7 +5,8 @@ import { CopyCode } from "@/components/copy-code";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
-import { activitySince, attentionItems, funnelCounts, mergeActivity, type ActivityRow } from "@/lib/admin-home";
+import { activitySince, attentionItems, funnelCounts, mergeActivity, plainActivityText, type ActivityRow } from "@/lib/admin-home";
+import { verdictLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { roleLabel } from "@/lib/roles";
@@ -119,7 +120,7 @@ export default async function AdminPage({
         id: `run-${row.id}`,
         at: row.createdAt.toISOString(),
         kind: "verification",
-        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${row.verdict}` : ""}${typeof row.score === "number" ? ` · ${row.score}` : ""} · ${row.application?.name || "No application"}`,
+        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}${typeof row.score === "number" ? ` · ${row.score}` : ""} · ${row.application?.name || "No application"}`,
         href: "/admin/audit",
       }),
     ),
@@ -203,7 +204,7 @@ export default async function AdminPage({
             <li key={row.id} className="py-2">
               <Link href={row.href} className="block min-h-11">
                 <span className="text-xs text-mut">{formatAuditTime(new Date(row.at))}</span>
-                <span className="mt-0.5 block text-ink">{row.text}</span>
+                <span className="mt-0.5 block text-ink">{plainActivityText(row.text)}</span>
               </Link>
             </li>
           ))}

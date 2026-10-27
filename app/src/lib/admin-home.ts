@@ -194,6 +194,16 @@ export function activitySince(now = new Date()): Date {
   return new Date(now.getTime() - ACTIVITY_WINDOW_MS);
 }
 
+/** Activity lines use words. Stored enums such as NEEDS_OWNER_DECISION stay in the database. */
+export function plainActivityText(text: string): string {
+  return text
+    .replaceAll("verdict NEEDS_OWNER_DECISION", "Needs your decision")
+    .replaceAll("NEEDS_OWNER_DECISION", "Needs your decision")
+    .replaceAll("NOT_LEGIT", "Recommended not legit")
+    .replaceAll("verdict LEGIT", "Recommended legit")
+    .replaceAll(/\bLEGIT\b/g, "Recommended legit");
+}
+
 export function mergeActivity(rows: ActivityRow[], limit = 12): ActivityRow[] {
   return [...rows].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, limit);
 }

@@ -3,7 +3,7 @@ import { DecisionForm, InviteDecisionForm, RevokeApprovalForm } from "@/componen
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { approvalAttentionDetail, approvalAttentionTitle, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
@@ -24,6 +24,7 @@ export function GuidedReview({
   applicationStatus = null,
   verdict = "",
   role = "",
+  location = "",
 }: {
   applicationId: string;
   caseId: string;
@@ -37,6 +38,7 @@ export function GuidedReview({
   applicationStatus?: string | null;
   verdict?: string;
   role?: string;
+  location?: string;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -85,6 +87,7 @@ export function GuidedReview({
           verdict={verdict}
           steps={steps}
           role={role}
+          location={location}
         />
       ) : (
         <article className="mt-4">
@@ -172,6 +175,7 @@ function DecisionStep({
   verdict,
   steps,
   role,
+  location,
 }: {
   applicationId: string;
   caseId: string;
@@ -186,19 +190,26 @@ function DecisionStep({
   verdict: string;
   steps: BuiltStep[];
   role: string;
+  location: string;
 }) {
   const strongWarning = needsStrongApprovalWarning({
     letter: grade?.letter,
     recommendation: grade?.recommendation,
     verdict,
   });
+  const attention = (grade?.attention ?? []).map((item) => ({
+    ...item,
+    title: approvalAttentionTitle(item.title, location),
+    detail: approvalAttentionDetail(item.title, item.detail, location),
+  }));
+  const displayGrade = grade ? { ...grade, attention } : null;
   const warningText = strongApprovalWarning({
     letter: grade?.letter || "",
     verdict: verdictLabel(verdict),
     recommendation: grade?.recommendation || "",
     items: unverifiedApprovalItems({
       steps,
-      attention: grade?.attention,
+      attention,
     }),
   });
   const canRevoke = Boolean(applicationId) && (applicationStatus === "APPROVED" || applicationStatus === "PAYMENT_DUE");
@@ -225,7 +236,7 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">No steps were skipped.</p>
       )}
-      {grade ? <ExecutiveSummary report={grade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
+      {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
         <DecisionForm
           applicationId={applicationId}

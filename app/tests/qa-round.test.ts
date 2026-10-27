@@ -265,7 +265,8 @@ describe("QA fixes that stay outside grading", () => {
     expect(html).toContain(">SIGN IN</a>");
     expect(html).toContain(RECEIPT_FOOTER_NOTE);
     expect(html).not.toContain("process payments through the platform");
-    expect(footerNoteFor("We have your Private Floor application")).toContain("process payments through the platform");
+    expect(footerNoteFor("We have your Private Floor application")).toBe("Private Floor does not offer securities or take investments.");
+    expect(footerNoteFor("Your Private Floor application")).not.toMatch(/\$|dues|payment|price|charge/i);
   });
 
   it("does not name the demo member on the administrator sign-in page", () => {
@@ -311,6 +312,10 @@ describe("QA fixes that stay outside grading", () => {
     expect(paid).not.toContain("Due only after approval");
     expect(paid).not.toContain("$");
     expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 12_900, waived: false })).toContain("Due only after approval");
+    const approvedUnpaid = statusMembershipLine({ status: "APPROVED", monthlyCents: 12_900, waived: false, paymentStatus: "DUE" });
+    expect(approvedUnpaid).toContain("Dues are due now to activate your membership.");
+    expect(approvedUnpaid).not.toContain("Due only after approval");
+    expect(statusMembershipLine({ status: "PAYMENT_DUE", monthlyCents: 14_900, waived: false })).toContain("Dues are due now to activate your membership.");
 
     const decision = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
     expect(decision.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(decision.indexOf('role="dialog"'));

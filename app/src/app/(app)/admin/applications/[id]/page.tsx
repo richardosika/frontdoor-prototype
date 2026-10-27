@@ -8,6 +8,7 @@ import { PaymentPanel } from "@/components/payment-admin";
 import { CheckTable, ExecutiveSummary, GradeMark } from "@/components/grade-summary";
 import { RunAndReload } from "@/components/run-and-reload";
 import { btn, btnOutline, card, field, labelCls, sectionLabel } from "@/components/ui";
+import { restoreAdminNotice } from "@/lib/admin-notice";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { adminDuesLine } from "@/lib/dues";
@@ -34,6 +35,12 @@ export default async function ApplicationDetailPage({
   await settleStuckRuns();
   const { id } = await params;
   const query = await searchParams;
+  await restoreAdminNotice({
+    scope: `application:${id}`,
+    pathname: `/admin/applications/${id}`,
+    step: query.step,
+    notice: query.notice,
+  });
   const application = await prisma.application.findUnique({
     where: { id },
     include: {

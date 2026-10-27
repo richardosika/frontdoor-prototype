@@ -14,6 +14,7 @@ import {
 } from "@/lib/verification-db";
 import { confirmedNote, isAutoSuggestedNote } from "@/lib/guided-prefill";
 import { prepareGuidedCase, runLivePrefill } from "@/lib/guided-prefill-db";
+import { rememberAdminNotice } from "@/lib/admin-notice";
 import { rerunApplicantName, rerunFinishedSummary, rerunGradeFields } from "@/lib/rerun-audit";
 import { parseGradeSnapshot } from "@/lib/verify/grade";
 import type { Prisma } from "@prisma/client";
@@ -396,14 +397,17 @@ export async function decideInviteReview(formData: FormData) {
     revalidatePath("/admin");
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
-    redirect(`${back}&notice=${encodeURIComponent(`Referral code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`)}`);
+    const approvedNotice = `Referral code issued for ${issued.email}. Code: ${issued.code}. This file is Verified.`;
+    await rememberAdminNotice(`case:${caseId}`, approvedNotice);
+    redirect(`${back}&notice=${encodeURIComponent(approvedNotice)}`);
   }
   if (decision === "DECLINED") {
     await prisma.inviteRequest.update({ where: { id: record.inviteRequest.id }, data: { status: "DECLINED" } });
     await applyDecisionStatus({ caseId: record.id, decision, actorId: admin.id, actorName: admin.name });
     revalidatePath("/admin/applications");
     revalidatePath("/admin/verification");
-    redirect(`${back}&notice=${encodeURIComponent("Declined. This file is Rejected.")}`);
+    await rememberAdminNotice(`case:${caseId}`, "Declined");
+    redirect(`${back}&notice=${encodeURIComponent("Declined")}`);
   }
   await applyDecisionStatus({ caseId: record.id, decision: "NEEDS_INFO", actorId: admin.id, actorName: admin.name });
   if (note) {
@@ -413,5 +417,6 @@ export async function decideInviteReview(formData: FormData) {
     });
   }
   revalidatePath("/admin/verification");
+  await rememberAdminNotice(`case:${caseId}`, "Asked for more info. This file is Needs info.");
   redirect(`${back}&notice=${encodeURIComponent("Asked for more info. This file is Needs info.")}`);
 }

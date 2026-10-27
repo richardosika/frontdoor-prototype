@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -23,7 +24,7 @@ function ConfirmModal({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-forest/50 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-forest/50 p-4 sm:items-center">
       <div role="dialog" aria-modal="true" aria-labelledby="decision-confirm-title" className="w-full max-w-md rounded border border-line bg-paper p-4 shadow-[0_30px_80px_rgba(0,0,0,.28)]">
         <h2 id="decision-confirm-title" className="font-serif text-2xl font-normal text-forest">
           {title}
@@ -71,6 +72,7 @@ export function DecisionForm({
   const [result, setResult] = useState("");
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   function approveBody() {
     const dues = paying
@@ -96,8 +98,7 @@ export function DecisionForm({
     const form = formRef.current;
     if (!form || !pending) return;
     if (pending === "APPROVED" && strongWarning) {
-      const box = form.querySelector('input[name="acknowledgeGrade"]');
-      if (!(box instanceof HTMLInputElement) || !box.checked) {
+      if (!acknowledged) {
         setModalError("Check the box to confirm this approval. Approval was not sent.");
         return;
       }
@@ -109,14 +110,43 @@ export function DecisionForm({
       if (input instanceof HTMLInputElement) input.value = "yes";
     }
     const button = form.querySelector(`button[value="${pending}"]`);
-    setPending(null);
     setModalError("");
     setResult("");
     allowSubmit.current = true;
     if (button instanceof HTMLButtonElement) form.requestSubmit(button);
   }
 
+  const dialog = pending ? (
+    <ConfirmModal
+      title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
+      body={
+        pending === "APPROVED"
+          ? approveBody()
+          : "Decline this application? A short notice goes out. The applicant does not see your reason."
+      }
+      confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
+      error={modalError}
+      extra={
+        pending === "APPROVED" && strongWarning ? (
+          <label className="mt-3 flex items-start gap-2 text-sm text-ink">
+            <input
+              name="acknowledgeGrade"
+              type="checkbox"
+              className="mt-1"
+              checked={acknowledged}
+              onChange={(event) => setAcknowledged(event.target.checked)}
+            />
+            <span>I confirm this approval despite the grade and the unverified items.</span>
+          </label>
+        ) : null
+      }
+      onConfirm={confirmPending}
+      onCancel={cancelPending}
+    />
+  ) : null;
+
   return (
+    <>
     <form
       ref={formRef}
       action={reviewApplication}
@@ -124,6 +154,10 @@ export function DecisionForm({
       onSubmit={(event) => {
         if (allowSubmit.current) {
           allowSubmit.current = false;
+          return;
+        }
+        if (pending) {
+          event.preventDefault();
           return;
         }
         setError("");
@@ -139,6 +173,7 @@ export function DecisionForm({
         if (decision === "APPROVED" || decision === "DECLINED") {
           event.preventDefault();
           setModalError("");
+          setAcknowledged(false);
           setPending(decision);
         }
       }}
@@ -184,29 +219,9 @@ export function DecisionForm({
           Decline
         </button>
       </div>
-      {pending ? (
-        <ConfirmModal
-          title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
-          body={
-            pending === "APPROVED"
-              ? approveBody()
-              : "Decline this application? A short notice goes out. The applicant does not see your reason."
-          }
-          confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
-          error={modalError}
-          extra={
-            pending === "APPROVED" && strongWarning ? (
-              <label className="mt-3 flex items-start gap-2 text-sm text-ink">
-                <input name="acknowledgeGrade" type="checkbox" className="mt-1" />
-                <span>I confirm this approval despite the grade and the unverified items.</span>
-              </label>
-            ) : null
-          }
-          onConfirm={confirmPending}
-          onCancel={cancelPending}
-        />
-      ) : null}
     </form>
+    {dialog && typeof document !== "undefined" ? createPortal(dialog, document.body) : null}
+  </>
   );
 }
 

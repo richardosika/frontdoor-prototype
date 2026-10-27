@@ -49,7 +49,8 @@ describe("Resend test mail", () => {
     expect(message.html).toContain("letter-spacing:0.4em");
     expect(message.html).toContain(">1234<");
     expect(message.html).toContain("Private Floor Club LLC, 299 Market Street, Saddle Brook, NJ 07663");
-    expect(message.html).toContain("does not offer securities or process payments through the platform");
+    expect(message.html).toContain("does not offer securities or take investments");
+    expect(message.html).not.toContain("process payments through the platform");
     const payload = resendPayload(message);
     expect(payload.to).toEqual([TEST_INBOX]);
     expect(payload.html).toContain(">1234<");
