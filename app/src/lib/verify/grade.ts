@@ -660,7 +660,7 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push("Court records were not checked, or the court source did not answer.");
   } else if (isCorroboratedNegative(courts)) {
     evidence.push("A court result may name this person and company near a serious word. Possible match, verify. It is not treated as a confirmed case.");
-  } else if (courts.status === "PASS") {
+  } else if (courts.status === "PASS" || /None found/i.test(courts.finding)) {
     evidence.push("None found in CourtListener federal data. That is not a risk flag, not credit, and not a clearance of all litigation.");
   } else {
     evidence.push("The court search did not confirm a case against this person and company.");
@@ -696,10 +696,10 @@ function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeight
   const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
   if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
   if (row?.status === "PASS" && row.selfReported && !independent) {
     return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
   }
-  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
   return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");
 }
 
@@ -709,10 +709,10 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
   }
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
   if (row?.status === "PASS" && row.companyOnly) {
-    if (!independent) {
-      return portionLine(0, possible, "The LinkedIn company page is company-only and no independent source tied the person to the company");
-    }
     return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  }
+  if (row?.status === "PASS" && row.selfReported && !independent) {
+    return portionLine(0, possible, "The applicant's own LinkedIn profile is self-reported and no independent source tied the person to the company");
   }
   return award(row?.status === "PASS", possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
 }
@@ -990,17 +990,22 @@ export function gradeChecks(
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
   const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
+  const companyConfirmed = checks.some(
+    (check) => check.status === "PASS" && (check.companyOnly || check.key === "business-registry"),
+  );
   if (!bothNamed) {
     const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
     const weakHit = independentCount > 0;
     pushAttention({
       severity: "Medium",
       title: "Thin public record",
-      detail: weakHit
-        ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
-        : selfReported
-          ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
-          : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
+      detail: companyConfirmed
+        ? "company confirmed, person not confirmed. Request more info. A free source confirmed the company. Nothing tied this person to that company. This is not a rejection and not an approval. Ask for a team-page URL."
+        : weakHit
+          ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
+          : selfReported
+            ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
+            : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
     });
   } else if (independentCount < 2) {
     pushAttention({
@@ -1095,7 +1100,17 @@ export function gradeChecks(
     recommendation = "APPROVE WITH CONDITIONS";
   } else recommendation = "NEEDS MORE INFO";
 
-  const reasoning = reasoningFor({ recommendation, letter, score, confidence, paying, role: facts.role, hard: hardChecks.length > 0, review: reviewRed.length > 0 });
+  const reasoning = reasoningFor({
+    recommendation,
+    letter,
+    score,
+    confidence,
+    paying,
+    role: facts.role,
+    hard: hardChecks.length > 0,
+    review: reviewRed.length > 0,
+    companyConfirmed: companyConfirmed && !bothNamed,
+  });
   const nextStep = nextStepFor({ recommendation, checks, facts, paying });
   const summary: ExecutiveSections = {
     applicant: applicantSection(facts, options?.subject || "APPLICATION"),
@@ -1141,13 +1156,17 @@ function reasoningFor(input: {
   role?: string;
   hard: boolean;
   review: boolean;
+  companyConfirmed?: boolean;
 }): string {
   const grade = `The grade is ${input.letter} (${input.score} of 100) and confidence is ${input.confidence}.`;
   if (input.recommendation === "DECLINE") {
     return `${grade} A hard red flag is on the file. I recommend you decline unless you have read that flag and you still want this person. This is a recommendation only. You approve every member yourself.`;
   }
-  if (input.review) {
+  if (input.review && !input.companyConfirmed) {
     return `${grade} Something on the file might be this person, and it might be someone else. I recommend you get more information before you approve. I am not treating that hit as fact.`;
+  }
+  if (input.recommendation === "NEEDS MORE INFO" && input.companyConfirmed) {
+    return `${grade} company confirmed, person not confirmed. Request more info. The company showed up on a free source. Nothing tied this person to that company. This is not a rejection and not an approval.`;
   }
   if (input.recommendation === "NEEDS MORE INFO") {
     return `${grade} The file is too thin, or too many sources came back empty, for me to recommend approval. Empty sources were not counted in their favor.`;

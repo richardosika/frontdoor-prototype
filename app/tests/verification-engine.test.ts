@@ -293,7 +293,8 @@ describe("courts", () => {
       { ok: true, status: 200 },
       facts({ name: "Jeff Hines", org: "Skanska USA" }),
     );
-    expect(scattered.status).toBe("PASS");
+    expect(scattered.status).toBe("INCONCLUSIVE");
+    expect(scattered.status).not.toBe("PASS");
     expect(scattered.finding).toContain("None found");
     expect(scattered.reviewFlag).not.toBe(true);
     expect(scattered.corroborates).not.toBe(true);
@@ -337,7 +338,8 @@ describe("courts", () => {
       { ok: true, status: 200 },
       facts({ name: "Richard Kennedy", org: "Skanska USA" }),
     );
-    expect(otherGiven.status).toBe("PASS");
+    expect(otherGiven.status).toBe("INCONCLUSIVE");
+    expect(otherGiven.status).not.toBe("PASS");
     expect(otherGiven.finding).toContain("None found");
     expect(otherGiven.reviewFlag).not.toBe(true);
     const company = assessCourts(

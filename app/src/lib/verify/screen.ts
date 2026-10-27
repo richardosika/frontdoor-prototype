@@ -2,7 +2,7 @@ import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, leftTheCompany, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, firmContainsApplicantName, leftTheCompany, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -59,9 +59,13 @@ type Attempt = {
 
 const COMPANY_ONLY = "company confirmed, person NOT confirmed";
 
-export function scorePublicText(text: string, facts: { name: string; org: string; location: string; aliases?: string[] }): MatchScore {
+export function scorePublicText(
+  text: string,
+  facts: { name: string; org: string; location: string; aliases?: string[] },
+  options?: { ownFirm?: boolean },
+): MatchScore {
   const hay = text.toLowerCase();
-  const hit = personHit(text, facts.name, facts.org);
+  const hit = personHit(text, facts.name, facts.org, options?.ownFirm ? { ownFirm: true } : undefined);
   const suffixMismatch = hit === "suffix-mismatch";
   const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
@@ -768,7 +772,7 @@ async function personPageFromSitemap(
   for (const url of urls.slice(0, 4)) {
     const page = await pull(fetchText, url);
     if (page.status < 200 || page.status >= 400 || isBotChallenge(page.text)) continue;
-    const score = scorePublicText(visible(page.text), queryFacts);
+    const score = scorePublicText(visible(page.text), queryFacts, { ownFirm: true });
     if (!score.name) continue;
     if (!best || rank(score) > rank(best.score)) best = { url, score };
   }
@@ -975,7 +979,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       queryFacts = { ...queryFacts, aliases: brandAliases(facts.org, website || homeUrl, pages.map((page) => page.raw).join("\n")) };
       const best = pages
-        .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts) }))
+        .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts, { ownFirm: true }) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
       const label = crossDomain ? hostLabel(crossDomain) : "";
       const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
@@ -1083,7 +1087,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         }
         continue;
       }
-      const score = scorePublicText(visible(linked.text), queryFacts);
+      const ownProfile = /linkedin\.com\/in\//i.test(url);
+      const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile });
+      const selfNamedProfile = ownProfile && score.name && firmContainsApplicantName(facts.org, person);
       const blockedTyped = typedLinkedin && typedLinkedin !== url;
       attempts.push({
         key: "linkedin-fetch",
@@ -1097,6 +1103,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           : score.confidence === "none"
             ? "LinkedIn returned a page"
             : "the public LinkedIn page",
+        selfReported: selfNamedProfile || undefined,
       });
       recorded = true;
       break;

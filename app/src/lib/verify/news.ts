@@ -596,7 +596,9 @@ export function judgeHeadline(
   const company = Boolean(companyName) && textHasCompany(text, companyName, personName);
   const aliases = [...(facts.aliases || [])];
   const domain = facts.website ? domainBrand(facts.website) : "";
-  if (domain) aliases.push(domain);
+  const typed = companyPhraseTokens(companyName);
+  const typedCompact = typed.join("");
+  if (domain && domain !== typedCompact && !typed.includes(domain)) aliases.push(domain);
   const alias = company ? "" : mentionsBrandAlias(text, aliases);
   const kind = negativeKind(text);
   return {

@@ -976,7 +976,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       }),
     );
   }
-  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText), 40_000, {
+  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText, searchFacts.website), 40_000, {
     status: "UNAVAILABLE" as const,
     corroborates: false,
     url: "https://www.sec.gov/edgar/search/",

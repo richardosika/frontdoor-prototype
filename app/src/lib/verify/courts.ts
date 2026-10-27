@@ -180,7 +180,7 @@ export function assessCourts(
     });
   }
   return courtRow({
-    status: "PASS",
+    status: "INCONCLUSIVE",
     corroborates: false,
     finding: "None found. No CourtListener opinion contains the exact full name (first and last, in quotes). This is not a risk flag and not credit. This is not a clearance of all litigation.",
   });

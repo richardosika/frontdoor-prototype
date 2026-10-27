@@ -343,7 +343,7 @@ function surnamePattern(surname: string): string {
 
 const NAME_MIDDLE = String.raw`(?:\s+(?:[A-Z]\.?|[A-Z][a-z][A-Za-z'-]{0,24})){0,2}`;
 
-type NameSpan = { surnameStart: number; surnameEnd: number };
+type NameSpan = { matchStart: number; surnameStart: number; surnameEnd: number };
 
 /**
  * Given name (or nickname), then up to two initials or capitalized words, then the surname.
@@ -365,7 +365,7 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
     for (const hit of whole.matchAll(local)) surnameMatch = hit;
     if (!surnameMatch) return;
     const surnameStart = start + (surnameMatch.index ?? 0);
-    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
+    spans.push({ matchStart: start, surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
   };
   for (const match of text.matchAll(forward)) pushSurname(match.index ?? 0, match[0]);
   for (const match of text.matchAll(reverse)) {
@@ -373,7 +373,7 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
     const surnameMatch = new RegExp(surname).exec(match[0]);
     if (!surnameMatch) continue;
     const surnameStart = start + (surnameMatch.index ?? 0);
-    spans.push({ surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
+    spans.push({ matchStart: start, surnameStart, surnameEnd: surnameStart + surnameMatch[0].length });
   }
   const separator = String.raw`(?:\s*,\s*|\s+[Aa]nd\s+|\s+&\s+)`;
   const list = new RegExp(`(?<![A-Za-z0-9-])((?:[A-Z][a-z]{1,24}${separator})+[A-Z][a-z]{1,24})\\s+${surname}`, "g");
@@ -409,17 +409,54 @@ function suffixAfter(text: string, index: number): string | null {
 }
 
 /**
+ * The firm name contains this applicant's full name, in order.
+ * "Joshua Stein PLLC" contains Joshua Stein. "Rudin Management Company" does not contain William Rudin.
+ */
+export function firmContainsApplicantName(org: string, person: string): boolean {
+  const parsed = parsePersonName(person);
+  if (!parsed || parsed.given.length < 1) return false;
+  const phrase = companyPhraseTokens(org);
+  const name = [...parsed.given.map((part) => part.toLowerCase()), parsed.surname.toLowerCase()];
+  if (phrase.length < name.length) return false;
+  for (let index = 0; index <= phrase.length - name.length; index += 1) {
+    if (name.every((token, offset) => phrase[index + offset] === token)) return true;
+  }
+  return false;
+}
+
+const NAME_TITLES = new Set(["attorney", "lawyer", "counsel", "esq", "mr", "mrs", "ms", "dr", "hon"]);
+
+/** "Mark Joshua Stein" is a different person. "Attorney Joshua Stein" is still this person. */
+function otherGivenImmediatelyBefore(text: string, matchStart: number, parsed: ParsedPersonName): boolean {
+  const previous = text.slice(0, matchStart).match(/([A-Za-z][A-Za-z'-]*)\s+$/);
+  if (!previous) return false;
+  const word = previous[1];
+  if (!/^[A-Z]/.test(word)) return false;
+  const lower = word.toLowerCase().replace(/[^a-z'-]/g, "");
+  if (lower.length < 3) return false;
+  if (parsed.given.some((part) => part.toLowerCase() === lower)) return false;
+  if (TITLE_WORDS.has(lower) || NAME_TITLES.has(lower) || LEGAL.has(lower) || STOP.has(lower)) return false;
+  return true;
+}
+
+/**
  * Given name plus surname, in that order. When both the application and the page carry a suffix, they have to agree.
  * Jr against III is a mismatch. A page that omits the suffix does not contradict one.
  * A surname that only occurs inside the company name does not count.
+ * On the firm's own site, or the person's own LinkedIn profile, the firm name may be the person's name.
+ * That occurrence still counts for the person. A different given name in front of it does not.
  */
-export function personHit(text: string, name: string, org = ""): PersonHit {
+export function personHit(text: string, name: string, org = "", options?: { ownFirm?: boolean }): PersonHit {
   const parsed = parsePersonName(name);
   if (!parsed || parsed.given.length < 1) return "none";
   const companyRanges = org ? companySpanRanges(text, org) : [];
-  const spans = orderedNameSpans(text, parsed).filter(
-    (span) => !companyRanges.some((range) => span.surnameStart >= range.start && span.surnameStart < range.end),
-  );
+  const ownFirm = Boolean(options?.ownFirm) && firmContainsApplicantName(org, name);
+  const spans = orderedNameSpans(text, parsed).filter((span) => {
+    const inside = companyRanges.some((range) => span.surnameStart >= range.start && span.surnameStart < range.end);
+    if (!inside) return true;
+    if (!ownFirm) return false;
+    return !otherGivenImmediatelyBefore(text, span.matchStart, parsed);
+  });
   if (!spans.length) return "none";
   if (!parsed.suffix) return "match";
   const suffixes = spans.map((span) => suffixAfter(text, span.surnameEnd)).filter((item): item is string => Boolean(item));
@@ -559,7 +596,8 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   if (!phrase.length) return false;
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
   if (phrase.length === 1) {
-    if (!distinctive.length) return false;
+    const shortBrand = isShortBrandToken(phrase[0]);
+    if (!distinctive.length && !shortBrand) return false;
     if (!companyTokenHit(text, phrase[0])) return false;
     if (surnameOnly(text, phrase[0], org)) return false;
     void person;

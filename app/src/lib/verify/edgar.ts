@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, isDistinctiveCompanyToken, isGenericFirmToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -85,6 +85,40 @@ function firmTokens(value: string): string[] {
 
 function pickByTicker(rows: EdgarCompany[], org: string): EdgarCompany {
   return rows.reduce((best, row) => (preferTicker(tickerPreference(row.ticker, org), tickerPreference(best.ticker, org)) ? row : best));
+}
+
+/**
+ * The typed org is itself a ticker, and the website stem is that same ticker.
+ * "JLL" on jll.com is Jones Lang LaSalle. "ABC LLC" on a different domain is not ticker ABC.
+ */
+export function edgarTickerDomainMatch(rows: EdgarCompany[], org: string, website = ""): EdgarCompany | null {
+  const compact = normalizeFirmName(org).replace(/\s+/g, "");
+  if (!compact || compact.length < 2 || compact.length > 5) return null;
+  const stem = domainBrand(website);
+  if (!stem || stem !== compact) return null;
+  const hits = rows.filter((row) => row.ticker.trim().toLowerCase().replace(/[^a-z0-9]/g, "") === compact);
+  if (!hits.length) return null;
+  return pickByTicker(hits, org);
+}
+
+export function padCik(cik: string): string {
+  const digits = cik.replace(/\D/g, "");
+  return digits ? digits.padStart(10, "0") : "";
+}
+
+/** Forms 3, 4, and 5 for one CIK. The surname is quoted so a shared token is not the whole search. */
+export function insiderSearchUrl(surname: string, cik: string, form: string): string {
+  const padded = padCik(cik);
+  return `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${surname}"`)}&forms=${encodeURIComponent(form)}&ciks=${padded}`;
+}
+
+/** A reporting-owner display name on a CIK-scoped Form 3, 4, or 5. The company line in the same filing is not the person. */
+export function reportingOwnerLine(names: string[] | string[][], person: string): string {
+  for (const group of filingGroups(names)) {
+    const hit = group.find((name) => mentionsPerson(name, person));
+    if (hit) return hit.replace(/\s+/g, " ").trim();
+  }
+  return "";
 }
 
 /** "(Canada)" names a different filer. "(DE)" and a ticker in parentheses do not. */
@@ -312,15 +346,19 @@ export function assessEdgarMatch(input: {
   tickersOk: boolean;
   companies: EdgarCompany[];
   filingNames: string[] | string[][];
+  website?: string;
+  insiderNames?: string[] | string[][];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   const groups = filingGroups(input.filingNames);
   const flat = groups.flat();
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
+  const tickerMatch = input.tickersOk ? edgarTickerDomainMatch(input.companies, input.org, input.website || "") : null;
   const fromFiling = matchEdgarCompany(
     flat.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
     input.org,
   );
-  const match = fromList || fromFiling;
+  const match = fromList || tickerMatch || fromFiling;
+  const tickerAccepted = Boolean(tickerMatch) && match === tickerMatch;
   const personLine = personOnFiling(groups, input.person, input.org);
   if (!input.tickersOk && flat.length === 0) {
     return {
@@ -341,7 +379,7 @@ export function assessEdgarMatch(input: {
     };
   }
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
-  if (!sameFirmName(match.title, input.org)) {
+  if (!sameFirmName(match.title, input.org) && !tickerAccepted) {
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -350,15 +388,23 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR lists ${titled}, CIK ${match.cik}. A parent, affiliate, or different name is not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass.`,
     };
   }
-  const personSentence = personLine ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.` : "";
-  const personTied = Boolean(personLine);
+  const ownerLine = tickerAccepted || sameFirmName(match.title, input.org) ? reportingOwnerLine(input.insiderNames || [], input.person) : "";
+  const personSentence = personLine
+    ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.`
+    : ownerLine
+      ? ` A Form 3, 4, or 5 for this CIK names ${ownerLine} as a reporting owner.`
+      : "";
+  const personTied = Boolean(personLine || ownerLine);
   if (!personTied) {
+    const tickerNote = tickerAccepted
+      ? " The ticker matches the company name on the application, and the website domain stem is that ticker."
+      : "";
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
       companyOnly: true,
       url: edgarCompanyUrl(match.cik),
-      finding: `EDGAR lists ${titled}, CIK ${match.cik}. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+      finding: `EDGAR lists ${titled}, CIK ${match.cik}.${tickerNote} A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
     };
   }
   return {
@@ -393,6 +439,7 @@ export async function lookupEdgar(
   org: string,
   person: string,
   fetchText?: FetchText,
+  website = "",
 ): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly">> {
   const tokens = org.trim();
   if (!tokens) {
@@ -405,6 +452,7 @@ export async function lookupEdgar(
   }
   const fetchImpl = fetchText ?? defaultFetch;
   const companies = await loadTickers(fetchImpl).catch(() => null);
+  const listed = companies ? matchEdgarCompany(companies, org) || edgarTickerDomainMatch(companies, org, website) : null;
   const last = surnameForSearch(person);
   const distinctive = distinctiveCompanyTokens(org)[0] || org;
   const phrase = edgarCompanySearchPhrase(org);
@@ -417,11 +465,25 @@ export async function lookupEdgar(
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
     if (filing.ok) groups.push(...(filingNames(filing.text) || []));
   }
+  const insiderNames: string[][] = [];
+  if (listed?.cik && last.length >= 3) {
+    const forms = await Promise.all(
+      ["3", "4", "5"].map(async (form) => {
+        const searchUrl = insiderSearchUrl(last, listed.cik, form);
+        return fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
+      }),
+    );
+    for (const filing of forms) {
+      if (filing.ok) insiderNames.push(...(filingNames(filing.text) || []));
+    }
+  }
   return assessEdgarMatch({
     org,
     person,
     tickersOk: Boolean(companies),
     companies: companies || [],
     filingNames: groups,
+    website,
+    insiderNames,
   });
 }
