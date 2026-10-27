@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { assessLocalAddress, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
-import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
+import { classifyFetchError, fetchLimits, looksLikeHtml, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, neutralScreenNewsPass, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { civilDocket, classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
@@ -2999,5 +2999,33 @@ describe("thirteenth follow-up", () => {
   it("abandons one slow check instead of holding the case", async () => {
     const result = await settleWithin(new Promise<string>(() => undefined), 30, "timed out");
     expect(result).toBe("timed out");
+    expect(nextTimeoutMs({ failure: "timeout" }, 8000)).toBe(16000);
+    expect(nextTimeoutMs({ failure: "nxdomain" }, 8000)).toBeNull();
+    expect(nextTimeoutMs({}, 8000)).toBeNull();
+    let calls = 0;
+    const retried = await settleWithinRetry(async () => {
+      calls += 1;
+      if (calls === 1) return new Promise<string>(() => undefined);
+      return "ok";
+    }, 20, "timed out");
+    expect(retried).toBe("ok");
+    expect(calls).toBe(2);
+    let once = 0;
+    const ready = await settleWithinRetry(async () => {
+      once += 1;
+      return "ready";
+    }, 50, "timed out");
+    expect(ready).toBe("ready");
+    expect(once).toBe(1);
+    const graded = gradeChecks(
+      [
+        row({ key: "news", status: "UNAVAILABLE", finding: "This check timed out. The source could not be checked." }),
+        row({ key: "courts", status: "UNAVAILABLE", weight: 0, finding: "CourtListener was blocked, timed out, or did not respond. This source could not be checked." }),
+      ],
+      facts(),
+    );
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("timed out");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("timed out");
+    expect(graded.summary.couldNotCheck.toLowerCase()).not.toContain("did not check out");
   });
 });

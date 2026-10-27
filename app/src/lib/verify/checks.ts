@@ -142,6 +142,13 @@ export async function settleWithin<T>(work: Promise<T>, ms: number, fallback: T)
   }
 }
 
+/** A timed-out check is tried once more with twice the budget. The fallback stays unavailable, never a failure. */
+export async function settleWithinRetry<T>(work: () => Promise<T>, ms: number, fallback: T): Promise<T> {
+  const first = await settleWithin(work(), ms, fallback);
+  if (first !== fallback) return first;
+  return settleWithin(work(), ms * 2, fallback);
+}
+
 function timedOut(key: string, source: string, weight: number): CheckOutput {
   return check({
     key,
@@ -964,7 +971,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     }),
   );
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
-  const court = await settleWithin(fetchText(courtUrl), 20_000, { ok: false, status: 0, text: "" });
+  const courtFallback = { ok: false, status: 0, text: "" };
+  const court = await settleWithinRetry(() => fetchText(courtUrl), 20_000, courtFallback);
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
   const companyQuery = searchFacts.org.trim();
   const registryHttp = companyQuery
@@ -986,11 +994,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
   // Public screening always records web-footprint, including an explicit miss. The direct
   // webFootprintCheck helper is not a second production pass.
-  out.push(
-    ...(await settleWithin(newsChecks(searchFacts, fetchText), 45_000, [
-      timedOut("news", "News", 8),
-    ])),
-  );
+  const newsFallback = [timedOut("news", "News", 8)];
+  out.push(...(await settleWithinRetry(() => newsChecks(searchFacts, fetchText), 45_000, newsFallback)));
   return out;
 }
 

@@ -53,6 +53,8 @@ const BENCH_DIR = __dirname;
 const CACHE_DIR = path.join(BENCH_DIR, ".cache");
 const USER_AGENT = "PrivateFloorClub/1.0 (verification; connect@privatefloorclub.com)";
 const CASE_TIMEOUT_MS = 5 * 60 * 1000;
+// Cases in one process run one after another. A second bench process on the same machine
+// makes news and court fetches time out. A timed-out check stays unavailable; it is not a failure.
 
 const args = process.argv.slice(2);
 const flag = (name: string) => {

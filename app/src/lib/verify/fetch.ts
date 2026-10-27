@@ -169,6 +169,12 @@ export function shouldRetryStatus(status: number): boolean {
   return status === 0 || status === 429 || status >= 500;
 }
 
+/** One longer try after a timer abort. A dead domain and an HTTP error are not timeouts. */
+export function nextTimeoutMs(result: { failure?: FetchFailure }, timeoutMs: number): number | null {
+  if (result.failure !== "timeout") return null;
+  return timeoutMs * 2;
+}
+
 export type FetchFailure = "nxdomain" | "timeout" | "network";
 
 /** DNS NXDOMAIN/ENOTFOUND is a dead domain. An aborted timer is a timeout. Anything else is a network error. */
@@ -203,6 +209,8 @@ export async function politeFetch(
     await new Promise((resolve) => setTimeout(resolve, retryDelayMs(url) * attempt));
     latest = await fetchOnce(url, timeout, options);
   }
+  const longer = nextTimeoutMs(latest, timeout);
+  if (longer) latest = await fetchOnce(url, longer, options);
   if (cacheable(url) && latest.status >= 200 && latest.status < 300) responseCache.set(url, { at: Date.now(), value: latest });
   return latest;
 }
