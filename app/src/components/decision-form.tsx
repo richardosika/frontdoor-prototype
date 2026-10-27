@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
+import { DECISION_ACK_KEY, DECISION_DIALOG_ID, DECISION_MEMORY_KEY } from "@/lib/decision-dialog";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 
@@ -24,8 +24,9 @@ function ConfirmModal({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-forest/50 p-4 sm:items-center">
-      <div role="dialog" aria-modal="true" aria-labelledby="decision-confirm-title" className="w-full max-w-md rounded border border-line bg-paper p-4 shadow-[0_30px_80px_rgba(0,0,0,.28)]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-forest/50 p-4">
+      <div className="flex min-h-full items-end justify-center sm:items-center">
+      <div role="dialog" aria-modal="true" aria-labelledby="decision-confirm-title" className="my-auto w-full max-w-md rounded border border-line bg-paper p-4 shadow-[0_30px_80px_rgba(0,0,0,.28)]">
         <h2 id="decision-confirm-title" className="font-serif text-2xl font-normal text-forest">
           {title}
         </h2>
@@ -44,6 +45,7 @@ function ConfirmModal({
             Cancel
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -67,12 +69,15 @@ export function DecisionForm({
   warningText?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const boxRef = useRef<HTMLInputElement>(null);
   const allowSubmit = useRef(false);
+  const pendingRef = useRef<"APPROVED" | "DECLINED" | null>(null);
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
+  pendingRef.current = pending;
 
   function approveBody() {
     const dues = paying
@@ -83,8 +88,90 @@ export function DecisionForm({
     return `${dues}${warning}${second}`;
   }
 
+  function remember(decision: "APPROVED" | "DECLINED" | null) {
+    try {
+      if (!decision) {
+        sessionStorage.removeItem(DECISION_MEMORY_KEY);
+        sessionStorage.removeItem(DECISION_ACK_KEY);
+        return;
+      }
+      sessionStorage.setItem(DECISION_MEMORY_KEY, decision);
+    } catch {
+      // Private browsing can reject storage. The dialog still opens from the click.
+    }
+  }
+
+  function restoreAck() {
+    if (!boxRef.current) return;
+    try {
+      boxRef.current.checked = sessionStorage.getItem(DECISION_ACK_KEY) === "1";
+    } catch {
+      // Leave the box as the browser painted it.
+    }
+  }
+
+  useEffect(() => {
+    const saved = (() => {
+      try {
+        const value = sessionStorage.getItem(DECISION_MEMORY_KEY);
+        return value === "APPROVED" || value === "DECLINED" ? value : null;
+      } catch {
+        return null;
+      }
+    })();
+    if (saved) {
+      setPending(saved);
+      restoreAck();
+    }
+    const node = dialogRef.current;
+    const onCancel = (event: Event) => {
+      event.preventDefault();
+      const decision = pendingRef.current;
+      remember(null);
+      setPending(null);
+      setModalError("");
+      setResult(
+        decision === "DECLINED"
+          ? "Decline was not recorded. Nothing was sent."
+          : "Approval was not recorded. Nothing was sent.",
+      );
+    };
+    node?.addEventListener("cancel", onCancel);
+    return () => node?.removeEventListener("cancel", onCancel);
+    // Restore once, after hydration, including a tick that landed before React attached.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const node = dialogRef.current;
+    if (!node) return;
+    if (!pending) {
+      let saved = "";
+      try {
+        saved = sessionStorage.getItem(DECISION_MEMORY_KEY) || "";
+      } catch {
+        saved = "";
+      }
+      if (saved === "APPROVED" || saved === "DECLINED") return;
+      if (node.open) node.close();
+      return;
+    }
+    node.setAttribute("data-pending", pending);
+    if (!node.open) node.showModal();
+    restoreAck();
+  }, [pending]);
+
+  function openPending(decision: "APPROVED" | "DECLINED") {
+    remember(decision);
+    setError("");
+    setResult("");
+    setModalError("");
+    setPending(decision);
+  }
+
   function cancelPending() {
     const decision = pending;
+    remember(null);
     setPending(null);
     setModalError("");
     setResult(
@@ -98,7 +185,7 @@ export function DecisionForm({
     const form = formRef.current;
     if (!form || !pending) return;
     if (pending === "APPROVED" && strongWarning) {
-      if (!acknowledged) {
+      if (!boxRef.current?.checked) {
         setModalError("Check the box to confirm this approval. Approval was not sent.");
         return;
       }
@@ -112,38 +199,12 @@ export function DecisionForm({
     const button = form.querySelector(`button[value="${pending}"]`);
     setModalError("");
     setResult("");
+    remember(null);
     allowSubmit.current = true;
     if (button instanceof HTMLButtonElement) form.requestSubmit(button);
   }
 
-  const dialog = pending ? (
-    <ConfirmModal
-      title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
-      body={
-        pending === "APPROVED"
-          ? approveBody()
-          : "Decline this application? A short notice goes out. The applicant does not see your reason."
-      }
-      confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}
-      error={modalError}
-      extra={
-        pending === "APPROVED" && strongWarning ? (
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink">
-            <input
-              name="acknowledgeGrade"
-              type="checkbox"
-              className="mt-1"
-              checked={acknowledged}
-              onChange={(event) => setAcknowledged(event.target.checked)}
-            />
-            <span>I confirm this approval despite the grade and the unverified items.</span>
-          </label>
-        ) : null
-      }
-      onConfirm={confirmPending}
-      onCancel={cancelPending}
-    />
-  ) : null;
+  const showing = pending || "APPROVED";
 
   return (
     <>
@@ -172,9 +233,7 @@ export function DecisionForm({
         }
         if (decision === "APPROVED" || decision === "DECLINED") {
           event.preventDefault();
-          setModalError("");
-          setAcknowledged(false);
-          setPending(decision);
+          openPending(decision);
         }
       }}
     >
@@ -209,18 +268,74 @@ export function DecisionForm({
         <p className="text-sm text-brass">{confirmLabel} Approving asks for a second confirmation and is written to the audit log.</p>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button className={`${btn} min-h-12 w-full sm:w-auto`} name="decision" value="APPROVED" type="submit">
+        <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" data-decision-open="APPROVED" onClick={() => openPending("APPROVED")}>
           Approve
         </button>
         <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="NEEDS_INFO" type="submit">
           Request more info
         </button>
-        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="DECLINED" type="submit">
+        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-open="DECLINED" onClick={() => openPending("DECLINED")}>
           Decline
         </button>
       </div>
+      <button hidden name="decision" value="APPROVED" type="submit">
+        Approve
+      </button>
+      <button hidden name="decision" value="DECLINED" type="submit">
+        Decline
+      </button>
     </form>
-    {dialog && typeof document !== "undefined" ? createPortal(dialog, document.body) : null}
+    <dialog
+      id={DECISION_DIALOG_ID}
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="decision-confirm-title"
+      data-pending={showing}
+      suppressHydrationWarning
+      className="w-[min(100%-2rem,28rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded border border-line bg-paper p-4 shadow-[0_30px_80px_rgba(0,0,0,.28)] backdrop:bg-forest/50"
+    >
+      <h2 id="decision-confirm-title" className="font-serif text-2xl font-normal text-forest">
+        {showing === "DECLINED" ? "Confirm decline" : "Confirm approval"}
+      </h2>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+        {showing === "DECLINED"
+          ? "Decline this application? A short notice goes out. The applicant does not see your reason."
+          : approveBody()}
+      </p>
+      {strongWarning && showing !== "DECLINED" ? (
+        <label className="mt-3 flex items-start gap-2 text-sm text-ink">
+          <input
+            ref={boxRef}
+            name="acknowledgeGrade"
+            data-decision-ack="1"
+            type="checkbox"
+            className="mt-1"
+            onChange={(event) => {
+              try {
+                sessionStorage.setItem(DECISION_ACK_KEY, event.currentTarget.checked ? "1" : "0");
+              } catch {
+                // The checkbox itself keeps the tick when storage is blocked.
+              }
+            }}
+          />
+          <span>I confirm this approval despite the grade and the unverified items.</span>
+        </label>
+      ) : null}
+      {modalError ? (
+        <p className="mt-3 text-sm text-brass" role="alert">
+          {modalError}
+        </p>
+      ) : null}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" onClick={confirmPending}>
+          {showing === "DECLINED" ? "Decline" : "Approve"}
+        </button>
+        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-cancel="1" onClick={cancelPending}>
+          Cancel
+        </button>
+      </div>
+    </dialog>
   </>
   );
 }

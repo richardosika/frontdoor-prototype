@@ -15,11 +15,29 @@ describe("PF Tester October 27 batch", () => {
     expect(freeRegistryState("Springfield, Illinois")).toBe("IL");
     expect(freeRegistryState("Austin, TX")).toBe("TX");
     expect(freeRegistryState("London, UK")).toBeNull();
-    expect(freeRegistryState("Columbus, OH")).toBeNull();
+    expect(freeRegistryState("Columbus, OH")).toBe("OH");
+    expect(freeRegistryState("Phoenix, Arizona")).toBe("AZ");
     expect(approvalAttentionTitle(OUTSIDE_REGISTRY_TITLE, "Chicago, IL")).toContain("No free IL registry API");
     expect(approvalAttentionTitle(OUTSIDE_REGISTRY_TITLE, "Chicago, IL")).not.toContain("outside the free US registry list");
     expect(approvalAttentionTitle(OUTSIDE_REGISTRY_TITLE, "London, UK")).toBe(OUTSIDE_REGISTRY_TITLE);
     expect(approvalAttentionTitle("Thin public record", "Chicago, IL")).toBe("Thin public record");
+    expect(approvalAttentionTitle(OUTSIDE_REGISTRY_TITLE, "Phoenix, Arizona")).toContain("No free AZ registry API");
+    expect(approvalAttentionTitle(OUTSIDE_REGISTRY_TITLE, "Phoenix, Arizona")).not.toContain("outside the free US registry list");
+    for (const code of [
+      "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+      "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
+      "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    ]) {
+      expect(freeRegistryState(`City, ${code}`)).toBe(code);
+    }
+    expect(freeRegistryState("Washington, D.C.")).toBe("DC");
+    expect(freeRegistryState("Seattle, Washington")).toBe("WA");
+    expect(freeRegistryState("Charleston, West Virginia")).toBe("WV");
+    expect(freeRegistryState("Little Rock, Arkansas")).toBe("AR");
+    expect(freeRegistryState("Toronto, Canada")).toBeNull();
+    expect(freeRegistryState("Come in")).toBeNull();
+    const review = readFileSync(path.join(ROOT, "components/guided-review.tsx"), "utf8");
+    expect(review).toContain("decisionDialogBootstrap");
   });
 
   it("shows plain words for a needs-owner verdict in the activity feed", () => {
@@ -42,8 +60,10 @@ describe("PF Tester October 27 batch", () => {
   it("keeps the approval checkbox outside the server form and restores a dropped Declined notice", () => {
     const form = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
     expect(form.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(form.indexOf('role="dialog"'));
-    expect(form).toContain("createPortal");
-    expect(form).toContain("setAcknowledged");
+    expect(form.indexOf('name="acknowledgeGrade"')).toBeGreaterThan(form.indexOf("</form>"));
+    expect(form).toContain('type="button" data-decision-open="APPROVED"');
+    expect(form).toContain("sessionStorage");
+    expect(form).not.toContain("createPortal");
     const action = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
     const succeed = action.slice(action.indexOf("const succeed"), action.indexOf("const decision ="));
     expect(succeed).toContain("rememberAdminNotice");

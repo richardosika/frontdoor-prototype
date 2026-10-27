@@ -4,6 +4,7 @@ import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { approvalAttentionDetail, approvalAttentionTitle, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { decisionDialogBootstrap } from "@/lib/decision-dialog";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
@@ -47,6 +48,7 @@ export function GuidedReview({
 
   return (
     <section className="mt-4 rounded border border-line bg-paper p-4">
+      <script dangerouslySetInnerHTML={{ __html: decisionDialogBootstrap() }} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
       <h2 className="mt-1 font-serif text-2xl font-normal text-forest">
         Step {current.index} of {total}
