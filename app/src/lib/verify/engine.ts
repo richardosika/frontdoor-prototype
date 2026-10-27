@@ -1,11 +1,12 @@
 import type { EvidenceStatus, Prisma, RunSubject, Verdict } from "@prisma/client";
 import { applicationStatusAfterVerification } from "@/lib/application-status";
+import { isInviteUsable } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
 import { failedGrade, gradeChangeNote, gradeChecks, gradePlainText, parseGradeSnapshot } from "@/lib/verify/grade";
 import { scoreReport, summaryTail } from "@/lib/verify/score";
 import type { ApplicantFacts } from "@/lib/verify/types";
-import { politeFetch } from "@/lib/verify/fetch";
+import { fetchForChecks } from "@/lib/verify/fetch";
 import { readCardImage } from "@/lib/verify/ocr";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
@@ -45,8 +46,9 @@ export async function executeVerificationRun(runId: string, options?: { network?
     const ctx: CheckContext = {
       facts,
       watchlist: watch.entries,
+      watchlistFetchedAt: watch.fetchedAt,
       network,
-      fetchText: politeFetch,
+      fetchText: fetchForChecks,
     };
     const report = scoreReport(await collectChecks(ctx));
     const finishedAt = new Date();
@@ -157,7 +159,7 @@ async function factsForRun(run: {
     socialLinks: string;
     statement: string;
     testProfile: string;
-    inviteCode: { note: string; code: string } | null;
+    inviteCode: { note: string; code: string; uses?: number; maxUses?: number; expiresAt?: Date | null } | null;
     businessCard?: { deletedAt: Date | null; sizeBytes: number; contentType?: string; bytes?: Uint8Array | null } | null;
     referenceEmails?: string[];
   } | null;
@@ -197,12 +199,20 @@ async function factsForRun(run: {
     org,
     location: application?.location || "",
     role: application?.role || "DEVELOPER",
+    applicationSubmitted: application ? true : undefined,
     phone: application?.phone || "",
     website: application?.website || "",
     linkedinUrl: application?.linkedinUrl || "",
     socialLinks: application?.socialLinks || "",
     statement: application?.statement || "",
     inviteNote: application?.inviteCode ? `${application.inviteCode.code} · ${application.inviteCode.note}` : "",
+    inviteValid: application?.inviteCode
+      ? isInviteUsable({
+          uses: application.inviteCode.uses ?? 0,
+          maxUses: application.inviteCode.maxUses ?? 1,
+          expiresAt: application.inviteCode.expiresAt ?? null,
+        })
+      : undefined,
     testProfile: application?.testProfile || "",
     cardText,
     cardUploaded,

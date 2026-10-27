@@ -2,6 +2,7 @@ import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
+import { verdictLabel } from "@/lib/application-status";
 import { prisma } from "@/lib/prisma";
 import { auditRunScore } from "@/lib/rerun-audit";
 
@@ -62,7 +63,7 @@ export default async function AuditPage() {
               return (
               <li key={row.id} className="py-2">
                 {formatAuditTime(row.createdAt)} · {row.subject} · {row.status}
-                {row.verdict ? ` · ${row.verdict}` : ""}
+                {row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}
                 {grade ? ` · ${grade}` : ""} · {row.application?.name || row.companyName || "No application"}
               </li>
               );

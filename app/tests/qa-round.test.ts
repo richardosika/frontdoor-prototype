@@ -283,7 +283,7 @@ describe("QA fixes that stay outside grading", () => {
 
   it("keeps one grade, the approval checkbox, and the status money line in the display layer", () => {
     const rubric = rubricSections().map((section) => reviewCopy(section.body)).join(" ");
-    expect(rubric).toContain("Referral source 4");
+    expect(rubric).toContain("Referral 4");
     expect(rubric).not.toMatch(/invite/i);
     expect(reviewCopy("No invite source was confirmed (0 of 4). (Invite code)")).toBe(
       "No referral source was confirmed (0 of 4). (Referral code)",

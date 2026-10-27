@@ -9,6 +9,8 @@ import {
   publicFinding,
   reviewStepFromQuery,
   stepCountsAsPass,
+  approveConfirmMessage,
+  unverifiedPersonItems,
 } from "@/lib/review-steps";
 
 function report(confidence: GradeReport["confidence"]): GradeReport {
@@ -44,6 +46,27 @@ describe("guided review steps", () => {
   it("does not describe an unconfirmed check as verified", () => {
     expect(publicFinding("INCONCLUSIVE", "SEC EDGAR returned a hit")).toMatch(/^Not confirmed\./);
     expect(publicFinding("NOT_RUN", "No search ran")).toMatch(/^Not confirmed\./);
+    expect(publicFinding("NOT_RUN", "OFAC was not checked. This is not a pass.")).toContain("not checked");
+    expect(displayCheckStatus("NOT_PROVIDED", "OFAC was not checked. This is not a pass.")).toBe("Not checked");
+    const unloaded = buildReviewSteps({
+      evidence: [{ checkKey: "sanctions", status: "NOT_RUN", finding: "OFAC was not checked. This is not a pass.", source: "OFAC", url: "https://ofac.treasury.gov/sanctions-list-service" }],
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+    });
+    expect(unloaded.find((step) => step.id === "risk")?.status).toBe("NOT_CHECKED");
+    const cleared = buildReviewSteps({
+      evidence: [
+        { checkKey: "sanctions", status: "PASS", finding: "No name matched the OFAC list loaded 2026-10-27.", source: "OFAC", url: "https://ofac.treasury.gov/sanctions-list-service" },
+        { checkKey: "duplicate", status: "PASS", finding: "No duplicate.", source: "Records", url: "" },
+        { checkKey: "text-risk", status: "PASS", finding: "No risk phrasing.", source: "Local", url: "" },
+        { checkKey: "velocity", status: "PASS", finding: "No burst.", source: "Local", url: "" },
+      ],
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+    });
+    expect(cleared.find((step) => step.id === "risk")?.status).toBe("PASS");
     expect(publicFinding("PASS", "The company site names them.")).toBe("The company site names them.");
     expect(publicFinding("INCONCLUSIVE", "SEC EDGAR returned a hit")).not.toMatch(/checked out/i);
   });
@@ -97,5 +120,31 @@ describe("guided review steps", () => {
     expect(displayCheckStatus("NOT_PROVIDED", "Skipped: no card on file")).toBe("Skipped");
     expect(displayCheckStatus("PASS", "Looked fine")).toBe("Pass");
     expect(displayCheckStatus("PENDING", "")).toBe("Not checked");
+  });
+
+  it("keeps the person-to-company link unverified when a company-name SEC match auto-passes the step", () => {
+    const evidence = [
+      {
+        checkKey: "edgar",
+        status: "PASS",
+        finding: "EDGAR lists CBRE GROUP, INC. That shows a company by this name exists. It does not tie the person to the firm.",
+        source: "SEC EDGAR",
+        url: "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=1138118",
+        corroborates: false,
+      },
+    ];
+    const steps = buildReviewSteps({
+      evidence,
+      saved: emptyProgress(),
+      references: [],
+      cardOnFile: false,
+      facts: { name: "QA Tester", org: "CBRE Group", location: "Dallas, TX", website: "https://www.cbre.com" },
+    });
+    expect(steps.find((step) => step.id === "company")?.status).toBe("PASS");
+    expect(unverifiedPersonItems(evidence)).toEqual(["person-to-company link"]);
+    expect(approveConfirmMessage({ dues: "Approve this person?", unverified: unverifiedPersonItems(evidence) })).toContain(
+      "Unverified: person-to-company link",
+    );
+    expect(unverifiedPersonItems([...evidence, { checkKey: "news", status: "PASS", corroborates: true }])).toEqual([]);
   });
 });

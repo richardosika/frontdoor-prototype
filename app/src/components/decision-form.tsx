@@ -5,6 +5,7 @@ import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { DECISION_ACK_KEY, DECISION_DIALOG_ID, DECISION_MEMORY_KEY } from "@/lib/decision-dialog";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
+import { approveConfirmMessage } from "@/lib/review-steps";
 
 function ConfirmModal({
   title,
@@ -59,6 +60,7 @@ export function DecisionForm({
   paying = false,
   strongWarning = false,
   warningText = "",
+  unverified = [],
 }: {
   applicationId: string;
   caseId?: string;
@@ -67,6 +69,7 @@ export function DecisionForm({
   paying?: boolean;
   strongWarning?: boolean;
   warningText?: string;
+  unverified?: string[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -83,9 +86,9 @@ export function DecisionForm({
     const dues = paying
       ? "Approve this person? The membership-dues link goes out only after you approve."
       : "Approve this person? This role can sign in right away.";
-    const warning = notLegit ? ` ${confirmLabel}` : "";
+    const base = approveConfirmMessage({ dues, extra: notLegit ? confirmLabel : "", unverified });
     const second = strongWarning ? `\n\n${warningText || "Approve this file despite the grade?"}` : "";
-    return `${dues}${warning}${second}`;
+    return `${base}${second}`;
   }
 
   function remember(decision: "APPROVED" | "DECLINED" | null) {
@@ -406,7 +409,7 @@ export function RevokeApprovalForm({ applicationId, caseId }: { applicationId: s
   );
 }
 
-export function InviteDecisionForm({ caseId }: { caseId: string }) {
+export function InviteDecisionForm({ caseId, unverified = [] }: { caseId: string; unverified?: string[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const allowSubmit = useRef(false);
   const [result, setResult] = useState("");
@@ -454,7 +457,10 @@ export function InviteDecisionForm({ caseId }: { caseId: string }) {
           title={pending === "APPROVED" ? "Confirm approval" : "Confirm decline"}
           body={
             pending === "APPROVED"
-              ? "Approve this request to join? A referral code goes out, and this file is marked Verified."
+              ? approveConfirmMessage({
+                  dues: "Approve this request to join? A referral code goes out, and this file is marked Verified.",
+                  unverified,
+                })
               : "Decline this request to join? This file is marked Rejected."
           }
           confirmLabel={pending === "APPROVED" ? "Approve" : "Decline"}

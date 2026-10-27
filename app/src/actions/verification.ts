@@ -284,10 +284,8 @@ async function createRerunRun(input: {
   });
 }
 
-export async function rerunGuidedChecks(formData: FormData) {
-  const admin = await requireVerificationAdmin();
-  const caseId = String(formData.get("caseId") || "");
-  const back = `/admin/verification/${caseId}`;
+/** Re-run checks, then add a named Verification runs row. Returns the notice, or null when the file is missing. */
+export async function recordGuidedRerun(caseId: string, actorId: string): Promise<string | null> {
   const existing = await prisma.verificationCase.findUnique({
     where: { id: caseId },
     select: {
@@ -301,7 +299,7 @@ export async function rerunGuidedChecks(formData: FormData) {
       project: { select: { name: true } },
     },
   });
-  if (!existing) notFound();
+  if (!existing) return null;
   await runLivePrefill(caseId);
   const saved = await prisma.verificationCase.findUnique({ where: { id: caseId }, select: { gradeSnapshot: true, status: true } });
   const grade = parseGradeSnapshot(saved?.gradeSnapshot);
@@ -355,17 +353,26 @@ export async function rerunGuidedChecks(formData: FormData) {
   await prisma.verificationEvent.create({
     data: {
       caseId,
-      actorId: admin.id,
+      actorId,
       fromStatus: status,
       toStatus: status,
       summary,
     },
   });
-  revalidatePath(back);
+  revalidatePath(`/admin/verification/${caseId}`);
   revalidatePath("/admin/verification");
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit");
   revalidatePath("/admin");
+  return summary;
+}
+
+export async function rerunGuidedChecks(formData: FormData) {
+  const admin = await requireVerificationAdmin();
+  const caseId = String(formData.get("caseId") || "");
+  const back = `/admin/verification/${caseId}`;
+  const summary = await recordGuidedRerun(caseId, admin.id);
+  if (!summary) notFound();
   redirect(`${back}?step=decision&notice=${encodeURIComponent(summary)}`);
 }
 

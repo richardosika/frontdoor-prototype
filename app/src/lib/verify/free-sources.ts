@@ -70,19 +70,19 @@ function companyMatches(org: string, companyName: string): boolean {
 export function assessOpenCorporates(org: string, http: { ok: boolean; status: number; text: string }): CheckOutput {
   const searchUrl = openCorporatesSearchUrl(org || "company");
   const ranAt = new Date().toISOString();
-  const base = { key: "opencorporates", weight: 6, source: "OpenCorporates", url: searchUrl, ranAt };
+  const base = { key: "opencorporates", weight: 0, source: "OpenCorporates", url: searchUrl, ranAt };
   if (!org.trim()) {
     return {
       ...base,
       status: "NOT_RUN",
-      finding: `No company name was on the file. OpenCorporates ${COULD_NOT_VERIFY}.`,
+      finding: `No company name was on the file. OpenCorporates ${COULD_NOT_VERIFY}. Not checkable for free.`,
     };
   }
   if (!http.ok || http.status === 401 || http.status === 403 || http.status === 0 || http.status === 429) {
     return {
       ...base,
       status: "UNAVAILABLE",
-      finding: `OpenCorporates ${COULD_NOT_VERIFY}. The public company search did not return records without a paid token.`,
+      finding: `OpenCorporates ${COULD_NOT_VERIFY}. The public company search did not return records without a paid token. Not checkable for free.`,
     };
   }
   const companies = openCorporatesCompanies(http.text);
@@ -92,16 +92,16 @@ export function assessOpenCorporates(org: string, http: { ok: boolean; status: n
       ...base,
       status: "PASS",
       url: match.url,
-      corroborates: true,
-      finding: `OpenCorporates returned ${match.name}. Open the record and confirm it is the same firm.`,
+      corroborates: false,
+      finding: `OpenCorporates returned ${match.name}. That is company-exists evidence only. It does not tie a person to the firm. Not checkable for free.`,
     };
   }
   return {
     ...base,
     status: "INCONCLUSIVE",
     finding: companies.length
-      ? "OpenCorporates responded. None of the company names matched this firm."
-      : "OpenCorporates responded. No company records came back for this name.",
+      ? "OpenCorporates responded. None of the company names matched this firm. Not checkable for free."
+      : "OpenCorporates responded. No company records came back for this name. Not checkable for free.",
   };
 }
 
@@ -109,19 +109,19 @@ export function assessOpenSanctions(facts: Pick<ApplicantFacts, "name" | "org" |
   const query = facts.name.trim() || facts.org.trim();
   const searchUrl = openSanctionsSearchUrl(query || "name");
   const ranAt = new Date().toISOString();
-  const base = { key: "opensanctions", weight: 8, source: "OpenSanctions", url: searchUrl, ranAt };
+  const base = { key: "opensanctions", weight: 0, source: "OpenSanctions", url: searchUrl, ranAt };
   if (!query) {
     return {
       ...base,
       status: "NOT_RUN",
-      finding: `No name was on the file. OpenSanctions ${COULD_NOT_VERIFY}.`,
+      finding: `No name was on the file. OpenSanctions ${COULD_NOT_VERIFY}. Not checkable for free.`,
     };
   }
   if (!http.ok || http.status === 401 || http.status === 403 || http.status === 0 || http.status === 429) {
     return {
       ...base,
       status: "UNAVAILABLE",
-      finding: `OpenSanctions ${COULD_NOT_VERIFY}. The public search did not return a list without a paid key.`,
+      finding: `OpenSanctions ${COULD_NOT_VERIFY}. The public search did not return a list without a paid key. Not checkable for free.`,
     };
   }
   const hits = openSanctionsHits(http.text);
@@ -131,7 +131,7 @@ export function assessOpenSanctions(facts: Pick<ApplicantFacts, "name" | "org" |
       ...base,
       status: "PASS",
       url: openSanctionsApiUrl(query),
-      finding: "OpenSanctions search returned no close name match. A name on a list without a country or date of birth would not be proof.",
+      finding: "OpenSanctions search returned no close name match. A name on a list without a country or date of birth would not be proof. Not checkable for free.",
     };
   }
   const place = close.countries.join(" ");
@@ -144,7 +144,7 @@ export function assessOpenSanctions(facts: Pick<ApplicantFacts, "name" | "org" |
     hardFlag: corroborated,
     reviewFlag: !corroborated,
     finding: corroborated
-      ? `OpenSanctions name match on ${close.caption}, and the location lines up. Open the entity before you decide.`
-      : `Possible OpenSanctions match on ${close.caption} without country corroboration. This is not proof.`,
+      ? `OpenSanctions name match on ${close.caption}, and the location lines up. Open the entity before you decide. Not checkable for free.`
+      : `Possible OpenSanctions match on ${close.caption} without country corroboration. This is not proof. Not checkable for free.`,
   };
 }

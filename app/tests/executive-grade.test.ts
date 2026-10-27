@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   CAP_RULES,
   GRADE_WEIGHTS,
+  GRADE_WEIGHTS_MODE,
+  LETTER_FLOORS,
   LETTERS,
   capLetter,
   decisionNoticeText,
   gradeChangeNote,
   gradeChecks,
   letterFromScore,
+  rubricSections,
+  weightsFor,
   type GradeFacts,
   type GradeReport,
 } from "@/lib/verify/grade";
@@ -60,7 +64,7 @@ function strongChecks(): CheckOutput[] {
     pass("linkedin-format", { source: "Local URL check" }),
     pass("linkedin-fetch", { source: "LinkedIn public page", corroborates: true, finding: "A public fetch included the name." }),
     pass("business-card", { source: "Card text compare", corroborates: true }),
-    pass("invite-source", { source: "Invite code" }),
+    pass("invite-source", { source: "Referral or request code" }),
     pass("plausibility", { source: "Local plausibility heuristic" }),
     pass("velocity", { source: "Private Floor application records" }),
     pass("social-links", { source: "Local URL check" }),
@@ -103,12 +107,95 @@ describe("grade rubric", () => {
     expect(capLetter("A", "B")).toBe("B");
     expect(capLetter("F", "B")).toBe("F");
     expect(CAP_RULES).toEqual({
-      noCorroboration: "B",
+      noCorroboration: "D",
+      thinCorroboration: "C",
       ambiguousNews: "C",
       reviewRedFlag: "D",
       hardRedFlag: "F",
       twoConflicts: "C",
     });
+  });
+
+  it("keeps proposal R2 off unless a grade asks for it", () => {
+    expect(GRADE_WEIGHTS_MODE).toBe("standard");
+    expect(LETTER_FLOORS).toEqual({ A: 90, B: 80, C: 70, D: 60 });
+    const r2 = weightsFor("r2");
+    const groups = Object.values(r2).map((group) => Object.values(group).reduce((sum, value) => sum + value, 0));
+    expect(groups).toEqual([14, 23, 21, 20, 12, 10]);
+    expect(groups.reduce((sum, value) => sum + value, 0)).toBe(100);
+    expect(r2.identity["linkedin-fetch"]).toBe(0);
+    expect(r2.company["business-registry"]).toBe(0);
+    expect(r2.company.website).toBe(11);
+    expect(r2.footprint["web-footprint"]).toBe(11);
+    expect(rubricSections().map((section) => section.body).join(" ")).not.toContain("R2 is on");
+    expect(rubricSections("r2").map((section) => section.body).join(" ")).toContain("Letter floors are unchanged");
+
+    const standard = gradeChecks(strongChecks(), fullFacts);
+    const proposed = gradeChecks(strongChecks(), fullFacts, { weightsMode: "r2" });
+    expect(standard.summary.couldNotCheck).not.toContain("Coverage:");
+    expect(proposed.summary.couldNotCheck).toContain("Coverage:");
+    expect(proposed.summary.couldNotCheck).toContain("100 of 100 rubric points were checkable");
+    expect(proposed.plainText).toContain("Coverage:");
+    expect(proposed.score).toBe(standard.score + 2);
+    expect(proposed.letter).toBe(standard.letter);
+    expect(proposed.recommendation).toBe(standard.recommendation);
+
+    const noRegistrant = gradeChecks(
+      [
+        pass("website"),
+        pass("web-footprint", { corroborates: true }),
+        pass("news", { corroborates: true }),
+        row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name." }),
+      ],
+      fullFacts,
+      { weightsMode: "r2" },
+    );
+    const edgarDown = gradeChecks(
+      [
+        pass("website"),
+        pass("web-footprint", { corroborates: true }),
+        pass("news", { corroborates: true }),
+        row({ key: "edgar", status: "UNAVAILABLE", finding: "EDGAR was blocked." }),
+      ],
+      fullFacts,
+      { weightsMode: "r2" },
+    );
+    expect(noRegistrant.summary.couldNotCheck).toContain("100 of 100 rubric points were checkable");
+    expect(noRegistrant.summary.couldNotCheck).toContain("no registrant stays in that denominator");
+    expect(edgarDown.summary.couldNotCheck).toContain("94 of 100 rubric points were checkable");
+    expect(edgarDown.score).toBeGreaterThan(noRegistrant.score);
+
+    const blockedSite = gradeChecks(
+      [
+        row({ key: "website", status: "UNAVAILABLE", finding: "Blocked by site." }),
+        row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name." }),
+        row({ key: "linkedin-fetch", status: "UNAVAILABLE", finding: "LinkedIn blocked automated access." }),
+        row({ key: "business-registry", status: "NOT_RUN", finding: "Not run." }),
+      ],
+      fullFacts,
+      { weightsMode: "r2" },
+    );
+    expect(blockedSite.summary.couldNotCheck).toContain("89 of 100 rubric points were checkable");
+
+    const thin = gradeChecks(
+      [
+        pass("website", { selfReported: true, corroborates: false }),
+        pass("email-syntax"),
+        pass("disposable-email"),
+        pass("role-address"),
+        pass("phone-state"),
+        pass("sanctions"),
+        pass("duplicate"),
+        pass("text-risk"),
+        pass("velocity"),
+        pass("plausibility"),
+        pass("invite-source"),
+      ],
+      fullFacts,
+      { weightsMode: "r2" },
+    );
+    expect(thin.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(["D", "F"]).toContain(thin.letter);
   });
 });
 
@@ -142,7 +229,7 @@ describe("executive grade profiles", () => {
         row({ key: "text-risk", status: "INCONCLUSIVE", finding: "The track-record note is short." }),
         row({ key: "linkedin-format", status: "INCONCLUSIVE", finding: "No LinkedIn URL was provided." }),
         row({ key: "business-card", status: "NOT_RUN", finding: "No business card was uploaded." }),
-        row({ key: "invite-source", status: "INCONCLUSIVE", finding: "No invite note was stored." }),
+        row({ key: "invite-source", status: "INCONCLUSIVE", finding: "No referral or request code was stored." }),
         row({ key: "website", status: "INCONCLUSIVE", finding: "No company website was given." }),
         row({ key: "edgar", status: "INCONCLUSIVE", finding: "No data found for this company name.", source: "SEC EDGAR" }),
         row({ key: "web-footprint", status: "UNAVAILABLE", finding: "Web search could not be checked.", source: "Web search" }),
@@ -335,7 +422,7 @@ describe("executive grade profiles", () => {
       ],
       { ...fullFacts, location: "London, United Kingdom", phone: "+44 20 7946 0991" },
     );
-    expect(report.attention.some((item) => item.title === "Location is outside the free US registry list")).toBe(true);
+    expect(report.attention.some((item) => item.title === "No manual registry link for this state")).toBe(true);
     expect(report.summary.couldNotCheck.toLowerCase()).toContain("not run");
     const identity = report.categories.find((category) => category.id === "identity");
     expect(identity?.reason).toContain("0 of 3");

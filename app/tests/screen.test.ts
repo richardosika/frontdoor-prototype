@@ -146,11 +146,11 @@ describe("public screening", () => {
       company: true,
       confidence: "high",
     });
-    expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(true);
+    expect(scorePublicText("Stephen Ross unveils a Related tower", { name: "Stephen M. Ross", org: "Related Companies", location: "New York, NY" }).company).toBe(false);
     expect(scorePublicText("Captiva Island's record home sale", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(false);
     expect(scorePublicText("Richard Osika leads Captiva Development from Saddle Brook", { name: "Richard Osika", org: "Captiva Development", location: "Saddle Brook, NJ" }).company).toBe(true);
     expect(
-      scorePublicText("Persistence and Agility with Rich Osika\nBuild Pro Construction Service's core area of business", {
+      scorePublicText("Persistence and Agility with Rich Osika\nBuild Pro Construction Services' core area of business", {
         name: "Richard Osika",
         org: "BuildPro Construction Services LLC",
         location: "Saddle Brook, NJ",
@@ -202,14 +202,20 @@ describe("public screening", () => {
     expect(linked?.finding.toLowerCase()).not.toContain("not found");
     expect(linked?.finding).toContain("blocked automated access");
     expect(linked?.url).toContain("company/buildprocs");
-    expect(web?.status).toBe("PASS");
-    expect(web?.url).toContain("/en/about");
-    expect(web?.finding).toContain("Confidence: high");
+    const site = checks.find((item) => item.key === "website");
+    expect(site?.status).toBe("PASS");
+    expect(site?.selfReported).toBe(true);
+    expect(site?.corroborates).toBe(false);
+    expect(site?.url).toContain("/en/about");
+    expect(web?.corroborates).toBe(false);
+    expect(web?.url || "").not.toContain("/en/about");
+    expect(youtube?.finding).toContain("no match found");
+    expect(youtube?.finding).toContain("Name: yes");
+    expect(youtube?.finding).toContain("Company: no");
     expect(youtube?.finding).toContain("Confidence: low");
-    expect(youtube?.finding).toContain("Rich Osika");
     expect(youtube?.finding.toLowerCase()).not.toContain("not found");
     expect(news?.status).toBe("INCONCLUSIVE");
-    expect(news?.finding.toLowerCase()).toContain("no result found");
+    expect(news?.finding.toLowerCase()).toContain("no match found");
     expect(x?.status).toBe("UNAVAILABLE");
     expect(x?.finding).toContain("Couldn't check for free");
     expect(x?.finding.toLowerCase()).not.toContain("not found");
@@ -223,7 +229,7 @@ describe("public screening", () => {
       corroborates: item.corroborates,
     })));
     expect(suggestion.mark).toBe("PASS");
-    expect(suggestion.evidenceUrl).toContain("buildpro-cs.com");
+    expect(suggestion.evidenceUrls.join(" ")).toContain("buildpro-cs.com");
 
     const steps = buildReviewSteps({
       evidence: checks.map((item) => ({ checkKey: item.key, status: item.status, finding: item.finding, source: item.source, url: item.url })),
@@ -244,10 +250,12 @@ describe("public screening", () => {
     expect(publicFinding("UNAVAILABLE", "LinkedIn blocked automated access. Couldn't check for free.")).not.toMatch(/not found/i);
 
     const grade = gradeChecks(checks, { applicantName: facts.name, org: facts.org, location: facts.location, website: "https://www.buildpro-cs.com" });
-    expect(grade.summary.couldNotCheck).toContain("YouTube returned a public result");
+    expect(grade.summary.couldNotCheck).toContain("YouTube: no match found");
     expect(grade.summary.couldNotCheck).toContain("Confidence: low");
+    expect(grade.summary.couldNotCheck).not.toContain("YouTube returned a public result");
     expect(grade.summary.couldNotCheck).toContain("Couldn't check for free");
-    expect(grade.summary.checkedOut).toContain("names both the person and the company");
+    expect(grade.summary.checkedOut).toContain("A public web page included the person or the company name");
+    expect(grade.summary.checkedOut).not.toContain("names both the person and the company");
 
     const blockedSuggestion = suggestOne(
       "identity",

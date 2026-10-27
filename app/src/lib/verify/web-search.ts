@@ -1,19 +1,48 @@
 import { nameTokens, normalizeName } from "@/lib/verify/fuzzy";
+import { leftTheCompany } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const NEGATIVE = /\b(fraud|lawsuit|indicted|scam|ponzi)\b/i;
+
+/** A LinkedIn people-directory or search page is not a profile or a company page. */
+export function isLinkedInDirectory(value: string): boolean {
+  const text = value.replace(/&amp;/g, "&").replace(/&gt;/g, ">");
+  if (/linkedin\.com\/(?:pub\/dir|directory|search)(?:\/|\b)/i.test(text)) return true;
+  return /linkedin\.com\s*(?:›|>|\u203a)\s*pub\s*(?:›|>|\u203a)\s*dir\b/i.test(text);
+}
 
 export function duckDuckGoResultTexts(html: string): string[] {
   const withoutChrome = html
     .replace(/<title[\s\S]*?<\/title>/gi, " ")
     .replace(/<form[\s\S]*?<\/form>/gi, " ");
   const chunks = [...withoutChrome.matchAll(/class="result__(?:a|snippet|extras__url)"[^>]*>([\s\S]*?)<\/a>/gi)];
-  return chunks.map((match) => stripTags(match[1])).map((text) => text.trim()).filter((text) => text.length > 2);
+  return chunks
+    .filter((match) => !isLinkedInDirectory(match[0]))
+    .map((match) => stripTags(match[1]))
+    .map((text) => text.trim())
+    .filter((text) => text.length > 2);
 }
 
 export function bingResultTexts(html: string): string[] {
   const blocks = [...html.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)];
-  return blocks.map((match) => stripTags(match[0])).map((text) => text.trim()).filter((text) => text.length > 2);
+  return blocks
+    .filter((match) => !isLinkedInDirectory(match[0]))
+    .map((match) => stripTags(match[0]))
+    .map((text) => text.trim())
+    .filter((text) => text.length > 2);
+}
+
+/** Keyless Wikidata entity search. Used only after DuckDuckGo, Bing, and Wikipedia return nothing usable. */
+export function wikidataSearchResultTexts(payload: string): string[] {
+  try {
+    const parsed = JSON.parse(payload) as { search?: { label?: string; description?: string }[] };
+    if (!Array.isArray(parsed.search)) return [];
+    return parsed.search
+      .map((row) => stripTags(`${row.label || ""} ${row.description || ""}`).trim())
+      .filter((text) => text.length > 2);
+  } catch {
+    return [];
+  }
 }
 
 export function wikipediaRestResultTexts(payload: string): string[] {
@@ -97,14 +126,14 @@ function stripTags(value: string): string {
 
 /** Blocked or rate-limited responses are unavailable. An HTTP success with nothing parsed is no data. */
 export function providerAttemptState(status: number, snippetCount: number): "unavailable" | "no-data" | "ready" {
-  if (status === 0 || status === 401 || status === 403 || status === 429 || status >= 500) return "unavailable";
+  if (status === 0 || status === 202 || status === 401 || status === 403 || status === 429 || status === 999 || status >= 500) return "unavailable";
   if (snippetCount === 0) return "no-data";
   return "ready";
 }
 
 type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
 
-type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative"; sample: string; url: string };
+type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative" | "departed"; sample: string; url: string };
 
 export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput> {
   const query = `"${facts.name}" "${facts.org}"`;
@@ -145,7 +174,7 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       response = { ok: false, status: 0, text: "" };
     }
     const snippets = response.status >= 200 && response.status < 300
-      ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query))
+      ? provider.parse(response.text).filter((text) => !isQueryEcho(text, query) && !isLinkedInDirectory(text))
       : [];
     const state = providerAttemptState(response.status, snippets.length);
     if (state === "unavailable") {
@@ -163,9 +192,14 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
-    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org));
+    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && !leftTheCompany(text, facts.org));
+    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && leftTheCompany(text, facts.org));
     if (hit) {
       attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
+      break;
+    }
+    if (departed) {
+      attempts.push({ provider: provider.provider, state: "departed", sample: departed.slice(0, 180), url: provider.url });
       break;
     }
     attempts.push({ provider: provider.provider, state: "no-data", sample: "", url: provider.url });
@@ -173,7 +207,8 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
 
   const hit = attempts.find((item) => item.state === "hit");
   const negative = attempts.find((item) => item.state === "negative");
-  const responded = attempts.filter((item) => item.state === "no-data" || item.state === "hit" || item.state === "negative");
+  const departed = attempts.find((item) => item.state === "departed");
+  const responded = attempts.filter((item) => item.state === "no-data" || item.state === "hit" || item.state === "negative" || item.state === "departed");
   const blocked = attempts.filter((item) => item.state === "unavailable").map((item) => item.provider);
   const ranAt = new Date().toISOString();
   if (negative) {
@@ -185,6 +220,18 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       finding: `Possible match, needs review. ${negative.provider} returned a result that names this person and company near a negative term. This is not a failure.`,
       source: negative.provider,
       url: negative.url,
+      ranAt,
+    };
+  }
+  if (departed) {
+    return {
+      key: "web-footprint",
+      status: "INCONCLUSIVE",
+      weight: 12,
+      reviewFlag: true,
+      finding: `This may no longer be at ${facts.org}. ${departed.provider} returned an announced departure, not current employment.`,
+      source: departed.provider,
+      url: departed.url,
       ranAt,
     };
   }

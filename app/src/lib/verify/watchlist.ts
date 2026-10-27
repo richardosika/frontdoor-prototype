@@ -71,6 +71,13 @@ export function parseWatchlists(sdnCsv: string, altCsv = ""): WatchlistEntry[] {
   return entries;
 }
 
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export function watchlistNeedsRefresh(fetchedAt: Date | null, count: number, now = Date.now()): boolean {
+  if (!count || !fetchedAt) return true;
+  return now - fetchedAt.getTime() > MAX_AGE_MS;
+}
+
 export async function loadWatchlist(): Promise<{ entries: WatchlistEntry[]; fetchedAt: Date | null }> {
   const cached = await prisma.sourceCache.findUnique({ where: { key: CACHE_KEY } });
   if (!cached) return { entries: [], fetchedAt: null };
@@ -97,4 +104,14 @@ export async function refreshWatchlist(): Promise<{ count: number; fetchedAt: Da
   });
   const altNote = alt.ok ? "" : " Alternate names could not be downloaded; primary names were cached.";
   return { count: entries.length, fetchedAt, error: altNote.trim() };
+}
+
+/** Best-effort refresh when the process starts and the cache is missing or older than a day. */
+export async function ensureWatchlistFresh(): Promise<void> {
+  const cached = await loadWatchlist();
+  if (!watchlistNeedsRefresh(cached.fetchedAt, cached.entries.length)) return;
+  const result = await refreshWatchlist();
+  if (result.error && result.count === 0) {
+    console.error(`OFAC refresh did not load a list. ${result.error}`);
+  }
 }

@@ -10,6 +10,7 @@ import { verdictLabel } from "@/lib/application-status";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { roleLabel } from "@/lib/roles";
+import { formatRunScores } from "@/lib/verify/score";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,7 @@ export default async function AdminPage({
     prisma.verificationRun.findMany({
       orderBy: { createdAt: "desc" },
       take: 12,
-      select: { id: true, subject: true, status: true, verdict: true, score: true, createdAt: true, application: { select: { name: true } } },
+      select: { id: true, subject: true, status: true, verdict: true, score: true, gradeLetter: true, gradeScore: true, createdAt: true, application: { select: { name: true } } },
     }),
     prisma.confirmation.findMany({
       where: { status: "CONFIRMED", reviewStatus: "PENDING_ADMIN" },
@@ -120,7 +121,7 @@ export default async function AdminPage({
         id: `run-${row.id}`,
         at: row.createdAt.toISOString(),
         kind: "verification",
-        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}${typeof row.score === "number" ? ` · ${row.score}` : ""} · ${row.application?.name || "No application"}`,
+        text: `${row.subject} · ${row.status}${row.verdict ? ` · ${verdictLabel(row.verdict)}` : ""}${formatRunScores(row) ? ` · ${formatRunScores(row)}` : ""} · ${row.application?.name || "No application"}`,
         href: "/admin/audit",
       }),
     ),

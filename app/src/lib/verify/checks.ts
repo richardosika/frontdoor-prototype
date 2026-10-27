@@ -1,13 +1,18 @@
 import { annualDuesCents } from "@/lib/dues";
-import { assessCourts } from "@/lib/verify/courts";
+import { normalizeInviteCode } from "@/lib/domain";
+import { factsForSearch } from "@/lib/verify/qa-marker";
+import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
-import { registrableHost } from "@/lib/verify/host";
+import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
+import { isReservedDomain, registrableHost } from "@/lib/verify/host";
+import { companyPhraseTokens, isDistinctiveCompanyToken, isShortBrandToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
-import { newsChecks } from "@/lib/verify/news";
+import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
-import { runPublicScreen } from "@/lib/verify/screen";
-import { webFootprintCheck } from "@/lib/verify/web-search";
+import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
+import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
+import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
   "mailinator.com",
@@ -44,36 +49,67 @@ const FREE_PROVIDERS = new Set([
   "gmx.com",
 ]);
 
-const AREA_TO_STATE: Record<string, string> = {
-  "201": "NJ",
-  "551": "NJ",
-  "609": "NJ",
-  "732": "NJ",
-  "848": "NJ",
-  "856": "NJ",
-  "862": "NJ",
-  "908": "NJ",
-  "973": "NJ",
-  "212": "NY",
-  "332": "NY",
-  "347": "NY",
-  "516": "NY",
-  "518": "NY",
-  "585": "NY",
-  "607": "NY",
-  "631": "NY",
-  "646": "NY",
-  "716": "NY",
-  "718": "NY",
-  "845": "NY",
-  "914": "NY",
-  "917": "NY",
-  "929": "NY",
-  "203": "CT",
-  "475": "CT",
-  "860": "CT",
-  "959": "CT",
+const STATE_AREA_CODES: Record<string, string[]> = {
+  NJ: ["201", "551", "609", "640", "732", "848", "856", "862", "908", "973"],
+  NY: ["212", "315", "332", "347", "363", "516", "518", "585", "607", "631", "646", "680", "716", "718", "838", "845", "914", "917", "929", "934"],
+  CT: ["203", "475", "860", "959"],
+  CA: ["209", "213", "279", "310", "323", "341", "408", "415", "424", "442", "510", "530", "559", "562", "619", "626", "628", "650", "657", "661", "669", "707", "714", "747", "760", "805", "818", "820", "831", "840", "858", "909", "916", "925", "949", "951"],
+  TX: ["210", "214", "254", "281", "325", "346", "361", "409", "430", "432", "469", "512", "682", "713", "726", "737", "806", "817", "830", "832", "903", "915", "936", "940", "945", "956", "972", "979"],
+  FL: ["239", "305", "321", "352", "386", "407", "448", "561", "656", "689", "727", "754", "772", "786", "813", "850", "863", "904", "941", "954"],
+  DE: ["302"],
+  PA: ["215", "223", "267", "272", "412", "445", "484", "570", "582", "610", "717", "724", "814", "835", "878"],
+  SC: ["803", "839", "843", "854"],
+  IL: ["217", "224", "309", "312", "331", "447", "464", "618", "630", "708", "773", "779", "815", "847", "872"],
+  MA: ["339", "351", "413", "508", "617", "774", "781", "857", "978"],
+  GA: ["229", "404", "470", "478", "678", "706", "762", "770", "912"],
+  DC: ["202"],
+  MD: ["227", "240", "301", "410", "443", "667"],
+  CO: ["303", "719", "720", "970", "983"],
+  VA: ["276", "434", "540", "571", "703", "757", "804", "826", "948"],
+  WA: ["206", "253", "360", "425", "509", "564"],
+  NC: ["252", "336", "472", "704", "743", "828", "910", "919", "980", "984"],
+  AZ: ["480", "520", "602", "623", "928"],
+  OH: ["216", "220", "234", "283", "326", "330", "380", "419", "436", "440", "513", "567", "614", "740", "937"],
+  MI: ["231", "248", "269", "313", "517", "586", "616", "679", "734", "810", "906", "947", "989"],
+  AL: ["205", "251", "256", "334", "659", "938"],
+  AK: ["907"],
+  AR: ["479", "501", "870"],
+  HI: ["808"],
+  ID: ["208", "986"],
+  IN: ["219", "260", "317", "463", "574", "765", "812", "930"],
+  IA: ["319", "515", "563", "641", "712"],
+  KS: ["316", "620", "785", "913"],
+  KY: ["270", "364", "502", "606", "859"],
+  LA: ["225", "318", "337", "504", "985"],
+  ME: ["207"],
+  MN: ["218", "320", "507", "612", "651", "763", "952"],
+  MS: ["228", "601", "662", "769"],
+  MO: ["314", "417", "557", "573", "636", "660", "816"],
+  MT: ["406"],
+  NE: ["308", "402", "531"],
+  NV: ["702", "725", "775"],
+  NH: ["603"],
+  NM: ["505", "575"],
+  ND: ["701"],
+  OK: ["405", "539", "572", "580", "918"],
+  OR: ["458", "503", "541", "971"],
+  RI: ["401"],
+  SD: ["605"],
+  TN: ["423", "615", "629", "731", "865", "901", "931"],
+  UT: ["385", "435", "801"],
+  VT: ["802"],
+  WV: ["304", "681"],
+  WI: ["262", "274", "414", "534", "608", "715", "920"],
+  WY: ["307"],
 };
+
+const TOLL_FREE_AREA_CODES = new Set(["800", "833", "844", "855", "866", "877", "888"]);
+
+const AREA_TO_STATE: Record<string, string> = {};
+for (const [state, codes] of Object.entries(STATE_AREA_CODES)) {
+  for (const code of codes) AREA_TO_STATE[code] = state;
+}
+const PHONE_STATE_RE = new RegExp(`\\b(${Object.keys(STATE_AREA_CODES).join("|")})\\b`);
 
 /** Local overlay so the test console can show a corroborated sanctions hit without a paid list. */
 export const TEST_WATCHLIST = [{ name: "Alexei Sanctionhit", location: "Newark United States" }];
@@ -83,12 +119,47 @@ export type WatchlistEntry = { name: string; location: string; dob?: string; ali
 export type CheckContext = {
   facts: ApplicantFacts;
   watchlist: WatchlistEntry[];
+  /** When the OFAC list was loaded. A pass names this date. */
+  watchlistFetchedAt?: Date | string | null;
   network: boolean;
-  fetchText?: (url: string) => Promise<{ ok: boolean; status: number; text: string }>;
+  fetchText?: (url: string, init?: { userAgent?: string }) => Promise<{ ok: boolean; status: number; text: string }>;
 };
 
 function check(partial: Omit<CheckOutput, "ranAt"> & { ranAt?: string }): CheckOutput {
   return { ranAt: new Date().toISOString(), ...partial };
+}
+
+/** One slow source returns unavailable. It does not hold the rest of the case. */
+export async function settleWithin<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** A timed-out check is tried once more with twice the budget. The fallback stays unavailable, never a failure. */
+export async function settleWithinRetry<T>(work: () => Promise<T>, ms: number, fallback: T): Promise<T> {
+  const first = await settleWithin(work(), ms, fallback);
+  if (first !== fallback) return first;
+  return settleWithin(work(), ms * 2, fallback);
+}
+
+function timedOut(key: string, source: string, weight: number): CheckOutput {
+  return check({
+    key,
+    status: "UNAVAILABLE",
+    weight,
+    finding: "This check timed out. The source could not be checked.",
+    source,
+    url: "",
+  });
 }
 
 function stripHtml(value: string): string {
@@ -175,30 +246,130 @@ export function emailChecks(facts: ApplicantFacts): CheckOutput[] {
 
 export function phoneStateCheck(facts: ApplicantFacts): CheckOutput {
   const digits = facts.phone.replace(/\D/g, "");
-  const area = digits.length >= 10 ? digits.slice(-10, -7) : "";
-  const state = facts.location.toUpperCase().match(/\b(NJ|NY|CT|FL|TX|DE|CA)\b/)?.[1] || "";
-  const expected = area ? AREA_TO_STATE[area] : "";
-  if (!area || !expected || !state) {
+  const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits.length >= 10 ? digits.slice(-10) : "";
+  const area = national.length === 10 ? national.slice(0, 3) : "";
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(PHONE_STATE_RE)?.[1] || "";
+  const base = { key: "phone-state", weight: 4, source: "Local area-code table", url: "" };
+  if (area && TOLL_FREE_AREA_CODES.has(area)) {
+    const where = state ? `so it does not confirm ${state}` : "so it does not confirm a state";
     return check({
-      key: "phone-state",
+      ...base,
       status: "INCONCLUSIVE",
-      weight: 4,
-      finding: "Phone area code and state could not both be read, so this check is inconclusive.",
-      source: "Local area-code table",
-      url: "",
+      finding: `The area code ${area} is toll-free, ${where}. This is inconclusive, not a failure.`,
     });
   }
-  const match = expected === state;
+  if (!area || !state) {
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: "Phone area code and state could not both be read, so this check is inconclusive.",
+    });
+  }
+  const expected = AREA_TO_STATE[area] || "";
+  if (!expected || expected !== state) {
+    const where = expected ? `It is used in ${expected}.` : "It is not in the US area-code table.";
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `The area code ${area} is outside the stated state ${state}. ${where} This is inconclusive, not a failure.`,
+    });
+  }
   return check({
-    key: "phone-state",
-    status: match ? "PASS" : "FAIL",
-    weight: 4,
-    reviewFlag: !match,
-    finding: match
-      ? `The area code ${area} fits ${state}.`
-      : `The area code ${area} usually maps to ${expected}, while the application says ${state}. Look at the phone before you decide.`,
-    source: "Local area-code table",
-    url: "",
+    ...base,
+    status: "PASS",
+    finding: `The area code ${area} fits ${state}.`,
+  });
+}
+
+function isIpHost(host: string): boolean {
+  const bare = host.replace(/^\[|\]$/g, "");
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(bare)) return true;
+  return bare.includes(":");
+}
+
+export function rdapRegisteredAt(payload: string): Date | null {
+  try {
+    const parsed = JSON.parse(payload) as { events?: { eventAction?: string; eventDate?: string }[] };
+    const events = Array.isArray(parsed.events) ? parsed.events : [];
+    const registration = events.find((event) => /registration|registered/i.test(event.eventAction || ""));
+    if (!registration?.eventDate) return null;
+    const date = new Date(registration.eventDate);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+function youngerThanMonths(registeredAt: Date, months: number, now: Date): boolean {
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return registeredAt.getTime() > cutoff.getTime();
+}
+
+/** .us has no RDAP service. A bootstrap reply that names no server is the same gap. */
+export function rdapServiceMissing(host: string, text: string): boolean {
+  const tld = host.split(".").filter(Boolean).pop()?.toLowerCase() || "";
+  if (tld === "us") return true;
+  return /no rdap servers|no rdap service|unsupported tld|rdap servers? (?:were|was)? not found/i.test(text.slice(0, 800));
+}
+
+/** No row for an IP host. A reserved or example name does not earn points. A domain younger than 12 months does not corroborate. */
+export function assessRdap(
+  host: string,
+  http: { ok: boolean; status: number; text: string; failure?: string },
+  now = new Date(),
+): CheckOutput | null {
+  if (!host || isIpHost(host)) return null;
+  const url = `https://rdap.org/domain/${host}`;
+  const base = { key: "rdap", weight: 4, source: "RDAP", url };
+  if (isReservedDomain(host)) {
+    return check({
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      corroborates: false,
+      finding: `RDAP was not treated as a pass for ${host}. This is a reserved or example domain and did not check out.`,
+    });
+  }
+  if (!http.ok) {
+    if (rdapServiceMissing(host, http.text)) {
+      return check({
+        ...base,
+        status: "UNAVAILABLE",
+        corroborates: false,
+        finding: `RDAP couldn't check for free. ${host} uses a TLD with no RDAP service.`,
+      });
+    }
+    if (http.failure === "nxdomain" || http.status === 404) {
+      return check({
+        ...base,
+        status: "FAIL",
+        reviewFlag: true,
+        corroborates: false,
+        finding: `RDAP has no registration for ${host}. domain is not registered. This counts against the company.`,
+      });
+    }
+    return check({
+      ...base,
+      status: "UNAVAILABLE",
+      corroborates: false,
+      finding: `RDAP was blocked, timed out, or did not respond for ${host}. This source could not be checked.`,
+    });
+  }
+  const registered = rdapRegisteredAt(http.text);
+  if (registered && youngerThanMonths(registered, 12, now)) {
+    return check({
+      ...base,
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      finding: `RDAP shows ${host} was registered within the last 12 months. A young domain is not corroboration.`,
+    });
+  }
+  return check({
+    ...base,
+    status: "PASS",
+    corroborates: false,
+    finding: `RDAP responded for ${host}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`,
   });
 }
 
@@ -267,7 +438,15 @@ export function duplicateCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
-export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[]): CheckOutput {
+function ofacListDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[], fetchedAt?: Date | string | null): CheckOutput {
+  const realLoaded = watchlist.length > 0;
   const lists = [...TEST_WATCHLIST, ...watchlist];
   let best = { score: 0, entry: null as WatchlistEntry | null, field: "" };
   for (const entry of lists) {
@@ -277,15 +456,27 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
     const field = person >= company ? "name" : "company";
     if (score > best.score) best = { score, entry, field };
   }
+  const overlayHit = Boolean(best.entry && TEST_WATCHLIST.some((entry) => entry.name === best.entry?.name) && !watchlist.some((entry) => entry.name === best.entry?.name));
   if (!best.entry || best.score < SANCTIONS_MATCH_THRESHOLD) {
+    if (!realLoaded) {
+      return check({
+        key: "sanctions",
+        status: "NOT_RUN",
+        weight: 10,
+        finding: "OFAC was not checked. No list was loaded. This is not a pass.",
+        source: "OFAC SDN cache",
+        url: "https://ofac.treasury.gov/sanctions-list-service",
+      });
+    }
+    const date = ofacListDate(fetchedAt);
     return check({
       key: "sanctions",
-      status: lists.length ? "PASS" : "NOT_RUN",
+      status: "PASS",
       weight: 10,
-      finding: lists.length
-        ? "No corroborated sanctions or watchlist name match on the lists that were loaded."
-        : "No watchlist was loaded, so this check did not run.",
-      source: "OFAC cache plus Private Floor test overlay",
+      finding: date
+        ? `No name matched the OFAC list loaded ${date}.`
+        : "No name matched the OFAC list that was loaded. The list date was not recorded.",
+      source: "OFAC SDN cache",
       url: "https://ofac.treasury.gov/sanctions-list-service",
     });
   }
@@ -302,7 +493,7 @@ export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[
         ? `Watchlist name match on ${best.entry.name} (${best.field}) and the application location lines up with ${best.entry.location}.`
         : `Watchlist name match on ${best.entry.name} (${best.field}) and a date of birth in the file lines up with ${best.entry.dob}.`
       : `Possible watchlist match on ${best.entry.name} without country or date-of-birth corroboration. Owner review, not an automatic red flag.`,
-    source: "OFAC cache plus Private Floor test overlay",
+    source: overlayHit ? "Private Floor test overlay (not a loaded sanctions list)" : "OFAC SDN cache",
     url: "https://ofac.treasury.gov/sanctions-list-service",
   });
 }
@@ -319,7 +510,7 @@ export function linkedinFormatCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const ok = /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[a-z0-9\-_%]+\/?$/i.test(url);
+  const ok = /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:in|company)\/[a-z0-9\-_%&.]+(?:\/[a-z0-9\-_%&.]+)*\/?(?:\?[^#]*)?(?:#.*)?$/i.test(url);
   return check({
     key: "linkedin-format",
     status: ok ? "PASS" : "FAIL",
@@ -408,7 +599,7 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
         status: "UNAVAILABLE",
         weight: 10,
         finding:
-          "The business card image could not be checked for free. OCR is not installed on this host, so the image was not read. The file is on the application for a Private Floor administrator to read.",
+          "The business card image could not be checked. OCR is installed (tesseract.js) and did not return readable text. The file is on the application for a Private Floor administrator to read.",
         source: "Card text compare",
         url: "",
       });
@@ -422,17 +613,18 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
-  const nameHit = nameMatchScore(facts.name, card) >= 0.5 || card.toLowerCase().includes(facts.name.toLowerCase().split(" ")[0] || "");
-  const orgHit = facts.org.length > 2 && card.toLowerCase().includes(facts.org.toLowerCase().slice(0, 8));
+  const nameHit = mentionsPerson(card, facts.name);
+  const orgHit = facts.org.trim().length > 2 && mentionsCompany(card, facts.org, facts.name);
   if (nameHit && orgHit) {
     return check({
       key: "business-card",
       status: "PASS",
       weight: 10,
-      finding: "The card text includes the applicant name and company.",
+      finding: "The card text includes the applicant's full first and last name and the company. The card is self-reported. It does not independently tie the person to the company.",
       source: "Card text compare",
       url: "",
-      corroborates: true,
+      corroborates: false,
+      selfReported: true,
     });
   }
   return check({
@@ -446,14 +638,33 @@ export function cardConsistencyCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+function inviteToken(note: string): string {
+  const head = note.split("·")[0] || note;
+  return normalizeInviteCode(head);
+}
+
 export function inviteCheck(facts: ApplicantFacts): CheckOutput {
-  if (!facts.inviteNote.trim()) {
+  const note = facts.inviteNote.trim();
+  if (!note) {
     return check({
       key: "invite-source",
-      status: "INCONCLUSIVE",
+      status: "NOT_RUN",
       weight: 6,
-      finding: "No invite note was stored, so the sponsoring member is not named here.",
-      source: "Invite code",
+      finding: "No referral or request code was stored",
+      source: "Referral or request code",
+      url: "",
+    });
+  }
+  const token = inviteToken(note);
+  const formatOk = token.length >= 4 && /^[A-Z0-9-]+$/.test(token);
+  if (facts.inviteValid === false || !formatOk) {
+    return check({
+      key: "invite-source",
+      status: "FAIL",
+      weight: 6,
+      reviewFlag: true,
+      finding: "The referral or request code was supplied but is not valid.",
+      source: "Referral or request code",
       url: "",
     });
   }
@@ -461,17 +672,47 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
     key: "invite-source",
     status: "PASS",
     weight: 6,
-    finding: `Invite source: ${facts.inviteNote}.`,
-    source: "Invite code",
+    finding: `Referral or request: ${facts.inviteNote}.`,
+    source: "Referral or request code",
     url: "",
   });
 }
 
+/** A made-up token. Real firm words such as Keystone, Brambleton, and Construction stay readable. */
+export function tokenLooksGibberish(token: string): boolean {
+  const word = token.toLowerCase();
+  if (word.length < 4) return false;
+  if (!/[aeiouy]/.test(word)) return true;
+  if (/q(?!u)/.test(word)) return true;
+  if (/(.)\1\1/.test(word)) return true;
+  if (word.length <= 9) {
+    const clusters = word.match(/[^aeiouy]{3,}/g) || [];
+    if (clusters.some((cluster) => /[qxzj]/.test(cluster))) return true;
+  }
+  // "th" and "ch" are ordinary English. "Northbridge" is not a made-up cluster.
+  const withoutH = word.replace(/h/g, "");
+  if (/[^aeiouy]{5,}/.test(withoutH)) return true;
+  return false;
+}
+
+export function companyNameLooksReal(org: string): boolean {
+  if (org.trim().length < 2 || /asdf|qwerty|testtest/i.test(org)) return false;
+  return !companyPhraseTokens(org).some((token) => tokenLooksGibberish(token));
+}
+
 export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
-  const nameOk = facts.name.trim().split(/\s+/).length >= 2 && facts.name.trim().length >= 5;
-  const orgOk = facts.org.trim().length >= 2 && !/asdf|qwerty|testtest/i.test(facts.org);
+  const parts = facts.name.trim().split(/\s+/).filter(Boolean);
+  const firmToken = parts.length === 1 ? parts[0].toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  const orgToken = facts.org.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const oneWordFirm =
+    parts.length === 1 &&
+    companyNameLooksReal(facts.org) &&
+    (isDistinctiveCompanyToken(firmToken) || isShortBrandToken(firmToken)) &&
+    (firmToken === orgToken || orgToken.startsWith(firmToken));
+  const nameOk = (parts.length >= 2 && facts.name.trim().length >= 5) || oneWordFirm;
+  const orgReal = companyNameLooksReal(facts.org);
   const roleKnown = annualDuesCents(facts.role) >= 0;
-  if (nameOk && orgOk && roleKnown) {
+  if (nameOk && orgReal && roleKnown) {
     return check({
       key: "plausibility",
       status: "PASS",
@@ -481,12 +722,15 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
       url: "",
     });
   }
+  const gibberish = !orgReal && facts.org.trim().length >= 2;
   return check({
     key: "plausibility",
     status: "FAIL",
     weight: 4,
     reviewFlag: true,
-    finding: "The name or company looks incomplete. Read the application before you decide.",
+    finding: gibberish
+      ? "The company name does not look like real words."
+      : "The name or company looks incomplete. Read the application before you decide.",
     source: "Local plausibility heuristic",
     url: "",
   });
@@ -549,7 +793,18 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA)\b/)?.[1];
+  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN|AZ)\b/)?.[1];
+  const portal = state ? registryPortal(state) : undefined;
+  if (portal) {
+    return check({
+      key: "business-registry",
+      status: "NOT_RUN",
+      weight: 8,
+      finding: `${portal.label} was not searched on this pass. A skipped search is not a pass.`,
+      source: portal.source,
+      url: portal.portalUrl,
+    });
+  }
   const links: Record<string, string> = {
     NJ: "https://www.njportal.com/DOR/BusinessNameSearch/",
     NY: "https://apps.dos.ny.gov/publicInquiry/",
@@ -567,6 +822,11 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     MD: "https://egov.maryland.gov/businessexpress/entitysearch",
     CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
     VA: "https://cis.scc.virginia.gov/",
+    OR: "https://sos.oregon.gov/business/Pages/find.aspx",
+    IA: "https://sos.iowa.gov/search/business/search.aspx",
+    NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
+    TN: "https://sos.tn.gov/business-services/business-search",
+    AZ: "https://ecorp.azcc.gov/EntitySearch/Index",
   };
   if (!state || !links[state]) {
     return check({
@@ -619,12 +879,19 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     ];
   }
   const fetchText = ctx.fetchText;
+  const searchFacts = factsForSearch(ctx.facts);
   const out: CheckOutput[] = [];
   const domain = domainOf(ctx.facts.email);
   if (domain && !DISPOSABLE.has(domain)) {
+    let mxTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       const dns = await import(/* webpackIgnore: true */ "node:dns/promises");
-      const records = await dns.resolveMx(domain);
+      const records = await Promise.race([
+        dns.resolveMx(domain),
+        new Promise<never>((_, reject) => {
+          mxTimer = setTimeout(() => reject(new Error("timeout")), 8_000);
+        }),
+      ]);
       out.push(
         check({
           key: "mx",
@@ -646,6 +913,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
           url: "",
         }),
       );
+    } finally {
+      if (mxTimer) clearTimeout(mxTimer);
     }
   } else {
     out.push(
@@ -667,26 +936,52 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     host = "";
   }
   const rdapHost = host ? registrableHost(host) : "";
-  if (rdapHost && !FREE_PROVIDERS.has(rdapHost)) {
-    const rdap = await pageText(fetchText, `https://rdap.org/domain/${rdapHost}`);
-    const rdapMissing = rdap.status === 404;
+  if (rdapHost && isReservedDomain(rdapHost)) {
+    const judged = assessRdap(rdapHost, { ok: false, status: 0, text: "" });
+    if (judged) out.push(judged);
+  } else if (rdapHost && !FREE_PROVIDERS.has(rdapHost) && !isIpHost(rdapHost)) {
+    const rdap = await settleWithin(pageText(fetchText, `https://rdap.org/domain/${rdapHost}`), 20_000, { ok: false, status: 0, text: "" });
+    const judged = assessRdap(rdapHost, rdap);
+    if (judged) out.push(judged);
+  }
+  const screenSink: CheckOutput[] = [];
+  let screenRows: CheckOutput[] | null = null;
+  try {
+    const pending: Promise<CheckOutput[] | null> = runPublicScreen(searchFacts, fetchText, screenSink);
+    screenRows = await settleWithin(pending, 120_000, null);
+  } catch {
+    screenRows = null;
+  }
+  // A finished row stays. A row the timeout dropped is unavailable, not a miss and not a failure.
+  out.push(...completeScreenRows(screenRows ?? screenSink.slice()));
+  const registryState = statedUsState(ctx.facts.location || "");
+  const portal = registryState ? registryPortal(registryState) : undefined;
+  if (portal) {
+    const registryUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
+    const registryHttp = await settleWithin(fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+      ok: false,
+      status: 0,
+      text: "",
+    });
+    const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp);
     out.push(
       check({
-        key: "rdap",
-        status: rdap.ok ? "PASS" : rdapMissing ? "INCONCLUSIVE" : "UNAVAILABLE",
-        weight: 4,
-        finding: rdap.ok
-          ? `RDAP responded for ${rdapHost}. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.`
-          : rdapMissing
-            ? `RDAP responded for ${rdapHost}. No data found for that domain.`
-            : `RDAP was blocked, timed out, or did not respond for ${rdapHost}. This source could not be checked.`,
-        source: "RDAP",
-        url: `https://rdap.org/domain/${rdapHost}`,
+        key: "business-registry",
+        status: registry.status,
+        weight: 8,
+        finding: registry.finding,
+        source: portal.source,
+        url: registry.url,
+        corroborates: false,
       }),
     );
   }
-  out.push(...(await runPublicScreen(ctx.facts, fetchText)));
-  const edgar = await lookupEdgar(ctx.facts.org, ctx.facts.applicantName || ctx.facts.name);
+  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText, searchFacts.website), 40_000, {
+    status: "UNAVAILABLE" as const,
+    corroborates: false,
+    url: "https://www.sec.gov/edgar/search/",
+    finding: "EDGAR was blocked, timed out, or did not respond. This source could not be checked.",
+  });
   out.push(
     check({
       key: "edgar",
@@ -696,23 +991,41 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       source: "SEC EDGAR",
       url: edgar.url,
       corroborates: edgar.corroborates,
+      reviewFlag: edgar.reviewFlag,
+      companyOnly: edgar.companyOnly,
     }),
   );
-  const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
-  const court = await fetchText(courtUrl);
+  const courtQuery = courtSearchQuery(ctx.facts.name);
+  const courtUrl = courtQuery
+    ? `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(courtQuery)}&type=o`
+    : "https://www.courtlistener.com/";
+  const courtFallback = { ok: false, status: 0, text: "" };
+  const court = courtQuery
+    ? await settleWithinRetry(() => fetchText(courtUrl), 20_000, courtFallback)
+    : { ok: true, status: 200, text: JSON.stringify({ results: [] }) };
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
-  const companyQuery = ctx.facts.org.trim();
+  const companyQuery = searchFacts.org.trim();
   const registryHttp = companyQuery
-    ? await fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    ? await settleWithin(fetchText(openCorporatesApiUrl(companyQuery)).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      })
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenCorporates(companyQuery, registryHttp)));
   const sanctionsQuery = ctx.facts.name.trim() || companyQuery;
   const sanctionsHttp = sanctionsQuery
-    ? await fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" }))
+    ? await settleWithin(fetchText(openSanctionsApiUrl(sanctionsQuery)).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      })
     : { ok: false, status: 0, text: "" };
   out.push(check(assessOpenSanctions(ctx.facts, sanctionsHttp)));
-  if (!out.some((item) => item.key === "web-footprint")) out.push(await webFootprintCheck(ctx.facts, fetchText));
-  out.push(...(await newsChecks(ctx.facts, fetchText)));
+  // Public screening always records web-footprint, including an explicit miss. The direct
+  // webFootprintCheck helper is not a second production pass.
+  const newsFallback = [timedOut("news", "News", 8)];
+  out.push(...(await settleWithinRetry(() => newsChecks(searchFacts, fetchText), 45_000, newsFallback)));
   return out;
 }
 
@@ -748,22 +1061,103 @@ export function strongFixtureChecks(): CheckOutput[] {
   ];
 }
 
+const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder when a street is present";
+
+export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutput | null> {
+  const local = assessLocalAddress(ctx.facts.location || "");
+  const base = { key: "address", weight: 2, source: ADDRESS_SOURCE, url: "" };
+  if (local.kind === "absent") return null;
+  if (local.kind === "invalid") {
+    return check({ ...base, status: "FAIL", reviewFlag: true, corroborates: false, finding: local.finding });
+  }
+  if (local.kind === "unstructured") {
+    return check({
+      ...base,
+      status: "PASS",
+      corroborates: false,
+      finding: "A location is on the application. It is not a US street address, so the state and ZIP were not checked.",
+    });
+  }
+  if (!local.geocode || !ctx.network || !ctx.fetchText) {
+    const finding = local.parsed.zip
+      ? "The state and ZIP on the application check out. No street was sent to the Census geocoder."
+      : "The state on the application is a US state code. No ZIP or street was sent to the Census geocoder.";
+    return check({
+      ...base,
+      status: "PASS",
+      corroborates: false,
+      finding,
+    });
+  }
+  const url = censusGeocodeUrl(local.parsed);
+  try {
+    const http = await ctx.fetchText(url);
+    if (!http.ok) {
+      return check({
+        ...base,
+        status: "UNAVAILABLE",
+        url,
+        corroborates: false,
+        finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+      });
+    }
+    const judged = assessCensusBody(http.text);
+    if (judged === "match") {
+      return check({
+        ...base,
+        status: "PASS",
+        url,
+        corroborates: false,
+        finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
+      });
+    }
+    if (judged === "none") {
+      return check({
+        ...base,
+        status: "FAIL",
+        url,
+        reviewFlag: true,
+        corroborates: false,
+        finding: "The address did not check out. The Census geocoder returned no match for this street.",
+      });
+    }
+    return check({
+      ...base,
+      status: "UNAVAILABLE",
+      url,
+      corroborates: false,
+      finding: "The address is not checkable. The Census geocoder did not return a readable result. This is not a pass and not a failure.",
+    });
+  } catch {
+    return check({
+      ...base,
+      status: "UNAVAILABLE",
+      url,
+      corroborates: false,
+      finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+    });
+  }
+}
+
 export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {
+  const registryState = statedUsState(ctx.facts.location || "");
+  const registryOnNetwork = Boolean(ctx.network && registryState && registryPortal(registryState));
   const local = [
     ...emailChecks(ctx.facts),
     phoneStateCheck(ctx.facts),
     textRiskCheck(ctx.facts),
     duplicateCheck(ctx.facts),
-    sanctionsCheck(ctx.facts, ctx.watchlist),
+    sanctionsCheck(ctx.facts, ctx.watchlist, ctx.watchlistFetchedAt),
     linkedinFormatCheck(ctx.facts),
     cardConsistencyCheck(ctx.facts),
     inviteCheck(ctx.facts),
     plausibilityCheck(ctx.facts),
     velocityCheck(ctx.facts),
     socialFormatCheck(ctx.facts),
-    registryLinkCheck(ctx.facts),
+    ...(registryOnNetwork ? [] : [registryLinkCheck(ctx.facts)]),
   ];
+  const address = await resolveAddressCheck(ctx);
   const remote = await networkChecks(ctx);
   const fixture = ctx.facts.testProfile === "strong" && !ctx.network ? strongFixtureChecks() : [];
-  return [...local, ...remote, ...fixture];
+  return alignNewsRows([...local, ...(address ? [address] : []), ...remote, ...fixture]);
 }

@@ -6,6 +6,7 @@ import {
   parseReviewProgress,
   reviewStepFromQuery,
   skippedFrom,
+  unverifiedPersonItems,
   type BuiltStep,
   type ReviewStepId,
   type StepEvidence,
@@ -27,6 +28,8 @@ export type MemberReview = {
   verdict: string;
   mode: MemberReviewMode;
   location: string;
+  unverified: string[];
+  applicationGrade: { letter: string; score: number } | null;
 };
 
 function rowsFromSnapshot(value: unknown): StepEvidence[] {
@@ -42,6 +45,7 @@ function rowsFromSnapshot(value: unknown): StepEvidence[] {
       finding: typeof row.finding === "string" ? row.finding : "",
       source: typeof row.source === "string" ? row.source : "",
       url: typeof row.url === "string" ? row.url : "",
+      corroborates: row.corroborates === true,
     });
   }
   return out;
@@ -71,6 +75,7 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
 
   let evidence = rowsFromSnapshot(record.sourceSnapshot);
   let verdict = "";
+  let applicationGrade: { letter: string; score: number } | null = null;
   const applicationId = application?.id || null;
   if (applicationId) {
     const run = await prisma.verificationRun.findFirst({
@@ -79,6 +84,9 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
       include: { evidence: true },
     });
     verdict = run?.verdict || "";
+    if (run?.gradeLetter && typeof run.gradeScore === "number") {
+      applicationGrade = { letter: run.gradeLetter, score: run.gradeScore };
+    }
     if (!evidence.length) {
       evidence = (run?.evidence ?? []).map((item) => ({
         checkKey: item.checkKey,
@@ -86,6 +94,7 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
         finding: item.finding,
         source: item.source,
         url: item.url,
+        corroborates: item.corroborates,
       }));
     }
   }
@@ -142,5 +151,7 @@ export async function loadMemberReview(caseId: string, stepQuery?: string): Prom
     verdict,
     mode: open ? "application" : invitePending ? "invite" : "closed",
     location: application?.location || invite?.location || user?.location || "",
+    unverified: unverifiedPersonItems(evidence),
+    applicationGrade,
   };
 }

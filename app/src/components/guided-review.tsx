@@ -8,7 +8,7 @@ import { decisionDialogBootstrap } from "@/lib/decision-dialog";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
-import type { GradeReport } from "@/lib/verify/grade";
+import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
 import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
 
@@ -26,6 +26,8 @@ export function GuidedReview({
   verdict = "",
   role = "",
   location = "",
+  unverified = [],
+  applicationGrade = null,
 }: {
   applicationId: string;
   caseId: string;
@@ -40,6 +42,8 @@ export function GuidedReview({
   verdict?: string;
   role?: string;
   location?: string;
+  unverified?: string[];
+  applicationGrade?: { letter: string; score: number } | null;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -90,6 +94,8 @@ export function GuidedReview({
           steps={steps}
           role={role}
           location={location}
+          unverified={unverified}
+          applicationGrade={applicationGrade}
         />
       ) : (
         <article className="mt-4">
@@ -178,6 +184,8 @@ function DecisionStep({
   steps,
   role,
   location,
+  unverified,
+  applicationGrade,
 }: {
   applicationId: string;
   caseId: string;
@@ -193,6 +201,8 @@ function DecisionStep({
   steps: BuiltStep[];
   role: string;
   location: string;
+  unverified: string[];
+  applicationGrade: { letter: string; score: number } | null;
 }) {
   const strongWarning = needsStrongApprovalWarning({
     letter: grade?.letter,
@@ -238,6 +248,20 @@ function DecisionStep({
       ) : (
         <p className="mt-3 text-sm text-ink">No steps were skipped.</p>
       )}
+      {unverified.length ? (
+        <div className="mt-3 rounded border border-[#7A2E2E] bg-cream p-3 text-sm" role="status">
+          <p className="font-semibold text-[#7A2E2E]">Unverified</p>
+          <ul className="mt-2 space-y-1">
+            {unverified.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-ink">A company that exists is not the same as this applicant being connected to it.</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-ink">Nothing on the unverified list. A source corroborated this person.</p>
+      )}
+      {grade ? <p className="mt-3 text-sm text-ink">{gradeComparisonLine(grade, applicationGrade)}</p> : null}
       {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
       {mode === "application" && applicationId ? (
         <DecisionForm
@@ -248,9 +272,10 @@ function DecisionStep({
           paying={paying}
           strongWarning={strongWarning}
           warningText={reviewCopy(warningText)}
+          unverified={unverified}
         />
       ) : null}
-      {mode === "invite" ? <InviteDecisionForm caseId={caseId} /> : null}
+      {mode === "invite" ? <InviteDecisionForm caseId={caseId} unverified={unverified} /> : null}
       {mode === "closed" ? (
         <>
           <p className="mt-4 text-sm text-ink">This file already has a decision, or there is no open application to decide. The file status above follows that decision.</p>

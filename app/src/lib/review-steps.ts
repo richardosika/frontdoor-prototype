@@ -31,7 +31,25 @@ export type StepEvidence = {
   finding: string;
   source: string;
   url: string;
+  corroborates?: boolean;
 };
+
+/**
+ * Items that were not corroborated about the person.
+ * A company-name SEC hit can auto-pass the company step and still leave this unverified.
+ */
+export function unverifiedPersonItems(evidence: { checkKey: string; status: string; corroborates?: boolean }[]): string[] {
+  const personTied = evidence.some((row) => row.status === "PASS" && row.corroborates === true);
+  return personTied ? [] : ["person-to-company link"];
+}
+
+export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[] }): string {
+  const extra = input.extra ? ` ${input.extra}` : "";
+  const unverified = input.unverified.length
+    ? ` Unverified: ${input.unverified.join(", ")}. A company that exists is not the same as this applicant being connected to it.`
+    : "";
+  return `${input.dues}${extra}${unverified}`;
+}
 
 export type BuiltStep = {
   id: ReviewStepId;
@@ -84,7 +102,7 @@ const STEP_META: Record<Exclude<ReviewStepId, "decision">, { title: string; abou
   },
   company: {
     title: "Company and registry",
-    about: "Website, SEC EDGAR, domain registration, and the state registry link. A state registry is not searched automatically.",
+    about: "Website, SEC EDGAR, domain registration, and the state registry. NY, CT, CO, OR, and PA are exact-name company checks. NJ, WA, IA, and other states without a free API are a manual link.",
     keys: ["website", "edgar", "rdap", "business-registry"],
   },
   news: {
@@ -175,6 +193,7 @@ export function displayCheckStatus(result: string, note: string): "Pass" | "Conc
   if (result === "PASS") return "Pass";
   if (result === "FAIL") return "Fail";
   if (result === "NEEDS_INFO") return "Concern";
+  if (result === "NOT_PROVIDED" && /not checked/i.test(note)) return "Not checked";
   if (result === "NOT_PROVIDED") return "Couldn't verify";
   return "Not checked";
 }
@@ -183,6 +202,7 @@ export function publicFinding(status: string, finding: string): string {
   const text = finding.trim();
   if (status === "PASS") return text || "This check passed.";
   if (status === "FAIL") return text || "This check did not pass.";
+  if (status === "NOT_RUN" && /not checked/i.test(text)) return text;
   if (status === "UNAVAILABLE") {
     if (/couldn't check for free|could not be checked|could not be verified for free|couldn't verify for free/i.test(text)) return text;
     return text ? `${text} Couldn't check for free.` : "Couldn't check for free.";
@@ -243,6 +263,10 @@ export function buildReviewSteps(input: {
     let status = statusFromSuggestion(prefill.mark);
     const saved = input.saved.steps[id] || null;
     if (saved) status = saved.status;
+    if (id === "risk" && !saved && status === "COULDNT_VERIFY") {
+      const sanctionsRow = input.evidence.find((row) => row.checkKey === "sanctions");
+      if (!sanctionsRow || sanctionsRow.status === "NOT_RUN") status = "NOT_CHECKED";
+    }
     const findings = rows.map((row) => ({
       source: row.source || "Check",
       status: row.status,

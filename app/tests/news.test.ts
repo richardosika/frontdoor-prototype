@@ -5,6 +5,7 @@ import {
   bingNewsUrl,
   allegedNegative,
   classifyNews,
+  dedupeNewsItems,
   feedBodyState,
   newsStoryChipLabel,
   gdeltNewsUrl,
@@ -55,8 +56,8 @@ describe("news feeds", () => {
   it("builds quoted person, company, and company-plus-city queries", () => {
     const applicant = facts();
     expect(newsSearchQueries(applicant)).toEqual([
-      `"Stephen Ross" related`,
-      `"Ross" "related"`,
+      `"Stephen Ross" "related companies"`,
+      `"Ross" "related companies"`,
       `"Related Companies" "New York"`,
     ]);
     expect(googleNewsUrl(newsSearchQueries(applicant)[0])).toContain("https://news.google.com/rss/search?q=");
@@ -295,6 +296,8 @@ describe("news feeds", () => {
       NOW,
     );
     expect(lien[0].status).toBe("FAIL");
+    expect(lien[0].reviewFlag).toBe(true);
+    expect(lien[0].finding).toContain("A civil headline names this person");
 
     const client = classifyNews(
       facts({ name: "John Smith", applicantName: "John Smith", org: "Acme Realty", location: "Austin, TX" }),
@@ -331,7 +334,11 @@ describe("news feeds", () => {
       NOW,
     );
     expect(city[0].status).toBe("FAIL");
+    expect(city[0].reviewFlag).toBe(true);
+    expect(city[0].finding).toContain("A civil headline names this person");
+    expect(city[0].finding).not.toContain("Company-level litigation");
     expect(city[1].status).toBe("FAIL");
+    expect(city[1].finding).toContain("Civil, names applicant");
   });
 
   it("asks Google, Bing, and GDELT and records which feeds were blocked", async () => {
@@ -415,5 +422,136 @@ describe("news feeds", () => {
     expect(feedBodyState(200, "<html>consent</html>", "rss")).toBe("unavailable");
     expect(feedBodyState(429, "", "json")).toBe("unavailable");
     expect(feedBodyState(200, JSON.stringify({ articles: [] }), "json")).toBe("no-data");
+  });
+
+  it("ignores a place-name collision and separates a lawsuit from fraud", () => {
+    const providers = [
+      { name: "Google News", state: "responded" as const },
+      { name: "Bing News", state: "responded" as const },
+      { name: "GDELT", state: "responded" as const },
+    ];
+    const place = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol council meets on Tuesday",
+          snippet: "The council agenda was routine.",
+          url: "https://example.com/council",
+          source: "Local",
+          publishedAt: "2026-05-01T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(place[0].corroborates).not.toBe(true);
+    expect(place[0].finding).not.toContain("names this person and company");
+    expect(place.some((check) => check.key === "news-story")).toBe(false);
+
+    const sole = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol council meets Ada Quinn",
+          snippet: "A local meeting.",
+          url: "https://example.com/meet",
+          source: "Local",
+          publishedAt: "2026-05-01T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(sole[0].corroborates).not.toBe(true);
+
+    const lawsuit = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Bristol Development sued over a lease",
+          snippet: "The filing names the company only.",
+          url: "https://example.com/suit",
+          source: "Desk",
+          publishedAt: "2026-05-02T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(lawsuit[0].status).toBe("INCONCLUSIVE");
+    expect(lawsuit[0].reviewFlag).toBeUndefined();
+    expect(lawsuit[0].finding).toContain("Company-level litigation");
+
+    const fraud = classifyNews(
+      facts({ name: "Ada Quinn", applicantName: "Ada Quinn", org: "Bristol Development", location: "New York, NY" }),
+      [
+        {
+          title: "Ada Quinn of Bristol Development indicted for fraud",
+          snippet: "Prosecutors described the charge.",
+          url: "https://example.com/fraud",
+          source: "Desk",
+          publishedAt: "2026-05-03T12:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      providers,
+      NOW,
+    );
+    expect(fraud[0].status).toBe("FAIL");
+    expect(fraud[0].reviewFlag).toBe(true);
+    expect(fraud[0].finding).toContain("not an automatic decline");
+  });
+
+  it("does not match turner inside a hyphenated word, and keeps one copy of a repeated headline", () => {
+    const applicant = facts({
+      name: "QA Tester",
+      applicantName: "QA Tester",
+      org: "Turner Construction Company",
+    });
+    const headline = "A page-turner for every e-reader tester";
+    const checks = classifyNews(
+      applicant,
+      [
+        {
+          title: headline,
+          snippet: "The e-reader tester loved the page-turner.",
+          url: "https://example.com/turner-1",
+          source: "Desk",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Google News",
+        },
+        {
+          title: headline,
+          snippet: "The e-reader tester loved the page-turner.",
+          url: "https://example.com/turner-2",
+          source: "Wire",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Bing News",
+        },
+        {
+          title: "Turner Construction Company starts a New York tower",
+          snippet: "Turner Construction Company published the notice.",
+          url: "https://example.com/turner-real",
+          source: "Desk",
+          publishedAt: "2026-07-18T07:00:00.000Z",
+          provider: "Google News",
+        },
+      ],
+      [
+        { name: "Google News", state: "responded" },
+        { name: "Bing News", state: "responded" },
+      ],
+      NOW,
+    );
+    const stories = checks.filter((check) => check.key === "news-story");
+    expect(stories.some((check) => /page-turner/i.test(check.finding))).toBe(false);
+    expect(stories.filter((check) => /Turner Construction Company starts/i.test(check.finding))).toHaveLength(1);
+    expect(dedupeNewsItems([
+      { title: headline, url: "https://example.com/a" },
+      { title: headline, url: "https://example.com/b" },
+    ])).toHaveLength(1);
   });
 });

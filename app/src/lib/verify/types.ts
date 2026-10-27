@@ -16,6 +16,16 @@ export type CheckOutput = {
   reviewFlag?: boolean;
   /** True only when this pass corroborates the person and the company, not merely the absence of a red flag. */
   corroborates?: boolean;
+  /**
+   * The company name matched on the applicant's own site or a LinkedIn company page.
+   * The person did not. This is partial credit and does not corroborate the person.
+   */
+  companyOnly?: boolean;
+  /**
+   * Applicant-supplied material (their own site, a footprint from that same site, or their card).
+   * Several of these together are one self-reported source. They do not corroborate the person.
+   */
+  selfReported?: boolean;
 };
 
 export type ApplicantFacts = {
@@ -26,12 +36,19 @@ export type ApplicantFacts = {
   org: string;
   location: string;
   role: string;
+  /**
+   * False when the file is a referral or request and no application was submitted.
+   * Absent on older runs and on project files.
+   */
+  applicationSubmitted?: boolean;
   phone: string;
   website: string;
   linkedinUrl: string;
   socialLinks: string;
   statement: string;
   inviteNote: string;
+  /** False when a stored referral or request code is expired or used up. Absent when no code was supplied. */
+  inviteValid?: boolean;
   testProfile: string;
   cardText: string;
   cardUploaded: boolean;

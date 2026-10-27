@@ -1,0 +1,672 @@
+{
+  "label": "qa-skanska",
+  "rubricVersion": "2026-10-25",
+  "startedAt": "2026-10-27T13:34:55.906Z",
+  "finishedAt": "2026-10-27T13:37:52.262Z",
+  "startedAtLocal": "10/27/2026, 9:34:55 AM (America/New_York)",
+  "groundTruthNote": "GROUND TRUTH TO BE CONFIRMED BY RICHARD. Person-to-company links and titles for REAL cases are the benchmark author's public-knowledge assumptions. They are NOT verified and the harness never asserts a current job title. Cases marked companyOnly only expect company corroboration.",
+  "ofac": "sdn.csv from <24h cache; alt.csv from <24h cache; 39614 watchlist entries parsed (same parser as the app's refreshWatchlist)",
+  "sourceHealth": [
+    {
+      "name": "CourtListener v4",
+      "url": "https://www.courtlistener.com/api/rest/v4/search/?q=%22Jane+Roe%22&type=o",
+      "status": 200,
+      "ms": 2329
+    },
+    {
+      "name": "SEC company_tickers",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "status": 200,
+      "ms": 65
+    },
+    {
+      "name": "SEC efts (URL as used by edgar.ts)",
+      "url": "https://efts.sec.gov/LATEST/search-index?q=%22Hines%22+%22Prologis%22&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01",
+      "status": 200,
+      "ms": 1248
+    },
+    {
+      "name": "DuckDuckGo html",
+      "url": "https://html.duckduckgo.com/html/?q=%22Jonathan+Gray%22+Blackstone",
+      "status": 200,
+      "ms": 633
+    },
+    {
+      "name": "Bing web",
+      "url": "https://www.bing.com/search?q=%22Jonathan+Gray%22+Blackstone",
+      "status": 200,
+      "ms": 144
+    },
+    {
+      "name": "Google News RSS",
+      "url": "https://news.google.com/rss/search?q=Blackstone",
+      "status": 200,
+      "ms": 547
+    },
+    {
+      "name": "GDELT doc API",
+      "url": "https://api.gdeltproject.org/api/v2/doc/doc?query=%22Blackstone%22&mode=artlist&format=json&maxrecords=3",
+      "status": 429,
+      "ms": 10854
+    },
+    {
+      "name": "OFAC sdn.csv (HEAD)",
+      "url": "https://www.treasury.gov/ofac/downloads/sdn.csv",
+      "status": 200,
+      "ms": 10730
+    },
+    {
+      "name": "rdap.org",
+      "url": "https://rdap.org/domain/prologis.com",
+      "status": 200,
+      "ms": 149
+    },
+    {
+      "name": "OpenSanctions API (expected 401)",
+      "url": "https://api.opensanctions.org/search/default?q=test",
+      "status": 401,
+      "ms": 317
+    },
+    {
+      "name": "OpenCorporates API (expected 401)",
+      "url": "https://api.opencorporates.com/v0.4/companies/search?q=prologis",
+      "status": 401,
+      "ms": 254
+    },
+    {
+      "name": "DNS MX gmail.com (ok)",
+      "url": "dns",
+      "status": 200,
+      "ms": 18
+    }
+  ],
+  "summary": {
+    "cases": 1,
+    "passed": 1,
+    "failed": 0,
+    "errored": 0,
+    "falsePositives": {
+      "count": 0,
+      "ids": [],
+      "definition": "fake or QA control reaching APPROVE* or grade >= C"
+    },
+    "falseNegatives": {
+      "count": 0,
+      "ids": [],
+      "definition": "real entity graded D/F or DECLINE"
+    },
+    "realHardFail": []
+  },
+  "results": [
+    {
+      "id": "QASKA",
+      "kind": "real",
+      "label": "Skanska USA / Richard Kennedy (usa.skanska.com redirect)",
+      "companyOnly": false,
+      "qaExpect": "",
+      "personAssumption": "Richard Kennedy - skanska.com/us/en leadership; the application site is the usa.skanska.com host that redirects; title unconfirmed by Richard",
+      "watchlist": "full",
+      "watchlistEntries": 39614,
+      "notes": [],
+      "facts": {
+        "name": "Richard Kennedy",
+        "applicantName": "Richard Kennedy",
+        "email": "pf.bench.qaska@gmail.com",
+        "org": "Skanska USA",
+        "location": "New York, NY",
+        "role": "GENERAL_CONTRACTOR",
+        "phone": "",
+        "website": "https://www.usa.skanska.com",
+        "linkedinUrl": "https://www.linkedin.com/company/skanska/",
+        "socialLinks": "",
+        "statement": "I invest in and operate commercial real estate and would like to meet other owners and operators.",
+        "inviteNote": "PF-BENCH-0000 · Benchmark invite code",
+        "testProfile": "",
+        "cardText": "",
+        "cardUploaded": false,
+        "duplicateOfMember": false,
+        "duplicateOfDeclined": false,
+        "recentApplications": 0,
+        "referenceCount": 0
+      },
+      "expected": "not F/DECLINE; company corroborated where public",
+      "checks": [
+        {
+          "key": "email-syntax",
+          "status": "PASS",
+          "weight": 5,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The email address is well formed.",
+          "source": "Local syntax check",
+          "url": ""
+        },
+        {
+          "key": "email-provider",
+          "status": "PASS",
+          "weight": 2,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "This is a private-email provider. That is allowed. It is a bonus signal only, not a requirement.",
+          "source": "Bundled provider list",
+          "url": ""
+        },
+        {
+          "key": "disposable-email",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The email domain is not on the bundled disposable list.",
+          "source": "Bundled disposable-domain list",
+          "url": ""
+        },
+        {
+          "key": "role-address",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The address is not a shared role inbox.",
+          "source": "Local role-address list",
+          "url": ""
+        },
+        {
+          "key": "phone-state",
+          "status": "INCONCLUSIVE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Phone area code and state could not both be read, so this check is inconclusive.",
+          "source": "Local area-code table",
+          "url": ""
+        },
+        {
+          "key": "text-risk",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The track-record note is long enough to read and has no fraud-pattern phrasing.",
+          "source": "Local text heuristic",
+          "url": ""
+        },
+        {
+          "key": "duplicate",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "No existing member or declined application uses this email.",
+          "source": "Private Floor member and application records",
+          "url": ""
+        },
+        {
+          "key": "sanctions",
+          "status": "PASS",
+          "weight": 10,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "No name matched the OFAC list loaded 2026-10-26.",
+          "source": "OFAC SDN cache",
+          "url": "https://ofac.treasury.gov/sanctions-list-service"
+        },
+        {
+          "key": "linkedin-format",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The LinkedIn URL has a public profile shape.",
+          "source": "Local URL check",
+          "url": "https://www.linkedin.com/company/skanska/"
+        },
+        {
+          "key": "business-card",
+          "status": "NOT_RUN",
+          "weight": 10,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "No business card was uploaded.",
+          "source": "Card text compare",
+          "url": ""
+        },
+        {
+          "key": "invite-source",
+          "status": "PASS",
+          "weight": 6,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Referral or request: PF-BENCH-0000 · Benchmark invite code.",
+          "source": "Referral or request code",
+          "url": ""
+        },
+        {
+          "key": "plausibility",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The name, company, and role are filled in and readable.",
+          "source": "Local plausibility heuristic",
+          "url": ""
+        },
+        {
+          "key": "velocity",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "No burst of applications from this email in the last hour.",
+          "source": "Private Floor application records",
+          "url": ""
+        },
+        {
+          "key": "social-links",
+          "status": "INCONCLUSIVE",
+          "weight": 2,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "No other social links were provided.",
+          "source": "Local URL check",
+          "url": ""
+        },
+        {
+          "key": "address",
+          "status": "PASS",
+          "weight": 2,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "The state on the application is a US state code. No ZIP or street was sent to the Census geocoder.",
+          "source": "US state and ZIP ranges; US Census Geocoder when a street is present",
+          "url": ""
+        },
+        {
+          "key": "mx",
+          "status": "PASS",
+          "weight": 6,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "MX records exist for gmail.com.",
+          "source": "DNS MX lookup",
+          "url": ""
+        },
+        {
+          "key": "rdap",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "RDAP responded for skanska.com. Open the record for registrar and registration date. Domain age is a bonus, not proof of identity.",
+          "source": "RDAP",
+          "url": "https://rdap.org/domain/skanska.com"
+        },
+        {
+          "key": "website",
+          "status": "UNAVAILABLE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: https://www.usa.skanska.com. blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL The site redirected to https://www.skanska.com/us/en. Couldn't check for free. Not checkable for free.",
+          "source": "Company website",
+          "url": "https://www.skanska.com/us/en"
+        },
+        {
+          "key": "linkedin-fetch",
+          "status": "PASS",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": true,
+          "finding": "Searched: https://www.linkedin.com/company/skanska/. Found: the public LinkedIn page company confirmed, person NOT confirmed. That is company-exists evidence, not a person-to-company link. Name: no. Company: yes. City: yes. Confidence: medium.",
+          "source": "LinkedIn",
+          "url": "https://www.linkedin.com/company/skanska/"
+        },
+        {
+          "key": "screen-x",
+          "status": "UNAVAILABLE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"skanska\" on X. X blocked automated access. Couldn't check for free. Not checkable for free.",
+          "source": "X",
+          "url": "https://x.com/search?q=%22Richard%20Kennedy%22%20%22skanska%22&src=typed_query&f=live"
+        },
+        {
+          "key": "screen-facebook",
+          "status": "UNAVAILABLE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"skanska\" on Facebook. Facebook blocked automated access. Couldn't check for free. Not checkable for free.",
+          "source": "Facebook",
+          "url": "https://www.facebook.com/search/top?q=%22Richard%20Kennedy%22%20%22skanska%22"
+        },
+        {
+          "key": "screen-instagram",
+          "status": "UNAVAILABLE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: Skanska USA on Instagram. Instagram blocked automated access. Couldn't check for free. Not checkable for free.",
+          "source": "Instagram",
+          "url": "https://www.instagram.com/explore/tags/skanska/"
+        },
+        {
+          "key": "screen-youtube",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": true,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"skanska\" on YouTube. Found: ... very exciting panelists with Katie found in Richard Kennedy Richard Kennedy is the president and CEO of Skanska USA where ... Name: yes. Company: yes. City: no. Confidence: high.",
+          "source": "YouTube",
+          "url": "https://www.youtube.com/results?search_query=%22Rich%20Kennedy%22%20%22skanska%22"
+        },
+        {
+          "key": "screen-tiktok",
+          "status": "INCONCLUSIVE",
+          "weight": 4,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"skanska\" on TikTok. no match found Name: no. Company: no. City: no. Confidence: none.",
+          "source": "TikTok",
+          "url": "https://www.tiktok.com/search?q=%22Richard%20Kennedy%22%20%22skanska%22"
+        },
+        {
+          "key": "screen-news",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"skanska\" | \"Kennedy\" \"skanska\". Found: Richard Kennedy, Skanska USA - Investment Reports Name: yes. Company: yes. City: no. Confidence: high.",
+          "source": "Google News",
+          "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1KQVBSUlRNT3p6NTlIWHRoWUhwODl6c2hNbXRHU2dFdlNWcVRTWU9wQU1qcG9LcGZ5VTlXRFBENlptbS1YWGNTdlRfa3c0V2ZOMXRYM2szT1BpbnJEOHlBLUVWcnNCMmVkcF8zaFRQM2s?oc=5"
+        },
+        {
+          "key": "screen-web",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": true,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"Skanska USA\" \"New York\". Found: Richard Kennedy new Skanska USA president based in New York Name: yes. Company: yes. City: yes. Confidence: high.",
+          "source": "DuckDuckGo",
+          "url": "https://html.duckduckgo.com/html/?q=%22Richard%20Kennedy%22%20%22Skanska%20USA%22%20%22New%20York%22"
+        },
+        {
+          "key": "web-footprint",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": true,
+          "companyOnly": false,
+          "finding": "Searched: \"Richard Kennedy\" \"Skanska USA\" \"New York\". Found: Richard Kennedy new Skanska USA president based in New York Name: yes. Company: yes. City: yes. Confidence: high.",
+          "source": "DuckDuckGo",
+          "url": "https://www.newyorkconstructionreport.com/richard-kennedy-new-skanska-usa-president-based-in-new-york/"
+        },
+        {
+          "key": "business-registry",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "NY Active Corporations lists SKANSKA USA INC.. That shows a company by this exact name exists. It does not tie a person to the firm.",
+          "source": "NY Active Corporations",
+          "url": "https://data.ny.gov/d/n9v6-gdp6"
+        },
+        {
+          "key": "edgar",
+          "status": "INCONCLUSIVE",
+          "weight": 12,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "EDGAR responded. No company on the SEC list uses this firm's name.",
+          "source": "SEC EDGAR",
+          "url": "https://www.sec.gov/edgar/search/"
+        },
+        {
+          "key": "courts",
+          "status": "UNAVAILABLE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "CourtListener was blocked, timed out, or did not respond. This source could not be checked. Not checkable for free.",
+          "source": "CourtListener",
+          "url": "https://www.courtlistener.com/api/rest/v4/search/?q=%22Richard%20Kennedy%22&type=o"
+        },
+        {
+          "key": "opencorporates",
+          "status": "UNAVAILABLE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "OpenCorporates couldn't verify for free. The public company search did not return records without a paid token. Not checkable for free.",
+          "source": "OpenCorporates",
+          "url": "https://opencorporates.com/companies?q=Skanska%20USA"
+        },
+        {
+          "key": "opensanctions",
+          "status": "UNAVAILABLE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "OpenSanctions couldn't verify for free. The public search did not return a list without a paid key. Not checkable for free.",
+          "source": "OpenSanctions",
+          "url": "https://www.opensanctions.org/search/?q=Richard%20Kennedy"
+        },
+        {
+          "key": "news",
+          "status": "PASS",
+          "weight": 8,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": true,
+          "companyOnly": false,
+          "finding": "Neutral coverage names this person and company. Richard Kennedy, Skanska USA Query-echo headlines were ignored. Google News, Bing News responded. Unavailable: GDELT.",
+          "source": "Google News, Bing News",
+          "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1KQVBSUlRNT3p6NTlIWHRoWUhwODl6c2hNbXRHU2dFdlNWcVRTWU9wQU1qcG9LcGZ5VTlXRFBENlptbS1YWGNTdlRfa3c0V2ZOMXRYM2szT1BpbnJEOHlBLUVWcnNCMmVkcF8zaFRQM2s?oc=5"
+        },
+        {
+          "key": "news-story",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2024-11-07 · Richard Kennedy, Skanska USA",
+          "source": "Investment Reports via Google News",
+          "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE1KQVBSUlRNT3p6NTlIWHRoWUhwODl6c2hNbXRHU2dFdlNWcVRTWU9wQU1qcG9LcGZ5VTlXRFBENlptbS1YWGNTdlRfa3c0V2ZOMXRYM2szT1BpbnJEOHlBLUVWcnNCMmVkcF8zaFRQM2s?oc=5"
+        },
+        {
+          "key": "news-story#2",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-10-21 · Skanska to construct a new waterfront connection in New York, USA, for USD 163M, about SEK 1.5 billion",
+          "source": "Cision News via Google News",
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxNM3MtcGw5TUFaVV8zSWQ1YVN1bkFNRXpfNFdRT3dCc0lub0xoZWt2STZyVlNkc3pfR1d6bFZacXAtQ0lCS0lncUs4VGJoODV5bFh6UW1jYk9oZGtPam9BX0wyN25Oc0I4Z3J6WklJZnZQd2NndVpnallOVEdBYUxRM0ZaWWhXUWFLazRaZkVZVHZKaG5LbjdxSXdGT1lyZG1rZVlSLWJlcmpzNEkwMUZZbk5vbjk2X01WekV2UDJlTzhjeURCdVNMRm9oR2MzdXV0cXVhR0sza2FmUFE?oc=5"
+        },
+        {
+          "key": "news-story#3",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-10-09 · Montague appoints Skanska USA to manage Strathmore mill project",
+          "source": "Greenfield Recorder via Google News",
+          "url": "https://news.google.com/rss/articles/CBMiekFVX3lxTE5KckJpTlhvaF9xcnFKUldvcGFhVmtvLTh3SnhvV1d3NVByS01HYzU1MFVIaFpnRjZBRnZXYU1oU05rR3Q1aDJOQy05ZHJUbHUwOXkxRVh4aWV0V0xYa1ZzaU5oY3VOOUhpVm0wQjZIQnVPYVlPWVRCZF9B?oc=5"
+        },
+        {
+          "key": "news-story#4",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-09-01 · Skanska names new US infrastructure CFO",
+          "source": "Construction Dive via Google News",
+          "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxQZEpyeHZCc0NENUdUbTU1Y0ZIeUFQWUFQNUpvZWh2TmdKLUZCTURIRnFHNGk4Y1NXS1FHS09pUnY2dG9OcUswTzhlOUVtSFl1b09lS1ZTaG9Ta0pmdEtiWTdaLUYyb21VeThnaGxXd2FRR1JKME5tNC1NeE9sWXItdw?oc=5"
+        },
+        {
+          "key": "news-story#5",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-07-02 · Why We Initiated A Position In Skanska (SKSBF)",
+          "source": "Seeking Alpha via Google News",
+          "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxQVWtqdWxfbEFpbXl3Z1Z2d2l0NnZhaHc0MnZna1ZqWVdlVDI5WHJxTkkwQWt3RWMxclpsbGwxYUJSMGNsaHJzbHVVSWRrY0h1dUpZRi1QUkpVXzhNYUtIbm1UcnhZRlg3Znp5RjZwb3lyUFlFeTBVR2lGT0hyWEtyZTg1QQ?oc=5"
+        },
+        {
+          "key": "news-story#6",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-06-08 · HISTORIC AGAIN: President Trump’s Transportation Secretary Sean P. Duffy, Amtrak, and Penn Transformation Partners (Halmar & Skanska) Unveil Design for Overhaul of New York Penn St",
+          "source": "Amtrak Media via Google News",
+          "url": "https://news.google.com/rss/articles/CBMitAJBVV95cUxOMlVYaXN6M1J6U0EycnlnZEx4RmJXZ1JCMWJaaGVmT0RhUzlxS1lIdUN0Y0Z4Ry16RHNLbDViZnJvdFRIa2NUWUE4YmxmQjZYX2l6MEstS0s4U2xpY0Y3X1FiMDBZRUQ0SUp6MjNjT3NMQ3NHSk5XRGs2VUd0TnNwR1MyNjNuRFgyTnZ6aXRkQVBEaGJlS2xtY3ZVNzU3RF9ZQzBTSmZLYmtxWGtNTDRIMU5yOFVUbmRoTkl2SThybDcxNGZkdFMyZnV4TEt5TjFQWkZTWWdsQUo1UkhiOUNiQ2FoRldkNlVNTkUtdmNmc2dwemZ5cHdHN0FJRm5Lb3VTWHpvcXNkMzAtNXVaZEwtYjhBMTg4RmNZdVR3MUpYaWt2S28zZU10c2EtTmNuLTJIZTIwbA?oc=5"
+        },
+        {
+          "key": "news-story#7",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-05-18 · Skanska USA Building Names Executive Officer for West Region, EVP-GM for Washington",
+          "source": "425business.com via Google News",
+          "url": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxNX19HZUJsNkRSbmNCU0psZUhCWkNyakVNQ2lQTnJLVjVpVjNoQV9FQ1h4a0x3Q21kbVpQNU5iQ0NhekpoalpHUW5SbjNSQzdZSkF5bVpSTUZjWjFpV3VpSV9lY01NdjZpbHp0Q29nam1xcFl3RmYtV2ZzeG9BUWMxcWhXX0ZlN2hyMGtFYTlnQm5CVDV1THdyYkk3Z3ZjVFpNaDNXS0hZbTZ1d21GSUtmRE5YWV9LOTNJN3NXQU5fMEloODU4QndVMzRpRy1IRnRUVWU3cGN4QkVpNFFNS3RnWXV5S2N6SGdVSkRwcTV0WDI3dFl0ZGtfQ2puRDRLOXM?oc=5"
+        },
+        {
+          "key": "news-story#8",
+          "status": "INCONCLUSIVE",
+          "weight": 0,
+          "hardFlag": false,
+          "reviewFlag": false,
+          "corroborates": false,
+          "companyOnly": false,
+          "finding": "Neutral · 2026-05-04 · Skanska constructs Hudson Tunnel Project Package 1C in New York, USA, for USD 363M, about SEK 3.4 billion",
+          "source": "Cision News via Google News",
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxQWmZZRmVHODlaR201VWh2LWhTcFhEaC1LVWxHWGZrRmNiclVIeWVFMTRkcXdNVFA3M1dhZ3lLNkpQcmF1RS1pS1R2UmNlUkhvSm5jOHBZdWk2b21ScUV1SFQybTJ0b0djSzZrVVRXdGZpenJrcXowR2RrWklJWWZHbGRxa1htWjlCUElaaVJULV9UZGFtUVBIOEk3TGlodmV0Z0dJUVJaWTJLM2w5QlFiZ25iZklPd0RXOXV0NjlPU0sxYldza05zVzI3TjVWYjdseUtwdUdZeFV1VGc?oc=5"
+        }
+      ],
+      "grade": {
+        "letter": "C",
+        "score": 71,
+        "rawScore": 71,
+        "confidence": "High",
+        "recommendation": "APPROVE WITH CONDITIONS",
+        "caps": [],
+        "banner": null,
+        "attention": [
+          "Medium: Sources that did not produce a result",
+          "Low: No business card",
+          "Low: No references"
+        ],
+        "categories": [
+          "Identity and contact: 13/18",
+          "Company legitimacy: 4/22",
+          "Public footprint and reputation: 16/18",
+          "Risk and sanctions: 20/20",
+          "Role fit and plausibility: 12/12",
+          "Completeness of application: 6/10"
+        ]
+      },
+      "legacy": {
+        "score": 76,
+        "verdict": "LEGIT"
+      },
+      "coverage": {
+        "all": {
+          "covered": 123,
+          "total": 171,
+          "share": 71.9
+        },
+        "network": {
+          "covered": 54,
+          "total": 86,
+          "share": 62.8
+        }
+      },
+      "result": "PASS",
+      "falsePositive": false,
+      "falseNegative": false,
+      "reasons": [],
+      "elapsedMs": 148901
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteVerificationCase } from "@/actions/owner";
-import { deleteBusinessCard, rerunGuidedChecks, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
+import { deleteBusinessCard, skipVerificationCheck, updateVerificationCase, updateVerificationCheck } from "@/actions/verification";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { loadMemberReview } from "@/lib/applicant-review";
 import { Banner } from "@/components/banner";
@@ -206,8 +206,7 @@ export default async function VerificationCasePage({
         <div className="mt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink">Same 8-step review from Applications, People, and Verification files. Step 8 is the decision.</p>
-            <form action={rerunGuidedChecks}>
-              <input type="hidden" name="caseId" value={record.id} />
+            <form action={`/admin/verification/${record.id}/rerun`} method="post">
               <button className={btnOutline} type="submit">
                 Re-run checks
               </button>
@@ -227,6 +226,8 @@ export default async function VerificationCasePage({
             verdict={memberReview.verdict}
             role={record.application?.role || record.user?.role || record.inviteRequest?.role || ""}
             location={memberReview.location}
+            unverified={memberReview.unverified}
+            applicationGrade={memberReview.applicationGrade}
           />
         </div>
       ) : null}
@@ -244,8 +245,7 @@ export default async function VerificationCasePage({
       {record.subject === "PROJECT" ? <section className={`${card} mt-4 p-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Project checklist</p>
-          <form action={rerunGuidedChecks}>
-            <input type="hidden" name="caseId" value={record.id} />
+          <form action={`/admin/verification/${record.id}/rerun`} method="post">
             <button className={btnOutline} type="submit">
               Re-run checks
             </button>

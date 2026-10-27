@@ -1,12 +1,66 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { distinctiveCompanyTokens, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
+/** Fraud, sanctions, or a criminal charge. A person-tied hit of this kind can cap the grade. */
+export const NEWS_PERSON_HARD =
+  /\b(frauds?|indicted|arrested|ponzi|scams?|sanctions?)\b|\bsec charges\b|\bcriminal charges?\b/i;
+
+/**
+ * Civil or company-level trouble. A company-only hit is an attention item.
+ * It caps the grade only when the applicant's own name is in the headline.
+ * REO, a dividend cut or reset, a loss, and a downgrade are ordinary results and are not in this list.
+ */
+export const NEWS_COMPANY_CIVIL =
+  /\b(lawsuits?|sued|bankruptc(?:y|ies)|foreclosures?|liens?)\b|\binvestigations?\b(?!\s+(?:practice|group|team|department|unit)\b)/i;
+
+/**
+ * A civil caption such as "Zumba v. Sciame Construction".
+ * The parties stay capitalized so "profits vs last year" is not a docket.
+ */
+/** "Zumba v. Sciame" is a docket. "Mamdani vs. Ken Griffin" is a debate, not a caption. */
+const CIVIL_DOCKET =
+  /\b[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,6}\s+[vV]\.?\s+[A-Z]/;
+
+export function civilDocket(text: string): boolean {
+  return CIVIL_DOCKET.test(text);
+}
+
+/**
+ * A company name that is only a place collides with unrelated headlines.
+ * "Bristol" is not enough. "Bristol Development" still matches the full phrase.
+ */
+const SOLE_PLACE = new Set([
+  "bristol",
+  "madison",
+  "lincoln",
+  "newark",
+  "trenton",
+  "hackensack",
+  "dallas",
+  "houston",
+  "austin",
+  "boston",
+  "chicago",
+  "denver",
+  "phoenix",
+  "atlanta",
+  "seattle",
+  "portland",
+  "orlando",
+  "tampa",
+  "miami",
+  "brooklyn",
+  "manhattan",
+  "jersey",
+  "philadelphia",
+  "baltimore",
+]);
+
 /** Negative coverage terms. Plurals are included. "client" does not match "lien". */
-export const NEWS_NEGATIVE =
-  /\b(frauds?|indicted|lawsuits?|sued|arrested|ponzi|scams?|bankruptc(?:y|ies)|sanctions?|investigations?|foreclosures?|liens?)\b|\bsec charges\b/i;
+export const NEWS_NEGATIVE = new RegExp(`${NEWS_PERSON_HARD.source}|${NEWS_COMPANY_CIVIL.source}`, "i");
 
 const COMMENTARY_BEFORE_NEGATIVE =
   /\b(says|said|plays down|played down|dismisses|dismissed|warns|warned|comments|commented|discusses|discussed|notes|noted)\b/i;
@@ -34,9 +88,17 @@ type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: s
 
 type Classified = NewsItem & {
   tone: "negative" | "neutral";
+  kind: "hard" | "civil" | "none";
   person: boolean;
   company: boolean;
   location: boolean;
+  departed: boolean;
+  suffixMismatch: boolean;
+  /** A foreclosure headline is company-level review. It does not cap the grade. */
+  foreclosureOnly: boolean;
+  /** The headline uses a brand alias and not the legal name. Review only. */
+  aliasOnly: boolean;
+  alias: string;
 };
 
 export function cityPhrase(location: string): string {
@@ -44,23 +106,96 @@ export function cityPhrase(location: string): string {
   return raw.length >= 4 ? raw : "";
 }
 
-export function newsSearchQueries(facts: ApplicantFacts): string[] {
-  const person = stripQuotes(facts.applicantName).replace(/\b[A-Za-z]\.\s*/g, " ").replace(/\s+/g, " ").trim();
+function wordsOf(value: string): string[] {
+  return value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 2);
+}
+
+/**
+ * Person plus the company search term. A word already in the person's name is not repeated,
+ * so "Ronald Tutor" is not searched as "tutor" "tutor".
+ */
+function bareToken(word: string): string {
+  return word.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function personCompanyQuery(person: string, companyTerm: string): string | null {
+  const cleanedPerson = person.trim();
+  const phrase = companyTerm.trim();
+  if (!cleanedPerson || !phrase) return null;
+  const seen = new Set(wordsOf(cleanedPerson));
+  const words = phrase.split(/\s+/).filter(Boolean);
+  // "bk real estate", "sl green realty", and a one-word brand such as "rxr" stay quoted in full.
+  if (words.some((word) => isShortBrandToken(bareToken(word)))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
+  // The firm name is the person's name. Do not quote "Adam Leitman Bailey" a second time.
+  if (words.length && words.every((word) => seen.has(bareToken(word)))) return null;
+  const kept = words.filter((word) => {
+    const token = bareToken(word);
+    return token.length >= 2 && !seen.has(token);
+  });
+  const distinctive = kept.filter((word) => {
+    const token = bareToken(word);
+    return isDistinctiveCompanyToken(token) && !isStandaloneGenericQueryToken(token);
+  });
+  if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
+  // "building" alone is not the firm. Keep the whole name, including a short token and the surname.
+  if (words.length >= 2) return `"${cleanedPerson}" "${words.join(" ")}"`;
+  return null;
+}
+
+/** Quoted person-and-company query used by news, YouTube, and the other public searches. */
+export function socialSearchQuery(person: string, org: string): string {
+  const cleaned = personWithoutSuffix(stripQuotes(person));
+  const term = companySearchTerm(stripQuotes(org), cleaned);
+  return personCompanyQuery(cleaned, term) || (cleaned ? `"${cleaned}"` : "");
+}
+
+/** Instagram tag. A tag that is only the applicant's surname is not used. */
+export function instagramCompanyTag(org: string, person: string): string {
+  const cleaned = personWithoutSuffix(stripQuotes(person));
+  const term = companySearchTerm(stripQuotes(org), cleaned);
+  const surname = surnameForSearch(cleaned).toLowerCase();
+  const tag = term.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const personWords = new Set(wordsOf(cleaned));
+  const personTag = cleaned.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (tag && tag !== surname && tag !== personTag && !personWords.has(tag) && !isStandaloneGenericQueryToken(tag)) return tag;
+  const fallback = companyPhraseTokens(stripQuotes(org))
+    .filter((word) => word !== surname && !personWords.has(word) && !isStandaloneGenericQueryToken(word) && !isGenericFirmToken(word))
+    .join("");
+  if (!fallback || fallback === personTag) return "";
+  return fallback;
+}
+
+export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = []): string[] {
+  const person = personWithoutSuffix(stripQuotes(facts.applicantName));
   const company = stripQuotes(facts.org || facts.name);
   const city = stripQuotes(cityPhrase(facts.location));
-  const companyToken = distinctiveCompanyTokens(company)[0] || company;
-  const last = person.split(" ").filter((part) => part.length >= 3).slice(-1)[0] || "";
+  const term = companySearchTerm(company, person);
+  const last = surnameForSearch(person);
   const queries: string[] = [];
-  if (person && companyToken && normalizeName(person) !== normalizeName(company)) {
-    queries.push(`"${person}" ${companyToken}`);
-    if (last && normalizeName(last) !== normalizeName(person)) queries.push(`"${last}" "${companyToken}"`);
-  } else if (person || company) queries.push(`"${person || company}"`);
+  const personQuery = personCompanyQuery(person, term);
+  if (personQuery) queries.push(personQuery);
+  else if (person || company) queries.push(`"${person || company}"`);
+  if (last && normalizeName(last) !== normalizeName(person)) {
+    const lastQuery = personCompanyQuery(last, term);
+    if (lastQuery) queries.push(lastQuery);
+  }
   if (company && city && normalizeName(city) !== normalizeName(company)) queries.push(`"${company}" "${city}"`);
-  return queries.slice(0, 3);
+  const extras = [...aliases];
+  const domain = domainBrand(facts.website || "");
+  if (domain) extras.push(domain);
+  const termWords = new Set(term.toLowerCase().split(/\s+/));
+  for (const alias of [...new Set(extras.map((item) => item.toLowerCase()))]) {
+    if (!alias || termWords.has(alias)) continue;
+    const query = personCompanyQuery(person, alias) || (person ? `"${person}" "${alias}"` : `"${alias}"`);
+    if (query && !queries.includes(query)) queries.push(query);
+  }
+  return [...new Set(queries)].slice(0, 4);
 }
 
 export function gdeltQuery(facts: ApplicantFacts): string {
-  const person = quote(facts.applicantName);
+  const person = quote(personWithoutSuffix(facts.applicantName));
   const company = quote(facts.org || facts.name);
   const city = quote(cityPhrase(facts.location));
   const parts: string[] = [];
@@ -167,6 +302,19 @@ export function isNewsEcho(title: string, snippet: string, queries: string[]): b
   return queries.some((query) => isQueryEcho(title, query) || isQueryEcho(blob, query) || normalizeName(title) === normalizeName(query));
 }
 
+/** Identical headlines are one story. This runs before a headline is scored or saved. */
+export function dedupeNewsItems<T extends { title: string; url: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const key = normalizeName(item.title).slice(0, 140) || item.url;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 export function classifyNews(
   facts: ApplicantFacts,
   items: NewsItem[],
@@ -178,27 +326,38 @@ export function classifyNews(
   const personName = facts.applicantName.trim();
   const companyName = (facts.org || facts.name).trim();
   const kept = dedupe(
-    items
+    dedupeNewsItems(items)
       .filter((item) => withinNewsWindow(item.publishedAt, now))
       .filter((item) => !isNewsEcho(item.title, item.snippet, queries))
       .flatMap((item) => {
+        const factsForJudge = {
+          name: personName,
+          applicantName: personName,
+          org: companyName,
+          location: facts.location,
+          website: facts.website,
+          aliases: brandAliases(companyName, facts.website || ""),
+        };
         const blob = `${item.title} ${item.snippet}`;
-        const person = Boolean(personName) && textHasName(blob, personName);
-        const company = Boolean(companyName) && textHasCompany(blob, companyName, personName);
-        if (!person && !company) return [];
-        return [
-          {
-            ...item,
-            tone: allegedNegative(blob) ? ("negative" as const) : ("neutral" as const),
-            person,
-            company,
-            location: textHasLocation(blob, facts.location),
-          },
-        ];
+        const fromTitle = judgeHeadline(item.title, factsForJudge);
+        const fromBlob = judgeHeadline(blob, factsForJudge);
+        // The title decides whether this is litigation. A dividend headline stays ordinary
+        // when the snippet happens to contain the word lawsuit.
+        const judged = {
+          ...fromBlob,
+          tone: fromTitle.tone,
+          kind: fromTitle.kind,
+          departed: fromTitle.departed || fromBlob.departed,
+          foreclosureOnly: fromTitle.foreclosureOnly,
+          aliasOnly: !fromTitle.company && !fromBlob.company && (fromTitle.aliasOnly || fromBlob.aliasOnly),
+          alias: fromTitle.alias || fromBlob.alias,
+        };
+        if (!judged.person && !judged.company && !judged.suffixMismatch && !judged.aliasOnly) return [];
+        return [{ ...item, ...judged }];
       }),
   ).sort(byImportance);
   const shown = spreadStories(kept);
-  const summary = newsSummary(shown, providers, ranAt);
+  const summary = newsSummary(shown, providers, ranAt, companyName);
   return [summary, ...shown.map((item) => newsStory(item, ranAt))];
 }
 
@@ -235,11 +394,33 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
   return classifyNews(facts, collected, providers, now);
 }
 
-function newsSummary(items: Classified[], providers: { name: string; state: "responded" | "unavailable" }[], ranAt: string): CheckOutput {
+function newsSummary(
+  items: Classified[],
+  providers: { name: string; state: "responded" | "unavailable" }[],
+  ranAt: string,
+  companyName: string,
+): CheckOutput {
   const responded = providers.filter((provider) => provider.state === "responded").map((provider) => provider.name);
   const blocked = providers.filter((provider) => provider.state === "unavailable").map((provider) => provider.name);
   const feeds = feedSentence(responded, blocked);
-  const evidenceUrl = items.find((item) => item.person && item.company)?.url || items[0]?.url || "";
+  const personHardItem = items.find((item) => item.kind === "hard" && item.person && (item.company || item.location));
+  const companyHardItem = items.find((item) => item.kind === "hard" && !item.person && item.company);
+  const personNamedCivilItem = items.find(
+    (item) => item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly,
+  );
+  const ambiguousItem = items.find((item) => item.tone === "negative" && item.person && !item.company && !item.location);
+  const foreclosureItem = items.find((item) => item.foreclosureOnly && item.company);
+  const companyLitigationItem = items.find((item) => item.kind === "civil" && !item.person && item.company);
+  const deciding =
+    personHardItem ||
+    companyHardItem ||
+    personNamedCivilItem ||
+    ambiguousItem ||
+    foreclosureItem ||
+    companyLitigationItem ||
+    items.find((item) => item.person && item.company) ||
+    items[0];
+  const evidenceUrl = deciding?.url || "";
   const base = { key: "news", weight: 8, source: responded.join(", ") || blocked.join(", ") || "News", url: evidenceUrl, ranAt };
   if (!responded.length) {
     return {
@@ -248,15 +429,36 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
       finding: `News could not be checked. ${feeds}`.trim(),
     };
   }
-  const corroboratedNegative = items.some((item) => item.tone === "negative" && corroborated(item));
-  const ambiguousNegative = items.some((item) => item.tone === "negative" && item.person && !item.company && !item.location);
-  const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company);
-  if (corroboratedNegative) {
+  const personHard = Boolean(personHardItem);
+  const companyHard = Boolean(companyHardItem);
+  const personNamedCivil = Boolean(personNamedCivilItem);
+  const ambiguousNegative = Boolean(ambiguousItem);
+  const companyLitigation = Boolean(foreclosureItem || companyLitigationItem);
+  const aligned = items.some((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
+  const departure = items.some((item) => item.departed && item.person);
+  const suffixMismatch = items.find((item) => item.suffixMismatch);
+  if (personHard) {
     return {
       ...base,
       status: "FAIL",
       reviewFlag: true,
-      finding: `Negative coverage names this person or company with the company or city in the same headline. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+      finding: `Negative coverage names this person with the company or city near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+    };
+  }
+  if (companyHard) {
+    return {
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      finding: `Negative coverage names this company near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
+    };
+  }
+  if (personNamedCivil) {
+    return {
+      ...base,
+      status: "FAIL",
+      reviewFlag: true,
+      finding: `A civil headline names this person with the company or city. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
     };
   }
   if (ambiguousNegative) {
@@ -267,19 +469,52 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
       finding: `Possible match, needs review. A headline names this person near a negative term without the company or city. This is not a failure. ${feeds}`.trim(),
     };
   }
+  if (companyLitigation) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `Company-level litigation headline. A lawsuit or similar civil term names the company. This is an attention item for Richard, not an automatic review flag, and it does not tie fraud or a criminal charge to the person. ${feeds}`.trim(),
+    };
+  }
+  if (suffixMismatch && !aligned) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      finding: `A different generational suffix is in this headline, so the name did not match. Needs review. ${feeds}`.trim(),
+    };
+  }
+  if (departure && !aligned) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      finding: `This may no longer be at ${companyName || "the company on the application"}. The headline is an announced departure, not current employment. ${feeds}`.trim(),
+    };
+  }
   if (aligned) {
     return {
       ...base,
       status: "PASS",
       corroborates: true,
-      finding: `Neutral coverage names this person and company. Query-echo headlines were ignored. ${feeds}`.trim(),
+      finding: `Neutral coverage names this person and company. ${deciding?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  const aliasItem = items.find((item) => item.aliasOnly && !item.company);
+  if (aliasItem) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      reviewFlag: true,
+      corroborates: false,
+      finding: `A headline uses the brand ${aliasItem.alias || "alias"} and not the legal name. Needs review. This is not corroboration. ${aliasItem.title} ${feeds}`.replace(/\s+/g, " ").trim(),
     };
   }
   if (items.length) {
     return {
       ...base,
       status: "INCONCLUSIVE",
-      finding: `A headline names the person or the company, without a negative term tying them together. ${feeds}`.trim(),
+      finding: `A headline names the person or the company. ${deciding?.title || ""} ${feeds}`.replace(/\s+/g, " ").trim(),
     };
   }
   return {
@@ -290,16 +525,31 @@ function newsSummary(items: Classified[], providers: { name: string; state: "res
 }
 
 function newsStory(item: Classified, ranAt: string): CheckOutput {
-  const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location;
-  const status: EvidenceStatus = ambiguous ? "INCONCLUSIVE" : item.tone === "negative" ? "FAIL" : item.person && item.company ? "PASS" : "INCONCLUSIVE";
+  const ambiguous = item.tone === "negative" && item.person && !item.company && !item.location && !item.foreclosureOnly;
+  const personHard = item.kind === "hard" && item.person && (item.company || item.location);
+  const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly;
+  const companyCivil = (item.kind === "civil" && !item.person) || item.foreclosureOnly;
+  const status: EvidenceStatus = personHard || personNamedCivil ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
-  const label = ambiguous ? "Possible match, review" : item.tone === "negative" ? "Negative" : "Neutral";
+  const label = item.suffixMismatch
+    ? "Different suffix"
+    : item.departed
+      ? "Departure"
+      : ambiguous
+        ? "Possible match, review"
+        : personHard
+          ? "Negative"
+          : personNamedCivil
+            ? "Civil, names applicant"
+            : companyCivil
+              ? "Company litigation"
+              : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
     status,
     weight: 0,
-    reviewFlag: ambiguous || undefined,
+    reviewFlag: ambiguous || personNamedCivil || item.departed || item.suffixMismatch || undefined,
     finding: `${label} · ${date} · ${item.title.slice(0, 180)}`,
     source: outlet ? `${outlet} via ${item.provider}` : item.provider,
     url: item.url,
@@ -308,9 +558,127 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
 }
 
 function corroborated(item: Classified): boolean {
-  if (item.tone !== "negative") return false;
-  if (item.person && (item.company || item.location)) return true;
-  return item.company && !item.person;
+  return item.kind === "hard" && item.person && (item.company || item.location);
+}
+
+/**
+ * REO, a dividend, a downgrade, or an earnings line is an ordinary results headline.
+ * A lawsuit, a docket, or a fraud word in the same text still counts.
+ */
+export function ordinaryResults(text: string): boolean {
+  if (NEWS_PERSON_HARD.test(text) || civilDocket(text)) return false;
+  if (/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text)) return false;
+  return /\b(reos?|real estate owned|dividends?|downgrades?|earnings)\b/i.test(text);
+}
+
+function negativeKind(text: string): "hard" | "civil" | "none" {
+  if (ordinaryResults(text)) return "none";
+  if (NEWS_PERSON_HARD.test(text) && allegedNegative(text)) return "hard";
+  if (civilDocket(text)) return "civil";
+  if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
+  return "none";
+}
+
+/** Foreclosure without a fraud term, a docket, or another civil charge. Review, not a grade cap. */
+export function foreclosureOnly(text: string): boolean {
+  if (ordinaryResults(text)) return false;
+  if (!/\bforeclosures?\b/i.test(text)) return false;
+  if (NEWS_PERSON_HARD.test(text)) return false;
+  if (civilDocket(text)) return false;
+  return !/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text);
+}
+
+/**
+ * The same headline judgement used by the news check and by screen-news.
+ * "trust" is not enough to make a company hit. A foreclosure is company-level review.
+ */
+export function judgeHeadline(
+  text: string,
+  facts: { name: string; applicantName?: string; org: string; location: string; website?: string; aliases?: string[] },
+): Omit<Classified, keyof NewsItem> {
+  const personName = (facts.applicantName || facts.name).trim();
+  const companyName = facts.org.trim();
+  const hit = personName ? personHit(text, personName, companyName) : "none";
+  const person = hit === "match";
+  const company = Boolean(companyName) && textHasCompany(text, companyName, personName);
+  const aliases = [...(facts.aliases || [])];
+  const domain = facts.website ? domainBrand(facts.website) : "";
+  const typed = companyPhraseTokens(companyName);
+  const typedCompact = typed.join("");
+  if (domain && domain !== typedCompact && !typed.includes(domain)) aliases.push(domain);
+  const alias = company ? "" : mentionsBrandAlias(text, aliases);
+  const kind = negativeKind(text);
+  return {
+    tone: kind === "none" ? "neutral" : "negative",
+    kind,
+    person,
+    company,
+    location: textHasLocation(text, facts.location),
+    departed: person && company && leftTheCompany(text, companyName),
+    suffixMismatch: hit === "suffix-mismatch",
+    foreclosureOnly: kind === "civil" && foreclosureOnly(text),
+    aliasOnly: Boolean(alias),
+    alias,
+  };
+}
+
+/**
+ * The news row and the news screen have to tell the same story.
+ * A headline that one of them matched is shown on both. An alias stays a review flag.
+ */
+export function alignNewsRows(checks: CheckOutput[]): CheckOutput[] {
+  const news = checks.find((row) => row.key === "news");
+  const screen = checks.find((row) => row.key === "screen-news");
+  if (!news || !screen) return checks;
+  const newsMatched = /headline names|Neutral coverage names|uses the brand/i.test(news.finding);
+  const newsEmpty = /No data found|None of the headlines named/i.test(news.finding);
+  const screenEmpty = /no match found|No result found/i.test(screen.finding);
+  const screenCompanyNo = /Company: no/.test(screen.finding);
+  const screenShowsMatch = /Company: yes|Company: alias/.test(screen.finding);
+  if (newsMatched && (screenEmpty || screenCompanyNo) && !screenShowsMatch) {
+    return checks.map((row) =>
+      row.key !== "screen-news"
+        ? row
+        : {
+            ...row,
+            status: news.status === "FAIL" ? "FAIL" : "INCONCLUSIVE",
+            url: news.url || row.url,
+            corroborates: false,
+            reviewFlag: news.reviewFlag,
+            finding: `Searched: ${row.finding.match(/Searched: ([^.]+)/)?.[1] || "news"}. ${news.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  const screenBoth = /Name: yes/.test(screen.finding) && /Company: yes/.test(screen.finding);
+  const headline = screen.finding.match(/Found: ([^.]{8,180})/)?.[1] || "";
+  if (screenBoth && newsEmpty) {
+    return checks.map((row) =>
+      row.key !== "news"
+        ? row
+        : {
+            ...row,
+            status: "PASS",
+            corroborates: true,
+            url: screen.url || row.url,
+            finding: `Neutral coverage names this person and company. ${headline} ${row.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  if (newsEmpty && /Found:|uses the brand|Company: alias/.test(screen.finding)) {
+    return checks.map((row) =>
+      row.key !== "news"
+        ? row
+        : {
+            ...row,
+            status: "INCONCLUSIVE",
+            corroborates: false,
+            reviewFlag: screen.reviewFlag || row.reviewFlag,
+            url: screen.url || row.url,
+            finding: `A headline names the person or the company. ${screen.finding}`.replace(/\s+/g, " ").trim(),
+          },
+    );
+  }
+  return checks;
 }
 
 function feedSentence(responded: string[], blocked: string[]): string {
@@ -416,13 +784,16 @@ function textHasName(text: string, name: string): boolean {
 }
 
 function textHasCompany(text: string, org: string, person = ""): boolean {
+  const phrase = companyPhraseTokens(org);
+  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  if (phrase.length === 1 && distinctive.length === 1 && SOLE_PLACE.has(distinctive[0])) return false;
   return mentionsCompany(text, org, person);
 }
 
 function textHasLocation(text: string, location: string): boolean {
   const city = normalizeName(cityPhrase(location));
   if (city.length < 4) return false;
-  return new RegExp(`\\b${escapeRegExp(city)}\\b`).test(normalizeName(text));
+  return new RegExp(`(?<![A-Za-z0-9-])${escapeRegExp(city)}(?![A-Za-z0-9-])`).test(normalizeName(text));
 }
 
 function dedupe(items: Classified[]): Classified[] {

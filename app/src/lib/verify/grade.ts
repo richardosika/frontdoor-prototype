@@ -1,5 +1,8 @@
 import { annualDuesCents } from "@/lib/dues";
 import { roleLabel } from "@/lib/roles";
+import { US_POSTAL_CODES, statedUsState } from "@/lib/verify/address";
+import { independentPageLinksParent } from "@/lib/verify/edgar";
+import { mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus, Verdict } from "@/lib/verify/types";
 
 /**
@@ -28,15 +31,19 @@ export const LETTER_FLOORS = { A: 90, B: 80, C: 70, D: 60 } as const;
 /**
  * Caps only move a letter down. They are the rules Richard asked to be able to read.
  * noCorroboration: no passing check that actually ties the person to the company.
+ *   The letter stays below C. Point floors are unchanged.
  * ambiguousNews: a negative headline names the person and not the company or city.
  * reviewRedFlag: a disposable address that still has a public page, a sanctions name
- *   without country or date of birth, or a negative headline/case that also names the company.
+ *   without country or date of birth, or fraud, sanctions, or a criminal charge tied to the
+ *   person with the company or city. A company-level lawsuit is an attention item, not this cap.
  * hardRedFlag: corroborated sanctions, fraud-pattern text, disposable address with no
  *   website or LinkedIn, or an email that already belongs to a member or a declined applicant.
  * twoConflicts: two or more failed checks that disagree with the application.
  */
 export const CAP_RULES = {
-  noCorroboration: "B",
+  noCorroboration: "D",
+  /** One independent source can reach C. It cannot be an approval, and it cannot be an A or a B. */
+  thinCorroboration: "C",
   ambiguousNews: "C",
   reviewRedFlag: "D",
   hardRedFlag: "F",
@@ -91,6 +98,66 @@ export const GRADE_WEIGHTS = {
     references: 1,
   },
 } as const;
+
+export type GradeWeightsMode = "standard" | "r2";
+
+/**
+ * R2 is off until Richard turns it on.
+ * It moves the 4 LinkedIn-fetch points and the 2 registry points onto the website and the web footprint.
+ * Letter floors stay A 90, B 80, C 70, D 60.
+ */
+export const GRADE_WEIGHTS_MODE: GradeWeightsMode = "standard";
+
+type GradeWeightTable = {
+  [Group in keyof typeof GRADE_WEIGHTS]: { [Key in keyof (typeof GRADE_WEIGHTS)[Group]]: number };
+};
+
+export function weightsFor(mode: GradeWeightsMode = GRADE_WEIGHTS_MODE): GradeWeightTable {
+  if (mode !== "r2") return GRADE_WEIGHTS;
+  return {
+    ...GRADE_WEIGHTS,
+    identity: { ...GRADE_WEIGHTS.identity, "linkedin-fetch": 0 },
+    company: { ...GRADE_WEIGHTS.company, website: 11, "business-registry": 0 },
+    footprint: { ...GRADE_WEIGHTS.footprint, "web-footprint": 11 },
+  };
+}
+
+/** Points whose check did not run or did not answer. An inconclusive EDGAR row stays in the denominator. */
+export function r2CheckablePossible(checks: CheckOutput[], weights: GradeWeightTable = weightsFor("r2")): number {
+  const pairs: [string, number][] = [
+    ["email-syntax", weights.identity["email-syntax"]],
+    ["disposable-email", weights.identity["disposable-email"]],
+    ["role-address", weights.identity["role-address"]],
+    ["phone-state", weights.identity["phone-state"]],
+    ["linkedin-format", weights.identity["linkedin-format"]],
+    ["linkedin-fetch", weights.identity["linkedin-fetch"]],
+    ["website", weights.company.website],
+    ["edgar", weights.company.edgar],
+    ["business-card", weights.company["business-card"]],
+    ["rdap", weights.company.rdap],
+    ["business-registry", weights.company["business-registry"]],
+    ["web-footprint", weights.footprint["web-footprint"]],
+    ["news", weights.footprint.news],
+    ["social-links", weights.footprint["social-links"]],
+    ["sanctions", weights.risk.sanctions],
+    ["duplicate", weights.risk.duplicate],
+    ["text-risk", weights.risk["text-risk"]],
+    ["velocity", weights.risk.velocity],
+    ["plausibility", weights.role.plausibility],
+    ["invite-source", weights.role["invite-source"]],
+  ];
+  let excluded = 0;
+  for (const [key, weight] of pairs) {
+    const row = checks.find((check) => check.key === key);
+    if (!row) continue;
+    if (row.status === "NOT_RUN" || row.status === "UNAVAILABLE") {
+      excluded += weight;
+      continue;
+    }
+    if (key === "phone-state" && row.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) excluded += weight;
+  }
+  return Math.max(0, 100 - excluded);
+}
 
 export const FREE_SOURCE_LIMIT =
   "Paid people-search, credit files, full court dockets, a logged-in LinkedIn page, and state registries that have no stable free API were not checked. A blocked source, or a source that came back empty, is not a clean result. Email domain and mail-server records are not treated as proof of identity.";
@@ -192,6 +259,17 @@ function award(earned: boolean, possible: number, yes: string, no: string): Line
   };
 }
 
+/** Half of a person-and-company award, and never the full amount. A zero-weight row stays zero. */
+function companyOnlyPoints(possible: number): number {
+  if (possible <= 1) return 0;
+  return Math.floor(possible / 2);
+}
+
+function unavailableLine(possible: number, reason: string, mode: GradeWeightsMode): Line {
+  if (mode === "r2") return { earned: 0, possible: 0, reason: `${reason}.` };
+  return { earned: 0, possible, reason: `${reason} (0 of ${possible}).` };
+}
+
 function sumLines(lines: Line[]): { earned: number; possible: number; reason: string } {
   const earned = lines.reduce((sum, line) => sum + line.earned, 0);
   const possible = lines.reduce((sum, line) => sum + line.possible, 0);
@@ -207,7 +285,30 @@ function withData(check: CheckOutput): boolean {
 }
 
 export function corroboratingPasses(checks: CheckOutput[]): CheckOutput[] {
-  return checks.filter((check) => check.status === "PASS" && check.corroborates);
+  return checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
+}
+
+function citedEvidence(finding: string): string {
+  const found = finding.match(/Found:\s*([\s\S]*?)\s+Name:/i);
+  if (found) return found[1];
+  return finding.replace(/Searched:\s*.*?\.\s*/i, " ").replace(/\sName:\s*(yes|no)\b[\s\S]*$/i, "");
+}
+
+/**
+ * An independent pass counts toward the grade either way. The team-page request
+ * stays up until one of those passes actually names the person and the company.
+ */
+export function namesPersonAndCompany(check: CheckOutput, facts: GradeFacts): boolean {
+  if (check.status !== "PASS" || !check.corroborates || check.selfReported || check.companyOnly) return false;
+  const scored = check.finding.match(/Name:\s*(yes|no)\b[\s\S]*?Company:\s*(yes|no)\b/i);
+  if (scored && (scored[1].toLowerCase() !== "yes" || scored[2].toLowerCase() !== "yes")) return false;
+  if (/names (?:this |both the |the )?person and (?:the )?company/i.test(check.finding)) return true;
+  const person = facts.applicantName || facts.name || "";
+  const org = facts.org || "";
+  if (!person || !org) return Boolean(scored);
+  const cited = citedEvidence(check.finding);
+  if (!cited.trim()) return Boolean(scored);
+  return mentionsPerson(cited, person, org) && mentionsCompany(cited, org, person);
 }
 
 function confidenceOf(checks: CheckOutput[]): Confidence {
@@ -221,11 +322,11 @@ function confidenceOf(checks: CheckOutput[]): Confidence {
 }
 
 function isHardSanctions(check: CheckOutput): boolean {
-  return check.key === "sanctions" && Boolean(check.hardFlag);
+  return (check.key === "sanctions" || check.key === "opensanctions") && Boolean(check.hardFlag);
 }
 
 function isPossibleSanctions(check: CheckOutput): boolean {
-  return check.key === "sanctions" && Boolean(check.reviewFlag) && !check.hardFlag;
+  return (check.key === "sanctions" || check.key === "opensanctions") && Boolean(check.reviewFlag) && !check.hardFlag;
 }
 
 function isDisposableHard(check: CheckOutput): boolean {
@@ -248,9 +349,18 @@ function isDeclinedDuplicate(check: CheckOutput): boolean {
   return isDuplicate(check) && /declined|banned/i.test(check.finding);
 }
 
+function isCompanyLawsuitOnly(check: CheckOutput): boolean {
+  return /company-level litigation|^Company litigation ·/i.test(check.finding);
+}
+
+function isDepartureOrSuffix(check: CheckOutput): boolean {
+  return /may no longer be at|different generational suffix|^Departure ·|^Different suffix ·/i.test(check.finding);
+}
+
 function isAmbiguousNews(check: CheckOutput): boolean {
   if (check.key !== "news" && check.key !== "news-story") return false;
   if (check.status === "FAIL") return false;
+  if (isCompanyLawsuitOnly(check) || isDepartureOrSuffix(check)) return false;
   return Boolean(check.reviewFlag) || /possible match/i.test(check.finding);
 }
 
@@ -261,21 +371,34 @@ function isCorroboratedNegative(check: CheckOutput): boolean {
 }
 
 function isConflict(check: CheckOutput): boolean {
+  if (check.key === "news-story") return false;
   if (check.status !== "FAIL" || check.hardFlag) return false;
   if (isDisposableReview(check) || isPossibleSanctions(check) || isCorroboratedNegative(check)) return false;
   return true;
 }
 
-function joinSentences(lines: string[]): string {
-  const unique = lines.map((line) => line.trim()).filter(Boolean);
+/** One sentence per source. News is kept once, preferring the line that states the name, company, and city. */
+export function dedupeSourceLines(lines: string[]): string[] {
+  const cleaned = lines.map((line) => line.trim()).filter(Boolean);
+  const news = cleaned.filter((line) => /^News search\b/.test(line));
+  const preferredNews = news.find((line) => /Name:/.test(line)) || news.find((line) => /no match found/.test(line)) || news[0];
   const seen = new Set<string>();
   const kept: string[] = [];
-  for (const line of unique) {
+  let newsKept = false;
+  for (const line of cleaned) {
+    if (/^News search\b/.test(line)) {
+      if (newsKept || line !== preferredNews) continue;
+      newsKept = true;
+    }
     if (seen.has(line)) continue;
     seen.add(line);
     kept.push(line);
   }
-  return kept.join(" ");
+  return kept;
+}
+
+function joinSentences(lines: string[]): string {
+  return dedupeSourceLines(lines).join(" ");
 }
 
 function passSentence(check: CheckOutput): string | null {
@@ -293,6 +416,7 @@ function passSentence(check: CheckOutput): string | null {
     case "linkedin-format":
       return `The LinkedIn link looks like a public profile (${source}).`;
     case "linkedin-fetch":
+      if (check.companyOnly) return `The LinkedIn company page confirms the company. company confirmed, person NOT confirmed (${source}). A logged-in page was not opened.`;
       return `A public LinkedIn page included the person's name (${source}). A logged-in page was not opened.`;
     case "duplicate":
       return `This email is not already a member and does not match a declined application (${source}).`;
@@ -305,11 +429,12 @@ function passSentence(check: CheckOutput): string | null {
     case "plausibility":
       return `The name, company, and role are filled in and can be read (${source}).`;
     case "invite-source":
-      return `An invite code is on the file (${source}).`;
+      return `A referral or request code is on the file (${source}).`;
     case "social-links":
       return `The other social links are full web addresses (${source}). Those pages were not opened.`;
     case "website":
     case "fixture-website":
+      if (check.companyOnly) return `The company's own site confirms the company. company confirmed, person NOT confirmed (${source}).`;
       return `A public web page included the person or the company name (${source}).`;
     case "edgar":
     case "fixture-edgar":
@@ -336,8 +461,14 @@ function scoreClause(check: CheckOutput): string {
   return score?.[0] || "";
 }
 
+/** YouTube, TikTok, and news count only when the person is named with the company or the city. */
+function socialScoreQualified(score: string): boolean {
+  return /Name: yes\./.test(score) && (/Company: yes\./.test(score) || /City: yes\./.test(score));
+}
+
 function failSentence(check: CheckOutput): string | null {
   if (check.status !== "FAIL") return null;
+  if (check.key === "business-registry" || check.key === "courts") return null;
   const source = check.source || "the check";
   if (isHardSanctions(check)) {
     return `A sanctions list name matches, and the location or date of birth on the application lines up with the list entry (${source}). Confirm the entry before you decide.`;
@@ -363,6 +494,18 @@ function failSentence(check: CheckOutput): string | null {
   if (check.key === "phone-state" && check.status === "FAIL") {
     return `The phone area code does not match the state on the application (${source}).`;
   }
+  if ((check.key === "website" || check.key === "rdap") && /domain does not resolve/i.test(check.finding)) {
+    return `domain does not resolve (${source}).`;
+  }
+  if (check.key === "rdap" && /not registered/i.test(check.finding)) {
+    return `This domain is not registered (${source}).`;
+  }
+  if (check.key === "rdap" && /did not check out/i.test(check.finding)) {
+    return `did not check out (${source}).`;
+  }
+  if (check.key === "address") {
+    return `address did not check out (${source}).`;
+  }
   if (check.key === "website" && check.status === "FAIL") {
     return `The website responded, but the person and company names were not on the home page, the about page, or the team page (${source}).`;
   }
@@ -373,6 +516,7 @@ function failSentence(check: CheckOutput): string | null {
     return `The email looks like a shared inbox (${source}).`;
   }
   if (check.key === "plausibility" && check.status === "FAIL") {
+    if (/does not look like real words/i.test(check.finding)) return `The company name does not look like real words (${source}).`;
     return `The name or company looks incomplete (${source}).`;
   }
   if (check.key === "velocity" && check.status === "FAIL") {
@@ -394,13 +538,26 @@ function failSentence(check: CheckOutput): string | null {
 function uncheckedSentence(check: CheckOutput): string | null {
   if (check.key === "news-story" || check.key === "email-provider" || check.key === "mx") return null;
   if (check.status !== "INCONCLUSIVE" && check.status !== "NOT_RUN" && check.status !== "UNAVAILABLE") return null;
+  if (check.key === "invite-source") {
+    if (check.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(check.finding)) return "No referral was supplied.";
+    return "The referral could not be matched.";
+  }
+  if (check.key === "address" && check.status === "UNAVAILABLE") {
+    return "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.";
+  }
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
   }
-  if (check.key.startsWith("screen-")) {
+  if (check.key.startsWith("screen-") || check.key === "news") {
     const score = scoreClause(check);
-    if (score) return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
+    const nothingMatched = !score || (/Name: no\./.test(score) && /Company: no\./.test(score) && /City: no\./.test(score));
+    if (score && socialScoreQualified(score)) {
+      return `${labelFor(check.key)} returned a public result. ${score} That is evidence on the file. It is not a pass.`;
+    }
+    if (nothingMatched || check.key.startsWith("screen-") || check.key === "news") {
+      return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
+    }
   }
   if (check.status === "NOT_RUN") {
     return `${labelFor(check.key)} was not run. ${check.finding}`.replace(/\s+/g, " ").trim();
@@ -421,7 +578,7 @@ function labelFor(key: string): string {
     "text-risk": "Write-up check",
     velocity: "Repeat-application check",
     plausibility: "Name and company check",
-    "invite-source": "Invite source",
+    "invite-source": "Referral",
     "social-links": "Social links",
     website: "Company website",
     edgar: "SEC EDGAR",
@@ -438,6 +595,7 @@ function labelFor(key: string): string {
     "screen-tiktok": "TikTok",
     news: "News search",
     courts: "Court search",
+    address: "Address",
   };
   return labels[key] || key;
 }
@@ -454,23 +612,39 @@ function applicantSection(facts: GradeFacts, subject: string): string {
   const org = facts.org?.trim() || "a company they did not name";
   const role = roleLabel(facts.role);
   const location = facts.location?.trim() || "no location was given";
-  const invite = facts.inviteNote?.trim() ? `They came in through invite ${facts.inviteNote.trim()}.` : "No invite code was stored on this file.";
+  const invite = facts.inviteNote?.trim() ? `They came in through a referral or request: ${facts.inviteNote.trim()}.` : "No referral was supplied.";
+  const requestOnly =
+    facts.applicationSubmitted === false
+      ? "Referral or request only — no application submitted; grade based on request fields only."
+      : "";
   if (subject === "COMPANY") {
-    return `This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`;
+    return `${requestOnly} This is the company file for ${facts.org?.trim() || facts.name || "the company on the application"}. The applicant is ${name}. ${quoteStatement(facts.statement)} ${invite}`.trim();
   }
-  return `${name} applied as a ${role} at ${org}, ${location}. ${quoteStatement(facts.statement)} ${invite}`;
+  return `${requestOnly} ${name} applied as a ${role} at ${org}, ${location}. ${quoteStatement(facts.statement)} ${invite}`.trim();
 }
 
 function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   const org = facts.org?.trim() || facts.name?.trim() || "The company";
   const evidence: string[] = [`${org} is the company named on the application.`];
-  if (passedKey(checks, "website", "fixture-website")) {
-    evidence.push(`A public page included the person or the company name (${sourceOf(checks, "website", "fixture-website")}).`);
+  const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  if (website?.status === "PASS" && website.companyOnly) {
+    evidence.push(`The company's own site names the company. company confirmed, person NOT confirmed (${website.source}).`);
+  } else if (website?.status === "PASS") {
+    evidence.push(`A public page included the person or the company name (${website.source}).`);
+  } else if (website?.status === "UNAVAILABLE") {
+    evidence.push("The company website is not checkable for free.");
+  } else if (website?.status === "FAIL" && /domain does not resolve/i.test(website.finding)) {
+    evidence.push("domain does not resolve.");
   } else {
     evidence.push("No company website was confirmed.");
   }
-  if (passedKey(checks, "edgar", "fixture-edgar")) {
-    evidence.push(`SEC EDGAR returned a hit for the company name (${sourceOf(checks, "edgar", "fixture-edgar")}). Confirm it is the same firm before you rely on it.`);
+  const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
+  if (edgar?.status === "PASS") {
+    evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
+  } else if (edgar && /parent match, needs review/i.test(edgar.finding)) {
+    evidence.push(edgar.finding);
+  } else if (edgar?.companyOnly && !edgar.reviewFlag) {
+    evidence.push(`EDGAR lists this exact company name (${edgar.source}). It does not tie the person to the firm.`);
   } else {
     evidence.push("No EDGAR filing was confirmed.");
   }
@@ -487,58 +661,217 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push("Court records were not checked, or the court source did not answer.");
   } else if (isCorroboratedNegative(courts)) {
     evidence.push("A court result may name this person and company near a serious word. Possible match, verify. It is not treated as a confirmed case.");
+  } else if (courts.status === "PASS" || /None found/i.test(courts.finding)) {
+    evidence.push("None found in CourtListener federal data. That is not a risk flag, not credit, and not a clearance of all litigation.");
   } else {
     evidence.push("The court search did not confirm a case against this person and company.");
   }
   const registry = findCheck(checks, "business-registry");
-  evidence.push(
-    registry?.url
-      ? `The state registry was not searched automatically. A manual link is on the file (${registry.source}).`
-      : "No free state-registry search was run.",
-  );
+  if (registry?.status === "PASS") {
+    evidence.push(registry.finding);
+  } else if (registry?.status === "INCONCLUSIVE" || registry?.status === "UNAVAILABLE") {
+    evidence.push(registry.finding);
+  } else if (registry?.url) {
+    evidence.push(`The state registry was not searched automatically. A manual link is on the file (${registry.source}).`);
+  } else {
+    evidence.push("No free state-registry search was run.");
+  }
   evidence.push("Free sources cannot show ownership, good standing, credit, or that this person controls the company.");
   return joinSentences(evidence);
 }
 
 function usStateKnown(location: string | undefined): boolean {
-  return /\b(NJ|NY|DE|FL|TX|CT|CA)\b/i.test(location || "");
+  const state = statedUsState(location || "");
+  return Boolean(state && US_POSTAL_CODES.has(state));
 }
 
 function payingRole(role: string | undefined): boolean {
   return annualDuesCents(role || "") > 0;
 }
 
+function portionLine(earned: number, possible: number, reason: string): Line {
+  return { earned, possible, reason: `${reason} (${earned} of ${possible}).` };
+}
+
+function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode, independent: boolean): Line {
+  const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
+  if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  if (row?.status === "PASS" && row.selfReported && !independent) {
+    // The company's own site named the company. That is company-exists credit.
+    // The person on that same page stays self-reported and earns the other half only after an independent tie.
+    if (/Company:\s*yes/i.test(row.finding)) {
+      return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person self-reported");
+    }
+    return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
+  }
+  return award(row?.status === "PASS", possible, "A public website includes the person or company", "No website confirmed the person or company");
+}
+
+function linkedinAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, independent: boolean): Line {
+  if (possible <= 0) {
+    return award(Boolean(row?.status === "PASS" && !row.companyOnly), possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
+  }
+  if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
+  if (row?.status === "PASS" && row.companyOnly) {
+    return portionLine(companyOnlyPoints(possible), possible, "company confirmed, person NOT confirmed");
+  }
+  if (row?.status === "PASS" && row.selfReported && !independent) {
+    return portionLine(0, possible, "The applicant's own LinkedIn profile is self-reported and no independent source tied the person to the company");
+  }
+  return award(row?.status === "PASS", possible, "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name");
+}
+
+function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode): Line {
+  if (!earned && row?.status === "UNAVAILABLE") return unavailableLine(possible, "Web search is not checkable for free", mode);
+  return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
+}
+
+/**
+ * A neutral screen-news pass names the person and the company. It is not a second
+ * independent source. It fills the news points only when the news check itself is
+ * inconclusive, for example because a company-level litigation headline took that slot.
+ */
+export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
+  return checks.some((check) => {
+    if (check.key !== "screen-news" || check.status !== "PASS") return false;
+    if (/company-level/i.test(check.finding) || /same source/i.test(check.finding)) return false;
+    return /Name: yes\b/.test(check.finding) && /Company: yes\b/.test(check.finding);
+  });
+}
+
+function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean, checks: CheckOutput[], org: string): Line {
+  if (row?.status === "PASS") {
+    return award(true, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
+  }
+  if (row && /parent match, needs review/i.test(row.finding)) {
+    const pages = checks
+      .filter((check) => check.key !== "edgar" && check.key !== "fixture-edgar" && !check.selfReported && check.status === "PASS")
+      .map((check) => check.finding);
+    const points = independentPageLinksParent(org, row.finding, pages) ? companyOnlyPoints(possible) : 0;
+    return portionLine(points, possible, "parent match, needs review");
+  }
+  // Exact normalized-name filer, not a different firm. Person credit stays off, so an
+  // impersonation of a public registrant does not gain points unless something else
+  // already ties that person to the company.
+  if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag && independent) {
+    return portionLine(companyOnlyPoints(possible), possible, "EDGAR lists this exact company name. It does not tie the person");
+  }
+  return award(false, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
+}
+
+function phoneAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
+  if (row?.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) {
+    return { earned: 0, possible: 0, reason: "The phone is toll-free, so the area code is not applicable." };
+  }
+  if (row?.status === "PASS" && !independent) {
+    return portionLine(0, possible, "The phone area code is self-reported and no independent source tied the person to the company");
+  }
+  return award(passed(row), possible, "The phone area code fits the state", "The phone area code was not confirmed against the state");
+}
+
+function rdapAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
+  if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "domain does not resolve");
+  if (row?.status === "FAIL" && /not registered/i.test(row.finding)) return portionLine(0, possible, "domain is not registered");
+  if (row?.status === "FAIL" && /did not check out/i.test(row.finding)) return portionLine(0, possible, "did not check out");
+  if (row?.status === "UNAVAILABLE" && /couldn't check for free/i.test(row.finding)) return unavailableLine(possible, "RDAP couldn't check for free", mode);
+  return award(passed(row), possible, "A domain record responded", "No domain record was confirmed");
+}
+
+function registryAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode): Line {
+  if (!row || row.status === "NOT_RUN") {
+    return award(false, possible, "A free state registry has this exact company name", "The state registry is not searched for free");
+  }
+  if (row.status === "UNAVAILABLE") return unavailableLine(possible, "The state registry is not checkable for free", mode);
+  return award(
+    row.status === "PASS",
+    possible,
+    "A free state registry has this exact company name",
+    "The state registry did not confirm this exact company name",
+  );
+}
+
+function applicationField(earned: boolean, possible: number, yes: string, no: string, independent: boolean): Line {
+  if (earned && !independent) {
+    return portionLine(0, possible, "No independent source tied the person to the company, so this application field earns no completeness credit");
+  }
+  return award(earned, possible, yes, no);
+}
+
+function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number, independent: boolean): Line {
+  const row = findCheck(checks, "address");
+  if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
+  if (row.status === "FAIL") return portionLine(0, possible, "address did not check out");
+  if (row.status === "UNAVAILABLE") return { earned: 0, possible: 0, reason: "The address is not checkable." };
+  if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
+  return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
+}
+
+function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
+  if (row?.status === "FAIL") return portionLine(0, possible, "The referral or request code was supplied but is not valid");
+  const absent = !facts.inviteNote?.trim() || row?.status === "NOT_RUN" || /no referral|no invite (code|note) was stored/i.test(row?.finding || "");
+  if (absent && mode === "r2") return { earned: 0, possible: 0, reason: "No referral was supplied." };
+  if (absent) return portionLine(0, possible, "No referral was supplied");
+  if (row?.status === "INCONCLUSIVE") return portionLine(0, possible, "The referral could not be matched");
+  if (row?.status === "PASS") return award(true, possible, "A referral or request code is on the file", "No referral was supplied");
+  return { earned: 0, possible, reason: "No referral was supplied." };
+}
+
 export function gradeChecks(
   checks: CheckOutput[],
   facts: GradeFacts = {},
-  options?: { gradedAt?: string; subject?: string },
+  options?: { gradedAt?: string; subject?: string; weightsMode?: GradeWeightsMode },
 ): GradeReport {
-  const weights = GRADE_WEIGHTS;
-  const websitePass = passedKey(checks, "website", "fixture-website");
-  const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
-  const webPass = passedKey(checks, "web-footprint", "fixture-web") || checks.some((item) => item.key.startsWith("screen-") && item.status === "PASS" && item.corroborates);
+  const weightsMode = options?.weightsMode || GRADE_WEIGHTS_MODE;
+  const weights = weightsFor(weightsMode);
+  const footprintRow = findCheck(checks, "web-footprint");
+  const thirdPartyFootprint = passed(footprintRow) && !footprintRow?.selfReported;
+  const webPass =
+    thirdPartyFootprint ||
+    passed(findCheck(checks, "fixture-web")) ||
+    checks.some((item) => item.key.startsWith("screen-") && item.status === "PASS" && item.corroborates && !item.selfReported);
   const card = findCheck(checks, "business-card");
   const linkedin = findCheck(checks, "linkedin-fetch");
 
+  const independent = corroboratingPasses(checks).length > 0;
+  const linkedinPerson = passed(linkedin) && !linkedin?.companyOnly;
   const identity = sumLines([
     award(passed(findCheck(checks, "email-syntax")), weights.identity["email-syntax"], "The email address is well formed", "The email address is missing or not well formed"),
     award(passed(findCheck(checks, "disposable-email")), weights.identity["disposable-email"], "The email domain is not disposable", "The disposable-email check did not pass"),
     award(passed(findCheck(checks, "role-address")), weights.identity["role-address"], "The email is not a shared inbox", "The shared-inbox check did not pass"),
-    award(passed(findCheck(checks, "phone-state")), weights.identity["phone-state"], "The phone area code fits the state", "The phone area code was not confirmed against the state"),
-    award(passed(findCheck(checks, "linkedin-format")), weights.identity["linkedin-format"], "The LinkedIn link looks like a public profile", "No usable LinkedIn link was confirmed"),
-    award(passed(linkedin), weights.identity["linkedin-fetch"], "A public LinkedIn page included the name", "A public LinkedIn page did not confirm the name"),
+    phoneAward(findCheck(checks, "phone-state"), weights.identity["phone-state"], independent),
+    award(
+      passed(findCheck(checks, "linkedin-format")) && (linkedinPerson || independent),
+      weights.identity["linkedin-format"],
+      "The LinkedIn link looks like a public profile",
+      "No usable LinkedIn link was confirmed",
+    ),
+    linkedinAward(linkedin, weights.identity["linkedin-fetch"], weightsMode, independent),
   ]);
   const company = sumLines([
-    award(websitePass, weights.company.website, "A public website includes the person or company", "No website confirmed the person or company"),
-    award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
-    award(passed(card), weights.company["business-card"], "The business card matches the name and company", "No matching business card was confirmed"),
-    award(passed(findCheck(checks, "rdap")), weights.company.rdap, "A domain record responded", "No domain record was confirmed"),
-    award(false, weights.company["business-registry"], "", "The state registry is not searched for free"),
+    websiteAward(checks, weights.company.website, weightsMode, independent),
+    edgarAward(findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar"), weights.company.edgar, independent, checks, facts.org || ""),
+    award(
+      passed(card) && independent,
+      weights.company["business-card"],
+      "The business card matches the name and company",
+      "No matching business card was confirmed",
+    ),
+    rdapAward(findCheck(checks, "rdap"), weights.company.rdap, weightsMode),
+    registryAward(findCheck(checks, "business-registry"), weights.company["business-registry"], weightsMode),
   ]);
+  const newsRow = findCheck(checks, "news");
+  const newsFootprint = passed(newsRow) || (newsRow?.status === "INCONCLUSIVE" && neutralScreenNewsPass(checks));
   const footprint = sumLines([
-    award(webPass, weights.footprint["web-footprint"], "A public web result names the person and the company", "No public web result confirmed the person and the company"),
-    award(passed(findCheck(checks, "news")), weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
-    award(passed(findCheck(checks, "social-links")), weights.footprint["social-links"], "Social links are full web addresses", "Social links were missing or not usable"),
+    footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode),
+    award(newsFootprint, weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
+    award(
+      passed(findCheck(checks, "social-links")) && independent,
+      weights.footprint["social-links"],
+      "Social links are full web addresses",
+      "Social links were missing or not usable",
+    ),
   ]);
   const risk = sumLines([
     award(passed(findCheck(checks, "sanctions")), weights.risk.sanctions, "The loaded sanctions lists had no name match", "Sanctions were not cleared"),
@@ -548,17 +881,17 @@ export function gradeChecks(
   ]);
   const role = sumLines([
     award(passed(findCheck(checks, "plausibility")), weights.role.plausibility, "The name, company, and role are readable", "The name, company, or role is not readable"),
-    award(passed(findCheck(checks, "invite-source")), weights.role["invite-source"], "An invite code is on the file", "No invite source was confirmed"),
+    inviteAward(findCheck(checks, "invite-source"), weights.role["invite-source"], weightsMode, facts),
   ]);
   const statementOk = (facts.statement || "").trim().length >= 40;
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());
   const completeness = sumLines([
-    award(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application"),
-    award(Boolean(facts.location?.trim()), weights.completeness.location, "A location is on the application", "No location is on the application"),
-    award(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application"),
-    award(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short"),
-    award(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded"),
-    award((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file"),
+    applicationField(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application", independent),
+    locationAward(checks, facts, weights.completeness.location, independent),
+    applicationField(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application", independent),
+    applicationField(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short", independent),
+    applicationField(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded", independent),
+    applicationField((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file", independent),
   ]);
 
   const categories: GradeCategory[] = [
@@ -570,7 +903,12 @@ export function gradeChecks(
     { id: "completeness", label: CATEGORY_LABELS.completeness, ...completeness, reason: `${completeness.earned} of ${completeness.possible}. ${completeness.reason}` },
   ];
 
-  const rawScore = Math.max(0, Math.min(100, categories.reduce((sum, category) => sum + category.earned, 0)));
+  const earnedPoints = Math.max(0, Math.min(100, categories.reduce((sum, category) => sum + category.earned, 0)));
+  const checkablePoints = weightsMode === "r2" ? r2CheckablePossible(checks, weights) : 100;
+  const rawScore =
+    weightsMode === "r2"
+      ? Math.max(0, Math.min(100, Math.round((100 * earnedPoints) / Math.max(checkablePoints, 1))))
+      : earnedPoints;
   let letter = letterFromScore(rawScore);
   const caps: string[] = [];
   const banners: string[] = [];
@@ -609,8 +947,11 @@ export function gradeChecks(
   if (conflicts.length >= 2) {
     applyCap(CAP_RULES.twoConflicts, "two or more checks disagree with the application");
   }
-  if (corroboratingPasses(checks).length === 0) {
+  const independentCount = corroboratingPasses(checks).length;
+  if (independentCount === 0) {
     applyCap(CAP_RULES.noCorroboration, "no free source corroborated the person and the company");
+  } else if (independentCount < 2) {
+    applyCap(CAP_RULES.thinCorroboration, "fewer than two independent sources tied this person to this company");
   }
 
   const checked = checks.map(passSentence).filter((line): line is string => Boolean(line));
@@ -658,11 +999,66 @@ export function gradeChecks(
   for (const check of conflicts) {
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: failSentence(check) || check.finding });
   }
-  if (corroboratingPasses(checks).length === 0) {
+  const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
+  const companyConfirmed = checks.some(
+    (check) => check.status === "PASS" && (check.companyOnly || check.key === "business-registry"),
+  );
+  if (!bothNamed) {
+    const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
+    const weakHit = independentCount > 0;
     pushAttention({
       severity: "Medium",
       title: "Thin public record",
-      detail: "No free source tied this person to this company. The grade cannot go above a B, and a thin file should not be read as clean.",
+      detail: companyConfirmed
+        ? "company confirmed, person not confirmed. Request more info. A free source confirmed the company. Nothing tied this person to that company. This is not a rejection and not an approval. Ask for a team-page URL."
+        : weakHit
+          ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
+          : selfReported
+            ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
+            : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
+    });
+  } else if (independentCount < 2) {
+    pushAttention({
+      severity: "Medium",
+      title: "Only one independent source",
+      detail: "Only one independent source tied this person to this company. The applicant's own site and a self-reported card do not count. The grade cannot go above a C, and this is not an approval.",
+    });
+  }
+  for (const check of checks) {
+    if (check.key === "news" && /company-level litigation/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Company litigation headline",
+        detail: check.finding,
+      });
+    }
+    if ((check.key === "news" || check.key === "website" || check.key === "web-footprint") && /may no longer be at/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Headline may be a departure",
+        detail: check.finding,
+      });
+    }
+    if (/different generational suffix/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Different generational suffix",
+        detail: check.finding,
+      });
+    }
+  }
+  const phone = findCheck(checks, "phone-state");
+  if (phone?.status === "INCONCLUSIVE" && /toll-free/i.test(phone.finding)) {
+    pushAttention({
+      severity: "Low",
+      title: "Toll-free phone number",
+      detail: phone.finding,
+    });
+  } else if (phone?.status === "INCONCLUSIVE" && /outside the stated state/i.test(phone.finding)) {
+    pushAttention({
+      severity: "Low",
+      title: "Phone area code is outside the stated state",
+      detail: phone.finding,
     });
   }
   const importantMissing = ["website", "edgar", "courts", "web-footprint", "news", "sanctions", "linkedin-fetch", "business-registry"].filter((key) => {
@@ -692,8 +1088,8 @@ export function gradeChecks(
   if (!usStateKnown(facts.location)) {
     pushAttention({
       severity: "Low",
-      title: "Location is outside the free US registry list",
-      detail: "Phone area codes and the manual registry links cover a few US states only. A location elsewhere was not searched, and that is not a clean result.",
+      title: "No manual registry link for this state",
+      detail: "This location is not a US state on the registry list. It was not searched. That is not a failure.",
     });
   }
   if ((facts.referenceCount || 0) === 0) {
@@ -714,14 +1110,31 @@ export function gradeChecks(
     recommendation = "APPROVE WITH CONDITIONS";
   } else recommendation = "NEEDS MORE INFO";
 
-  const reasoning = reasoningFor({ recommendation, letter, score, confidence, paying, role: facts.role, hard: hardChecks.length > 0, review: reviewRed.length > 0 });
+  const reasoning = reasoningFor({
+    recommendation,
+    letter,
+    score,
+    confidence,
+    paying,
+    role: facts.role,
+    hard: hardChecks.length > 0,
+    review: reviewRed.length > 0,
+    companyConfirmed: companyConfirmed && !bothNamed,
+  });
   const nextStep = nextStepFor({ recommendation, checks, facts, paying });
   const summary: ExecutiveSections = {
     applicant: applicantSection(facts, options?.subject || "APPLICATION"),
     company: companySection(checks, facts),
     checkedOut: checked.length ? joinSentences(checked) : "Nothing in the checks that ran confirmed a fact about this person or company.",
     didNotCheckOut: failed.length ? joinSentences(failed) : "Nothing in the checks that ran showed a direct conflict.",
-    couldNotCheck: joinSentences(unchecked),
+    couldNotCheck: joinSentences(
+      weightsMode === "r2"
+        ? [
+            ...unchecked,
+            `Coverage: ${earnedPoints} of ${checkablePoints} checkable points, rescaled to ${rawScore} of 100. ${checkablePoints} of 100 rubric points were checkable for free. An EDGAR result with no registrant stays in that denominator. Letter floors are unchanged.`,
+          ]
+        : unchecked,
+    ),
     reasoning,
     nextStep,
   };
@@ -753,13 +1166,17 @@ function reasoningFor(input: {
   role?: string;
   hard: boolean;
   review: boolean;
+  companyConfirmed?: boolean;
 }): string {
   const grade = `The grade is ${input.letter} (${input.score} of 100) and confidence is ${input.confidence}.`;
   if (input.recommendation === "DECLINE") {
     return `${grade} A hard red flag is on the file. I recommend you decline unless you have read that flag and you still want this person. This is a recommendation only. You approve every member yourself.`;
   }
-  if (input.review) {
+  if (input.review && !input.companyConfirmed) {
     return `${grade} Something on the file might be this person, and it might be someone else. I recommend you get more information before you approve. I am not treating that hit as fact.`;
+  }
+  if (input.recommendation === "NEEDS MORE INFO" && input.companyConfirmed) {
+    return `${grade} company confirmed, person not confirmed. Request more info. The company showed up on a free source. Nothing tied this person to that company. This is not a rejection and not an approval.`;
   }
   if (input.recommendation === "NEEDS MORE INFO") {
     return `${grade} The file is too thin, or too many sources came back empty, for me to recommend approval. Empty sources were not counted in their favor.`;
@@ -778,6 +1195,9 @@ function nextStepFor(input: { recommendation: Recommendation; checks: CheckOutpu
     return "Read the red banner. If you approve anyway, the decision form asks you to confirm, and that confirmation is written to the audit log.";
   }
   const asks: string[] = [];
+  if (input.recommendation === "NEEDS MORE INFO" && !corroboratingPasses(input.checks).some((check) => namesPersonAndCompany(check, input.facts))) {
+    asks.push("request more info: ask for a team-page URL that names this person at this company");
+  }
   if (!input.facts.cardUploaded && !input.facts.cardText?.trim()) asks.push("ask for a business card");
   if (!input.facts.linkedinUrl?.trim()) asks.push("ask for a LinkedIn URL");
   if ((input.facts.referenceCount || 0) === 0) asks.push("ask for a reference");
@@ -819,7 +1239,13 @@ function lowerConfidence(confidence: Confidence): Confidence {
   return "Low";
 }
 
-/** A skipped review step is not a pass. The letter and score stay put. Confidence drops one step. */
+function recommendationAfterConfidence(recommendation: Recommendation, confidence: Confidence): Recommendation {
+  if (confidence === "Low" && (recommendation === "APPROVE" || recommendation === "APPROVE WITH CONDITIONS")) return "NEEDS MORE INFO";
+  if (confidence !== "High" && recommendation === "APPROVE") return "APPROVE WITH CONDITIONS";
+  return recommendation;
+}
+
+/** A skipped review step is not a pass. The letter and score stay put. Confidence drops one step, and that drop can lower the recommendation. */
 export function applyReviewSkips(report: GradeReport, skips: { title: string; reason: string }[]): GradeReport {
   if (!skips.length) return report;
   const extra: AttentionItem[] = skips.map((skip) => ({
@@ -827,12 +1253,97 @@ export function applyReviewSkips(report: GradeReport, skips: { title: string; re
     title: `Skipped: ${skip.title}`,
     detail: `Skipped, not a pass. Reason: ${skip.reason || "No reason recorded."} This does not confirm the step.`,
   }));
+  const confidence = lowerConfidence(report.confidence);
+  const recommendation = recommendationAfterConfidence(report.recommendation, confidence);
+  const summary =
+    recommendation === report.recommendation
+      ? report.summary
+      : {
+          ...report.summary,
+          reasoning: reasoningFor({
+            recommendation,
+            letter: report.letter,
+            score: report.score,
+            confidence,
+            paying: /month to month/i.test(report.summary.reasoning),
+            hard: false,
+            review: false,
+          }),
+          nextStep:
+            recommendation === "NEEDS MORE INFO"
+              ? "Read the skipped steps. A skipped step is not a pass, and confidence is too low to recommend approval."
+              : report.summary.nextStep,
+        };
   const next: GradeReport = {
     ...report,
-    confidence: lowerConfidence(report.confidence),
+    confidence,
+    recommendation,
+    summary,
     attention: [...extra, ...report.attention],
   };
   return { ...next, plainText: gradePlainText(next) };
+}
+
+export function gradeComparisonLine(
+  latest: { letter: string; score: number } | null,
+  atApplication: { letter: string; score: number } | null,
+): string {
+  if (!latest) return "";
+  if (!atApplication || (atApplication.letter === latest.letter && atApplication.score === latest.score)) {
+    return `Latest check: grade ${latest.letter} ${latest.score}.`;
+  }
+  return `Latest check: grade ${latest.letter} ${latest.score}. Grade at application: grade ${atApplication.letter} ${atApplication.score}.`;
+}
+
+export function rerunAuditSummary(
+  latest: { letter: string; score: number },
+  atApplication: { letter: string; score: number } | null,
+): string {
+  const prior = atApplication ? `grade ${atApplication.letter} ${atApplication.score}` : "no stored application grade";
+  return `Re-ran checks. Latest check: grade ${latest.letter} ${latest.score}. Grade at application was ${prior}.`;
+}
+
+/**
+ * The company file is the same application with the company name in the name field.
+ * It is not scored below the application unless a new conflict says why.
+ */
+export function companyFileBesideApplication(company: GradeReport | null, application: GradeReport | null): GradeReport | null {
+  if (!company || !application || company.score >= application.score) return company;
+  const stated = company.summary.didNotCheckOut;
+  const sameMiss = stated === application.summary.didNotCheckOut;
+  const empty = /^Nothing\b/i.test(stated);
+  const incomplete = /looks incomplete/i.test(stated);
+  if (!sameMiss && stated && !empty && !incomplete) {
+    return {
+      ...company,
+      changeNote: `${company.changeNote} Company file is ${company.letter} ${company.score}, below the application grade ${application.letter} ${application.score}, because ${stated}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  const lifted: GradeReport = { ...company, letter: application.letter, score: application.score };
+  return {
+    ...lifted,
+    changeNote: `Company file kept the application grade ${application.letter} ${application.score}. The same inputs do not lower the company file.`,
+    plainText: gradePlainText(lifted),
+  };
+}
+
+/** A re-run that already has a grade does not say this is the first graded run. */
+export function noteAfterRerun(
+  previous: GradeReport | null,
+  stored: { letter: string; score: number } | null,
+  next: GradeReport,
+): string {
+  if (previous) {
+    const note = gradeChangeNote(previous, next);
+    return note.startsWith("First graded run") ? `Re-ran checks. Grade is ${next.letter} ${next.score}. The stored checks were replaced.` : note;
+  }
+  if (stored && stored.letter) {
+    if (stored.letter === next.letter && stored.score === next.score) {
+      return `Re-ran checks. Grade stays ${next.letter} ${next.score}. The stored checks were replaced.`;
+    }
+    return `Grade moved from ${stored.letter} (${stored.score}) to ${next.letter} (${next.score}). The stored checks were replaced.`;
+  }
+  return gradeChangeNote(null, next);
 }
 
 export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeReport, "letter" | "score" | "recommendation" | "confidence" | "attention" | "banner">): string {
@@ -858,15 +1369,27 @@ export function gradeChangeNote(previous: GradeReport | null, next: Pick<GradeRe
   return changes.join(" ");
 }
 
-export function rubricSections(): { title: string; body: string }[] {
+export function rubricSections(mode: GradeWeightsMode = GRADE_WEIGHTS_MODE): { title: string; body: string }[] {
+  const weights = weightsFor(mode);
   const points = (group: Record<string, number>) =>
     Object.entries(group)
       .map(([key, value]) => `${labelFor(key)} ${value}`)
       .join(", ");
+  const identityPossible = Object.values(weights.identity).reduce((sum, value) => sum + value, 0);
+  const companyPossible = Object.values(weights.company).reduce((sum, value) => sum + value, 0);
+  const footprintPossible = Object.values(weights.footprint).reduce((sum, value) => sum + value, 0);
+  const registrySentence =
+    mode === "r2"
+      ? "The state registry is 0 under R2."
+      : "The registry row is 2 only when a free state list has the exact company name (NY, CT, CO, OR, PA). That hit does not corroborate a person. NJ, WA, IA, and states with no keyless API are not checkable for free and earn 0.";
+  const r2Note =
+    mode === "r2"
+      ? " R2 is on: LinkedIn fetch is 0 and the state registry is 0. Those 6 points sit on the website and the web footprint instead. The displayed score rescales earned points over the checkable points. A check that did not run, or did not answer, leaves the denominator. No SEC registrant stays in the denominator as 0 of 6. Letter floors are unchanged."
+      : "";
   return [
     {
       title: "Points",
-      body: `Identity and contact, ${points(GRADE_WEIGHTS.identity)} (18). Company legitimacy, ${points(GRADE_WEIGHTS.company)} (22). The registry row is always 0 because it is not searched for free. Public footprint, ${points(GRADE_WEIGHTS.footprint)} (18). Risk and sanctions, ${points(GRADE_WEIGHTS.risk)} (20). Role fit, ${points(GRADE_WEIGHTS.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.`,
+      body: `Identity and contact, ${points(weights.identity)} (${identityPossible}). Company legitimacy, ${points(weights.company)} (${companyPossible}). ${registrySentence} Public footprint, ${points(weights.footprint)} (${footprintPossible}). Risk and sanctions, ${points(weights.risk)} (20). Role fit, ${points(weights.role)} (12). Completeness, phone 2, location 2, website or LinkedIn 2, track record 2, business card 1, references 1 (10). Total 100. Email domain and MX earn 0.${r2Note}`,
     },
     {
       title: "Letters",
@@ -874,7 +1397,7 @@ export function rubricSections(): { title: string; body: string }[] {
     },
     {
       title: "Caps",
-      body: `No person-and-company corroboration: cannot exceed ${CAP_RULES.noCorroboration}. A negative headline that is only a name match: cannot exceed ${CAP_RULES.ambiguousNews}, and the file says possible match, verify. Disposable email with some public page, an uncorroborated sanctions name, or a negative headline or court result that also names the company: cannot exceed ${CAP_RULES.reviewRedFlag}, with a red banner. Corroborated sanctions, fraud-pattern text, a disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed ${CAP_RULES.hardRedFlag}, with a red banner. Two or more conflicting checks: cannot exceed ${CAP_RULES.twoConflicts}.`,
+      body: `No independent person-and-company corroboration: cannot exceed ${CAP_RULES.noCorroboration}. The applicant's own site and a footprint from that same site count as one self-reported source and do not lift this cap. A negative headline that is only a name match: cannot exceed ${CAP_RULES.ambiguousNews}, and the file says possible match, verify. Disposable email with some public page, an uncorroborated sanctions name, or fraud, sanctions, or a criminal charge tied to the person with the company or city: cannot exceed ${CAP_RULES.reviewRedFlag}, with a red banner. A company-level lawsuit or a civil docket that does not name the applicant is an attention item and does not use that cap. An ordinary results headline (REO, dividend, loss, downgrade) is not a negative hit. Corroborated sanctions, including an OpenSanctions hard flag when that source answers, fraud-pattern text, a disposable email with no website or LinkedIn, or a duplicate of a member or a declined applicant: cannot exceed ${CAP_RULES.hardRedFlag}, with a red banner. Two or more conflicting checks: cannot exceed ${CAP_RULES.twoConflicts}. Separate news headlines are not separate conflicts.`,
     },
     {
       title: "Confidence",
@@ -946,7 +1469,7 @@ export function parseGradeSnapshot(value: unknown): GradeReport | null {
 export function inferFlags(key: string, status: EvidenceStatus | string, finding: string): { hardFlag: boolean; reviewFlag: boolean; corroborates: boolean } {
   const text = finding.toLowerCase();
   const hard =
-    (key === "sanctions" && status === "FAIL" && text.includes("lines up")) ||
+    ((key === "sanctions" || key === "opensanctions") && status === "FAIL" && text.includes("lines up")) ||
     (key === "disposable-email" && status === "FAIL" && text.includes("no website or linkedin")) ||
     (key === "duplicate" && status === "FAIL") ||
     (key === "text-risk" && status === "FAIL" && text.includes("fraud pattern"));

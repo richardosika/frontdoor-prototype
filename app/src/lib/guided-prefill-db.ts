@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { MEMBER_CHECKS, PROJECT_CHECKS } from "@/lib/verification";
 import { ensureVerificationCase } from "@/lib/verification-db";
 import { collectChecks, type CheckContext } from "@/lib/verify/checks";
-import { politeFetch } from "@/lib/verify/fetch";
-import { gradeChecks, parseGradeSnapshot, type GradeReport } from "@/lib/verify/grade";
+import { fetchForChecks } from "@/lib/verify/fetch";
+import { gradeChecks, gradePlainText, noteAfterRerun, parseGradeSnapshot, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { loadWatchlist } from "@/lib/verify/watchlist";
 
@@ -23,6 +23,23 @@ async function rememberSources(caseId: string, rows: EvidenceRow[]): Promise<voi
     where: { id: caseId },
     data: { sourceSnapshot: rows },
   });
+}
+
+/** Rows written onto a run when checks are replaced. The previous EDGAR line does not stay. */
+export function evidenceRowsForRun(runId: string, checks: CheckOutput[]) {
+  return checks.map((check) => ({
+    runId,
+    checkKey: check.key,
+    status: check.status as EvidenceStatus,
+    weight: check.weight,
+    finding: check.finding,
+    source: check.source,
+    url: check.url,
+    ranAt: Number.isNaN(new Date(check.ranAt).getTime()) ? new Date() : new Date(check.ranAt),
+    hardFlag: Boolean(check.hardFlag),
+    reviewFlag: Boolean(check.reviewFlag),
+    corroborates: Boolean(check.corroborates),
+  }));
 }
 
 function asEvidence(checks: CheckOutput[]): EvidenceRow[] {
@@ -46,6 +63,7 @@ function factsToApplicant(facts: PrefillFacts, extra: Partial<ApplicantFacts> = 
     org: facts.org,
     location: facts.location,
     role: extra.role || "DEVELOPER",
+    applicationSubmitted: extra.applicationSubmitted,
     phone: extra.phone || "",
     website: facts.website,
     linkedinUrl: facts.linkedinUrl,
@@ -68,6 +86,7 @@ async function writeSuggestions(input: {
   grade: GradeReport | null;
   mode: "fill-empty" | "refresh";
   summary: string;
+  audit?: boolean;
 }): Promise<number> {
   const record = await prisma.verificationCase.findUnique({
     where: { id: input.caseId },
@@ -112,7 +131,7 @@ async function writeSuggestions(input: {
       data: { gradeSnapshot: input.grade as unknown as Prisma.InputJsonValue },
     });
   }
-  if (updated > 0) {
+  if (updated > 0 || input.audit) {
     await prisma.verificationEvent.create({
       data: {
         caseId: record.id,
@@ -239,6 +258,7 @@ export async function factsForCase(caseId: string): Promise<{ facts: PrefillFact
     applicant: factsToApplicant(facts, {
       email: application?.email || user?.email || invite?.email || "",
       role: application?.role || user?.role || invite?.role || "DEVELOPER",
+      applicationSubmitted: Boolean(application),
       phone: application?.phone || user?.phone || "",
       socialLinks: application?.socialLinks || "",
       inviteNote: application?.inviteCode ? `${application.inviteCode.code} ${application.inviteCode.note}` : "",
@@ -340,12 +360,49 @@ export async function runLivePrefill(caseId: string): Promise<void> {
   const ctx: CheckContext = {
     facts: loaded.applicant,
     watchlist: watch.entries,
+    watchlistFetchedAt: watch.fetchedAt,
     network: !loaded.applicant.testProfile,
-    fetchText: politeFetch,
+    fetchText: fetchForChecks,
   };
   const checks = await collectChecks(ctx);
   const evidence = asEvidence(checks);
-  const grade = await gradeFor(checks, loaded.applicant, loaded.subject);
+  let grade = await gradeFor(checks, loaded.applicant, loaded.subject);
+  const record = await prisma.verificationCase.findUnique({
+    where: { id: caseId },
+    select: { applicationId: true },
+  });
+  let atApplication: { letter: string; score: number } | null = null;
+  if (record?.applicationId && grade) {
+    const run = await prisma.verificationRun.findFirst({
+      where: { applicationId: record.applicationId, subject: "APPLICATION", status: "DONE" },
+      orderBy: { finishedAt: "desc" },
+      select: { id: true, gradeLetter: true, gradeScore: true, gradeSnapshot: true },
+    });
+    const previous = parseGradeSnapshot(run?.gradeSnapshot);
+    const stored = run?.gradeLetter && typeof run.gradeScore === "number" ? { letter: run.gradeLetter, score: run.gradeScore } : null;
+    if (previous) atApplication = { letter: previous.letter, score: previous.score };
+    else if (stored) atApplication = stored;
+    grade = { ...grade, changeNote: noteAfterRerun(previous, stored, grade) };
+    grade.plainText = gradePlainText(grade);
+    if (run) {
+      await prisma.verificationEvidence.deleteMany({ where: { runId: run.id } });
+      if (checks.length) {
+        await prisma.verificationEvidence.createMany({ data: evidenceRowsForRun(run.id, checks) });
+      }
+      await prisma.verificationRun.update({
+        where: { id: run.id },
+        data: {
+          gradeLetter: grade.letter,
+          gradeScore: grade.score,
+          gradeConfidence: grade.confidence,
+          recommendation: grade.recommendation,
+          gradeSnapshot: grade as unknown as Prisma.InputJsonValue,
+          summary: grade.plainText,
+          finishedAt: new Date(),
+        },
+      });
+    }
+  }
   await rememberSources(caseId, evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, evidence);
   await writeSuggestions({
@@ -353,7 +410,10 @@ export async function runLivePrefill(caseId: string): Promise<void> {
     suggestions,
     grade,
     mode: "refresh",
-    summary: "Re-ran free-source checks. Auto-suggested marks were refreshed. Confirmed items and skips were left as they were.",
+    audit: true,
+    summary: grade
+      ? `${rerunAuditSummary(grade, atApplication)} Stored checks were replaced.`
+      : "Re-ran checks. No grade was stored.",
   });
 }
 
