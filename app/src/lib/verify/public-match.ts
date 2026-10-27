@@ -16,6 +16,8 @@ const NICKNAMES: Record<string, string[]> = {
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
+/** A job title after the brand is not a different firm. "CBRE CEO" is still CBRE. "Starwood Capital" is not. */
+const TITLE_WORDS = new Set(["ceo", "president", "chairman", "chairwoman", "chairperson", "founder", "cofounder", "principal", "partner"]);
 /** Four-letter words that show up in too many firm names to identify one company. "toll" is not in this set. */
 const SHORT_GENERIC = new Set([
   "home",
@@ -513,7 +515,7 @@ function brandMention(text: string, brand: string, phrase: string[], org: string
     if (!next) return true;
     const word = next[1];
     const lower = word.toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (!lower || phrase.includes(lower) || LEGAL.has(lower)) return true;
+    if (!lower || phrase.includes(lower) || LEGAL.has(lower) || TITLE_WORDS.has(lower)) return true;
     // "Vornado stock" is this firm. "Madison Air" and "Starwood Capital" name a different one.
     // A capitalized next word is a different firm, unless it is this person's name: "Vornado's Steve Roth".
     if (word[0] === word[0].toUpperCase()) {
