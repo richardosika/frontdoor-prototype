@@ -2912,14 +2912,17 @@ describe("batch 7 firm names, news links, and crawl budget", () => {
       return { ok: false, status: 404, text: "" };
     });
     const screen = checks.find((check) => check.key === "screen-news");
-    expect(judged[0].status).toBe("INCONCLUSIVE");
+    expect(judged[0].status).toBe("PASS");
+    expect(judged[0].corroborates).toBe(true);
+    expect(judged[0].finding).toContain("Neutral coverage");
     expect(judged[0].finding).toContain("Company-level litigation");
-    expect(judged[0].url).toBe("https://therealdeal.com/vornado-foreclosure");
-    expect(screen?.status).toBe(judged[0].status);
+    expect(judged[0].url).toBe("https://example.com/vornado-neutral");
+    expect(screen?.status).not.toBe("FAIL");
     expect(screen?.corroborates).not.toBe(true);
-    expect(judged[0].corroborates).not.toBe(true);
-    expect(screen?.finding).toContain("Company-level litigation");
-    expect(screen?.url).toBe("https://therealdeal.com/vornado-foreclosure");
+    expect(screen?.url).toBe("https://example.com/vornado-neutral");
+    const graded = gradeChecks(judged, vornado);
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+    expect(graded.summary.company).toContain("A headline names the person and the company");
   });
 
   it("treats a TLD with no RDAP service as unavailable and an unregistered domain as a company finding", () => {
@@ -3635,13 +3638,13 @@ describe("qa october 27", () => {
     expect(affiliate.status).toBe("INCONCLUSIVE");
     expect(affiliate.status).not.toBe("PASS");
     expect(affiliate.corroborates).toBe(false);
-    expect(affiliate.reviewFlag).toBe(true);
+    expect(affiliate.reviewFlag).not.toBe(true);
     expect(affiliate.finding).toContain("HINES GLOBAL INCOME TRUST");
-    expect(affiliate.finding.toLowerCase()).toContain("parent match, needs review");
-    expect(affiliate.finding.toLowerCase()).toContain("not a pass");
+    expect(affiliate.finding).toContain("EDGAR matched a different or related company; not credited");
+    expect(affiliate.finding.toLowerCase()).not.toContain("parent match, needs review");
     expect(affiliate.finding.toLowerCase()).toContain("not credited");
     const affiliateGrade = gradeChecks(
-      [row({ key: "edgar", status: affiliate.status, weight: 6, corroborates: false, reviewFlag: true, finding: affiliate.finding })],
+      [row({ key: "edgar", status: affiliate.status, weight: 6, corroborates: false, reviewFlag: affiliate.reviewFlag, finding: affiliate.finding })],
       facts({ org: "Hines", name: "Jeff Hines" }),
     );
     expect(affiliateGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
@@ -5283,7 +5286,9 @@ describe("Willy Walker live inputs", () => {
       }),
     );
     expect(request.summary.reasoning).toContain("Incomplete application. Request a website, phone, or business card. Send to review: incomplete.");
+    expect(request.summary.nextStep.startsWith("Ask for the website and phone first.")).toBe(true);
     expect(request.summary.nextStep).toContain("Send to review: incomplete.");
+    expect(request.attention.some((item) => item.title === "Incomplete application: no website and no phone")).toBe(true);
     expect(request.summary.applicant).toContain("fewer checks were available");
     expect(fake.summary.reasoning).not.toContain("Incomplete application");
     expect(request.score).toBe(36);
@@ -5542,14 +5547,16 @@ describe("batch 13 search, particles, foreclosure topic, and affiliate filings",
     expect(edgar.status).not.toBe("PASS");
     expect(edgar.companyOnly).not.toBe(true);
     expect(edgar.corroborates).not.toBe(true);
-    expect(edgar.finding).toContain("Parent match, needs review");
+    expect(edgar.reviewFlag).not.toBe(true);
+    expect(edgar.finding).toContain("EDGAR matched a different or related company; not credited");
+    expect(edgar.finding).not.toContain("Parent match, needs review");
     expect(edgar.finding).toContain("1619312");
     expect(edgar.finding).toContain("EX-32");
     expect(edgar.finding).toContain("1563756");
     expect(edgar.finding).toContain("2026-03-30");
     expect(edgar.finding).toContain("does not add points");
     const graded = gradeChecks(
-      [row({ key: "edgar", status: edgar.status, corroborates: false, companyOnly: false, finding: edgar.finding, reviewFlag: true })],
+      [row({ key: "edgar", status: edgar.status, corroborates: false, companyOnly: false, finding: edgar.finding, reviewFlag: edgar.reviewFlag })],
       facts({ name: "David Lichtenstein", applicantName: "David Lichtenstein", org: "The Lightstone Group" }),
     );
     expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
@@ -5598,5 +5605,213 @@ describe("batch 13 search, particles, foreclosure topic, and affiliate filings",
     expect(fake.score).toBeLessThanOrEqual(48);
     expect(fake.recommendation).not.toBe("APPROVE");
     expect(fake.summary.reasoning).not.toContain("Incomplete application");
+  });
+});
+
+describe("batch 13 wording and own-site search", () => {
+  const both = (person: string, org: string) => `${person} leads ${org} in New York.`;
+
+  it("keeps searching when Bing's first hit is the applicant's own site", async () => {
+    const cases = [
+      { domain: "ripcony.com", person: "Peter Ripka", org: "RIPCO Real Estate" },
+      { domain: "lightstonegroup.com", person: "David Lichtenstein", org: "The Lightstone Group" },
+      { domain: "acorecapital.com", person: "Warren de Haan", org: "ACORE Capital" },
+      { domain: "walkerdunlop.com", person: "Willy Walker", org: "Walker & Dunlop" },
+    ];
+    for (const { domain, person, org } of cases) {
+      const applicant = facts({
+        name: person,
+        applicantName: person,
+        org,
+        website: `https://www.${domain}`,
+        location: "New York, NY",
+      });
+      const own = `https://www.${domain}/team`;
+      const independent = "https://www.bisnow.com/news/independent-page";
+      const checks = await runPublicScreen(applicant, async (url) => {
+        if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+        if (url.includes("bing.com")) {
+          return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="${own}">${both(person, org)}</a></li></ol>` };
+        }
+        if (url.includes("mojeek.com")) {
+          return { ok: true, status: 200, text: `<a class="title" href="${independent}">${both(person, org)}</a>` };
+        }
+        if (url.includes(domain)) return { ok: true, status: 200, text: `<html><p>${org}</p></html>` };
+        return { ok: false, status: 403, text: "" };
+      });
+      const web = checks.find((check) => check.key === "screen-web");
+      expect(web?.source).toBe("Mojeek");
+      expect(web?.corroborates).toBe(true);
+      expect(web?.selfReported).not.toBe(true);
+      expect(web?.url).not.toContain(domain);
+      const footprint = checks.find((check) => check.key === "web-footprint");
+      expect(footprint?.status).toBe("PASS");
+      expect(footprint?.selfReported).not.toBe(true);
+      expect(footprint?.url).toContain("bisnow.com");
+    }
+  });
+
+  it("uses one own-site sentence in the company line, what checked out, and what could not be checked", async () => {
+    const applicant = facts({
+      name: "Peter Ripka",
+      applicantName: "Peter Ripka",
+      org: "RIPCO Real Estate",
+      website: "https://www.ripcony.com",
+      location: "New York, NY",
+    });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.ripcony.com/team">${both("Peter Ripka", "RIPCO Real Estate")}</a></li></ol>`,
+        };
+      }
+      if (url.includes("ripcony.com")) return { ok: true, status: 200, text: "<html><p>RIPCO Real Estate</p></html>" };
+      return { ok: false, status: 403, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.selfReported).toBe(true);
+    expect(web?.corroborates).not.toBe(true);
+    const graded = gradeChecks(
+      [
+        ...checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint"),
+        row({
+          key: "linkedin-fetch",
+          status: "PASS",
+          companyOnly: true,
+          corroborates: false,
+          source: "LinkedIn",
+          finding: "The public LinkedIn page company confirmed, person NOT confirmed. Name: no. Company: yes.",
+        }),
+      ],
+      applicant,
+    );
+    const own = "The only web search hit was the applicant's own site. That is not an independent confirmation.";
+    expect(graded.summary.company).toContain(own);
+    expect(graded.summary.checkedOut).toContain(own);
+    expect(graded.summary.couldNotCheck).toContain(own);
+    expect(graded.summary.company).not.toContain("No public web result confirmed the person and the company together");
+    expect(graded.summary.couldNotCheck).not.toContain("(LinkedIn)");
+    expect(graded.summary.couldNotCheck).not.toMatch(/Name:|Company:|Confidence:/);
+    expect(graded.categories.find((category) => category.id === "footprint")?.reason).not.toContain("No public web result confirmed");
+  });
+
+  it("says headlines named the company but not this person, without the raw score", () => {
+    const graded = gradeChecks(
+      [
+        row({
+          key: "news",
+          status: "INCONCLUSIVE",
+          finding: "News search: no match found. Name: no. Company: yes. City: no. Confidence: low.",
+          source: "Google News",
+        }),
+        row({
+          key: "screen-news",
+          status: "INCONCLUSIVE",
+          finding: "Searched: news. No result found. Name: no. Company: yes. City: yes. Confidence: low.",
+          source: "Google News",
+        }),
+      ],
+      facts({ name: "Robert Mullen", applicantName: "Robert Mullen", org: "STO Building Group" }),
+    );
+    expect(graded.summary.company).toContain("Headlines named the company but not this person.");
+    expect(graded.summary.company).not.toContain("No news item was confirmed");
+    expect(graded.summary.couldNotCheck).toContain("Headlines named the company but not this person.");
+    expect(graded.summary.couldNotCheck).not.toMatch(/Name:|Company:|City:|Confidence:/);
+    expect(graded.summary.company).not.toMatch(/Confidence:/);
+  });
+
+  it("does not parent-match Madison Realty Capital to Madison Air Solutions", () => {
+    const edgar = assessEdgarMatch({
+      org: "Madison Realty Capital",
+      person: "Josh Zegen",
+      tickersOk: true,
+      companies: [{ title: "Madison Air Solutions Corp", ticker: "MAIR", cik: "2098430" }],
+      filingNames: [],
+    });
+    expect(edgar.reviewFlag).not.toBe(true);
+    expect(edgar.companyOnly).not.toBe(true);
+    expect(edgar.corroborates).not.toBe(true);
+    expect(edgar.finding).toContain("EDGAR matched a different or related company; not credited");
+    expect(edgar.finding).toContain("2098430");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: edgar.status, corroborates: false, companyOnly: false, reviewFlag: edgar.reviewFlag, finding: edgar.finding, source: "SEC EDGAR" })],
+      facts({ org: "Madison Realty Capital", name: "Josh Zegen", applicantName: "Josh Zegen" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(graded.summary.company).toContain("EDGAR matched a different or related company; not credited");
+    expect(graded.summary.couldNotCheck).toContain("EDGAR matched a different or related company; not credited");
+    expect(graded.summary.couldNotCheck).not.toContain("came back without a usable match");
+  });
+
+  it("keeps a neutral person-and-company story as a pass when another headline is a company lawsuit", () => {
+    const blackstone = "Jonathan Gray leads Blackstone through a new fund";
+    const lawsuit = "Deadline Alert: Blackstone, Inc. Stockholders Face December 8, 2026 Lead Plaintiff Deadline in Securities Fraud Class Action";
+    const compass = "Robert Reffkin leads Compass in New York";
+    const compassSuit = "Deadline Alert: Compass, Inc. Stockholders Face December 8, 2026 Lead Plaintiff Deadline in Securities Fraud Class Action";
+    const madison = "Josh Zegen leads Madison Realty Capital";
+    const madisonSuit = "Madison Realty Capital faces a lawsuit over a New York loan";
+    for (const [person, org, neutral, suit] of [
+      ["Jonathan Gray", "Blackstone", blackstone, lawsuit],
+      ["Robert Reffkin", "Compass", compass, compassSuit],
+      ["Josh Zegen", "Madison Realty Capital", madison, madisonSuit],
+    ] as const) {
+      const rows = classifyNews(
+        facts({ name: person, applicantName: person, org, location: "New York, NY" }),
+        [
+          { title: suit, snippet: suit, url: "https://example.com/suit", source: "Wire", provider: "Google News", publishedAt: null },
+          { title: neutral, snippet: neutral, url: "https://example.com/neutral", source: "Desk", provider: "Google News", publishedAt: null },
+        ],
+        [{ name: "Google News", state: "responded" }],
+      );
+      const news = rows.find((item) => item.key === "news");
+      expect(news?.status).toBe("PASS");
+      expect(news?.corroborates).toBe(true);
+      expect(news?.url).toBe("https://example.com/neutral");
+      expect(news?.finding).toContain("Company-level litigation");
+      const graded = gradeChecks(rows, facts({ name: person, applicantName: person, org }));
+      expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+    }
+  });
+
+  it("describes an exact current-name EDGAR row as the outside source for own-site credit", () => {
+    const finding = "EDGAR's current name for CIK 1497770 is WALKER & DUNLOP, INC. That is an exact current-name match. It does not tie the person to the firm.";
+    const graded = gradeChecks(
+      [
+        row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding, source: "SEC EDGAR" }),
+        row({
+          key: "website",
+          status: "PASS",
+          companyOnly: true,
+          selfReported: true,
+          corroborates: false,
+          finding: "Found: a page on the company site. Name: no. Company: yes. City: no. Confidence: high.",
+          source: "Company website",
+        }),
+      ],
+      facts({ name: "Willy Walker", applicantName: "Willy Walker", org: "Walker & Dunlop", website: "https://www.walkerdunlop.com" }),
+    );
+    expect(graded.summary.company).toContain("EDGAR's exact current-name match is an outside source, so the company's own site counts as company credit. It does not tie the person.");
+    expect(graded.summary.company).not.toContain("No EDGAR filing was confirmed");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+  });
+
+  it("strips a leading QA-TEST prefix before the EDGAR and website-alias checks", () => {
+    expect(domainMatchesOrgStem("walkerdunlop", "QA-TEST Walker & Dunlop")).toBe(true);
+    expect(factsForSearch(facts({ email: "person@gmail.com", org: "QA-TEST Walker & Dunlop" })).org).toBe("QA-TEST Walker & Dunlop");
+    const edgar = assessEdgarMatch({
+      org: "QA-TEST Walker & Dunlop",
+      person: "Willy Walker",
+      tickersOk: true,
+      companies: [{ title: "WALKER & DUNLOP, INC.", ticker: "WD", cik: "1497770" }],
+      filingNames: [],
+    });
+    expect(edgar.finding).toContain("1497770");
+    expect(edgar.companyOnly).toBe(true);
+    expect(edgar.status).toBe("INCONCLUSIVE");
+    expect(matchEdgarCompany([{ title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" }], "QA-TEST CBRE Group, Inc.")).toBeNull();
   });
 });

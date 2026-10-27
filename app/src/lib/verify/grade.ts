@@ -419,6 +419,33 @@ export function capitalizeSentences(text: string): string {
   });
 }
 
+const OWN_SITE_WEB = "The only web search hit was the applicant's own site. That is not an independent confirmation.";
+const HEADLINES_COMPANY_ONLY = "Headlines named the company but not this person.";
+const EDGAR_RELATED = "EDGAR matched a different or related company; not credited.";
+const EDGAR_EXACT_OUTSIDE =
+  "EDGAR's exact current-name match is an outside source, so the company's own site counts as company credit. It does not tie the person.";
+
+function companyNamedNotPerson(check: CheckOutput | undefined): boolean {
+  if (!check) return false;
+  return /Company:\s*yes/i.test(check.finding) && /Name:\s*no/i.test(check.finding);
+}
+
+function webSearchLine(checks: CheckOutput[]): "independent" | "own-site" | "blocked" | "none" {
+  const screen = checks.find((check) => check.key === "screen-web");
+  const footprint = checks.find((check) => check.key === "web-footprint" || check.key === "fixture-web");
+  const ownSite = Boolean(
+    screen?.selfReported ||
+      footprint?.selfReported ||
+      /applicant's own site/i.test(`${screen?.finding || ""} ${footprint?.finding || ""}`),
+  );
+  if ((footprint?.status === "PASS" && !footprint.selfReported) || (screen?.status === "PASS" && screen.corroborates && !screen.selfReported)) {
+    return "independent";
+  }
+  if (ownSite) return "own-site";
+  if (webSearchCouldNotBeChecked(checks)) return "blocked";
+  return "none";
+}
+
 function passSentence(check: CheckOutput): string | null {
   if (check.status !== "PASS") return null;
   const source = check.source || "the check";
@@ -465,12 +492,15 @@ function passSentence(check: CheckOutput): string | null {
       return `The business card text includes the name and company on the application (${source}).`;
     case "web-footprint":
     case "fixture-web":
-      return `A public web result names both the person and the company (${source}).`;
+      return check.selfReported ? OWN_SITE_WEB : `A public web result names both the person and the company (${source}).`;
+    case "screen-web":
+      return check.selfReported ? OWN_SITE_WEB : `A public web result names both the person and the company (${source}).`;
     case "news":
+    case "screen-news":
       return `A headline names both the person and the company and does not tie them to a problem (${source}).`;
     default:
       if (check.key.startsWith("screen-")) {
-        return `${labelFor(check.key)} returned a public result that names this person and this company (${source}). ${scoreClause(check)}`.trim();
+        return `${labelFor(check.key)} returned a public result that names this person and this company (${source}).`;
       }
       return null;
   }
@@ -578,6 +608,26 @@ function uncheckedSentence(check: CheckOutput, checks: CheckOutput[]): string | 
     return "No LinkedIn URL was on the application. That is not a failure.";
   }
   if ((check.key === "edgar" || check.key === "fixture-edgar") && check.companyOnly && !check.reviewFlag) return null;
+  if (
+    (check.key === "edgar" || check.key === "fixture-edgar") &&
+    /parent match|different or related company/i.test(check.finding)
+  ) {
+    return EDGAR_RELATED;
+  }
+  if (check.key === "web-footprint" || check.key === "fixture-web") {
+    const verdict = webSearchLine(checks);
+    if (verdict === "independent") return null;
+    if (verdict === "own-site") return OWN_SITE_WEB;
+  }
+  if ((check.key === "news" || check.key === "screen-news") && check.status !== "UNAVAILABLE") {
+    const news = checks.find((item) => item.key === "news");
+    const screenNews = checks.find((item) => item.key === "screen-news");
+    if (companyNamedNotPerson(check) || companyNamedNotPerson(news) || companyNamedNotPerson(screenNews)) {
+      if (check.key === "screen-news" && companyNamedNotPerson(news)) return null;
+      return HEADLINES_COMPANY_ONLY;
+    }
+    return `${labelFor(check.key)} found nothing that names this person at this company.`;
+  }
   const source = check.source || check.key;
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
@@ -714,23 +764,33 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
     evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
   } else if (edgar && /former name/i.test(edgar.finding)) {
     evidence.push(edgar.finding);
-  } else if (edgar && /parent match, needs review/i.test(edgar.finding)) {
-    evidence.push(edgar.finding);
+  } else if (edgar && /parent match, needs review|different or related company/i.test(edgar.finding)) {
+    evidence.push(EDGAR_RELATED);
   } else if (edgar?.status === "INCONCLUSIVE" && edgar.companyOnly && !edgar.reviewFlag) {
-    evidence.push(edgar.finding.endsWith(".") ? edgar.finding : `${edgar.finding}.`);
+    const exact = /exact current-name match/i.test(edgar.finding);
+    const ownSite = website?.status === "PASS" && (website.companyOnly || website.selfReported);
+    evidence.push(exact && ownSite ? EDGAR_EXACT_OUTSIDE : edgar.finding.endsWith(".") ? edgar.finding : `${edgar.finding}.`);
   } else {
     evidence.push("No EDGAR filing was confirmed.");
   }
   const namedElsewhere = otherSourceNamedBoth(checks, facts);
-  if (passedKey(checks, "web-footprint", "fixture-web")) {
-    evidence.push(`A public web result names the person and the company (${sourceOf(checks, "web-footprint", "fixture-web")}).`);
+  const webLine = webSearchLine(checks);
+  if (webLine === "independent") {
+    const source = sourceOf(checks, "web-footprint", "fixture-web") || sourceOf(checks, "screen-web");
+    evidence.push(`A public web result names the person and the company (${source}).`);
+  } else if (webLine === "own-site") {
+    evidence.push(OWN_SITE_WEB);
+  } else if (webLine === "blocked") {
+    evidence.push("Could not check, search blocked.");
   } else if (namedElsewhere) {
     evidence.push(`The public web search did not return a page naming both; ${namedElsewhere} did.`);
   } else {
     evidence.push("No public web result confirmed the person and the company together.");
   }
   const news = findCheck(checks, "news");
+  const screenNews = findCheck(checks, "screen-news");
   if (passed(news)) evidence.push(`A headline names the person and the company (${news?.source || "News"}).`);
+  else if (companyNamedNotPerson(news) || companyNamedNotPerson(screenNews)) evidence.push(HEADLINES_COMPANY_ONLY);
   else evidence.push("No news item was confirmed as this person at this company.");
   const courts = findCheck(checks, "courts");
   if (!courts || courts.status === "UNAVAILABLE" || courts.status === "NOT_RUN") {
@@ -776,7 +836,7 @@ function portionLine(earned: number, possible: number, reason: string): Line {
  */
 export function outsideSourceConfirmsCompany(checks: CheckOutput[]): boolean {
   const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
-  if (edgar && !/former name|parent match/i.test(edgar.finding || "")) {
+  if (edgar && !/former name|parent match|different or related company/i.test(edgar.finding || "")) {
     if (edgar.status === "PASS") return true;
     if (edgar.companyOnly && !edgar.reviewFlag && /exact current-name match|exact company name|name-only company match/i.test(edgar.finding || "")) return true;
   }
@@ -994,14 +1054,16 @@ export function gradeChecks(
   ]);
   const newsRow = findCheck(checks, "news");
   const newsFootprint = passed(newsRow) || (newsRow?.status === "INCONCLUSIVE" && neutralScreenNewsPass(checks));
+  const webLine = webSearchLine(checks);
+  const footprintAside = !webPass
+    ? webLine === "own-site"
+      ? "The only web search hit was the applicant's own site. That is not an independent confirmation"
+      : otherSourceNamedBoth(checks, facts)
+        ? `The public web search did not return a page naming both; ${otherSourceNamedBoth(checks, facts)} did`
+        : ""
+    : "";
   const footprint = sumLines([
-    footprintAward(
-      footprintRow,
-      webPass,
-      weights.footprint["web-footprint"],
-      weightsMode,
-      !webPass ? (otherSourceNamedBoth(checks, facts) ? `The public web search did not return a page naming both; ${otherSourceNamedBoth(checks, facts)} did` : "") : "",
-    ),
+    footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode, footprintAside),
     award(newsFootprint, weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
     award(
       passed(findCheck(checks, "social-links")) && independent,
@@ -1298,7 +1360,12 @@ export function gradeChecks(
     !facts.phone?.trim() &&
     !companyCouldNotBeFound(checks);
   if (incompleteRequest) {
-    const line = "Incomplete application. Request a website, phone, or business card. Send to review: incomplete.";
+    pushAttention({
+      severity: "Medium",
+      title: "Incomplete application: no website and no phone",
+      detail: "This request has no website and no phone. Ask for the website and phone before treating the file as finished.",
+    });
+    const line = "Ask for the website and phone first. Incomplete application. Request a website, phone, or business card. Send to review: incomplete.";
     reasoning = capitalizeSentences(`${line} ${reasoning}`);
     nextStep = line;
   }

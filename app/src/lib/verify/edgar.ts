@@ -1,5 +1,6 @@
 import { politeFetch } from "@/lib/verify/fetch";
 import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { stripQaOrg } from "@/lib/verify/qa-marker";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const TICKER_URL = "https://www.sec.gov/files/company_tickers.json";
@@ -188,6 +189,10 @@ function parentRequiredTokens(org: string): string[] {
   });
 }
 
+function differentCompanyWord(token: string, orgTokens: Set<string>): boolean {
+  return token.length >= 2 && !orgTokens.has(token) && !isGenericFirmToken(token);
+}
+
 function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany | null {
   const required = parentRequiredTokens(org);
   // The first distinctive token has to be in the filer. "building" alone is not STO Building Group.
@@ -200,6 +205,9 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
     const titleSet = new Set(titleTokens);
     if (!titleSet.has(first)) continue;
     if (!required.every((token) => titleSet.has(token))) continue;
+    // A longer filer that adds its own non-generic word is a different company, not a parent.
+    // Madison Realty Capital is not Madison Air Solutions. Generic extras such as "property" still match.
+    if (titleTokens.some((token) => differentCompanyWord(token, orgTokens))) continue;
     const extra =
       foreignParenthetical(row.title, orgTokens) ||
       titleTokens.some((token) => !orgTokens.has(token));
@@ -208,6 +216,36 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
     break;
   }
   return best;
+}
+
+/**
+ * One shared first word plus a different distinctive word. Madison Realty Capital is not
+ * Madison Air Solutions. Shown as an affiliate line: 0 points and no review flag.
+ */
+function sharedWordAffiliate(rows: EdgarCompany[], org: string): EdgarCompany | null {
+  const required = parentRequiredTokens(org);
+  if (required.length !== 1) return null;
+  const first = required[0];
+  const orgTokens = new Set(firmTokens(org));
+  for (const row of rows) {
+    const titleTokens = firmTokens(row.title);
+    if (!titleTokens.includes(first)) continue;
+    if (!required.every((token) => titleTokens.includes(token))) continue;
+    if (!titleTokens.some((token) => differentCompanyWord(token, orgTokens))) continue;
+    return row;
+  }
+  return null;
+}
+
+function differentCompanyResult(row: EdgarCompany): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
+  const titled = `${row.title}${row.ticker ? ` (${row.ticker})` : ""}`;
+  return {
+    status: "INCONCLUSIVE",
+    corroborates: false,
+    companyOnly: false,
+    url: edgarCompanyUrl(row.cik),
+    finding: `EDGAR matched a different or related company; not credited. ${titled}, CIK ${row.cik}, shares one word with the company on the application. It is not an exact match and does not add points.`,
+  };
 }
 
 /**
@@ -523,6 +561,7 @@ export function assessEdgarMatch(input: {
   identity?: EdgarFilerIdentity | null;
   textHits?: EdgarTextHit[];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
+  input = { ...input, org: stripQaOrg(input.org || "") };
   const groups = filingGroups(input.filingNames);
   const flat = groups.flat();
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
@@ -546,6 +585,13 @@ export function assessEdgarMatch(input: {
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
     if (parent) {
       const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
+      return result;
+    }
+    const related = sharedWordAffiliate(input.companies, input.org);
+    if (related) {
+      const result = differentCompanyResult(related);
       const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
       if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
       return result;
@@ -595,7 +641,7 @@ export function assessEdgarMatch(input: {
         companyOnly: true,
         url: edgarCompanyUrl(match.cik),
         finding: withIncorporation(
-          `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match. It does not tie the person to the firm.`,
+          `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match and an outside source for the company. It does not tie the person to the firm.`,
           input.identity,
         ),
       };
@@ -645,6 +691,7 @@ export async function lookupEdgar(
   fetchText?: FetchText,
   website = "",
 ): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly">> {
+  org = stripQaOrg(org);
   const tokens = org.trim();
   if (!tokens) {
     return {
