@@ -117,6 +117,19 @@ export type ParsedPersonName = { given: string[]; surname: string; suffix: strin
  * Given name, surname, and a generational suffix.
  * The suffix is kept for matching. It is not the surname, so a query can drop Jr without dropping Gilbane.
  */
+const NAME_PARTICLES = new Set(["de", "del", "della", "di", "da", "das", "dos", "du", "van", "von", "der", "den", "ten", "ter", "la", "le", "lo", "el"]);
+
+function surnameFromParts(parts: string[]): { given: string[]; surname: string } {
+  const surnameParts = [parts[parts.length - 1]];
+  let index = parts.length - 2;
+  while (index >= 0 && NAME_PARTICLES.has(parts[index].toLowerCase())) {
+    surnameParts.unshift(parts[index]);
+    index -= 1;
+  }
+  const given = parts.slice(0, index + 1).filter((part) => part.includes("-") || part.replace(/[^A-Za-z0-9]/g, "").length >= 3);
+  return { given, surname: surnameParts.join(" ") };
+}
+
 export function parsePersonName(name: string): ParsedPersonName | null {
   const parts = name
     .replace(/\b[A-Za-z]\.\s*/g, " ")
@@ -131,8 +144,7 @@ export function parsePersonName(name: string): ParsedPersonName | null {
     parts.pop();
   }
   if (!parts.length) return null;
-  const surname = parts[parts.length - 1];
-  const given = parts.slice(0, -1).filter((part) => part.includes("-") || part.replace(/[^A-Za-z0-9]/g, "").length >= 3);
+  const { given, surname } = surnameFromParts(parts);
   return { given, surname, suffix };
 }
 

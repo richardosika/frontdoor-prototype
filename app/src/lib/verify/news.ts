@@ -14,7 +14,20 @@ export const NEWS_PERSON_HARD =
  * REO, a dividend cut or reset, a loss, and a downgrade are ordinary results and are not in this list.
  */
 export const NEWS_COMPANY_CIVIL =
-  /\b(lawsuits?|sued|bankruptc(?:y|ies)|foreclosures?|liens?)\b|\binvestigations?\b(?!\s+(?:practice|group|team|department|unit)\b)/i;
+  /\b(lawsuits?|sued|bankruptc(?:y|ies)|liens?)\b|\binvestigations?\b(?!\s+(?:practice|group|team|department|unit)\b)/i;
+
+/**
+ * The company is a party to a foreclosure. A podcast about "foreclosure danger zones" is not.
+ * "Mack Real Estate Group foreclosure" and "faces foreclosure" are. "On Foreclosure" is not.
+ */
+export function companyForeclosure(text: string): boolean {
+  if (!/\bforeclosures?\b/i.test(text)) return false;
+  if (/\b(on|about)\s+foreclosures?\b/i.test(text) && !/\b(sued|lawsuits?|charged|defendant|faces?|facing|against)\b/i.test(text)) return false;
+  if (/\b(faces?|facing|files?|filed|entered|enters)\s+(?:a\s+|the\s+)?foreclosures?\b/i.test(text)) return true;
+  if (/\bforeclosures?\s+(?:against|of|names?|naming|action|suit|proceeding|filing)\b/i.test(text)) return true;
+  if (/\b(?:a|the)\s+foreclosures?\s+names?\b/i.test(text)) return true;
+  return /\b[A-Z][\w&.'’.-]+(?:\s+[A-Z][\w&.'’.-]+){0,6}\s+foreclosures?\b/.test(text);
+}
 
 /**
  * A civil caption such as "Zumba v. Sciame Construction".
@@ -595,13 +608,14 @@ function negativeKind(text: string): "hard" | "civil" | "none" {
   if (civilDocket(text)) return "civil";
   if (NEWS_COMPANY_CIVIL.test(text) && allegedNegative(text)) return "civil";
   if (plaintiffSolicitation(text)) return "civil";
+  if (companyForeclosure(text)) return "civil";
   return "none";
 }
 
 /** Foreclosure without a fraud term, a docket, or another civil charge. Review, not a grade cap. */
 export function foreclosureOnly(text: string): boolean {
   if (ordinaryResults(text)) return false;
-  if (!/\bforeclosures?\b/i.test(text)) return false;
+  if (!companyForeclosure(text)) return false;
   if (NEWS_PERSON_HARD.test(text)) return false;
   if (civilDocket(text)) return false;
   return !/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text);

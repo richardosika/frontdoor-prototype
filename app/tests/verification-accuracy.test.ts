@@ -8,10 +8,10 @@ import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
@@ -5377,6 +5377,11 @@ describe("a DuckDuckGo challenge does not erase a public record", () => {
       expect(check.status).toBe("UNAVAILABLE");
       expect(check.corroborates).not.toBe(true);
       expect(check.finding).toContain("DuckDuckGo returned a challenge page");
+      expect(check.finding).toContain("All free search sources blocked");
+      expect(check.finding).toContain("Bing");
+      expect(check.finding).toContain("Brave");
+      expect(check.finding).toContain("Mojeek");
+      expect(check.finding).toContain("GDELT");
     }
     const graded = gradeChecks(restOfFile(web), mullen);
     const completeness = graded.categories.find((category) => category.id === "completeness");
@@ -5393,5 +5398,205 @@ describe("a DuckDuckGo challenge does not erase a public record", () => {
     const fake = gradeChecks(web, facts({ location: "New York, NY", statement: "I develop small buildings and keep a written record of each project for the application." }));
     expect(fake.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
     expect(fake.score).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("batch 13 search, particles, foreclosure topic, and affiliate filings", () => {
+  const ripka = facts({
+    name: "Peter Ripka",
+    applicantName: "Peter Ripka",
+    org: "RIPCO Real Estate",
+    website: "https://www.ripcony.com",
+    location: "New York, NY",
+    role: "BROKER",
+  });
+  const bingHtml = `<ol><li class="b_algo"><h2><a href="https://www.bisnow.com/new-york/news/peter-ripka-ripco">Peter Ripka | RIPCO Real Estate</a></h2><p>Peter Ripka is a broker at RIPCO Real Estate in New York.</p></li></ol>`;
+
+  it("uses Bing after a DuckDuckGo challenge and names every source when all of them are blocked", async () => {
+    const checks = await runPublicScreen(ripka, async (url) => {
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: bingHtml };
+      if (url.includes("ripcony.com")) return { ok: true, status: 200, text: "<html><p>RIPCO Real Estate</p></html>" };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      return { ok: false, status: 403, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.source).toBe("Bing");
+    expect(web?.finding).toContain("Tried DuckDuckGo (challenge page), Bing (result)");
+    expect(web?.finding).not.toContain("All free search sources blocked");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.status).not.toBe("UNAVAILABLE");
+    const recovered = gradeChecks(
+      [
+        ...checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint"),
+        row({ key: "email-syntax", status: "PASS" }),
+        row({ key: "disposable-email", status: "PASS" }),
+        row({ key: "role-address", status: "PASS" }),
+        row({
+          key: "linkedin-fetch",
+          status: "PASS",
+          companyOnly: true,
+          corroborates: false,
+          finding: "The public LinkedIn page company confirmed, person NOT confirmed. Name: no. Company: yes.",
+        }),
+        row({
+          key: "website",
+          status: "PASS",
+          selfReported: true,
+          corroborates: false,
+          finding: "Found: a page on the company site. Name: yes. Company: yes. City: yes. Confidence: high.",
+        }),
+        row({ key: "rdap", status: "PASS", finding: "RDAP responded for ripcony.com." }),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists RIPCO. It does not tie a person to the firm." }),
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "text-risk", status: "PASS" }),
+        row({ key: "velocity", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+      ],
+      facts({ ...ripka, statement: "I lead a brokerage and would like to meet owners and developers.", inviteNote: "PF-BENCH-0000 · Benchmark invite code" }),
+    );
+    expect(footprint?.status).toBe("PASS");
+    expect(recovered.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+    expect(recovered.letter).toBe("D");
+    expect(recovered.score).toBe(68);
+    expect(recovered.recommendation).not.toBe("APPROVE");
+
+    const blocked = await runPublicScreen(ripka, async (url) => {
+      if (url.includes("ripcony.com")) return { ok: true, status: 200, text: "<html><p>RIPCO Real Estate</p></html>" };
+      return { ok: false, status: 202, text: "challenge" };
+    });
+    const missed = blocked.find((check) => check.key === "screen-web");
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.corroborates).not.toBe(true);
+    expect(missed?.finding).toContain("All free search sources blocked");
+    expect(missed?.finding).toContain("DuckDuckGo (challenge page)");
+    expect(missed?.finding).toContain("Bing (challenge page)");
+    expect(missed?.finding).toContain("Brave (challenge page)");
+    expect(missed?.finding).toContain("Mojeek (challenge page)");
+    expect(missed?.finding).toContain("GDELT (challenge page)");
+  });
+
+  it("keeps de in the Warren de Haan search queries", () => {
+    expect(personWithoutSuffix("Warren de Haan")).toBe("Warren de Haan");
+    expect(surnameForSearch("Warren de Haan")).toBe("de Haan");
+    expect(surnameForSearch("Thomas Gilbane Jr.")).toBe("Gilbane");
+    const queries = newsSearchQueries(facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital", location: "New York, NY" }));
+    expect(queries.join(" ")).toContain("de Haan");
+    expect(queries.join(" ")).not.toMatch(/"Haan"/);
+    expect(queries.join(" ")).not.toContain("Warren Haan");
+    const youtube = socialSearchQuery("Warren de Haan", "ACORE Capital");
+    expect(youtube).toContain("de Haan");
+    expect(youtube).not.toContain("Warren Haan");
+  });
+
+  it("does not treat a foreclosure topic headline as litigation against the company", () => {
+    const podcast = "PODCAST: ACORE Capital Co-CEO Warren De Haan On Foreclosure Danger Zones, Inflation Impacts";
+    const cnbc = "Warren de Haan of ACORE Capital on commercial real estate lending";
+    expect(companyForeclosure(podcast)).toBe(false);
+    expect(companyForeclosure("Vornado Realty Trust faces foreclosure, The Real Deal")).toBe(true);
+    expect(companyForeclosure("The Real Deal: Mack Real Estate Group foreclosure in 2024")).toBe(true);
+    const judged = judgeHeadline(podcast, {
+      name: "Warren de Haan",
+      applicantName: "Warren de Haan",
+      org: "ACORE Capital",
+      location: "New York, NY",
+    });
+    expect(judged.person).toBe(true);
+    expect(judged.company).toBe(true);
+    expect(judged.kind).toBe("none");
+    expect(judged.foreclosureOnly).toBe(false);
+    const rows = classifyNews(
+      facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital", location: "New York, NY" }),
+      [
+        { title: podcast, snippet: podcast, url: "https://www.bisnow.com/acore-podcast", source: "Bisnow", provider: "Google News", publishedAt: null },
+        { title: cnbc, snippet: cnbc, url: "https://www.cnbc.com/acore-de-haan", source: "CNBC", provider: "Google News", publishedAt: null },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((row) => row.key === "news");
+    expect(news?.status).toBe("PASS");
+    expect(news?.corroborates).toBe(true);
+    expect(news?.finding).not.toContain("Company-level litigation");
+    const graded = gradeChecks(rows, facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital" }));
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(false);
+  });
+
+  it("shows an affiliate filing that names the person and does not add company points", () => {
+    const edgar = assessEdgarMatch({
+      org: "The Lightstone Group",
+      person: "David Lichtenstein",
+      tickersOk: true,
+      companies: [{ title: "Lightstone Value Plus REIT IV", ticker: "", cik: "1619312" }],
+      filingNames: [],
+      textHits: [
+        {
+          names: ["Lightstone Value Plus REIT III  (CIK 0001563756)", "David Lichtenstein"],
+          form: "EX-32",
+          fileDate: "2026-03-30",
+          personMatched: true,
+        },
+      ],
+    });
+    expect(edgar.status).not.toBe("PASS");
+    expect(edgar.companyOnly).not.toBe(true);
+    expect(edgar.corroborates).not.toBe(true);
+    expect(edgar.finding).toContain("Parent match, needs review");
+    expect(edgar.finding).toContain("1619312");
+    expect(edgar.finding).toContain("EX-32");
+    expect(edgar.finding).toContain("1563756");
+    expect(edgar.finding).toContain("2026-03-30");
+    expect(edgar.finding).toContain("does not add points");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: edgar.status, corroborates: false, companyOnly: false, finding: edgar.finding, reviewFlag: true })],
+      facts({ name: "David Lichtenstein", applicantName: "David Lichtenstein", org: "The Lightstone Group" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(graded.letter).not.toBe("A");
+    expect(graded.letter).not.toBe("B");
+    expect(graded.letter).not.toBe("C");
+    expect(graded.recommendation).not.toBe("APPROVE");
+  });
+
+  it("does not let the Danvorth fake rise above F or read as an approval", () => {
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are readable." }),
+      row({ key: "rdap", status: "FAIL", finding: "The domain is not registered." }),
+      row({ key: "website", status: "FAIL", finding: "The domain does not resolve." }),
+      row({
+        key: "screen-web",
+        status: "UNAVAILABLE",
+        finding: "All free search sources blocked. Tried DuckDuckGo (challenge page). Search blocked.",
+      }),
+      row({
+        key: "web-footprint",
+        status: "UNAVAILABLE",
+        finding: "All free search sources blocked. Tried DuckDuckGo (challenge page). Search blocked.",
+      }),
+    ];
+    const fake = gradeChecks(
+      local,
+      facts({
+        name: "Ambrose Tellwright",
+        applicantName: "Ambrose Tellwright",
+        org: "Danvorth Kestrel Holdings LLC",
+        website: "https://danvorthkestrel.com",
+        phone: "212-555-0199",
+        applicationSubmitted: true,
+      }),
+    );
+    expect(fake.letter).toBe("F");
+    expect(fake.score).toBe(28);
+    expect(fake.score).toBeLessThanOrEqual(48);
+    expect(fake.recommendation).not.toBe("APPROVE");
+    expect(fake.summary.reasoning).not.toContain("Incomplete application");
   });
 });

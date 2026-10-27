@@ -414,23 +414,71 @@ export function companyFromDisplayName(name: string): EdgarCompany | null {
   return { title, ticker, cik };
 }
 
-/** One array per filing. Names from different filings are not one record. */
-export function filingNames(payload: string): string[][] | null {
+export type EdgarTextHit = {
+  names: string[];
+  form: string;
+  fileDate: string;
+  /** True when this hit came from a search that required the person's name. */
+  personMatched: boolean;
+};
+
+/** EDGAR full-text hits, including the form and file date. A bad payload is null. */
+export function parseEdgarTextHits(payload: string, personMatched = false): EdgarTextHit[] | null {
   try {
-    const parsed = JSON.parse(payload) as { hits?: { hits?: { _source?: { display_names?: unknown } }[] } };
+    const parsed = JSON.parse(payload) as {
+      hits?: { hits?: { _source?: { display_names?: unknown; form?: unknown; file_type?: unknown; file_date?: unknown } }[] };
+    };
     const hits = parsed.hits?.hits;
     if (!Array.isArray(hits)) return null;
-    const groups: string[][] = [];
+    const rows: EdgarTextHit[] = [];
     for (const hit of hits.slice(0, 30)) {
-      const display = hit._source?.display_names;
+      const source = hit._source;
+      const display = source?.display_names;
       if (!Array.isArray(display)) continue;
       const names = display.map((name) => String(name)).filter((name) => name.trim());
-      if (names.length) groups.push(names);
+      if (!names.length) continue;
+      rows.push({
+        names,
+        form: String(source?.form || source?.file_type || "").trim(),
+        fileDate: String(source?.file_date || "").trim(),
+        personMatched,
+      });
     }
-    return groups.length ? groups : null;
+    return rows;
   } catch {
     return null;
   }
+}
+
+/** One array per filing. Names from different filings are not one record. */
+export function filingNames(payload: string): string[][] | null {
+  const hits = parseEdgarTextHits(payload);
+  if (!hits?.length) return null;
+  return hits.map((hit) => hit.names);
+}
+
+/**
+ * A person named on a related filer. Shown as evidence. It is not an exact match and it does not add points.
+ * A fuzzy parent stays at 0.
+ */
+export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string): string {
+  const tokens = distinctiveCompanyTokens(org)
+    .map((token) => token.toLowerCase())
+    .filter((token) => isDistinctiveCompanyToken(token) || isShortBrandToken(token));
+  if (!tokens.length || !person.trim()) return "";
+  for (const hit of hits) {
+    const companies = hit.names.map((name) => companyFromDisplayName(name)).filter((row): row is EdgarCompany => Boolean(row?.title));
+    const company = companies.find((row) => row.cik) || companies.find((row) => firmTokens(row.title).some((token) => tokens.includes(token)));
+    if (!company?.title || sameFirmName(company.title, org)) continue;
+    if (!firmTokens(company.title).some((token) => tokens.includes(token))) continue;
+    const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, person));
+    if (!named) continue;
+    const form = hit.form ? ` ${hit.form}` : "";
+    const cik = company.cik ? `, CIK ${company.cik.replace(/^0+/, "")}` : "";
+    const when = hit.fileDate ? `, filed ${hit.fileDate}` : "";
+    return `The person is named in an affiliate filing:${form} ${company.title}${cik}${when}. That filing is not an exact match for ${org} and does not add points.`.replace(/\s+/g, " ").trim();
+  }
+  return "";
 }
 
 /** A flat list is one filing. A list of lists keeps each filing separate. */
@@ -473,6 +521,7 @@ export function assessEdgarMatch(input: {
   website?: string;
   insiderNames?: string[] | string[][];
   identity?: EdgarFilerIdentity | null;
+  textHits?: EdgarTextHit[];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   const groups = filingGroups(input.filingNames);
   const flat = groups.flat();
@@ -495,7 +544,12 @@ export function assessEdgarMatch(input: {
   }
   if (!match) {
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
-    if (parent) return parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
+    if (parent) {
+      const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
+      return result;
+    }
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -610,10 +664,14 @@ export async function lookupEdgar(
   const companyQuery = phrase ? `"${phrase}"` : "";
   const queries = [...new Set([personQuery, companyQuery].filter(Boolean))];
   const groups: string[][] = [];
+  const textHits: EdgarTextHit[] = [];
   for (const query of queries) {
     const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(query)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`;
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    if (filing.ok) groups.push(...(filingNames(filing.text) || []));
+    if (!filing.ok) continue;
+    const hits = parseEdgarTextHits(filing.text, query === personQuery) || [];
+    textHits.push(...hits);
+    groups.push(...hits.map((hit) => hit.names));
   }
   let identity: EdgarFilerIdentity | null = null;
   if (listed?.cik) {
@@ -641,5 +699,6 @@ export async function lookupEdgar(
     website,
     insiderNames,
     identity,
+    textHits,
   });
 }

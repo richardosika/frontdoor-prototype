@@ -9,7 +9,7 @@ export const VERIFICATION_SOURCES = [
   { name: "OpenCorporates public company search", kind: "Not checkable for free. opencorporates.com returns 401 without a paid token. A blocked response is not a clear result." },
   { name: "SEC EDGAR full-text search", kind: "efts.sec.gov" },
   { name: "CourtListener public search", kind: "courtlistener.com" },
-  { name: "Web search (DuckDuckGo, Bing, Brave, Mojeek)", kind: "Free HTML, no key. A DuckDuckGo challenge is retried once, then Brave and Mojeek. An empty but reachable results page is inconclusive. A challenge page is could not check, not a miss." },
+  { name: "Web search (DuckDuckGo, Bing, Brave, Mojeek, Wikipedia, Wikidata, GDELT)", kind: "Free HTML or JSON, no key. A DuckDuckGo challenge does not stop the search. Bing, Brave, Mojeek, Wikipedia, Wikidata, and GDELT are tried, and the finding names each source. Unavailable only when every one of those sources is blocked. An empty but reachable results page is inconclusive. A challenge page is could not check, not a miss." },
   { name: "Web footprint", kind: "Recorded by public screening. The applicant's own site counts as one self-reported source. A URL another check already passed is not counted again. There is no email-domain to website match." },
   { name: "News (Google News RSS)", kind: "Free RSS, no key. A different company with a similar name is not a match." },
   { name: "Social pages (LinkedIn, X, Facebook, Instagram, YouTube, TikTok)", kind: "Public HTTP only. A login wall is could not check, not a miss." },
