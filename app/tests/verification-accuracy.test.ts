@@ -7,7 +7,7 @@ import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/v
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
@@ -282,7 +282,8 @@ describe("a neutral screen-news pass fills an inconclusive news check", () => {
       [row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" })],
       facts(),
     );
-    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
     const dead = gradeChecks(
       [row({ key: "website", status: "FAIL", selfReported: true, finding: "domain does not resolve" })],
       facts(),
@@ -943,7 +944,7 @@ describe("an independent hit that does not name both still asks for a team page"
     expect(namesPersonAndCompany(deal, person)).toBe(false);
     const graded = gradeChecks([directory, youtube, deal], person);
     expect(graded.categories.find((category) => category.id === "footprint")?.reason).toContain("8 of 8");
-    expect(graded.attention.some((item) => item.title === "Thin public record" && /does not name both/i.test(item.detail) && /team-page/i.test(item.detail))).toBe(true);
+    expect(graded.attention.some((item) => item.title === "Thin public record" && /team-page/i.test(item.detail) && /company confirmed, person not confirmed|does not name both/i.test(item.detail))).toBe(true);
     expect(graded.summary.nextStep.toLowerCase()).toContain("team-page");
     const named = row({
       key: "screen-web",
@@ -1368,9 +1369,9 @@ describe("website text survives the size cap", () => {
           location: "Hackensack, NJ",
         }),
       );
-      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(4);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person self-reported");
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
     }
   });
 });
@@ -1422,7 +1423,7 @@ describe("QA follow-up scoring", () => {
       facts({ org: "Turner Construction Company" }),
     );
     expect(personMatch.categories.find((category) => category.id === "company")?.earned).toBe(8);
-    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
     const companyOnlyWithNews = gradeChecks(
       [
         row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" }),
@@ -4183,8 +4184,8 @@ describe("batch 10 fixtures", () => {
       [row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes." })],
       facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com" }),
     );
-    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person self-reported");
-    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
     expect(companyOnlySite.letter).toBe("F");
     expect(companyOnlySite.recommendation.startsWith("APPROVE")).toBe(false);
   });
@@ -4798,5 +4799,195 @@ describe("company-only live QA fixtures", () => {
       { checkKey: "edgar", status: "PASS", corroborates: true, finding: "A Form 4 for this CIK names Sulentic Robert E as a reporting owner.", url: "https://www.sec.gov/edgar/browse/?CIK=1138118", source: "SEC EDGAR" },
     ]);
     expect(ownerStep.mark).toBe("PASS");
+  });
+});
+
+describe("self-reported website credit needs an outside source", () => {
+  // Local floor is 36. A registered domain is +2. Full social links are +2. Together that is 40.
+  // The ungated half credit added 4 and was how a fake reached F 44.
+  function floor(extra: CheckOutput[] = []): CheckOutput[] {
+    return [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member or a declined applicant." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up has no fraud-pattern phrasing." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst of applications." }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are filled in and readable." }),
+      row({ key: "rdap", status: "PASS", finding: "A domain registration record responded.", source: "RDAP" }),
+      row({ key: "social-links", status: "PASS", finding: "The other social links are full web addresses." }),
+      ...extra,
+    ];
+  }
+
+  function ownSite(host: string): CheckOutput {
+    return row({
+      key: "website",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url: host,
+      finding: "Company: yes. The company's own site names the company.",
+      source: "Company website",
+    });
+  }
+
+  it("drops the F 44 website credit when nothing outside the applicant confirms the company", () => {
+    const fakeFacts = facts({
+      name: "Jordan Hale",
+      applicantName: "Jordan Hale",
+      org: "Northbridge Meridian Holdings LLC",
+      website: "https://www.northbridgemeridian.example",
+      role: "DEVELOPER",
+    });
+    const checks = floor([ownSite("https://www.northbridgemeridian.example")]);
+    expect(outsideSourceConfirmsCompany(checks)).toBe(false);
+    const graded = gradeChecks(checks, fakeFacts);
+    // 38 is the local floor (36) plus a registered domain (2). The ungated half credit would make this 42.
+    // Richard's live read of this pattern was F 44; the same 4-point gate takes that file to F 40.
+    expect(graded.score).toBe(38);
+    expect(graded.letter).toBe("F");
+    expect(graded.recommendation).toBe("NEEDS MORE INFO");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company (0 of 8)");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    expect(graded.summary.checkedOut.toLowerCase()).not.toContain("own site confirms the company");
+    expect(companyCouldNotBeFound(checks)).toBe(false);
+    expect(graded.score + 4).toBe(42);
+    expect(graded.score).toBeLessThan(44);
+  });
+
+  it("keeps the half credit for Gilbane, Joshua Stein, Skanska, RXR, and Ulbrich when an outside source confirms the company", () => {
+    const gilbane = gradeChecks(
+      floor([
+        ownSite("https://www.gilbaneco.com/"),
+        row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "The LinkedIn company page confirms the company.", url: "https://www.linkedin.com/company/gilbane-building-company/", source: "LinkedIn" }),
+      ]),
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company", website: "https://www.gilbaneco.com/", location: "Providence, RI" }),
+    );
+    const stein = gradeChecks(
+      floor([
+        ownSite("https://www.joshuastein.com/"),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists JOSHUA STEIN PLLC.", url: "https://data.ny.gov/", source: "NY registry" }),
+      ]),
+      facts({ name: "Joshua Stein", applicantName: "Joshua Stein", org: "Joshua Stein PLLC", website: "https://www.joshuastein.com/", location: "New York, NY" }),
+    );
+    const skanska = gradeChecks(
+      floor([
+        ownSite("https://www.skanska.com/"),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists SKANSKA USA BUILDING INC.", url: "https://data.ny.gov/", source: "NY registry" }),
+      ]),
+      facts({ name: "QA TestAB", applicantName: "QA TestAB", org: "Skanska USA", website: "https://www.usa.skanska.com/", location: "New York, NY" }),
+    );
+    const rxr = gradeChecks(
+      floor([
+        row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes. The page names Scott Rechler at RXR.", url: "https://www.rxr.com/", source: "Company website" }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company. RXR CEO Scott Rechler says the tower is open.", source: "News" }),
+      ]),
+      facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com/", location: "New York, NY" }),
+    );
+    const ulbrich = gradeChecks(
+      floor([
+        ownSite("https://www.jll.com/"),
+        row({ key: "edgar", status: "PASS", corroborates: true, finding: "EDGAR lists JONES LANG LASALLE INC (JLL), CIK 1037976. A Form 4 names Ulbrich Christian as a reporting owner.", url: "https://www.sec.gov/edgar/browse/?CIK=1037976", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "Christian Ulbrich", applicantName: "Christian Ulbrich", org: "Jones Lang LaSalle", website: "https://www.jll.com/", location: "Chicago, IL" }),
+    );
+
+    expect(gilbane.score).toBe(44);
+    expect(stein.score).toBe(44);
+    expect(skanska.score).toBe(44);
+    expect(rxr.score).toBe(62);
+    expect(ulbrich.score).toBe(56);
+    for (const report of [gilbane, stein, skanska, rxr, ulbrich]) {
+      expect(report.recommendation).not.toBe("DECLINE");
+      expect(report.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    }
+    expect(gilbane.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
+    expect(stein.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(rxr.categories.find((category) => category.id === "company")?.reason).toContain("8 of 8");
+    expect(ulbrich.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(rxr.letter).toBe("D");
+    expect(rxr.recommendation).toBe("NEEDS MORE INFO");
+    expect(ulbrich.letter).toBe("F");
+  });
+
+  it("does not treat a former name or a parent match as the outside confirmation", () => {
+    const brookfield = gradeChecks(
+      floor([
+        ownSite("https://www.brookfieldproperties.com/"),
+        row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review.", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "QA TestAF", applicantName: "QA TestAF", org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" }),
+    );
+    const aecom = gradeChecks(
+      floor([
+        ownSite("https://www.aecom.com/"),
+        row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Parent match, needs review. EDGAR lists AECOM (ACM). A parent or affiliate is not an exact match.", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "QA Test", applicantName: "QA Test", org: "AECOM Tishman", website: "https://www.aecom.com/" }),
+    );
+    expect(outsideSourceConfirmsCompany([
+      ownSite("https://www.brookfieldproperties.com/"),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Brookfield Properties, Inc. is a former name.", source: "SEC EDGAR" }),
+    ])).toBe(false);
+    expect(outsideSourceConfirmsCompany([
+      ownSite("https://www.aecom.com/"),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Parent match, needs review. EDGAR lists AECOM (ACM).", source: "SEC EDGAR" }),
+    ])).toBe(false);
+    expect(brookfield.score).toBe(38);
+    expect(aecom.score).toBe(38);
+    expect(brookfield.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
+    expect(aecom.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
+    expect(brookfield.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    expect(aecom.recommendation).not.toBe("DECLINE");
+  });
+
+  it("leaves Brinkwell on the dead-domain score and keeps the fake under the outside-confirmed reals", () => {
+    const brinkwellFacts = facts({
+      name: "Thaddeus Brinkwell",
+      applicantName: "Thaddeus Brinkwell",
+      org: "Ormsley Vantage Lending Partners LLC",
+      website: "https://www.ormsleyvantage.com",
+      role: "LENDER",
+    });
+    const brinkwellChecks = [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up is clear." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst." }),
+      plausibilityCheck(brinkwellFacts),
+      row({ key: "social-links", status: "PASS", finding: "The other social links are full web addresses." }),
+      row({ key: "website", status: "FAIL", finding: "Searched: https://www.ormsleyvantage.com. domain does not resolve.", source: "Company website" }),
+      row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "domain is not registered.", source: "RDAP" }),
+    ];
+    const brinkwell = gradeChecks(brinkwellChecks, brinkwellFacts);
+    const fake = gradeChecks(
+      floor([ownSite("https://www.northbridgemeridian.example")]),
+      facts({ name: "Jordan Hale", applicantName: "Jordan Hale", org: "Northbridge Meridian Holdings LLC", website: "https://www.northbridgemeridian.example" }),
+    );
+    const gilbane = gradeChecks(
+      floor([
+        ownSite("https://www.gilbaneco.com/"),
+        row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, finding: "The LinkedIn company page confirms the company.", source: "LinkedIn" }),
+      ]),
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company" }),
+    );
+    expect(brinkwell.letter).toBe("F");
+    expect(brinkwell.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(brinkwell.score).toBe(28);
+    expect(brinkwell.score).toBeLessThan(40);
+    expect(fake.score).toBe(38);
+    expect(fake.score).toBeLessThan(44);
+    // Fixture gap is 6 (Gilbane 44, gated fake 38). Richard's live pair was Gilbane and Joshua Stein at F 48
+    // against a fake at F 44. Removing the 4 points makes that live gap 8. Both are short of the 15-point target.
+    expect(gilbane.score - fake.score).toBe(6);
+    expect(gilbane.score - fake.score).toBeLessThan(15);
+    expect(brinkwell.score).toBeLessThan(fake.score);
+    expect(brinkwell.score).toBeLessThanOrEqual(40);
   });
 });

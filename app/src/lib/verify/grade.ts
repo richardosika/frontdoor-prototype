@@ -682,7 +682,13 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   }
   const website = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (website?.status === "PASS" && website.companyOnly) {
-    evidence.push(`The company's own site names the company. Company confirmed, person not confirmed (${website.source}).`);
+    evidence.push(
+      outsideSourceConfirmsCompany(checks)
+        ? `The company's own site names the company. Company confirmed, person not confirmed (${website.source}).`
+        : "The applicant's own site names the company. No outside source confirmed the company.",
+    );
+  } else if (website?.status === "PASS" && website.selfReported && /Company:\s*yes/i.test(website.finding) && !outsideSourceConfirmsCompany(checks)) {
+    evidence.push("The applicant's own site names the company. No outside source confirmed the company.");
   } else if (website?.status === "PASS") {
     evidence.push(`A public page included the person or the company name (${website.source}).`);
   } else if (website?.status === "UNAVAILABLE") {
@@ -749,16 +755,48 @@ function portionLine(earned: number, possible: number, reason: string): Line {
   return { earned, possible, reason: `${reason} (${earned} of ${possible}).` };
 }
 
+/**
+ * An outside source confirms the company. The applicant's own website does not.
+ * A former name or a parent match does not. A LinkedIn company page, an exact
+ * current EDGAR name, a state-registry hit, or third-party news that names the company does.
+ */
+export function outsideSourceConfirmsCompany(checks: CheckOutput[]): boolean {
+  const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
+  if (edgar && !/former name|parent match/i.test(edgar.finding || "")) {
+    if (edgar.status === "PASS") return true;
+    if (edgar.companyOnly && !edgar.reviewFlag && /exact current-name match|exact company name|name-only company match/i.test(edgar.finding || "")) return true;
+  }
+  if (findCheck(checks, "business-registry")?.status === "PASS") return true;
+  const linkedin = findCheck(checks, "linkedin-fetch");
+  if (linkedin?.status === "PASS" && (linkedin.companyOnly || (!linkedin.selfReported && /Company:\s*yes/i.test(linkedin.finding)))) return true;
+  return checks.some((check) => {
+    if (check.status !== "PASS" || check.selfReported) return false;
+    if (check.key !== "news" && check.key !== "screen-news" && check.key !== "web-footprint" && !check.key.startsWith("screen-") && check.key !== "opencorporates") return false;
+    if (check.companyOnly) return true;
+    if (/Company:\s*yes/i.test(check.finding)) return true;
+    return /names the company|names the person and the company/i.test(check.finding);
+  });
+}
+
 function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeightsMode, independent: boolean): Line {
   const row = findCheck(checks, "website") || findCheck(checks, "fixture-website");
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The company website is not checkable for free", mode);
   if (row?.status === "FAIL" && /domain does not resolve/i.test(row.finding)) return portionLine(0, possible, "The domain does not resolve");
-  if (row?.status === "PASS" && row.companyOnly) return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
+  const ownSiteNamesCompany = Boolean(row?.status === "PASS" && (row.companyOnly || (row.selfReported && /Company:\s*yes/i.test(row.finding))));
+  if (ownSiteNamesCompany && row?.companyOnly) {
+    if (!outsideSourceConfirmsCompany(checks)) {
+      return portionLine(0, possible, "The applicant's own site names the company. No outside source confirmed the company");
+    }
+    return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
+  }
   if (row?.status === "PASS" && row.selfReported && !independent) {
-    // The company's own site named the company. That is company-exists credit.
+    // Half credit for the company on the applicant's own site, and only after an outside source confirms that company.
     // The person on that same page stays self-reported and earns the other half only after an independent tie.
-    if (/Company:\s*yes/i.test(row.finding)) {
+    if (/Company:\s*yes/i.test(row.finding) && outsideSourceConfirmsCompany(checks)) {
       return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person self-reported");
+    }
+    if (/Company:\s*yes/i.test(row.finding)) {
+      return portionLine(0, possible, "The applicant's own site names the company. No outside source confirmed the company");
     }
     return portionLine(0, possible, "The applicant's own site is self-reported and no independent source tied the person to the company");
   }
@@ -1019,8 +1057,16 @@ export function gradeChecks(
   }
 
   const missingCompany = companyCouldNotBeFound(checks);
+  const outsideCompany = outsideSourceConfirmsCompany(checks);
   const checked = checks
     .filter((check) => !(missingCompany && check.key === "plausibility"))
+    .filter((check) => {
+      if (outsideCompany) return true;
+      const ownSite = check.key === "website" || check.key === "fixture-website";
+      if (!ownSite) return true;
+      const namesCompany = Boolean(check.companyOnly || (check.selfReported && /Company:\s*yes/i.test(check.finding)));
+      return !namesCompany;
+    })
     .map(passSentence)
     .filter((line): line is string => Boolean(line));
   const failed = checks.map(failSentence).filter((line): line is string => Boolean(line));
@@ -1077,9 +1123,7 @@ export function gradeChecks(
     pushAttention({ severity: "Medium", title: labelFor(check.key), detail: capitalizeSentences(failSentence(check) || check.finding) });
   }
   const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
-  const companyConfirmed = checks.some(
-    (check) => check.status === "PASS" && (check.companyOnly || check.key === "business-registry"),
-  );
+  const companyConfirmed = outsideSourceConfirmsCompany(checks);
   if (!bothNamed) {
     const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
     const weakHit = independentCount > 0;
