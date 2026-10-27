@@ -209,6 +209,18 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
 }
 
 /**
+ * A one-word shorter filer is only a parent when its ticker is that brand
+ * (three characters or fewer, or the symbol starts with the brand).
+ * MRBK does not start with "mer", so it is a different company.
+ */
+function tickerLooksLikeSoleBrand(ticker: string, brand: string): boolean {
+  const symbol = ticker.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  if (symbol.length > 0 && symbol.length <= 3) return true;
+  const stem = brand.slice(0, 3);
+  return stem.length >= 3 && symbol.startsWith(stem);
+}
+
+/**
  * A shorter parent whose distinctive name leads the applicant's name.
  * Brookfield Corporation is the parent of Brookfield Properties.
  * AECOM is the parent of AECOM Tishman. A different brand is not.
@@ -230,6 +242,7 @@ function shorterParentCandidate(rows: EdgarCompany[], org: string): EdgarCompany
     if (!titleDistinctive.length) continue;
     if (titleDistinctive.some((token) => !orgSet.has(token))) continue;
     if (!titleDistinctive.every((token, index) => orgDistinctive[index] === token)) continue;
+    if (titleDistinctive.length === 1 && orgDistinctive.length === 1 && !tickerLooksLikeSoleBrand(row.ticker, titleDistinctive[0])) continue;
     const shorter = titleDistinctive.length < orgDistinctive.length || meaningful(titleTokens).length < meaningful(orgTokens).length;
     if (!shorter) continue;
     const titleLength = meaningful(titleTokens).length;

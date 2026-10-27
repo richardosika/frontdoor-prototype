@@ -110,17 +110,27 @@ export function approvalAttentionDetail(title: string, detail: string, location:
   return registryNoteForLocation(location);
 }
 
-const UNVERIFIED_STEP = new Set(["COULDNT_VERIFY", "NOT_CHECKED", "SKIPPED", "FAIL"]);
+const UNVERIFIED_STEP = new Set(["COULDNT_VERIFY", "NOT_CHECKED", "SKIPPED"]);
+
+export function approvalDialogLists(input: {
+  steps?: { id?: string; title: string; status: string }[];
+  attention?: { title: string }[];
+}): { failed: string[]; unverified: string[] } {
+  const steps = (input.steps ?? []).filter((step) => step.id !== "decision");
+  const failed = steps.filter((step) => step.status === "FAIL").map((step) => step.title);
+  const fromSteps = steps.filter((step) => UNVERIFIED_STEP.has(step.status)).map((step) => step.title);
+  const fromAttention = (input.attention ?? []).map((item) => item.title.trim()).filter(Boolean);
+  return {
+    failed: [...new Set(failed)].slice(0, 12),
+    unverified: [...new Set([...fromSteps, ...fromAttention])].slice(0, 12),
+  };
+}
 
 export function unverifiedApprovalItems(input: {
   steps?: { id?: string; title: string; status: string }[];
   attention?: { title: string }[];
 }): string[] {
-  const fromSteps = (input.steps ?? [])
-    .filter((step) => step.id !== "decision" && UNVERIFIED_STEP.has(step.status))
-    .map((step) => step.title);
-  const fromAttention = (input.attention ?? []).map((item) => item.title.trim()).filter(Boolean);
-  return [...new Set([...fromSteps, ...fromAttention])].slice(0, 12);
+  return approvalDialogLists(input).unverified;
 }
 
 export function strongApprovalWarning(input: {
@@ -128,9 +138,11 @@ export function strongApprovalWarning(input: {
   verdict: string;
   recommendation?: string;
   items: string[];
+  failed?: string[];
 }): string {
   const grade = input.letter ? `Grade ${input.letter}` : "No letter grade";
   const verdict = input.verdict || input.recommendation || "no verdict";
+  const failed = input.failed?.length ? `Failed: ${input.failed.join("; ")}. ` : "";
   const items = input.items.length ? input.items.join("; ") : "none listed";
-  return `${grade}. Verdict: ${verdict}. Unverified: ${items}. Approve this file anyway? This second confirmation is written to the audit log.`;
+  return `${grade}. Verdict: ${verdict}. ${failed}Unverified: ${items}. Approve this file anyway? This second confirmation is written to the audit log.`;
 }

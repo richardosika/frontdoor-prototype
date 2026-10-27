@@ -3979,6 +3979,32 @@ describe("batch 10 fixtures", () => {
     expect(instagramCompanyTag("STO Building Group", "Robert Mullen")).not.toBe("building");
   });
 
+  it("does not treat Meridian Corp as the parent of Meridian Capital Group", () => {
+    const meridian = assessEdgarMatch({
+      org: "Meridian Capital Group",
+      person: "Ralph Herzka",
+      tickersOk: true,
+      companies: [{ title: "Meridian Corp", ticker: "MRBK", cik: "1750735" }],
+      filingNames: [["Meridian Corp (MRBK) (CIK 0001750735)"]],
+    });
+    expect(meridian.finding.toLowerCase()).not.toContain("parent match");
+    expect(meridian.finding).not.toContain("1750735");
+    expect(meridian.finding).not.toContain("MRBK");
+    expect(meridian.corroborates).toBe(false);
+    const brookfield = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "Brian Kingston",
+      tickersOk: true,
+      companies: [
+        { title: "Meridian Corp", ticker: "MRBK", cik: "1750735" },
+        { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
+      ],
+      filingNames: [],
+    });
+    expect(brookfield.finding.toLowerCase()).toContain("parent match, needs review");
+    expect(brookfield.finding).toContain("BN");
+  });
+
   it("keeps Brookfield and AECOM as parent matches and awards points only when a page links the parent", () => {
     const companies = [
       { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
@@ -5049,7 +5075,7 @@ describe("batch 12 surnames, aliases, and company pages", () => {
   });
 
   it("treats a plaintiff-firm class-action solicitation as company-level attention", () => {
-    const headline = "Lead Plaintiff Deadline in Securities Fraud Class Action against Compass";
+    const headline = "Deadline Alert: Compass, Inc. Stockholders Face December 8, 2026 Lead Plaintiff Deadline in Securities Fraud Class Action";
     const judged = judgeHeadline(headline, {
       name: "Robert Reffkin",
       applicantName: "Robert Reffkin",
@@ -5067,6 +5093,9 @@ describe("batch 12 surnames, aliases, and company pages", () => {
     const news = rows.find((row) => row.key === "news");
     expect(news?.status).not.toBe("FAIL");
     expect(news?.finding).toContain("Company-level litigation");
+    const story = rows.find((row) => row.key === "news-story");
+    expect(story?.finding.startsWith("Company litigation")).toBe(true);
+    expect(story?.status).not.toBe("FAIL");
     const graded = gradeChecks(rows, facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass" }));
     expect(graded.caps.join(" ")).not.toMatch(/capped at F|capped at D/i);
     expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);

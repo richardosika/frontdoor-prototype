@@ -3,7 +3,7 @@ import { DecisionForm, InviteDecisionForm, RevokeApprovalForm } from "@/componen
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { approvalAttentionDetail, approvalAttentionTitle, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { approvalAttentionDetail, approvalAttentionTitle, approvalDialogLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
 import { decisionDialogBootstrap } from "@/lib/decision-dialog";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
@@ -216,14 +216,13 @@ function DecisionStep({
     detail: approvalAttentionDetail(item.title, item.detail, location),
   }));
   const displayGrade = grade ? { ...grade, attention } : null;
+  const dialogLists = approvalDialogLists({ steps, attention });
   const warningText = strongApprovalWarning({
     letter: grade?.letter || "",
     verdict: verdictLabel(verdict),
     recommendation: grade?.recommendation || "",
-    items: unverifiedApprovalItems({
-      steps,
-      attention,
-    }),
+    items: dialogLists.unverified,
+    failed: dialogLists.failed,
   });
   const canRevoke = Boolean(applicationId) && (applicationStatus === "APPROVED" || applicationStatus === "PAYMENT_DUE");
   return (
