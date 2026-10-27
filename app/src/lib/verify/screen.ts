@@ -3,9 +3,10 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { braveResultBlocks, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
+const SEARCH_RETRY_MS = 400;
 
 export { distinctiveCompanyTokens };
 
@@ -1339,15 +1340,51 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
-  const [ddg, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
-  const ddgSnippets = [...ddg.text.matchAll(/<a\b[^>]*class="result__(?:a|snippet)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const ddgSnippetsFrom = (html: string) =>
+    [...html.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const [ddgFirst, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
+  let ddg = ddgFirst;
+  let ddgUsedUrl = ddgUrl;
+  let ddgSnippets = ddgSnippetsFrom(ddg.text);
+  const ddgChallenge = ddg.status === 202 || (/challenge|captcha/i.test(`${ddgUrl} ${ddg.text.slice(0, 2500)}`) && !/result__a|result-link/.test(ddg.text));
+  if (ddgChallenge) {
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+    const loose = [person, facts.org].filter(Boolean).join(" ");
+    const retryUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(loose || searched)}`;
+    const retry = await pull(fetchText, retryUrl);
+    const retrySnippets = ddgSnippetsFrom(retry.text);
+    const retryBlocked = accessBlocked(retry.status, retry.text, retryUrl) || serpUnusable(retrySnippets.map((item) => item.text), queryFacts);
+    if (!retryBlocked && retrySnippets.length) {
+      ddg = retry;
+      ddgUsedUrl = retryUrl;
+      ddgSnippets = retrySnippets;
+    }
+  }
+  const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUsedUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
-  const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
   const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets.map((item) => item.text), queryFacts);
+  let braveUrl = "";
+  let braveSnippets: { text: string; hrefs: string[] }[] = [];
+  let braveBlocked = true;
+  let mojeekUrl = "";
+  let mojeekSnippets: { text: string; hrefs: string[] }[] = [];
+  let mojeekBlocked = true;
+  if (ddgBlocked && bingBlocked) {
+    braveUrl = `https://search.brave.com/search?q=${encodeURIComponent(searched)}&source=web`;
+    const brave = await pull(fetchText, braveUrl);
+    braveSnippets = brave.status >= 200 && brave.status < 300 ? braveResultBlocks(brave.text).map((block) => snippetFrom(block)) : [];
+    braveBlocked = accessBlocked(brave.status, brave.text, braveUrl) || braveSnippets.length === 0 || serpUnusable(braveSnippets.map((item) => item.text), queryFacts);
+    if (braveBlocked) {
+      mojeekUrl = `https://www.mojeek.com/search?q=${encodeURIComponent(searched)}`;
+      const mojeek = await pull(fetchText, mojeekUrl);
+      mojeekSnippets = mojeek.status >= 200 && mojeek.status < 300 ? mojeekResultBlocks(mojeek.text).map((block) => snippetFrom(block)) : [];
+      mojeekBlocked = accessBlocked(mojeek.status, mojeek.text, mojeekUrl) || mojeekSnippets.length === 0 || serpUnusable(mojeekSnippets.map((item) => item.text), queryFacts);
+    }
+  }
   let wikiUrl = "";
   let wikiSnippets: { text: string; hrefs: string[] }[] = [];
   let wikiBlocked = true;
-  if (ddgBlocked && bingBlocked) {
+  if (ddgBlocked && bingBlocked && braveBlocked && mojeekBlocked) {
     wikiUrl = `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`;
     const wiki = await pull(fetchText, wikiUrl);
     const texts = wiki.status >= 200 && wiki.status < 300 ? wikipediaRestResultTexts(wiki.text) : [];
@@ -1357,30 +1394,32 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   let dataUrl = "";
   let dataSnippets: { text: string; hrefs: string[] }[] = [];
   let dataBlocked = true;
-  if (ddgBlocked && bingBlocked && wikiBlocked) {
+  if (ddgBlocked && bingBlocked && braveBlocked && mojeekBlocked && wikiBlocked) {
     dataUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`;
     const data = await pull(fetchText, dataUrl);
     const texts = data.status >= 200 && data.status < 300 ? wikidataSearchResultTexts(data.text) : [];
     dataSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
     dataBlocked = accessBlocked(data.status, data.text, dataUrl) || texts.length === 0;
   }
-  if (ddgBlocked && bingBlocked && wikiBlocked && dataBlocked) {
-    const challenge = ddg.status === 202 || /challenge|captcha/i.test(`${ddgUrl} ${ddg.text.slice(0, 2500)}`);
+  const searchBlocked = ddgBlocked && bingBlocked && braveBlocked && mojeekBlocked && wikiBlocked && dataBlocked;
+  if (searchBlocked) {
     attempts.push(
       blockedAttempt(
         "screen-web",
         "Web search",
         searched,
         ddgUrl,
-        challenge
-          ? "DuckDuckGo returned a challenge page and is not checkable for free."
-          : "DuckDuckGo, Bing, Wikipedia, and Wikidata did not return a usable results page. Web search is not checkable for free.",
+        ddgChallenge
+          ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
+          : "DuckDuckGo, Bing, Brave, Mojeek, Wikipedia, and Wikidata did not return a usable results page. Web search is not checkable for free.",
       ),
     );
   } else {
     const pool = [
-      ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUrl, platform: "DuckDuckGo" })) : []),
+      ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUsedUrl, platform: "DuckDuckGo" })) : []),
       ...(!bingBlocked ? bingSnippets.map((item) => ({ ...item, url: bingUrl, platform: "Bing" })) : []),
+      ...(!braveBlocked ? braveSnippets.map((item) => ({ ...item, url: braveUrl, platform: "Brave" })) : []),
+      ...(!mojeekBlocked ? mojeekSnippets.map((item) => ({ ...item, url: mojeekUrl, platform: "Mojeek" })) : []),
       ...(!wikiBlocked ? wikiSnippets.map((item) => ({ ...item, url: wikiUrl, platform: "Wikipedia" })) : []),
       ...(!dataBlocked ? dataSnippets.map((item) => ({ ...item, url: dataUrl, platform: "Wikidata" })) : []),
     ];

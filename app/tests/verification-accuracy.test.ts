@@ -5139,3 +5139,105 @@ describe("batch 12 surnames, aliases, and company pages", () => {
     expect(linkedin?.companyOnly).not.toBe(true);
   });
 });
+
+describe("a DuckDuckGo challenge does not erase a public record", () => {
+  const mullen = facts({
+    name: "Robert Mullen",
+    applicantName: "Robert Mullen",
+    org: "STO Building Group",
+    website: "https://www.stobuildinggroup.com",
+    location: "New York, NY",
+    role: "GENERAL_CONTRACTOR",
+    statement: "I lead a construction company and would like to meet owners and developers.",
+    inviteNote: "PF-BENCH-0000 · Benchmark invite code",
+  });
+  const mojeekHtml = `<ul class="results-standard"><li class="result"><a class="title" href="https://www.linkedin.com/in/robert-mullen-04796524">Robert Mullen - CEO at STO Building Group | LinkedIn</a><p class="s">Robert Mullen is CEO at STO Building Group.</p></li></ul>`;
+
+  function restOfFile(web: CheckOutput[]): CheckOutput[] {
+    return [
+      ...web,
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({
+        key: "linkedin-fetch",
+        status: "PASS",
+        companyOnly: true,
+        corroborates: false,
+        finding: "The public LinkedIn page company confirmed, person NOT confirmed. Name: no. Company: yes.",
+      }),
+      row({
+        key: "website",
+        status: "PASS",
+        selfReported: true,
+        corroborates: false,
+        finding: "Found: a page on the company site. Name: yes. Company: yes. City: yes. Confidence: high.",
+      }),
+      row({ key: "rdap", status: "PASS", finding: "RDAP responded for stobuildinggroup.com." }),
+      row({
+        key: "business-registry",
+        status: "PASS",
+        corroborates: false,
+        finding: "NY Active Corporations lists STO BUILDING GROUP INC. It does not tie a person to the firm.",
+      }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+    ];
+  }
+
+  it("keeps B10R02 at D68 when DuckDuckGo is challenged and Mojeek has the public page", async () => {
+    const checks = await runPublicScreen(mullen, async (url) => {
+      if (url.includes("mojeek.com")) return { ok: true, status: 200, text: mojeekHtml };
+      if (url.includes("stobuildinggroup.com")) return { ok: true, status: 200, text: "<html><p>STO Building Group</p></html>" };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      if (url.includes("bing.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("search.brave.com")) return { ok: true, status: 200, text: "<html></html>" };
+      return { ok: false, status: 403, text: "" };
+    });
+    const web = checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint");
+    for (const check of web) {
+      expect(check.status).toBe("PASS");
+      expect(check.corroborates).toBe(true);
+      expect(check.status).not.toBe("UNAVAILABLE");
+    }
+    expect(web.find((check) => check.key === "screen-web")?.source).toBe("Mojeek");
+    const graded = gradeChecks(restOfFile(web), mullen);
+    expect(graded.categories.find((category) => category.id === "completeness")?.earned).toBe(6);
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(12);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+    expect(graded.score).toBe(68);
+    expect(graded.letter).toBe("D");
+  });
+
+  it("keeps the application fields when every search engine is blocked, and does not score that block as a pass", async () => {
+    const checks = await runPublicScreen(mullen, async (url) => {
+      if (url.includes("stobuildinggroup.com")) return { ok: true, status: 200, text: "<html><p>STO Building Group leadership Robert Mullen</p></html>" };
+      return { ok: false, status: 202, text: "challenge" };
+    });
+    const web = checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint");
+    for (const check of web) {
+      expect(check.status).toBe("UNAVAILABLE");
+      expect(check.corroborates).not.toBe(true);
+      expect(check.finding).toContain("DuckDuckGo returned a challenge page");
+    }
+    const graded = gradeChecks(restOfFile(web), mullen);
+    const completeness = graded.categories.find((category) => category.id === "completeness");
+    const company = graded.categories.find((category) => category.id === "company");
+    const footprint = graded.categories.find((category) => category.id === "footprint");
+    expect(completeness?.earned).toBe(6);
+    expect(footprint?.earned).toBe(0);
+    expect(footprint?.reason.toLowerCase()).toContain("could not check");
+    expect(footprint?.reason.toLowerCase()).toContain("search blocked");
+    expect(company?.reason.toLowerCase()).toContain("could not check, search blocked");
+    expect(company?.earned).toBe(8);
+    expect(graded.score).toBe(56);
+    expect(graded.letter).toBe("F");
+    const fake = gradeChecks(web, facts({ location: "New York, NY", statement: "I develop small buildings and keep a written record of each project for the application." }));
+    expect(fake.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
+    expect(fake.score).toBeLessThanOrEqual(40);
+  });
+});

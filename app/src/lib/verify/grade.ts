@@ -288,6 +288,15 @@ export function corroboratingPasses(checks: CheckOutput[]): CheckOutput[] {
   return checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
 }
 
+/** Both public web checks were blocked. An unavailable search is not a pass and not a miss. */
+export function webSearchCouldNotBeChecked(checks: CheckOutput[]): boolean {
+  const web = findCheck(checks, "screen-web");
+  const footprint = findCheck(checks, "web-footprint");
+  if (!web || !footprint) return false;
+  const blocked = (row: CheckOutput) => row.status === "UNAVAILABLE" && /challenge page|search blocked/i.test(row.finding);
+  return blocked(web) && blocked(footprint);
+}
+
 function citedEvidence(finding: string): string {
   const found = finding.match(/Found:\s*([\s\S]*?)\s+Name:/i);
   if (found) return found[1];
@@ -787,13 +796,15 @@ function websiteAward(checks: CheckOutput[], possible: number, mode: GradeWeight
     if (!outsideSourceConfirmsCompany(checks)) {
       return portionLine(0, possible, "The applicant's own site names the company. No outside source confirmed the company");
     }
-    return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
+    const blocked = webSearchCouldNotBeChecked(checks) ? ". Could not check, search blocked" : "";
+    return portionLine(companyOnlyPoints(possible), possible, `Company confirmed, person not confirmed${blocked}`);
   }
   if (row?.status === "PASS" && row.selfReported && !independent) {
     // Half credit for the company on the applicant's own site, and only after an outside source confirms that company.
     // The person on that same page stays self-reported and earns the other half only after an independent tie.
     if (/Company:\s*yes/i.test(row.finding) && outsideSourceConfirmsCompany(checks)) {
-      return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person self-reported");
+      const blocked = webSearchCouldNotBeChecked(checks) ? ". Could not check, search blocked" : "";
+      return portionLine(companyOnlyPoints(possible), possible, `Company confirmed, person self-reported${blocked}`);
     }
     if (/Company:\s*yes/i.test(row.finding)) {
       return portionLine(0, possible, "The applicant's own site names the company. No outside source confirmed the company");
@@ -818,7 +829,10 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
 }
 
 function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode): Line {
-  if (!earned && row?.status === "UNAVAILABLE") return unavailableLine(possible, "Web search is not checkable for free", mode);
+  if (!earned && row?.status === "UNAVAILABLE") {
+    const blocked = /challenge page|search blocked/i.test(row.finding || "");
+    return unavailableLine(possible, blocked ? "Could not check, search blocked" : "Web search is not checkable for free", mode);
+  }
   return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
 }
 
@@ -890,22 +904,22 @@ function registryAward(row: CheckOutput | undefined, possible: number, mode: Gra
   );
 }
 
-function applicationField(earned: boolean, possible: number, yes: string, no: string, independent: boolean): Line {
-  if (earned && !independent) {
+function applicationField(earned: boolean, possible: number, yes: string, no: string, independent: boolean, keepFields: boolean): Line {
+  if (earned && !independent && !keepFields) {
     return portionLine(0, possible, "No independent source tied the person to the company, so this application field earns no completeness credit");
   }
   return award(earned, possible, yes, no);
 }
 
-function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number, independent: boolean): Line {
+function locationAward(checks: CheckOutput[], facts: GradeFacts, possible: number, independent: boolean, keepFields: boolean): Line {
   const row = findCheck(checks, "address");
-  if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
+  if (!row) return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent, keepFields);
   if (row.status === "FAIL") return portionLine(0, possible, "The address did not check out");
   if (row.status === "UNAVAILABLE" || row.status === "INCONCLUSIVE") {
     return { earned: 0, possible: 0, reason: "Could not check. The address is inconclusive. A geocoder miss or an unreachable geocoder is not a pass and not a failure." };
   }
-  if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent);
-  return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent);
+  if (row.status === "PASS") return applicationField(true, possible, "A location is on the application", "No location is on the application", independent, keepFields);
+  return applicationField(Boolean(facts.location?.trim()), possible, "A location is on the application", "No location is on the application", independent, keepFields);
 }
 
 function inviteAward(row: CheckOutput | undefined, possible: number, mode: GradeWeightsMode, facts: GradeFacts): Line {
@@ -987,13 +1001,15 @@ export function gradeChecks(
   ]);
   const statementOk = (facts.statement || "").trim().length >= 40;
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());
+  // A blocked search is not a miss. Application fields stay on the completeness line when the company is already confirmed elsewhere.
+  const keepFields = independent || (webSearchCouldNotBeChecked(checks) && outsideSourceConfirmsCompany(checks));
   const completeness = sumLines([
-    applicationField(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application", independent),
-    locationAward(checks, facts, weights.completeness.location, independent),
-    applicationField(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application", independent),
-    applicationField(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short", independent),
-    applicationField(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded", independent),
-    applicationField((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file", independent),
+    applicationField(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application", independent, keepFields),
+    locationAward(checks, facts, weights.completeness.location, independent, keepFields),
+    applicationField(contactPage, weights.completeness.contactPage, "A website or LinkedIn URL is on the application", "No website or LinkedIn URL is on the application", independent, keepFields),
+    applicationField(statementOk, weights.completeness.statement, "They wrote a track-record note", "The track-record note is missing or very short", independent, keepFields),
+    applicationField(Boolean(facts.cardUploaded || facts.cardText?.trim()), weights.completeness.card, "A business card is on the file", "No business card was uploaded", independent, keepFields),
+    applicationField((facts.referenceCount || 0) > 0, weights.completeness.references, "A reference email is on the file", "No reference email is on the file", independent, keepFields),
   ]);
 
   const categories: GradeCategory[] = [
