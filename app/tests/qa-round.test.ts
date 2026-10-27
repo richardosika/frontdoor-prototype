@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
-import { needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
 import { applicantDuesSentence, FREE_MEMBERSHIP_LINE, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
@@ -186,18 +186,44 @@ describe("QA fixes that stay outside grading", () => {
     expect(needsStrongApprovalWarning({ letter: "F", recommendation: "NEEDS MORE INFO", verdict: "" })).toBe(true);
     expect(needsStrongApprovalWarning({ letter: "A", recommendation: "APPROVE", verdict: "LEGIT" })).toBe(false);
     expect(needsStrongApprovalWarning({ letter: "C", verdict: "NOT_LEGIT" })).toBe(true);
+    const lists = approvalItemLists({
+      steps: [
+        { id: "news", title: "News", status: "COULDNT_VERIFY" },
+        { id: "company", title: "Company and registry", status: "FAIL" },
+      ],
+      attention: [
+        { title: "Address", detail: "address did not check out." },
+        { title: "Domain registration", detail: "This domain is not registered." },
+        { title: "Company website", detail: "The website responded, but the names were not on the page." },
+        { title: "Sources that did not produce a result", detail: "Court search did not confirm anything. Missing data is not a pass." },
+        { title: "Court search", detail: "Could not be checked for free." },
+      ],
+    });
+    expect(lists.failed).toEqual(expect.arrayContaining(["Company and registry", "Address", "Domain registration", "Company website"]));
+    expect(lists.failed).not.toContain("News");
+    expect(lists.failed).not.toContain("Court search");
+    expect(lists.failed).not.toContain("Sources that did not produce a result");
+    expect(lists.unverified).toContain("News");
+    expect(lists.unverified).toContain("Court search");
+    expect(lists.unverified).toContain("Sources that did not produce a result");
+    expect(lists.unverified).not.toContain("Address");
     const text = strongApprovalWarning({
       letter: "F",
       verdict: "Recommended not legit",
-      items: unverifiedApprovalItems({
-        steps: [{ id: "news", title: "News", status: "COULDNT_VERIFY" }],
-        attention: [{ title: "Court search" }],
-      }),
+      failed: lists.failed,
+      unverified: lists.unverified,
     });
     expect(text).toContain("Grade F");
     expect(text).toContain("Recommended not legit");
-    expect(text).toContain("News");
-    expect(text).toContain("Court search");
+    expect(text).toContain("Failed:");
+    expect(text).toContain("Unverified:");
+    const failedPart = text.split("Unverified:")[0] || "";
+    const unverifiedPart = text.split("Unverified:")[1] || "";
+    expect(failedPart).toContain("Address");
+    expect(failedPart).toContain("Domain registration");
+    expect(failedPart).toContain("Company website");
+    expect(unverifiedPart).not.toContain("Address");
+    expect(unverifiedPart).toContain("News");
     expect(text).toContain("second confirmation");
   });
 

@@ -66,8 +66,19 @@ describe("PF Tester October 27 batch", () => {
     const review = readFileSync(path.join(ROOT, "components/guided-review.tsx"), "utf8");
     expect(review).toContain("decisionDialogBootstrap");
     const dialog = readFileSync(path.join(ROOT, "lib/decision-dialog.ts"), "utf8");
-    expect(dialog).toContain("MutationObserver");
-    expect(dialog).toContain("data-pf-held");
+    expect(dialog).not.toContain("MutationObserver");
+    expect(dialog).not.toContain("appendChild");
+    expect(dialog).not.toContain("data-pf-held");
+    expect(dialog).toContain("data-decision-closing");
+    expect(dialog).toContain("DECISION_QUEUE_KEY");
+    expect(dialog).toContain("STEP_SAVE_KEY");
+    const queue = readFileSync(path.join(ROOT, "lib/decision-queue.ts"), "utf8");
+    expect(queue).toContain("pf-decision-queue");
+    expect(queue).toContain("pf-step-save");
+    const form = readFileSync(path.join(ROOT, "components/decision-form.tsx"), "utf8");
+    expect(form).toContain("data-decision-closing");
+    expect(form).toContain("claimDecisionReplay");
+    expect(form).toContain("Saving this step. Approval sends when that finishes.");
     const oldNote = "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.";
     for (const code of [
       "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",

@@ -3,9 +3,28 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { DECISION_ACK_KEY, DECISION_DIALOG_ID, DECISION_MEMORY_KEY } from "@/lib/decision-dialog";
+import {
+  claimDecisionReplay,
+  clearDecisionQueue,
+  readDecisionQueue,
+  stepSaveBusy,
+  writeDecisionQueue,
+  type QueuedDecision,
+} from "@/lib/decision-queue";
 import { decideInviteReview } from "@/actions/verification";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { approveConfirmMessage } from "@/lib/review-steps";
+
+const SAVING_STEP = "Saving this step. Approval sends when that finishes.";
+
+function decisionNotice(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("notice") || "";
+}
+
+function approvalLanded(notice: string): boolean {
+  return /approved|declined|asked for more info/i.test(notice);
+}
 
 function ConfirmModal({
   title,
@@ -80,7 +99,7 @@ export function DecisionForm({
   const [result, setResult] = useState("");
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
-  const [hideDialog, setHideDialog] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
   pendingRef.current = pending;
 
   function approveBody() {
@@ -131,6 +150,7 @@ export function DecisionForm({
     const onCancel = (event: Event) => {
       event.preventDefault();
       const decision = pendingRef.current;
+      clearDecisionQueue();
       remember(null);
       setPending(null);
       setModalError("");
@@ -148,11 +168,6 @@ export function DecisionForm({
 
   useLayoutEffect(() => {
     const node = dialogRef.current;
-    const held = document.querySelector('dialog[data-pf-held="1"]');
-    if (held instanceof HTMLDialogElement && node && held !== node) {
-      setHideDialog(true);
-      return;
-    }
     if (node) node.setAttribute("data-react-bound", "1");
     let saved = "";
     try {
@@ -161,14 +176,44 @@ export function DecisionForm({
       saved = "";
     }
     if ((saved === "APPROVED" || saved === "DECLINED") && node && !node.open) {
+      node.removeAttribute("data-decision-closing");
       node.setAttribute("data-pending", saved);
       node.showModal();
     }
   });
 
+  useLayoutEffect(() => {
+    const node = dialogRef.current;
+    return () => {
+      if (!node) return;
+      node.setAttribute("data-decision-closing", "1");
+      if (node.open) node.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    let timer = 0;
+    const sync = () => setSaveBusy(stepSaveBusy());
+    sync();
+    const replay = () => {
+      sync();
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => replayQueued(), 300);
+    };
+    window.addEventListener("pf-step-save", replay);
+    timer = window.setTimeout(() => replayQueued(), 80);
+    return () => {
+      window.removeEventListener("pf-step-save", replay);
+      window.clearTimeout(timer);
+    };
+    // Replay a click that landed while a step save was still in flight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, caseId]);
+
   useEffect(() => {
     const node = dialogRef.current;
     if (!node) return;
+    if (node.getAttribute("data-decision-closing") === "1") return;
     if (!pending) {
       let saved = "";
       try {
@@ -185,7 +230,56 @@ export function DecisionForm({
     restoreAck();
   }, [pending]);
 
+  function closeDialog() {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.setAttribute("data-decision-closing", "1");
+    if (dialog.open) dialog.close();
+  }
+
+  function submitDecision(decision: "APPROVED" | "DECLINED", ack: boolean) {
+    const form = formRef.current;
+    if (!form) return;
+    if (decision === "APPROVED" && (ack || notLegit || strongWarning)) {
+      if (strongWarning) {
+        const strong = form.querySelector('input[name="confirmStrong"]');
+        if (strong instanceof HTMLInputElement) strong.value = "yes";
+      }
+      if (notLegit || strongWarning) {
+        const legit = form.querySelector('input[name="confirmNotLegit"]');
+        if (legit instanceof HTMLInputElement) legit.value = "yes";
+      }
+    }
+    remember(null);
+    closeDialog();
+    allowSubmit.current = true;
+    const button = form.querySelector(`button[name="decision"][value="${decision}"]`);
+    if (button instanceof HTMLButtonElement) form.requestSubmit(button);
+  }
+
+  function replayQueued() {
+    const queued = readDecisionQueue();
+    if (!queued || queued.applicationId !== applicationId) return;
+    if (caseId && queued.caseId && queued.caseId !== caseId) return;
+    const notice = decisionNotice();
+    if (approvalLanded(notice)) {
+      clearDecisionQueue();
+      remember(null);
+      closeDialog();
+      return;
+    }
+    if (stepSaveBusy()) return;
+    if (!formRef.current?.isConnected) return;
+    if (queued.decision === "APPROVED" && strongWarning && !queued.ack) return;
+    if (!claimDecisionReplay(queued)) return;
+    setPending(queued.decision);
+    setModalError("");
+    submitDecision(queued.decision, queued.ack);
+  }
+
   function openPending(decision: "APPROVED" | "DECLINED") {
+    pendingRef.current = decision;
+    dialogRef.current?.removeAttribute("data-decision-closing");
     remember(decision);
     setError("");
     setResult("");
@@ -195,6 +289,7 @@ export function DecisionForm({
 
   function cancelPending() {
     const decision = pending;
+    clearDecisionQueue();
     remember(null);
     setPending(null);
     setModalError("");
@@ -205,27 +300,47 @@ export function DecisionForm({
     );
   }
 
+  function ackChecked() {
+    const box = dialogRef.current?.querySelector('[data-decision-ack="1"]');
+    if (box instanceof HTMLInputElement) return box.checked;
+    return Boolean(boxRef.current?.checked);
+  }
+
   function confirmPending() {
     const form = formRef.current;
-    if (!form || !pending) return;
-    if (pending === "APPROVED" && strongWarning) {
-      if (!boxRef.current?.checked) {
-        setModalError("Check the box to confirm this approval. Approval was not sent.");
-        return;
+    let decision = pendingRef.current;
+    if (!decision) {
+      try {
+        const stored = sessionStorage.getItem(DECISION_MEMORY_KEY);
+        if (stored === "APPROVED" || stored === "DECLINED") decision = stored;
+      } catch {
+        decision = null;
       }
-      const strong = form.querySelector('input[name="confirmStrong"]');
-      if (strong instanceof HTMLInputElement) strong.value = "yes";
     }
-    if (pending === "APPROVED" && (notLegit || strongWarning)) {
-      const input = form.querySelector('input[name="confirmNotLegit"]');
-      if (input instanceof HTMLInputElement) input.value = "yes";
+    if (!form || !decision) return;
+    const ack = ackChecked();
+    if (decision === "APPROVED" && strongWarning && !ack) {
+      setModalError("Check the box to confirm this approval. Approval was not sent.");
+      return;
     }
-    const button = form.querySelector(`button[value="${pending}"]`);
+    const waiting = stepSaveBusy();
+    const queued: QueuedDecision = {
+      applicationId,
+      caseId: caseId || "",
+      decision,
+      ack,
+      at: Date.now(),
+      waiting,
+    };
+    writeDecisionQueue(queued);
+    if (waiting) {
+      setModalError(SAVING_STEP);
+      return;
+    }
+    if (!claimDecisionReplay(queued)) return;
     setModalError("");
     setResult("");
-    remember(null);
-    allowSubmit.current = true;
-    if (button instanceof HTMLButtonElement) form.requestSubmit(button);
+    submitDecision(decision, queued.ack);
   }
 
   const showing = pending || "APPROVED";
@@ -311,7 +426,7 @@ export function DecisionForm({
         Decline
       </button>
     </form>
-    {hideDialog ? null : <dialog
+    <dialog
       id={DECISION_DIALOG_ID}
       ref={dialogRef}
       role="dialog"
@@ -352,16 +467,43 @@ export function DecisionForm({
         {modalError}
       </p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" data-decision-confirm="1" onClick={confirmPending}>
+        <button
+          className={`${btn} min-h-12 w-full sm:w-auto${saveBusy ? " opacity-60" : ""}`}
+          type="button"
+          data-decision-confirm="1"
+          data-decision-waiting={saveBusy ? "1" : undefined}
+          aria-disabled={saveBusy || undefined}
+          onClick={confirmPending}
+        >
           {showing === "DECLINED" ? "Decline" : "Approve"}
         </button>
         <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-cancel="1" onClick={cancelPending}>
           Cancel
         </button>
       </div>
-    </dialog>}
+    </dialog>
   </>
   );
+}
+
+export function SettleDecision({ applicationId }: { applicationId: string }) {
+  useEffect(() => {
+    const notice = decisionNotice();
+    if (!approvalLanded(notice)) return;
+    clearDecisionQueue();
+    try {
+      sessionStorage.removeItem(DECISION_MEMORY_KEY);
+      sessionStorage.removeItem(DECISION_ACK_KEY);
+    } catch {
+      // The notice is already on the page.
+    }
+    const node = document.getElementById(DECISION_DIALOG_ID);
+    if (node instanceof HTMLDialogElement) {
+      node.setAttribute("data-decision-closing", "1");
+      if (node.open) node.close();
+    }
+  }, [applicationId]);
+  return null;
 }
 
 export function RevokeApprovalForm({ applicationId, caseId }: { applicationId: string; caseId?: string }) {

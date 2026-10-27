@@ -110,27 +110,91 @@ export function approvalAttentionDetail(title: string, detail: string, location:
   return registryNoteForLocation(location);
 }
 
-const UNVERIFIED_STEP = new Set(["COULDNT_VERIFY", "NOT_CHECKED", "SKIPPED", "FAIL"]);
+const UNVERIFIED_STEP = new Set(["COULDNT_VERIFY", "NOT_CHECKED", "SKIPPED"]);
+
+/** Titles grade.ts uses for a check that returned FAIL. Other attention titles are not hard failures. */
+const FAILED_CHECK_TITLES = new Set([
+  "Email syntax",
+  "Disposable-email check",
+  "Shared-inbox check",
+  "Phone area code",
+  "LinkedIn link",
+  "Public LinkedIn page",
+  "Duplicate check",
+  "Sanctions check",
+  "Write-up check",
+  "Repeat-application check",
+  "Name and company check",
+  "Referral",
+  "Social links",
+  "Company website",
+  "SEC EDGAR",
+  "Domain registration",
+  "Business card",
+  "State business registry",
+  "Public web search",
+  "News search",
+  "X",
+  "Facebook",
+  "Instagram",
+  "YouTube",
+  "TikTok",
+  "Court search",
+  "Address",
+]);
+
+const COULD_NOT_CHECK = /couldn'?t|could not|not checked|did not confirm|not a failure|was not searched|possible match|no free|optional|absence is not/i;
+
+function unique(items: string[]): string[] {
+  return [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(0, 12);
+}
+
+export function approvalItemLists(input: {
+  steps?: { id?: string; title: string; status: string }[];
+  attention?: { title: string; detail?: string }[];
+}): { failed: string[]; unverified: string[] } {
+  const failed: string[] = [];
+  const unverified: string[] = [];
+  for (const step of input.steps ?? []) {
+    if (step.id === "decision") continue;
+    if (step.status === "FAIL") failed.push(step.title);
+    else if (UNVERIFIED_STEP.has(step.status)) unverified.push(step.title);
+  }
+  for (const item of input.attention ?? []) {
+    const title = item.title.trim();
+    if (!title) continue;
+    const blob = `${title} ${item.detail || ""}`;
+    if (FAILED_CHECK_TITLES.has(title) && !COULD_NOT_CHECK.test(blob)) failed.push(title);
+    else unverified.push(title);
+  }
+  const failedItems = unique(failed);
+  const failedSet = new Set(failedItems);
+  return {
+    failed: failedItems,
+    unverified: unique(unverified).filter((item) => !failedSet.has(item)),
+  };
+}
 
 export function unverifiedApprovalItems(input: {
   steps?: { id?: string; title: string; status: string }[];
-  attention?: { title: string }[];
+  attention?: { title: string; detail?: string }[];
 }): string[] {
-  const fromSteps = (input.steps ?? [])
-    .filter((step) => step.id !== "decision" && UNVERIFIED_STEP.has(step.status))
-    .map((step) => step.title);
-  const fromAttention = (input.attention ?? []).map((item) => item.title.trim()).filter(Boolean);
-  return [...new Set([...fromSteps, ...fromAttention])].slice(0, 12);
+  return approvalItemLists(input).unverified;
 }
 
 export function strongApprovalWarning(input: {
   letter: string;
   verdict: string;
   recommendation?: string;
-  items: string[];
+  failed?: string[];
+  unverified?: string[];
+  items?: string[];
 }): string {
   const grade = input.letter ? `Grade ${input.letter}` : "No letter grade";
   const verdict = input.verdict || input.recommendation || "no verdict";
-  const items = input.items.length ? input.items.join("; ") : "none listed";
-  return `${grade}. Verdict: ${verdict}. Unverified: ${items}. Approve this file anyway? This second confirmation is written to the audit log.`;
+  const failed = input.failed ?? [];
+  const unverified = input.unverified ?? input.items ?? [];
+  const failedText = failed.length ? ` Failed: ${failed.join("; ")}.` : "";
+  const unverifiedText = unverified.length ? ` Unverified: ${unverified.join("; ")}.` : failed.length ? "" : " Unverified: none listed.";
+  return `${grade}. Verdict: ${verdict}.${failedText}${unverifiedText} Approve this file anyway? This second confirmation is written to the audit log.`;
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { saveReviewStep } from "@/actions/review";
+import { StepSaveForm } from "@/components/step-save-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 
 export function SkipStepForm({ applicationId, caseId, stepId }: { applicationId: string; caseId: string; stepId: string }) {
@@ -14,7 +15,7 @@ export function SkipStepForm({ applicationId, caseId, stepId }: { applicationId:
     );
   }
   return (
-    <form action={saveReviewStep} className="rounded border border-[#7A2E2E] bg-cream p-3">
+    <StepSaveForm action={saveReviewStep} className="rounded border border-[#7A2E2E] bg-cream p-3">
       <input type="hidden" name="applicationId" value={applicationId} />
       <input type="hidden" name="caseId" value={caseId} />
       <input type="hidden" name="stepId" value={stepId} />
@@ -33,6 +34,6 @@ export function SkipStepForm({ applicationId, caseId, stepId }: { applicationId:
           Cancel
         </button>
       </div>
-    </form>
+    </StepSaveForm>
   );
 }

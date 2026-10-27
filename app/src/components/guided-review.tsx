@@ -1,9 +1,10 @@
 import { saveReviewStep } from "@/actions/review";
-import { DecisionForm, InviteDecisionForm, RevokeApprovalForm } from "@/components/decision-form";
+import { DecisionForm, InviteDecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { SkipStepForm } from "@/components/skip-step-form";
+import { StepSaveForm } from "@/components/step-save-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { approvalAttentionDetail, approvalAttentionTitle, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { approvalAttentionDetail, approvalAttentionTitle, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
 import { decisionDialogBootstrap } from "@/lib/decision-dialog";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
@@ -54,6 +55,7 @@ export function GuidedReview({
   return (
     <section className="mt-4 rounded border border-line bg-paper p-4">
       <script dangerouslySetInnerHTML={{ __html: decisionDialogBootstrap() }} />
+      <SettleDecision applicationId={applicationId} />
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Guided review</p>
       <h2 className="mt-1 font-serif text-2xl font-normal text-forest">
         Step {current.index} of {total}
@@ -61,7 +63,7 @@ export function GuidedReview({
       <p className="mt-1 text-sm text-ink">Progress is saved on this application. You can leave and come back to the same step.</p>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {steps.map((step) => (
-          <form key={step.id} action={saveReviewStep}>
+          <StepSaveForm key={step.id} action={saveReviewStep}>
             <input type="hidden" name="applicationId" value={applicationId} />
             <input type="hidden" name="caseId" value={caseId} />
             <input type="hidden" name="stepId" value={step.id} />
@@ -76,7 +78,7 @@ export function GuidedReview({
               {step.id !== "decision" && step.status === "SKIPPED" ? " · skipped" : ""}
               {step.id !== "decision" && stepCountsAsPass(step.status) ? " · pass" : ""}
             </button>
-          </form>
+          </StepSaveForm>
         ))}
       </div>
       {current.id === "decision" ? (
@@ -123,7 +125,7 @@ export function GuidedReview({
             ))}
           </ul>
           {current.saved?.skipReason ? <p className="mt-3 text-sm text-ink">Skip reason: {current.saved.skipReason}</p> : null}
-          <form action={saveReviewStep} className="mt-4 space-y-3">
+          <StepSaveForm action={saveReviewStep} className="mt-4 space-y-3">
             <input type="hidden" name="applicationId" value={applicationId} />
             <input type="hidden" name="caseId" value={caseId} />
             <input type="hidden" name="stepId" value={current.id} />
@@ -149,9 +151,9 @@ export function GuidedReview({
             <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
               Save & next
             </button>
-          </form>
+          </StepSaveForm>
           {current.index > 1 ? (
-            <form action={saveReviewStep} className="mt-2">
+            <StepSaveForm action={saveReviewStep} className="mt-2">
               <input type="hidden" name="applicationId" value={applicationId} />
               <input type="hidden" name="caseId" value={caseId} />
               <input type="hidden" name="stepId" value={previous} />
@@ -159,7 +161,7 @@ export function GuidedReview({
               <button className={`${btnOutline} min-h-11 w-full sm:w-auto`} type="submit">
                 Back
               </button>
-            </form>
+            </StepSaveForm>
           ) : null}
           <div className="mt-3">
             <SkipStepForm applicationId={applicationId} caseId={caseId} stepId={current.id} />
@@ -216,14 +218,13 @@ function DecisionStep({
     detail: approvalAttentionDetail(item.title, item.detail, location),
   }));
   const displayGrade = grade ? { ...grade, attention } : null;
+  const itemLists = approvalItemLists({ steps, attention });
   const warningText = strongApprovalWarning({
     letter: grade?.letter || "",
     verdict: verdictLabel(verdict),
     recommendation: grade?.recommendation || "",
-    items: unverifiedApprovalItems({
-      steps,
-      attention,
-    }),
+    failed: itemLists.failed,
+    unverified: itemLists.unverified,
   });
   const canRevoke = Boolean(applicationId) && (applicationStatus === "APPROVED" || applicationStatus === "PAYMENT_DUE");
   return (
@@ -283,7 +284,7 @@ function DecisionStep({
           {canRevoke ? <RevokeApprovalForm applicationId={applicationId} caseId={caseId} /> : null}
         </>
       ) : null}
-      <form action={saveReviewStep} className="mt-3">
+      <StepSaveForm action={saveReviewStep} className="mt-3">
         <input type="hidden" name="applicationId" value={applicationId} />
         <input type="hidden" name="caseId" value={caseId} />
         <input type="hidden" name="stepId" value={previous} />
@@ -291,7 +292,7 @@ function DecisionStep({
         <button className={`${btnOutline} min-h-11`} type="submit">
           Back
         </button>
-      </form>
+      </StepSaveForm>
     </div>
   );
 }
