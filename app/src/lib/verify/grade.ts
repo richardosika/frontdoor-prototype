@@ -612,8 +612,11 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   } else {
     evidence.push("No company website was confirmed.");
   }
-  if (passedKey(checks, "edgar", "fixture-edgar")) {
-    evidence.push(`SEC EDGAR returned a hit for the company name (${sourceOf(checks, "edgar", "fixture-edgar")}). Confirm it is the same firm before you rely on it.`);
+  const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
+  if (edgar?.status === "PASS") {
+    evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
+  } else if (edgar?.companyOnly && !edgar.reviewFlag) {
+    evidence.push(`EDGAR lists this exact company name (${edgar.source}). It does not tie the person to the firm.`);
   } else {
     evidence.push("No EDGAR filing was confirmed.");
   }
@@ -700,6 +703,19 @@ export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
   });
 }
 
+function edgarAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
+  if (row?.status === "PASS") {
+    return award(true, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
+  }
+  // Exact normalized-name filer, not a different firm. Person credit stays off, so an
+  // impersonation of a public registrant does not gain points unless something else
+  // already ties that person to the company.
+  if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag && independent) {
+    return portionLine(companyOnlyPoints(possible), possible, "EDGAR lists this exact company name. It does not tie the person");
+  }
+  return award(false, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
+}
+
 function phoneAward(row: CheckOutput | undefined, possible: number, independent: boolean): Line {
   if (row?.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) {
     return { earned: 0, possible: 0, reason: "The phone is toll-free, so the area code is not applicable." };
@@ -757,7 +773,6 @@ export function gradeChecks(
 ): GradeReport {
   const weightsMode = options?.weightsMode || GRADE_WEIGHTS_MODE;
   const weights = weightsFor(weightsMode);
-  const edgarPass = passedKey(checks, "edgar", "fixture-edgar");
   const footprintRow = findCheck(checks, "web-footprint");
   const thirdPartyFootprint = passed(footprintRow) && !footprintRow?.selfReported;
   const webPass =
@@ -784,7 +799,7 @@ export function gradeChecks(
   ]);
   const company = sumLines([
     websiteAward(checks, weights.company.website, weightsMode, independent),
-    award(edgarPass, weights.company.edgar, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed"),
+    edgarAward(findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar"), weights.company.edgar, independent),
     award(
       passed(card) && independent,
       weights.company["business-card"],

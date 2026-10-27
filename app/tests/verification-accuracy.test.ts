@@ -139,7 +139,37 @@ describe("corroboration is independent of the applicant's own page", () => {
     });
     expect(companyOnly.status).toBe("INCONCLUSIVE");
     expect(companyOnly.corroborates).toBe(false);
+    expect(companyOnly.companyOnly).toBe(true);
     expect(companyOnly.finding.toLowerCase()).toContain("does not tie the person");
+    const alone = gradeChecks([row({ key: "edgar", status: companyOnly.status, companyOnly: true, corroborates: false, reviewFlag: companyOnly.reviewFlag, finding: companyOnly.finding })], facts({ org: "Toll Brothers, Inc." }));
+    expect(alone.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    const backed = gradeChecks(
+      [
+        row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding: companyOnly.finding }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company." }),
+      ],
+      facts({ org: "Toll Brothers, Inc." }),
+    );
+    expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("EDGAR lists this exact company name");
+    expect(backed.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(backed.score - alone.score).toBe(3 + 8);
+    const differentFirm = assessEdgarMatch({
+      org: "Terra Group",
+      person: "David Martin",
+      tickersOk: true,
+      companies: [{ title: "Terra Property Trust, Inc.", ticker: "TPTA", cik: "1674356" }],
+      filingNames: [],
+    });
+    expect(differentFirm.companyOnly).not.toBe(true);
+    expect(differentFirm.corroborates).toBe(false);
+    const impersonation = gradeChecks(
+      [
+        row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding: "EDGAR lists Prologis, Inc. (PLD). A name-only company match is inconclusive and does not corroborate." }),
+      ],
+      facts({ org: "Prologis", name: "Tobias Wrenfield" }),
+    );
+    expect(impersonation.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(impersonation.recommendation.startsWith("APPROVE")).toBe(false);
     const personTied = assessEdgarMatch({
       org: "Toll Brothers, Inc.",
       person: "Douglas Yearley",

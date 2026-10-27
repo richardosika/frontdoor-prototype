@@ -225,7 +225,7 @@ export function assessEdgarMatch(input: {
   tickersOk: boolean;
   companies: EdgarCompany[];
   filingNames: string[];
-}): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag"> {
+}): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   const fromList = input.tickersOk ? matchEdgarCompany(input.companies, input.org) : null;
   const fromFiling = matchEdgarCompany(
     input.filingNames.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
@@ -267,6 +267,7 @@ export function assessEdgarMatch(input: {
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
+      companyOnly: true,
       url: edgarCompanyUrl(match.cik),
       finding: `EDGAR lists ${titled}. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
     };
@@ -303,7 +304,7 @@ export async function lookupEdgar(
   org: string,
   person: string,
   fetchText?: FetchText,
-): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag">> {
+): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly">> {
   const tokens = org.trim();
   if (!tokens) {
     return {

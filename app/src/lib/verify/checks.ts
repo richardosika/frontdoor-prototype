@@ -960,6 +960,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       url: edgar.url,
       corroborates: edgar.corroborates,
       reviewFlag: edgar.reviewFlag,
+      companyOnly: edgar.companyOnly,
     }),
   );
   const courtUrl = `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(`"${ctx.facts.name}"`)}&type=o`;
