@@ -6,8 +6,35 @@ import { plainActivityText } from "@/lib/admin-home";
 import { OUTSIDE_REGISTRY_TITLE, approvalAttentionTitle, freeRegistryState } from "@/lib/approval-warning";
 import { footerNoteFor } from "@/lib/email-layout";
 import { templateDef } from "@/lib/email-templates";
+import { buildReviewSteps, parseReviewProgress } from "@/lib/review-steps";
+import { registryLinkCheck } from "@/lib/verify/checks";
+import { registryPortal } from "@/lib/verify/state-registries";
+import type { ApplicantFacts } from "@/lib/verify/types";
 
 const ROOT = path.resolve(__dirname, "../src");
+
+function registryFacts(location: string, org = "Example Builders"): ApplicantFacts {
+  return {
+    name: "Ada Applicant",
+    applicantName: "Ada Applicant",
+    email: "ada@example.com",
+    org,
+    location,
+    role: "GENERAL_CONTRACTOR",
+    phone: "",
+    website: "",
+    linkedinUrl: "",
+    socialLinks: "",
+    statement: "",
+    inviteNote: "",
+    testProfile: "1",
+    cardText: "",
+    cardUploaded: false,
+    duplicateOfMember: false,
+    duplicateOfDeclined: false,
+    recentApplications: 0,
+  };
+}
 
 describe("PF Tester October 27 batch", () => {
   it("keeps the outside-the-list line off a real listed US city", () => {
@@ -38,6 +65,39 @@ describe("PF Tester October 27 batch", () => {
     expect(freeRegistryState("Come in")).toBeNull();
     const review = readFileSync(path.join(ROOT, "components/guided-review.tsx"), "utf8");
     expect(review).toContain("decisionDialogBootstrap");
+    const dialog = readFileSync(path.join(ROOT, "lib/decision-dialog.ts"), "utf8");
+    expect(dialog).toContain("MutationObserver");
+    expect(dialog).toContain("data-pf-held");
+    const oldNote = "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.";
+    for (const code of [
+      "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+      "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
+      "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    ]) {
+      const row = registryLinkCheck(registryFacts(`City, ${code}`));
+      expect(row.finding).not.toContain("No stable free registry API");
+      expect(row.url).toMatch(/^https:\/\//);
+      if (!registryPortal(code)) {
+        expect(row.finding).toContain(`No free ${code} registry API`);
+        expect(row.finding).toContain("Open the state search");
+      }
+      const company = buildReviewSteps({
+        evidence: [{ checkKey: "business-registry", status: "NOT_RUN", finding: oldNote, source: "State registry", url: "", corroborates: false }],
+        saved: parseReviewProgress(null),
+        references: [],
+        cardOnFile: false,
+        facts: { name: "Ada", org: "Example Builders", location: `City, ${code}` },
+      }).find((step) => step.id === "company");
+      const finding = company?.findings.find((item) => item.source === "State registry");
+      expect(finding?.text).toContain(`No free ${code} registry API`);
+      expect(finding?.text).toContain("Open the state search");
+      expect(finding?.text).not.toContain("No stable free registry API");
+      expect(finding?.url).toMatch(/^https:\/\//);
+    }
+    const rhodeIsland = registryLinkCheck(registryFacts("Providence, Rhode Island", "Gilbane"));
+    expect(rhodeIsland.finding).toContain("No free RI registry API");
+    expect(rhodeIsland.finding).toContain("Gilbane");
+    expect(rhodeIsland.url).toContain("sos.ri.gov");
   });
 
   it("shows plain words for a needs-owner verdict in the activity feed", () => {

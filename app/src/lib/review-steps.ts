@@ -1,4 +1,5 @@
 import { emptyPrefillFacts, suggestCompany, suggestOne, type PrefillFacts, type StepSuggestion } from "@/lib/guided-prefill";
+import { shownRegistryCheck } from "@/lib/state-registry-search";
 
 /**
  * Guided review on an application file. A saved skip is not a pass.
@@ -267,12 +268,15 @@ export function buildReviewSteps(input: {
       const sanctionsRow = input.evidence.find((row) => row.checkKey === "sanctions");
       if (!sanctionsRow || sanctionsRow.status === "NOT_RUN") status = "NOT_CHECKED";
     }
-    const findings = rows.map((row) => ({
-      source: row.source || "Check",
-      status: row.status,
-      text: publicFinding(row.status, row.finding),
-      url: row.url || "",
-    }));
+    const findings = rows.map((row) => {
+      const shown = shownRegistryCheck({ finding: row.finding, url: row.url || "", location: facts.location, org: facts.org });
+      return {
+        source: row.source || "Check",
+        status: row.status,
+        text: publicFinding(row.status, shown.finding),
+        url: shown.url,
+      };
+    });
     if (id === "references") {
       findings.unshift({
         source: "Application",

@@ -11,6 +11,7 @@ import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSa
 import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
+import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
@@ -793,7 +794,7 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
-  const state = statedUsState(facts.location) || facts.location.toUpperCase().match(/\b(NJ|NY|DE|FL|TX|DC|CA|IL|MA|WA|GA|PA|CT|MD|CO|VA|OR|IA|NC|TN|AZ)\b/)?.[1];
+  const state = statedUsState(facts.location) || "";
   const portal = state ? registryPortal(state) : undefined;
   if (portal) {
     return check({
@@ -805,30 +806,8 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
       url: portal.portalUrl,
     });
   }
-  const links: Record<string, string> = {
-    NJ: "https://www.njportal.com/DOR/BusinessNameSearch/",
-    NY: "https://apps.dos.ny.gov/publicInquiry/",
-    DE: "https://icis.corp.delaware.gov/Ecorp/EntitySearch/NameSearch.aspx",
-    FL: "https://search.sunbiz.org/Inquiry/CorporationSearch/ByName",
-    TX: "https://mycpa.cpa.state.tx.us/coa/",
-    DC: "https://os.dc.gov/service/corporate-registration-search",
-    CA: "https://bizfileonline.sos.ca.gov/search/business",
-    IL: "https://www.ilsos.gov/departments/business_services/corp.html",
-    MA: "https://corp.sec.state.ma.us/corpweb/CorpSearch/CorpSearch.aspx",
-    WA: "https://ccfs.sos.wa.gov/",
-    GA: "https://ecorp.sos.ga.gov/BusinessSearch",
-    PA: "https://www.corporations.pa.gov/search/corpsearch",
-    CT: "https://service.ct.gov/business/s/onlinebusinesssearch",
-    MD: "https://egov.maryland.gov/businessexpress/entitysearch",
-    CO: "https://www.sos.state.co.us/biz/BusinessEntityCriteriaExt.do",
-    VA: "https://cis.scc.virginia.gov/",
-    OR: "https://sos.oregon.gov/business/Pages/find.aspx",
-    IA: "https://sos.iowa.gov/search/business/search.aspx",
-    NC: "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
-    TN: "https://sos.tn.gov/business-services/business-search",
-    AZ: "https://ecorp.azcc.gov/EntitySearch/Index",
-  };
-  if (!state || !links[state]) {
+  const url = state ? stateRegistrySearchUrl(state) : "";
+  if (!state || !url) {
     return check({
       key: "business-registry",
       status: "NOT_RUN",
@@ -842,9 +821,9 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
     key: "business-registry",
     status: "NOT_RUN",
     weight: 8,
-    finding: `Couldn't check for free. No free ${state} registry API. Open the state search and look up ${facts.org}.`,
+    finding: manualRegistryFinding(state, facts.org),
     source: "State registry",
-    url: links[state],
+    url,
   });
 }
 

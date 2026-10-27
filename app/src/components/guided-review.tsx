@@ -8,6 +8,7 @@ import { decisionDialogBootstrap } from "@/lib/decision-dialog";
 import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
+import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
 import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
@@ -139,11 +140,11 @@ export function GuidedReview({
             </label>
             <label className="block">
               <span className={labelCls}>Evidence link</span>
-              <input name="evidenceUrl" className={field} defaultValue={publicEvidenceHref(current.saved?.evidenceUrl || current.prefill?.evidenceUrl || "")} placeholder="https://" />
+              <input name="evidenceUrl" className={field} defaultValue={publicEvidenceHref(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: current.saved?.evidenceUrl || current.prefill?.evidenceUrl || "", location }).url)} placeholder="https://" />
             </label>
             <label className="block">
               <span className={labelCls}>Note</span>
-              <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(current.saved?.note || current.prefill?.note || "")} placeholder="What was found, and what was not" />
+              <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(shownRegistryCheck({ finding: current.saved?.note || current.prefill?.note || "", url: "", location }).finding)} placeholder="What was found, and what was not" />
             </label>
             <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
               Save & next

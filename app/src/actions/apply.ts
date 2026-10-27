@@ -194,7 +194,7 @@ export async function submitApplication(
   const application = await prisma.$transaction(async (tx) => {
     const created = await tx.application.create({
       data: {
-        inviteCodeId: invite?.id,
+        inviteCodeId: invite?.id ?? null,
         email,
         statusToken,
         name,

@@ -355,7 +355,7 @@ describe("QA fixes that stay outside grading", () => {
     expect(readFileSync(path.join(ROOT, "lib/notices.ts"), "utf8")).toContain("reviewNotice(");
     const gradeSummary = readFileSync(path.join(ROOT, "components/grade-summary.tsx"), "utf8");
     expect(gradeSummary).toContain("reviewCopy(section.body)");
-    expect(gradeSummary).toContain("reviewCopy(row.finding)");
+    expect(gradeSummary).toContain("reviewCopy(shown.finding)");
     expect(gradeSummary).toContain("reviewCopy(row.source)");
     const inviteStatus = readFileSync(path.join(ROOT, "app/invite-status/[token]/page.tsx"), "utf8");
     expect(inviteStatus).toContain("/request-status/");

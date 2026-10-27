@@ -2,6 +2,7 @@ import { EvidenceChip } from "@/components/evidence-chip";
 import { newsStoryChipLabel } from "@/lib/verify/news";
 import { rubricSections, type GradeReport, type Recommendation } from "@/lib/verify/grade";
 import { publicEvidenceHref } from "@/lib/evidence-link";
+import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
@@ -134,8 +135,12 @@ function SummaryBlock({ title, body }: { title: string; body: string }) {
 
 export function CheckTable({
   evidence,
+  location = "",
+  org = "",
 }: {
   evidence: { id: string; checkKey: string; status: string; finding: string; source: string; url: string; ranAt: Date }[];
+  location?: string;
+  org?: string;
 }) {
   return (
     <details className="mt-4">
@@ -152,18 +157,20 @@ export function CheckTable({
             </tr>
           </thead>
           <tbody>
-            {evidence.map((row) => (
+            {evidence.map((row) => {
+              const shown = shownRegistryCheck({ finding: row.finding, url: row.url, location, org });
+              return (
               <tr key={row.id} className="border-b border-line align-top">
                 <td className="py-2 pr-2">{reviewCheckKey(row.checkKey)}</td>
                 <td className="py-2 pr-2">
                   <EvidenceLabel row={row} />
                 </td>
                 <td className="max-w-xs py-2 pr-2 break-words">
-                  {reviewCopy(row.finding)}
-                  {row.url ? (
+                  {reviewCopy(shown.finding)}
+                  {shown.url ? (
                     <>
                       {" "}
-                      <a className="underline decoration-brass" href={publicEvidenceHref(row.url)} target="_blank" rel="noreferrer">
+                      <a className="underline decoration-brass" href={publicEvidenceHref(shown.url)} target="_blank" rel="noreferrer">
                         {row.checkKey === "news-story" ? "Open article" : "Link"}
                       </a>
                     </>
@@ -172,7 +179,8 @@ export function CheckTable({
                 <td className="py-2 pr-2">{reviewCopy(row.source)}</td>
                 <td className="py-2">{formatAuditTime(row.ranAt)}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

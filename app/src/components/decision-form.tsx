@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { DECISION_ACK_KEY, DECISION_DIALOG_ID, DECISION_MEMORY_KEY } from "@/lib/decision-dialog";
 import { decideInviteReview } from "@/actions/verification";
@@ -80,6 +80,7 @@ export function DecisionForm({
   const [result, setResult] = useState("");
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
+  const [hideDialog, setHideDialog] = useState(false);
   pendingRef.current = pending;
 
   function approveBody() {
@@ -144,6 +145,26 @@ export function DecisionForm({
     // Restore once, after hydration, including a tick that landed before React attached.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useLayoutEffect(() => {
+    const node = dialogRef.current;
+    const held = document.querySelector('dialog[data-pf-held="1"]');
+    if (held instanceof HTMLDialogElement && node && held !== node) {
+      setHideDialog(true);
+      return;
+    }
+    if (node) node.setAttribute("data-react-bound", "1");
+    let saved = "";
+    try {
+      saved = sessionStorage.getItem(DECISION_MEMORY_KEY) || "";
+    } catch {
+      saved = "";
+    }
+    if ((saved === "APPROVED" || saved === "DECLINED") && node && !node.open) {
+      node.setAttribute("data-pending", saved);
+      node.showModal();
+    }
+  });
 
   useEffect(() => {
     const node = dialogRef.current;
@@ -214,10 +235,12 @@ export function DecisionForm({
     <form
       ref={formRef}
       action={reviewApplication}
+      data-decision-form="1"
       className="mt-3 space-y-2"
       onSubmit={(event) => {
-        if (allowSubmit.current) {
+        if (allowSubmit.current || event.currentTarget.getAttribute("data-decision-allow") === "1") {
           allowSubmit.current = false;
+          event.currentTarget.removeAttribute("data-decision-allow");
           return;
         }
         if (pending) {
@@ -288,7 +311,7 @@ export function DecisionForm({
         Decline
       </button>
     </form>
-    <dialog
+    {hideDialog ? null : <dialog
       id={DECISION_DIALOG_ID}
       ref={dialogRef}
       role="dialog"
@@ -325,20 +348,18 @@ export function DecisionForm({
           <span>I confirm this approval despite the grade and the unverified items.</span>
         </label>
       ) : null}
-      {modalError ? (
-        <p className="mt-3 text-sm text-brass" role="alert">
-          {modalError}
-        </p>
-      ) : null}
+      <p className="mt-3 text-sm text-brass" role="alert" data-decision-error="1" hidden={!modalError}>
+        {modalError}
+      </p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" onClick={confirmPending}>
+        <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" data-decision-confirm="1" onClick={confirmPending}>
           {showing === "DECLINED" ? "Decline" : "Approve"}
         </button>
         <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-cancel="1" onClick={cancelPending}>
           Cancel
         </button>
       </div>
-    </dialog>
+    </dialog>}
   </>
   );
 }
