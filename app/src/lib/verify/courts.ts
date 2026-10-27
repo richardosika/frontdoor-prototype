@@ -24,22 +24,48 @@ export function courtResults(payload: string): CourtHit[] | null {
   }
 }
 
+/** A caption word may sit in front of the name. Another given name may not, so "Douglas Richard Kennedy" is not Richard Kennedy. */
+const CAPTION_WORD = new Set([
+  "v", "vs", "aka", "and", "the", "of", "in", "re", "by", "for", "to", "a", "an",
+  "appellant", "appellee", "plaintiff", "defendant", "petitioner", "respondent",
+  "complainant", "state", "commonwealth", "people", "united", "states", "ex", "rel",
+  "no", "case", "matter", "estate", "judge", "justice", "circuit", "court", "district",
+  "et", "al", "jr", "sr", "ii", "iii", "iv", "md", "dr", "mr", "mrs", "ms", "hon",
+]);
+
+function escapeToken(token: string): string {
+  return token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** The words have to sit together. "Jeff" in one sentence and "Hines" in another is not the name. */
 function containsPhrase(text: string, phrase: string): boolean {
   const parts = normalizeName(phrase).split(" ").filter((token) => token.length > 1);
   if (!parts.length) return false;
   if (parts.length === 1 && parts[0].length < 4) return false;
   const hay = normalizeName(text);
-  const body = parts.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  const body = parts.map(escapeToken).join("\\s+");
   return new RegExp(`(?:^|\\s)${body}(?:\\s|$)`).test(hay);
+}
+
+function anchoredName(hay: string, body: string): boolean {
+  if (new RegExp(`^${body}(?:\\s|$)`).test(hay)) return true;
+  for (const match of hay.matchAll(new RegExp(`(?:^|\\s)(\\S+)\\s+${body}(?=\\s|$)`, "g"))) {
+    const previous = match[1];
+    if (previous.length < 3 || CAPTION_WORD.has(previous)) return true;
+  }
+  return false;
 }
 
 function personPhrase(text: string, name: string): boolean {
   const parsed = parsePersonName(name);
   if (!parsed || parsed.given.length < 1 || !parsed.surname) return false;
-  const forward = `${parsed.given.join(" ")} ${parsed.surname}`;
-  const reversed = `${parsed.surname} ${parsed.given.join(" ")}`;
-  return containsPhrase(text, forward) || containsPhrase(text, reversed);
+  const hay = normalizeName(text);
+  const given = parsed.given.map((token) => escapeToken(token.toLowerCase())).join("\\s+");
+  const surname = escapeToken(parsed.surname.toLowerCase());
+  const initial = String.raw`(?:\s+[a-z])?`;
+  const forward = `${given}${initial}\\s+${surname}`;
+  const reversed = `${surname}\\s+${given}`;
+  return anchoredName(hay, forward) || anchoredName(hay, reversed);
 }
 
 function companyPhrase(text: string, org: string): boolean {

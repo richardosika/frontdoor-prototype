@@ -321,6 +321,19 @@ describe("courts", () => {
       facts({ name: "Jeff Hines", org: "Hines" }),
     );
     expect(reversed.finding).toContain("mention the full name");
+    const middle = assessCourts(
+      JSON.stringify({ results: [{ caseNameFull: "Richard T. Kennedy v. State", caseName: "", snippet: "" }] }),
+      { ok: true, status: 200 },
+      facts({ name: "Richard Kennedy", org: "Skanska USA" }),
+    );
+    expect(middle.finding).toContain("mention the full name");
+    const otherGiven = assessCourts(
+      JSON.stringify({ results: [{ caseNameFull: "Douglas Richard Kennedy, Appellee", caseName: "Commonwealth v. Kennedy", snippet: "" }] }),
+      { ok: true, status: 200 },
+      facts({ name: "Richard Kennedy", org: "Skanska USA" }),
+    );
+    expect(otherGiven.status).toBe("PASS");
+    expect(otherGiven.finding).toContain("No record found");
     const company = assessCourts(
       JSON.stringify({
         results: [{ caseName: "Skanska USA v. Owner", snippet: "Richard testified. Kennedy was counsel." }],
