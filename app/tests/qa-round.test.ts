@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
-import { approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
+import { approvalDialogLists, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
 import { applicantDuesSentence, FREE_MEMBERSHIP_LINE, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
@@ -229,6 +229,27 @@ describe("QA fixes that stay outside grading", () => {
     expect(unverifiedPart).not.toContain("Address");
     expect(unverifiedPart).toContain("News");
     expect(text).toContain("second confirmation");
+    const dialogLists = approvalDialogLists({
+      steps: [
+        { id: "address", title: "Address", status: "FAIL" },
+        { id: "domain", title: "Domain registration", status: "FAIL" },
+        { id: "website", title: "Company website", status: "FAIL" },
+        { id: "news", title: "News", status: "COULDNT_VERIFY" },
+        { id: "decision", title: "Decision", status: "FAIL" },
+      ],
+      attention: [{ title: "Court search" }],
+    });
+    const split = strongApprovalWarning({
+      letter: "F",
+      verdict: "NEEDS MORE INFO",
+      items: dialogLists.unverified,
+      failed: dialogLists.failed,
+    });
+    expect(split).toContain("Failed: Address; Domain registration; Company website.");
+    expect(split).toContain("Unverified: News; Court search.");
+    expect(split.split("Unverified:")[1]).not.toContain("Address");
+    expect(split.split("Unverified:")[1]).not.toContain("Company website");
+    expect(unverifiedApprovalItems({ steps: [{ title: "Address", status: "FAIL" }] })).toEqual([]);
   });
 
   it("uses one status label and a free-membership sentence", () => {

@@ -3,13 +3,23 @@ import { normalizeInviteCode } from "@/lib/domain";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { locationsCorroborate, nameMatchScore, SANCTIONS_MATCH_THRESHOLD } from "@/lib/verify/fuzzy";
-import { assessCensusBody, assessLocalAddress, censusGeocodeUrl, statedUsState } from "@/lib/verify/address";
+import {
+  assessCensusBody,
+  assessLocalAddress,
+  assessNominatimBody,
+  censusGeocodeUrl,
+  geocoderSaysAddressInvalid,
+  nominatimGeocodeUrl,
+  statedUsState,
+  streetGeocodeForms,
+  type ParsedAddress,
+} from "@/lib/verify/address";
 import { isReservedDomain, registrableHost } from "@/lib/verify/host";
 import { companyPhraseTokens, isDistinctiveCompanyToken, isShortBrandToken, mentionsCompany, mentionsPerson } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { alignNewsRows, newsChecks } from "@/lib/verify/news";
-import { lookupEdgar } from "@/lib/verify/edgar";
+import { edgarIsExactCompany, incorporationStateFromFinding, lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
@@ -679,21 +689,30 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
-/** A made-up token. Real firm words such as Keystone, Brambleton, and Construction stay readable. */
+/**
+ * A made-up company token. Strict signs only: no vowel, q not followed by u,
+ * the same letter three times, or five consonants in a row once h is ignored.
+ * A consonant pair or a q/x/z/j cluster is not enough. Those flags mark real
+ * surnames such as Schwartz, Herzka, and Hovnanian.
+ */
 export function tokenLooksGibberish(token: string): boolean {
   const word = token.toLowerCase();
   if (word.length < 4) return false;
   if (!/[aeiouy]/.test(word)) return true;
   if (/q(?!u)/.test(word)) return true;
   if (/(.)\1\1/.test(word)) return true;
-  if (word.length <= 9) {
-    const clusters = word.match(/[^aeiouy]{3,}/g) || [];
-    if (clusters.some((cluster) => /[qxzj]/.test(cluster))) return true;
-  }
-  // "th" and "ch" are ordinary English. "Northbridge" is not a made-up cluster.
   const withoutH = word.replace(/h/g, "");
   if (/[^aeiouy]{5,}/.test(withoutH)) return true;
   return false;
+}
+
+/** Person-name tokens that fail the strict company rule. This is a note, not a failing check. */
+export function personNameTokensLookMadeUp(name: string): boolean {
+  return name
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((token) => token.length >= 4 && !/^(jr|sr|ii|iii|iv)$/.test(token))
+    .some((token) => tokenLooksGibberish(token));
 }
 
 export function companyNameLooksReal(org: string): boolean {
@@ -712,13 +731,18 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
     (firmToken === orgToken || orgToken.startsWith(firmToken));
   const nameOk = (parts.length >= 2 && facts.name.trim().length >= 5) || oneWordFirm;
   const orgReal = companyNameLooksReal(facts.org);
+  // Person names are not failed by the gibberish heuristic. A strict mash is an attention note and the points stay.
+  const personReal = true;
   const roleKnown = annualDuesCents(facts.role) >= 0;
-  if (nameOk && orgReal && roleKnown) {
+  if (nameOk && orgReal && personReal && roleKnown) {
+    const madeUpPerson = personNameTokensLookMadeUp(facts.name);
     return check({
       key: "plausibility",
       status: "PASS",
       weight: 4,
-      finding: "The name, company, and role are filled in and readable.",
+      finding: madeUpPerson
+        ? "The name, company, and role are filled in and readable. The person name may not be real words. This note does not change the points."
+        : "The name, company, and role are filled in and readable.",
       source: "Local plausibility heuristic",
       url: "",
     });
@@ -731,7 +755,9 @@ export function plausibilityCheck(facts: ApplicantFacts): CheckOutput {
     reviewFlag: true,
     finding: gibberish
       ? "The company name does not look like real words."
-      : "The name or company looks incomplete. Read the application before you decide.",
+      : !personReal
+        ? "The person name does not look like real words."
+        : "The name or company looks incomplete. Read the application before you decide.",
     source: "Local plausibility heuristic",
     url: "",
   });
@@ -793,6 +819,37 @@ export function socialFormatCheck(facts: ApplicantFacts): CheckOutput {
   });
 }
 
+/**
+ * An exact EDGAR filer incorporated in another state. The address-state miss does not count against the company.
+ * A free registry in the incorporation state replaces the miss when that lookup passes.
+ */
+export function noteIncorporationRegistry(
+  registry: CheckOutput,
+  edgarFinding: string,
+  addressState: string,
+  incorporationPass?: CheckOutput | null,
+): CheckOutput {
+  const incorporated = incorporationStateFromFinding(edgarFinding);
+  if (!incorporated || !addressState || incorporated === addressState || !edgarIsExactCompany(edgarFinding)) return registry;
+  if (registry.status === "PASS") return registry;
+  if (incorporationPass?.status === "PASS") {
+    return {
+      ...registry,
+      status: "PASS",
+      finding: incorporationPass.finding,
+      source: incorporationPass.source || registry.source,
+      url: incorporationPass.url || registry.url,
+      corroborates: false,
+      reviewFlag: undefined,
+    };
+  }
+  const url = stateRegistrySearchUrl(incorporated) || registry.url;
+  const finding = `${registry.finding} This miss does not count against the company. EDGAR lists an exact match incorporated in ${incorporated}. Open the ${incorporated} secretary of state search.`
+    .replace(/\s+/g, " ")
+    .trim();
+  return { ...registry, finding, url };
+}
+
 export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
   const state = statedUsState(facts.location) || "";
   const portal = state ? registryPortal(state) : undefined;
@@ -812,7 +869,9 @@ export function registryLinkCheck(facts: ApplicantFacts): CheckOutput {
       key: "business-registry",
       status: "NOT_RUN",
       weight: 8,
-      finding: "Couldn't check for free. No stable free registry API for this state. Search the secretary of state manually.",
+      finding: state
+        ? `Couldn't check for free. No free ${state} registry API. Open the state search and look up ${facts.org}.`
+        : "Couldn't check for free. No free registry API for this location. Open the state search and look up the company.",
       source: "State registry",
       url: "",
     });
@@ -974,6 +1033,33 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       companyOnly: edgar.companyOnly,
     }),
   );
+  const incorporated = incorporationStateFromFinding(edgar.finding);
+  const registryIndex = out.findIndex((row) => row.key === "business-registry");
+  if (registryIndex >= 0 && incorporated && registryState && incorporated !== registryState && edgarIsExactCompany(edgar.finding)) {
+    const homePortal = registryPortal(incorporated);
+    let incorporationPass: CheckOutput | null = null;
+    if (homePortal) {
+      const homeUrl = homePortal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(homePortal, searchFacts.org);
+      const homeHttp = await settleWithin(fetchText(homeUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+        ok: false,
+        status: 0,
+        text: "",
+      });
+      const home = homePortal.state === "NY" ? assessNyRegistry(searchFacts.org, homeHttp) : assessStateRegistry(homePortal, searchFacts.org, homeHttp);
+      if (home.status === "PASS") {
+        incorporationPass = check({
+          key: "business-registry",
+          status: "PASS",
+          weight: 8,
+          finding: home.finding,
+          source: homePortal.source,
+          url: home.url,
+          corroborates: false,
+        });
+      }
+    }
+    out[registryIndex] = noteIncorporationRegistry(out[registryIndex], edgar.finding, registryState, incorporationPass);
+  }
   const courtQuery = courtSearchQuery(ctx.facts.name);
   const courtUrl = courtQuery
     ? `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(courtQuery)}&type=o`
@@ -1040,7 +1126,7 @@ export function strongFixtureChecks(): CheckOutput[] {
   ];
 }
 
-const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder when a street is present";
+const ADDRESS_SOURCE = "US state and ZIP ranges; US Census Geocoder, then OpenStreetMap Nominatim, when a street is present";
 
 export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutput | null> {
   const local = assessLocalAddress(ctx.facts.location || "");
@@ -1068,54 +1154,78 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
       finding,
     });
   }
-  const url = censusGeocodeUrl(local.parsed);
-  try {
-    const http = await ctx.fetchText(url);
-    if (!http.ok) {
-      return check({
-        ...base,
-        status: "UNAVAILABLE",
-        url,
-        corroborates: false,
-        finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
-      });
-    }
-    const judged = assessCensusBody(http.text);
-    if (judged === "match") {
-      return check({
-        ...base,
-        status: "PASS",
-        url,
-        corroborates: false,
-        finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
-      });
-    }
-    if (judged === "none") {
-      return check({
-        ...base,
-        status: "FAIL",
-        url,
-        reviewFlag: true,
-        corroborates: false,
-        finding: "The address did not check out. The Census geocoder returned no match for this street.",
-      });
-    }
+  const forms = streetGeocodeForms(local.parsed.street);
+  const census = await askGeocoder(ctx, forms, local.parsed, "census");
+  if (census.kind === "match") {
     return check({
       ...base,
-      status: "UNAVAILABLE",
-      url,
+      status: "PASS",
+      url: census.url,
       corroborates: false,
-      finding: "The address is not checkable. The Census geocoder did not return a readable result. This is not a pass and not a failure.",
-    });
-  } catch {
-    return check({
-      ...base,
-      status: "UNAVAILABLE",
-      url,
-      corroborates: false,
-      finding: "The address is not checkable. The Census geocoder timed out or did not respond. This is not a pass and not a failure.",
+      finding: "The Census geocoder matched this street address. The state and ZIP also check out.",
     });
   }
+  const nominatim = await askGeocoder(ctx, forms, local.parsed, "nominatim");
+  if (nominatim.kind === "match") {
+    const censusNote = census.kind === "none" ? "The Census geocoder returned no match. " : "The Census geocoder did not respond. ";
+    return check({
+      ...base,
+      status: "PASS",
+      url: nominatim.url,
+      corroborates: false,
+      finding: `${censusNote}OpenStreetMap Nominatim matched this street address. The state and ZIP also check out.`,
+    });
+  }
+  if (census.kind === "invalid" || nominatim.kind === "invalid") {
+    return check({
+      ...base,
+      status: "FAIL",
+      url: nominatim.url || census.url,
+      corroborates: false,
+      finding: "The address did not check out. The geocoder said this address is invalid.",
+    });
+  }
+  const url = nominatim.url || census.url;
+  const bothDown = census.kind === "down" && nominatim.kind === "down";
+  const bothMissed = census.kind === "none" && nominatim.kind === "none";
+  const finding = bothDown
+    ? "Could not check. The Census geocoder and OpenStreetMap Nominatim did not respond. This is inconclusive. It is not a pass and not a failure."
+    : bothMissed
+      ? "Could not check. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure."
+      : "Could not check. A geocoder returned no match and the other did not respond. This is inconclusive. It is not a pass and not a failure.";
+  return check({
+    ...base,
+    status: "INCONCLUSIVE",
+    url,
+    corroborates: false,
+    finding,
+  });
+}
+
+async function askGeocoder(
+  ctx: CheckContext,
+  forms: string[],
+  parsed: ParsedAddress,
+  source: "census" | "nominatim",
+): Promise<{ kind: "match"; url: string } | { kind: "none"; url: string } | { kind: "invalid"; url: string } | { kind: "down"; url: string }> {
+  let lastUrl = "";
+  let sawNone = false;
+  for (const street of forms) {
+    const addressed = { ...parsed, street };
+    const url = source === "census" ? censusGeocodeUrl(addressed) : nominatimGeocodeUrl(addressed);
+    lastUrl = url;
+    try {
+      const http = await ctx.fetchText?.(url);
+      if (!http?.ok) continue;
+      if (geocoderSaysAddressInvalid(http.text)) return { kind: "invalid", url };
+      const judged = source === "census" ? assessCensusBody(http.text, parsed) : assessNominatimBody(http.text, parsed);
+      if (judged === "match") return { kind: "match", url };
+      if (judged === "none") sawNone = true;
+    } catch {
+      continue;
+    }
+  }
+  return sawNone ? { kind: "none", url: lastUrl } : { kind: "down", url: lastUrl };
 }
 
 export async function collectChecks(ctx: CheckContext): Promise<CheckOutput[]> {

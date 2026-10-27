@@ -23,6 +23,20 @@ export function duckDuckGoResultTexts(html: string): string[] {
     .filter((text) => text.length > 2);
 }
 
+/** Brave HTML result cards. A script-only page yields nothing and the next engine is tried. */
+export function braveResultBlocks(html: string): string[] {
+  const cards = [...html.matchAll(/<div\b[^>]*class="[^"]*\bsnippet\b[^"]*"[\s\S]*?(?=<div\b[^>]*class="[^"]*\bsnippet\b|<\/body|$)/gi)];
+  if (cards.length) return cards.map((match) => match[0]);
+  return [...html.matchAll(/<a\b[^>]*class="[^"]*\b(?:title|heading)\b[^"]*"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => match[0]);
+}
+
+/** Mojeek HTML results. No key. */
+export function mojeekResultBlocks(html: string): string[] {
+  const items = [...html.matchAll(/<li\b[^>]*class="[^"]*\bresult\b[^"]*"[\s\S]*?<\/li>/gi)];
+  if (items.length) return items.map((match) => match[0]);
+  return [...html.matchAll(/<a\b[^>]*class="[^"]*\b(?:title|ob)\b[^"]*"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => match[0]);
+}
+
 export function bingResultTexts(html: string): string[] {
   const blocks = [...html.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)];
   return blocks

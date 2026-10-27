@@ -5,6 +5,7 @@ import {
   emptyPrefillFacts,
   keepExistingMark,
   suggestChecklist,
+  suggestCompany,
   suggestOne,
 } from "@/lib/guided-prefill";
 import { MEMBER_CHECKS, canMarkCaseVerified, checklistComplete } from "@/lib/verification";
@@ -176,5 +177,72 @@ describe("free company and sanctions sources", () => {
     const blocked = assessOpenSanctions({ name: "Ada Lopez", org: "", location: "" }, { ok: false, status: 401, text: "" });
     expect(blocked.status).toBe("UNAVAILABLE");
     expect(blocked.finding.toLowerCase()).toContain("couldn't verify for free");
+  });
+
+  it("does not suggest Pass when EDGAR is only a former name or a name-only hit", () => {
+    const facts = emptyPrefillFacts({ name: "Alex Morgan", org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" });
+    const website = row({
+      checkKey: "website",
+      status: "PASS",
+      finding: "The company's own site names the company.",
+      url: "https://www.brookfieldproperties.com/",
+      source: "Company website",
+    });
+    const former = suggestCompany(facts, [
+      website,
+      row({
+        checkKey: "edgar",
+        status: "INCONCLUSIVE",
+        finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review. A former name is not an exact match and does not corroborate.",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1680277",
+        source: "SEC EDGAR",
+        reviewFlag: true,
+      }),
+    ]);
+    expect(former.mark).toBe("CONCERN");
+    expect(former.result).toBe("NEEDS_INFO");
+    expect(former.note).toContain("Could not confirm");
+    expect(former.note).toContain("Needs review");
+    expect(former.note).toContain("BPI Property Inc.");
+    expect(former.note).toContain("former name");
+    expect(former.note).not.toContain("Suggested mark: Pass");
+
+    const nameOnly = suggestCompany(facts, [
+      website,
+      row({
+        checkKey: "edgar",
+        status: "INCONCLUSIVE",
+        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. A name-only company match is inconclusive and does not corroborate.",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+        source: "SEC EDGAR",
+      }),
+    ]);
+    expect(nameOnly.mark).toBe("CONCERN");
+    expect(nameOnly.result).not.toBe("PASS");
+
+    const exact = suggestCompany(emptyPrefillFacts({ name: "Alex Morgan", org: "CBRE Group", website: "https://www.cbre.com/" }), [
+      row({
+        checkKey: "edgar",
+        status: "INCONCLUSIVE",
+        finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+        source: "SEC EDGAR",
+      }),
+    ]);
+    expect(exact.mark).toBe("PASS");
+    expect(exact.note).toContain("exact current-name match");
+
+    const owner = suggestCompany(facts, [
+      row({
+        checkKey: "edgar",
+        status: "PASS",
+        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. A Form 4 for this CIK names Sulentic Robert E as a reporting owner.",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+        source: "SEC EDGAR",
+        corroborates: true,
+      }),
+    ]);
+    expect(owner.mark).toBe("PASS");
+    expect(owner.note.toLowerCase()).toContain("reporting owner");
   });
 });

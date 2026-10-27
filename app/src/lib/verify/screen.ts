@@ -1,11 +1,12 @@
 import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
-import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, socialSearchQuery } from "@/lib/verify/news";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, firmContainsApplicantName, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { isLinkedInDirectory, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
+const SEARCH_RETRY_MS = 400;
 
 export { distinctiveCompanyTokens };
 
@@ -269,10 +270,21 @@ export function sameOriginPages(html: string, base: string): string[] {
     .slice(0, 4);
 }
 
+function surnameNeedles(lastName: string): string[] {
+  const full = lastName.toLowerCase().replace(/[^a-z]/g, "");
+  const last = (lastName.toLowerCase().split(/\s+/).pop() || "").replace(/[^a-z]/g, "");
+  return [...new Set([full, last].filter((item) => item.length >= 3))];
+}
+
+function pathHasSurname(pathname: string, needles: string[]): boolean {
+  const path = decodeURIComponent(pathname).toLowerCase().replace(/[^a-z]/g, "");
+  return needles.some((needle) => path.includes(needle));
+}
+
 /** Up to eight sitemap URLs whose path contains the person's last name. Other sitemap paths are not fetched. */
 export function sitemapPersonUrls(xml: string, origin: string, lastName: string): string[] {
-  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
-  if (needle.length < 3) return [];
+  const needles = surnameNeedles(lastName);
+  if (!needles.length) return [];
   let base: URL;
   try {
     base = new URL(origin);
@@ -289,7 +301,7 @@ export function sitemapPersonUrls(xml: string, origin: string, lastName: string)
       continue;
     }
     if (url.origin !== base.origin) continue;
-    if (!decodeURIComponent(url.pathname).toLowerCase().includes(needle)) continue;
+    if (!pathHasSurname(url.pathname, needles)) continue;
     url.hash = "";
     const href = url.toString();
     if (seen.has(href)) continue;
@@ -302,8 +314,8 @@ export function sitemapPersonUrls(xml: string, origin: string, lastName: string)
 
 /** Same-origin links whose path contains the surname, including /our-people/partners/stephen-b-meister/. */
 export function surnamePageUrls(html: string, base: string, lastName: string): string[] {
-  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
-  if (needle.length < 3) return [];
+  const needles = surnameNeedles(lastName);
+  if (!needles.length) return [];
   let origin = "";
   try {
     origin = new URL(base).origin;
@@ -320,7 +332,7 @@ export function surnamePageUrls(html: string, base: string, lastName: string): s
       continue;
     }
     if (url.origin !== origin) continue;
-    if (!decodeURIComponent(url.pathname).toLowerCase().replace(/[^a-z]/g, "").includes(needle)) continue;
+    if (!pathHasSurname(url.pathname, needles)) continue;
     url.hash = "";
     const href = url.toString();
     if (seen.has(href)) continue;
@@ -378,7 +390,7 @@ export async function sitemapLastNameUrls(
   const root = await pull(fetchText, `${origin}/sitemap.xml`);
   if (root.status < 200 || root.status >= 400 || !root.text.includes("<loc")) return [];
   if (!/<sitemapindex\b/i.test(root.text)) return sitemapPersonUrls(root.text, origin, lastName);
-  const needle = lastName.toLowerCase().replace(/[^a-z]/g, "");
+  const needle = surnameNeedles(lastName).pop() || "";
   const children = sitemapLocs(root.text, origin);
   const named = children.filter((loc) => looksLikePeopleSitemap(loc, needle)).slice(0, 4);
   // A Liferay index uses sitemap.xml?p_l_id=… with no "people" in the path. Scan a few of those
@@ -829,7 +841,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     location: facts.location,
     aliases: brandAliases(facts.org, facts.website || ""),
   };
-  const searched = [person, facts.org, cityPhrase(facts.location)].filter(Boolean).map((part) => `"${part}"`).join(" ");
+  const place = queryCity(facts.location);
+  const searched = [person, facts.org, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
   const attempts: Attempt[] = [];
   const produced: CheckOutput[] = [];
   let flushed = 0;
@@ -985,7 +998,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
       const compact = pages.map((page) => page.text).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
       const brand = mentionsBrandAlias(pages.map((page) => `${page.text}\n${page.raw}`).join("\n"), queryFacts.aliases);
-      const aliasOnly = Boolean((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal));
+      const labelIsThisFirm = Boolean(label && domainMatchesOrgStem(label, facts.org));
+      const aliasOnly = Boolean(
+        !labelIsThisFirm && ((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal)),
+      );
       if (!pages.length && homeChallenge) {
         attempts.push(
           blockedAttempt(
@@ -1053,7 +1069,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const typedLinkedin = facts.linkedinUrl.trim();
   const discoveredLinkedin =
-    socials.find((item) => item.platform === "LinkedIn" && linkedinProfileMatchesPerson(item.url, person))?.url || "";
+    socials.find((item) => {
+      if (item.platform !== "LinkedIn") return false;
+      if (/linkedin\.com\/company\//i.test(item.url)) {
+        const slug = decodeURIComponent(item.url.match(/linkedin\.com\/company\/([^/?#]+)/i)?.[1] || "");
+        if (/^\d+$/.test(slug)) return true;
+        return linkedinCompanyMatchesOrg(item.url, facts.org);
+      }
+      return linkedinProfileMatchesPerson(item.url, person);
+    })?.url || "";
   const linkedinTargets = [typedLinkedin, discoveredLinkedin].filter((url, index, all) => url && all.indexOf(url) === index);
   if (!linkedinTargets.length) {
     attempts.push(
@@ -1090,6 +1114,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       const ownProfile = /linkedin\.com\/in\//i.test(url);
       const companyPage = /linkedin\.com\/company\//i.test(url);
+      if (companyPage && !linkedinCompanyMatchesOrg(url, facts.org)) {
+        continue;
+      }
       const selfNamedFirm = firmContainsApplicantName(facts.org, person);
       const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile || (companyPage && selfNamedFirm) });
       const selfNamedProfile = score.name && selfNamedFirm && (ownProfile || companyPage);
@@ -1110,6 +1137,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
       recorded = true;
       break;
+    }
+    if (!recorded) {
+      attempts.push({
+        key: "linkedin-fetch",
+        platform: "LinkedIn",
+        searched: linkedinTargets[0],
+        url: linkedinTargets[0].replace(/^http:\/\//i, "https://"),
+        outcome: "not-found",
+        score: emptyScore(),
+        detail: "The LinkedIn company page does not match this company.",
+      });
     }
   }
   flush();
@@ -1313,52 +1351,113 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
-  const [ddg, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
-  const ddgSnippets = [...ddg.text.matchAll(/<a\b[^>]*class="result__(?:a|snippet)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const ddgSnippetsFrom = (html: string) =>
+    [...html.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
+  const [ddgFirst, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
+  type SearchSnippet = { text: string; hrefs: string[] };
+  type SearchEngine = { name: string; url: string; note: string; snippets: SearchSnippet[] };
+  const namesBoth = (snippets: SearchSnippet[]) =>
+    snippets.some((item) => {
+      if (isLinkedInDirectory(item.text) || item.hrefs.some((href) => isLinkedInDirectory(href))) return false;
+      const score = scorePublicText(item.text, queryFacts);
+      return score.name && score.company;
+    });
+  const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[]): string => {
+    const challenge =
+      status === 202 ||
+      (/challenge|captcha/i.test(text.slice(0, 2500)) && !/result__a|result-link|b_algo|class="result"/i.test(text));
+    if (challenge) return "challenge page";
+    if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
+    if (!snippets.length) return "no results";
+    if (!namesBoth(snippets)) return "no name and company";
+    return "result";
+  };
+  const engines: SearchEngine[] = [];
+  const ddgSnippets = ddgSnippetsFrom(ddgFirst.text);
+  engines.push({ name: "DuckDuckGo", url: ddgUrl, snippets: ddgSnippets, note: engineNote(ddgFirst.status, ddgFirst.text, ddgUrl, ddgSnippets) });
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
-  const ddgBlocked = accessBlocked(ddg.status, ddg.text, ddgUrl) || serpUnusable(ddgSnippets.map((item) => item.text), queryFacts);
-  const bingBlocked = accessBlocked(bing.status, bing.text, bingUrl) || serpUnusable(bingSnippets.map((item) => item.text), queryFacts);
-  let wikiUrl = "";
-  let wikiSnippets: { text: string; hrefs: string[] }[] = [];
-  let wikiBlocked = true;
-  if (ddgBlocked && bingBlocked) {
-    wikiUrl = `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`;
-    const wiki = await pull(fetchText, wikiUrl);
-    const texts = wiki.status >= 200 && wiki.status < 300 ? wikipediaRestResultTexts(wiki.text) : [];
-    wikiSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
-    wikiBlocked = accessBlocked(wiki.status, wiki.text, wikiUrl) || texts.length === 0;
+  engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets) });
+  if (!engines.some((engine) => engine.note === "result")) {
+    const loose = [person, facts.org].filter(Boolean).join(" ");
+    const extras: { name: string; url: string; parse: (text: string) => SearchSnippet[]; delay?: boolean }[] = [];
+    if (engines[0]?.note === "challenge page" || engines[0]?.note === "blocked") {
+      extras.push({
+        name: "DuckDuckGo lite",
+        url: `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(loose || searched)}`,
+        parse: (text) => ddgSnippetsFrom(text),
+        delay: true,
+      });
+    }
+    extras.push(
+      {
+        name: "Brave",
+        url: `https://search.brave.com/search?q=${encodeURIComponent(searched)}&source=web`,
+        parse: (text) => braveResultBlocks(text).map((block) => snippetFrom(block)),
+      },
+      {
+        name: "Mojeek",
+        url: `https://www.mojeek.com/search?q=${encodeURIComponent(searched)}`,
+        parse: (text) => mojeekResultBlocks(text).map((block) => snippetFrom(block)),
+      },
+      {
+        name: "Wikipedia",
+        url: `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`,
+        parse: (text) => wikipediaRestResultTexts(text).map((text) => ({ text, hrefs: [] })),
+      },
+      {
+        name: "Wikidata",
+        url: `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`,
+        parse: (text) => wikidataSearchResultTexts(text).map((text) => ({ text, hrefs: [] })),
+      },
+      {
+        name: "GDELT",
+        url: `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`${person} ${facts.org}`.trim())}&mode=artlist&format=json&maxrecords=8`,
+        parse: (text) => gdeltResultTexts(text).map((text) => ({ text, hrefs: [] })),
+      },
+    );
+    const pulled = await Promise.all(
+      extras.map(async (job) => {
+        if (job.delay) await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+        const response = await pull(fetchText, job.url);
+        const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
+        return { name: job.name, url: job.url, snippets, note: engineNote(response.status, response.text, job.url, snippets) };
+      }),
+    );
+    engines.push(...pulled);
   }
-  let dataUrl = "";
-  let dataSnippets: { text: string; hrefs: string[] }[] = [];
-  let dataBlocked = true;
-  if (ddgBlocked && bingBlocked && wikiBlocked) {
-    dataUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`;
-    const data = await pull(fetchText, dataUrl);
-    const texts = data.status >= 200 && data.status < 300 ? wikidataSearchResultTexts(data.text) : [];
-    dataSnippets = texts.map((text) => ({ text, hrefs: [] as string[] }));
-    dataBlocked = accessBlocked(data.status, data.text, dataUrl) || texts.length === 0;
-  }
-  if (ddgBlocked && bingBlocked && wikiBlocked && dataBlocked) {
-    const challenge = ddg.status === 202 || /challenge|captcha/i.test(`${ddgUrl} ${ddg.text.slice(0, 2500)}`);
+  const tried = engines.map((engine) => `${engine.name} (${engine.note})`).join(", ");
+  const order = ["DuckDuckGo", "DuckDuckGo lite", "Bing", "Brave", "Mojeek", "Wikipedia", "Wikidata", "GDELT"];
+  const hitEngine = order
+    .map((name) => engines.find((engine) => engine.name === name && engine.note === "result"))
+    .find((engine): engine is SearchEngine => Boolean(engine));
+  const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked");
+  const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
+  const ddgBlocked = !engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "result");
+  if (!hitEngine && allBlocked) {
+    const closing = ddgChallenge
+      ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
+      : "Web search is not checkable for free.";
     attempts.push(
       blockedAttempt(
         "screen-web",
         "Web search",
         searched,
         ddgUrl,
-        challenge
-          ? "DuckDuckGo returned a challenge page and is not checkable for free."
-          : "DuckDuckGo, Bing, Wikipedia, and Wikidata did not return a usable results page. Web search is not checkable for free.",
+        `All free search sources blocked. Tried ${tried}. ${closing}`.replace(/\s+/g, " ").trim(),
       ),
     );
+  } else if (!hitEngine) {
+    attempts.push({
+      key: "screen-web",
+      platform: "Web search",
+      searched,
+      url: ddgBlocked ? bingUrl : ddgUrl,
+      outcome: "not-found",
+      score: emptyScore(),
+      detail: `Tried ${tried}. No free search source returned a page naming both.`,
+    });
   } else {
-    const pool = [
-      ...(!ddgBlocked ? ddgSnippets.map((item) => ({ ...item, url: ddgUrl, platform: "DuckDuckGo" })) : []),
-      ...(!bingBlocked ? bingSnippets.map((item) => ({ ...item, url: bingUrl, platform: "Bing" })) : []),
-      ...(!wikiBlocked ? wikiSnippets.map((item) => ({ ...item, url: wikiUrl, platform: "Wikipedia" })) : []),
-      ...(!dataBlocked ? dataSnippets.map((item) => ({ ...item, url: dataUrl, platform: "Wikidata" })) : []),
-    ];
-    const matched = pool
+    const matched = hitEngine.snippets
       .filter((item) => !isLinkedInDirectory(item.text) && !item.hrefs.some((href) => isLinkedInDirectory(href)))
       .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
       .filter((item) => item.score.name && item.score.company);
@@ -1366,12 +1465,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (hit) {
       attempts.push({
         key: "screen-web",
-        platform: hit.platform,
+        platform: hitEngine.name === "DuckDuckGo lite" ? "DuckDuckGo" : hitEngine.name,
         searched,
-        url: hit.url,
+        url: hitEngine.url,
         outcome: "found",
         score: hit.score,
-        detail: hit.text.slice(0, 180),
+        detail: `Tried ${tried}. ${hit.text.slice(0, 180)}`,
         linkedUrl: hit.hrefs.join(" "),
         moreUrls: matched.slice(1).flatMap((item) => item.hrefs).join(" "),
       });
@@ -1383,7 +1482,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: "the search page responded",
+        detail: `Tried ${tried}. No free search source returned a page naming both.`,
       });
     }
   }

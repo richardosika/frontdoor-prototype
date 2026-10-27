@@ -149,6 +149,7 @@ function unique(items: string[]): string[] {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(0, 12);
 }
 
+/** The approve dialog. A hard-fail attention title is Failed. A could-not-check line stays Unverified. */
 export function approvalItemLists(input: {
   steps?: { id?: string; title: string; status: string }[];
   attention?: { title: string; detail?: string }[];
@@ -172,6 +173,21 @@ export function approvalItemLists(input: {
   return {
     failed: failedItems,
     unverified: unique(unverified).filter((item) => !failedSet.has(item)),
+  };
+}
+
+/** Step status only. Attention titles stay Unverified. The dialog uses approvalItemLists. */
+export function approvalDialogLists(input: {
+  steps?: { id?: string; title: string; status: string }[];
+  attention?: { title: string }[];
+}): { failed: string[]; unverified: string[] } {
+  const steps = (input.steps ?? []).filter((step) => step.id !== "decision");
+  const failed = steps.filter((step) => step.status === "FAIL").map((step) => step.title);
+  const fromSteps = steps.filter((step) => UNVERIFIED_STEP.has(step.status)).map((step) => step.title);
+  const fromAttention = (input.attention ?? []).map((item) => item.title.trim()).filter(Boolean);
+  return {
+    failed: [...new Set(failed)].slice(0, 12),
+    unverified: [...new Set([...fromSteps, ...fromAttention])].slice(0, 12),
   };
 }
 

@@ -1,19 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { assessLocalAddress, statedUsState, zipMatchesState } from "@/lib/verify/address";
+import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSaysAddressInvalid, parseApplicationLocation, statedUsState, streetGeocodeForms, zipMatchesState } from "@/lib/verify/address";
 import { isReservedDomain } from "@/lib/verify/host";
-import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST } from "@/lib/verify/checks";
+import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, noteIncorporationRegistry, personNameTokensLookMadeUp, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
+import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, socialSearchQuery } from "@/lib/verify/news";
+import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
+import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
+import { approveConfirmMessage, unverifiedPersonItems } from "@/lib/review-steps";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -281,7 +283,8 @@ describe("a neutral screen-news pass fills an inconclusive news check", () => {
       [row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" })],
       facts(),
     );
-    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
     const dead = gradeChecks(
       [row({ key: "website", status: "FAIL", selfReported: true, finding: "domain does not resolve" })],
       facts(),
@@ -897,7 +900,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       [row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed. Name: no. Company: yes." })],
       filledIn,
     );
-    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
     expect(linkedinOnly.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
     const news = row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." });
     const backed = gradeChecks([news], filledIn);
@@ -909,7 +912,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       ],
       filledIn,
     );
-    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
     expect(linkedinBacked.score).toBeGreaterThan(linkedinOnly.score);
   });
 });
@@ -942,7 +945,7 @@ describe("an independent hit that does not name both still asks for a team page"
     expect(namesPersonAndCompany(deal, person)).toBe(false);
     const graded = gradeChecks([directory, youtube, deal], person);
     expect(graded.categories.find((category) => category.id === "footprint")?.reason).toContain("8 of 8");
-    expect(graded.attention.some((item) => item.title === "Thin public record" && /does not name both/i.test(item.detail) && /team-page/i.test(item.detail))).toBe(true);
+    expect(graded.attention.some((item) => item.title === "Thin public record" && /team-page/i.test(item.detail) && /company confirmed, person not confirmed|does not name both/i.test(item.detail))).toBe(true);
     expect(graded.summary.nextStep.toLowerCase()).toContain("team-page");
     const named = row({
       key: "screen-web",
@@ -1367,9 +1370,9 @@ describe("website text survives the size cap", () => {
           location: "Hackensack, NJ",
         }),
       );
-      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(4);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+      expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
     }
   });
 });
@@ -1403,11 +1406,11 @@ describe("QA follow-up scoring", () => {
     const graded = gradeChecks(checks, applicant);
     const company = graded.categories.find((category) => category.id === "company");
     const identity = graded.categories.find((category) => category.id === "identity");
-    expect(company?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
+    expect(company?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
     expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
-    expect(identity?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
-    expect(graded.summary.checkedOut).toContain("company confirmed, person NOT confirmed");
-    expect(graded.summary.company).toContain("company confirmed, person NOT confirmed");
+    expect(identity?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+    expect(graded.summary.checkedOut).toContain("Company confirmed, person not confirmed");
+    expect(graded.summary.company).toContain("Company confirmed, person not confirmed");
     expect(graded.summary.company).not.toContain("No company website was confirmed");
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     expect(["D", "F"]).toContain(graded.letter);
@@ -1421,7 +1424,7 @@ describe("QA follow-up scoring", () => {
       facts({ org: "Turner Construction Company" }),
     );
     expect(personMatch.categories.find((category) => category.id === "company")?.earned).toBe(8);
-    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(4);
+    expect(companyOnly.categories.find((category) => category.id === "company")?.earned).toBe(0);
     const companyOnlyWithNews = gradeChecks(
       [
         row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "company confirmed, person NOT confirmed" }),
@@ -1472,8 +1475,8 @@ describe("QA follow-up scoring", () => {
       expect(linkedin?.companyOnly).toBe(true);
       expect(linkedin?.corroborates).toBe(false);
       const graded = gradeChecks(checks, applicant);
-      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person NOT confirmed (4 of 8)");
-      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("company confirmed, person NOT confirmed (2 of 4)");
+      expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     }
   });
@@ -1690,20 +1693,32 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
     expect(backedCity.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
   });
 
-  it("fails a Census miss and leaves a geocoder timeout not checkable", async () => {
+  it("leaves a geocoder miss and a geocoder timeout as could not check", async () => {
+    const seen: string[] = [];
     const missed = await resolveAddressCheck({
       facts: facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }),
       watchlist: [],
       network: true,
       fetchText: async (url) => {
-        expect(url).toContain("geocoding.geo.census.gov");
+        seen.push(url);
         expect(url).not.toContain("googleapis");
         expect(url).not.toContain("usps.com");
+        if (url.includes("nominatim.openstreetmap.org")) return { ok: true, status: 200, text: "[]" };
+        expect(url).toContain("geocoding.geo.census.gov");
         return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
       },
     });
-    expect(missed?.status).toBe("FAIL");
-    expect(missed?.finding.toLowerCase()).toContain("address did not check out");
+    expect(seen.some((url) => url.includes("geocoding.geo.census.gov"))).toBe(true);
+    expect(seen.some((url) => url.includes("nominatim.openstreetmap.org"))).toBe(true);
+    expect(missed?.status).toBe("INCONCLUSIVE");
+    expect(missed?.reviewFlag).not.toBe(true);
+    expect(missed?.finding.toLowerCase()).toContain("could not check");
+    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
+    expect(missed?.finding.toLowerCase()).not.toContain("address did not check out");
+    const missedGrade = gradeChecks([missed!], facts({ location: "1 Not A Real Street ZZZ, Nowhere, NJ 07102" }));
+    expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(missedGrade.attention.some((item) => item.title === "Address")).toBe(false);
 
     const down = await resolveAddressCheck({
       facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
@@ -1713,15 +1728,17 @@ describe("admin pass on role, address, reserved domains, requests, and toll-free
         throw new Error("timeout");
       },
     });
-    expect(down?.status).toBe("UNAVAILABLE");
-    expect(down?.finding.toLowerCase()).toContain("not checkable");
+    expect(down?.status).toBe("INCONCLUSIVE");
+    expect(down?.finding.toLowerCase()).toContain("could not check");
+    expect(down?.finding.toLowerCase()).toContain("inconclusive");
+    expect(down?.finding.toLowerCase()).not.toContain("did not check out");
     const graded = gradeChecks([down!], facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }));
     const completeness = graded.categories.find((category) => category.id === "completeness");
-    expect(completeness?.reason).toContain("The address is not checkable.");
+    expect(completeness?.reason.toLowerCase()).toContain("could not check");
     expect(completeness?.reason).not.toContain("address did not check out");
     expect(completeness?.reason).not.toContain("A location is on the application (2 of 2)");
     expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
-    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("not checkable");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not check");
 
     const matched = await resolveAddressCheck({
       facts: facts({ location: "4600 Silver Hill Rd, Washington, DC 20233" }),
@@ -3138,7 +3155,7 @@ describe("thirteenth follow-up", () => {
       facts({ org: "Terra Group", name: "Pat Example" }),
     );
     expect(partial.finding.toLowerCase()).toContain("parent match, needs review");
-    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("parent match, needs review");
+    expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("Parent match, needs review");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
     expect(partialGrade.categories.find((category) => category.id === "company")?.reason).not.toContain("6 of 6");
     expect(partialGrade.letter).not.toBe("C");
@@ -3668,7 +3685,7 @@ describe("qa october 27", () => {
         facts({ org: "Brookfield Properties" }),
       );
       const reason = graded.categories.find((category) => category.id === "company")?.reason || "";
-      expect(reason).toContain("parent match, needs review");
+      expect(reason).toContain("Parent match, needs review");
       expect(reason).toContain("0 of 6");
       expect(reason).not.toContain("6 of 6");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
@@ -3963,6 +3980,32 @@ describe("batch 10 fixtures", () => {
     expect(instagramCompanyTag("STO Building Group", "Robert Mullen")).not.toBe("building");
   });
 
+  it("does not treat Meridian Corp as the parent of Meridian Capital Group", () => {
+    const meridian = assessEdgarMatch({
+      org: "Meridian Capital Group",
+      person: "Ralph Herzka",
+      tickersOk: true,
+      companies: [{ title: "Meridian Corp", ticker: "MRBK", cik: "1750735" }],
+      filingNames: [["Meridian Corp (MRBK) (CIK 0001750735)"]],
+    });
+    expect(meridian.finding.toLowerCase()).not.toContain("parent match");
+    expect(meridian.finding).not.toContain("1750735");
+    expect(meridian.finding).not.toContain("MRBK");
+    expect(meridian.corroborates).toBe(false);
+    const brookfield = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "Brian Kingston",
+      tickersOk: true,
+      companies: [
+        { title: "Meridian Corp", ticker: "MRBK", cik: "1750735" },
+        { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
+      ],
+      filingNames: [],
+    });
+    expect(brookfield.finding.toLowerCase()).toContain("parent match, needs review");
+    expect(brookfield.finding).toContain("BN");
+  });
+
   it("keeps Brookfield and AECOM as parent matches and awards points only when a page links the parent", () => {
     const companies = [
       { title: "BROOKFIELD Corp /ON/", ticker: "BN", cik: "1001085" },
@@ -4168,8 +4211,8 @@ describe("batch 10 fixtures", () => {
       [row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes." })],
       facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com" }),
     );
-    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("company confirmed, person self-reported");
-    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company");
+    expect(companyOnlySite.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
     expect(companyOnlySite.letter).toBe("F");
     expect(companyOnlySite.recommendation.startsWith("APPROVE")).toBe(false);
   });
@@ -4202,5 +4245,1358 @@ describe("batch 10 fixtures", () => {
     expect(linkedin?.url || "").toContain("/company/");
     expect(linkedin?.corroborates).not.toBe(true);
     expect(linkedin?.selfReported).toBe(true);
+  });
+});
+
+describe("batch 11 report wording and Vesey Street", () => {
+  const brookfieldFinding =
+    "EDGAR lists Brookfield Properties, Inc., CIK 1680277. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.";
+
+  it("says one thing about a name-only EDGAR hit and a discovered LinkedIn company page", () => {
+    const graded = gradeChecks(
+      [
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          corroborates: false,
+          source: "SEC EDGAR",
+          finding: brookfieldFinding,
+        }),
+        row({
+          key: "linkedin-format",
+          status: "INCONCLUSIVE",
+          finding: "No LinkedIn URL was provided.",
+          source: "Local URL check",
+        }),
+        row({
+          key: "linkedin-fetch",
+          status: "PASS",
+          companyOnly: true,
+          corroborates: false,
+          source: "LinkedIn",
+          url: "https://www.linkedin.com/company/brookfield-properties/",
+          finding: "The LinkedIn company page names Brookfield Properties. Company: yes. Name: no.",
+        }),
+      ],
+      facts({
+        name: "QA-TEST Bravo",
+        applicantName: "QA-TEST Bravo",
+        org: "Brookfield Properties",
+        location: "250 Vesey St, New York, NY 10281",
+        linkedinUrl: "",
+        website: "https://www.brookfieldproperties.com",
+      }),
+    );
+    const text = graded.plainText;
+    expect(graded.summary.company).toContain("Brookfield Properties, Inc.");
+    expect(graded.summary.company).toContain("CIK 1680277");
+    expect(graded.summary.company.toLowerCase()).toContain("name-only company match is inconclusive");
+    expect(graded.summary.couldNotCheck).not.toContain("SEC EDGAR came back without a usable match");
+    expect(text).not.toContain("came back without a usable match");
+    expect(graded.summary.checkedOut).toContain("The LinkedIn company page confirms the company.");
+    expect(graded.summary.checkedOut).toContain("Company confirmed, person not confirmed");
+    expect(text).not.toContain("LinkedIn link came back without a usable match");
+    expect(graded.attention.some((item) => item.title === "No LinkedIn URL")).toBe(false);
+    expect(graded.summary.couldNotCheck).toContain("No LinkedIn URL was on the application.");
+    expect(graded.summary.couldNotCheck).toContain("A LinkedIn company page was still found");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain(
+      "EDGAR lists this exact company name. A name-only match is inconclusive",
+    );
+    expect(text).not.toMatch(/(?:^|[.!?]\s+)(?:company confirmed|address did not|domain does not|did not check out)/);
+  });
+
+  it("passes 250 Vesey Street when Nominatim matches and Census does not", async () => {
+    expect(streetGeocodeForms("250 Vesey St")).toEqual(["250 Vesey Street", "250 Vesey St"]);
+    expect(expandStreetSuffix("4600 Silver Hill Rd.")).toBe("4600 Silver Hill Road");
+    const nominatim = JSON.stringify([
+      {
+        address: {
+          house_number: "250",
+          road: "Vesey Street",
+          city: "New York",
+          state: "New York",
+          postcode: "10281",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(nominatim, { street: "250 Vesey St", city: "New York", state: "NY", zip: "10281" })).toBe("match");
+    const urls: string[] = [];
+    const address = await resolveAddressCheck({
+      facts: facts({ location: "250 Vesey St, New York, NY 10281" }),
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        urls.push(url);
+        if (url.includes("nominatim.openstreetmap.org")) {
+          expect(decodeURIComponent(url).replace(/\+/g, " ")).toContain("250 Vesey Street");
+          expect(url).toContain("postalcode=10281");
+          return { ok: true, status: 200, text: nominatim };
+        }
+        expect(url).toContain("geocoding.geo.census.gov");
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(urls.filter((url) => url.includes("geocoding.geo.census.gov")).length).toBeGreaterThan(0);
+    expect(address?.status).toBe("PASS");
+    expect(address?.finding).toContain("OpenStreetMap Nominatim matched this street address");
+    expect(address?.finding).toContain("The Census geocoder returned no match");
+    const graded = gradeChecks([address!], facts({ location: "250 Vesey St, New York, NY 10281" }));
+    expect(graded.summary.checkedOut).toContain("OpenStreetMap Nominatim matched this street address");
+    expect(graded.summary.couldNotCheck.toLowerCase()).not.toContain("nominatim matched");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(graded.attention.some((item) => /address did not check out/i.test(item.detail))).toBe(false);
+  });
+});
+
+describe("batch 12 former names, registry links, geocoder misses, and missing companies", () => {
+  const brookfieldIdentity = {
+    currentName: "BPI Property Inc.",
+    formerNames: ["BP US REIT LLC", "Brookfield Properties, Inc."],
+  };
+  const brookfieldCompanies = [{ title: "Brookfield Properties, Inc.", ticker: "", cik: "1680277" }];
+
+  it("treats a former EDGAR name as needs review, shows both names, and does not suggest Pass", () => {
+    const payload = JSON.stringify({
+      name: "BPI Property Inc.",
+      formerNames: [
+        { name: "BP US REIT LLC" },
+        { name: "Brookfield Properties, Inc." },
+      ],
+    });
+    expect(parseSubmissionsIdentity(payload)?.currentName).toBe("BPI Property Inc.");
+    expect(submissionsUrl("1680277")).toBe("https://data.sec.gov/submissions/CIK0001680277.json");
+    expect(matchedNameIsFormer("Brookfield Properties", "Brookfield Properties, Inc.", brookfieldIdentity)).toBe(true);
+    expect(matchedNameIsFormer("CBRE Group", "CBRE GROUP INC", { currentName: "CBRE GROUP INC", formerNames: [] })).toBe(false);
+    expect(matchedNameIsFormer("BPI Property Inc.", "BPI Property Inc.", brookfieldIdentity)).toBe(false);
+
+    const former = assessEdgarMatch({
+      org: "Brookfield Properties",
+      person: "QA Test Person",
+      tickersOk: true,
+      companies: brookfieldCompanies,
+      filingNames: [],
+      identity: brookfieldIdentity,
+    });
+    expect(former.status).toBe("INCONCLUSIVE");
+    expect(former.reviewFlag).toBe(true);
+    expect(former.companyOnly).not.toBe(true);
+    expect(former.corroborates).toBe(false);
+    expect(former.finding).toContain("BPI Property Inc.");
+    expect(former.finding).toContain("Brookfield Properties, Inc.");
+    expect(former.finding).toContain("1680277");
+    expect(former.finding.toLowerCase()).toContain("former name");
+    expect(former.finding.toLowerCase()).toContain("needs review");
+
+    const graded = gradeChecks(
+      [
+        row({ key: "edgar", status: former.status, reviewFlag: true, finding: former.finding, url: former.url, source: "SEC EDGAR" }),
+        row({
+          key: "website",
+          status: "PASS",
+          companyOnly: true,
+          selfReported: true,
+          url: "https://www.brookfieldproperties.com/",
+          finding: "Company: yes. The company's own site names the company.",
+          source: "Company website",
+        }),
+        plausibilityCheck(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Brookfield Properties" })),
+      ],
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" }),
+    );
+    expect(graded.summary.company).toContain("BPI Property Inc.");
+    expect(graded.summary.company).toContain("former name");
+    expect(graded.summary.company).not.toContain("No EDGAR filing was confirmed");
+    const company = graded.categories.find((category) => category.id === "company");
+    expect(company?.reason).toContain("0 of 6");
+    expect(company?.reason.toLowerCase()).toContain("former");
+    expect(companyCouldNotBeFound(graded ? [
+      row({ key: "website", status: "PASS", companyOnly: true, finding: "Company: yes", url: "https://www.brookfieldproperties.com/" }),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: former.finding }),
+    ] : [])).toBe(false);
+
+    const current = assessEdgarMatch({
+      org: "CBRE Group",
+      person: "QA Test Person",
+      tickersOk: true,
+      companies: [{ title: "CBRE GROUP INC", ticker: "CBRE", cik: "1138118" }],
+      filingNames: [],
+      identity: { currentName: "CBRE GROUP INC", formerNames: ["CBRE CORP"] },
+    });
+    expect(current.finding).toContain("CBRE GROUP INC");
+    expect(current.finding).toContain("1138118");
+    expect(current.finding.toLowerCase()).not.toContain("former name");
+    expect(current.companyOnly).toBe(true);
+  });
+
+  it("uses the Arizona registry sentence and a state link for Rhode Island", () => {
+    const rhodeIsland = registryLinkCheck(facts({ location: "Providence, RI", org: "Gilbane Building Company" }));
+    expect(rhodeIsland.status).toBe("NOT_RUN");
+    expect(rhodeIsland.url).toBe("https://business.sos.ri.gov/CorpWeb/CorpSearch/CorpSearch.aspx");
+    expect(rhodeIsland.finding).toContain("Couldn't check for free. No free RI registry API. Open the state search and look up Gilbane Building Company.");
+    expect(rhodeIsland.finding).not.toContain("No stable free registry API");
+    expect(rhodeIsland.finding).not.toContain("Search the secretary of state manually");
+    const arizona = registryLinkCheck(facts({ location: "Phoenix, Arizona", org: "Desert Builders" }));
+    expect(arizona.finding).toContain("No free AZ registry API. Open the state search and look up Desert Builders.");
+    expect(arizona.url).toBe("https://ecorp.azcc.gov/EntitySearch/Index");
+    for (const state of ["AL", "OH", "WY", "RI"]) {
+      const link = registryLinkCheck(facts({ location: `Capital City, ${state}`, org: "Sample Builders" }));
+      expect(link.url).toMatch(/^https:\/\//);
+      expect(link.finding).toContain(`No free ${state} registry API`);
+    }
+  });
+
+  it("does not list a geocoder miss as a failure, and still fails a placeholder or an explicit invalid address", async () => {
+    const plaza = JSON.stringify([
+      {
+        address: {
+          building: "One New York Plaza",
+          house_number: "1",
+          road: "Water Street",
+          city: "New York",
+          state: "New York",
+          postcode: "10004",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(plaza, { street: "One New York Plaza", city: "New York", state: "NY", zip: "10004" })).toBe("match");
+    const wrongPlaza = JSON.stringify([
+      {
+        address: {
+          house_number: "1",
+          road: "Kingsbridge Plaza",
+          city: "City of Mount Vernon",
+          state: "New York",
+          postcode: "10550",
+        },
+      },
+    ]);
+    expect(assessNominatimBody(wrongPlaza, { street: "1 New York Plaza", city: "New York", state: "NY", zip: "10004" })).toBe("none");
+    expect(geocoderSaysAddressInvalid(JSON.stringify({ result: { addressMatches: [] } }))).toBe(false);
+    expect(geocoderSaysAddressInvalid("The address is invalid.")).toBe(true);
+
+    const missed = await resolveAddressCheck({
+      facts: facts({ location: "1 New York Plaza, New York, NY 10004" }),
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        if (url.includes("nominatim")) return { ok: true, status: 200, text: wrongPlaza };
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(missed?.status).toBe("INCONCLUSIVE");
+    expect(missed?.finding.toLowerCase()).toContain("could not check");
+    expect(missed?.finding.toLowerCase()).toContain("inconclusive");
+    const missedGrade = gradeChecks([missed!], facts({ location: "1 New York Plaza, New York, NY 10004" }));
+    expect(missedGrade.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(missedGrade.summary.didNotCheckOut.toLowerCase()).not.toContain("address");
+
+    const box = assessLocalAddress("P.O. Box 12, Phoenix, AZ 85001");
+    expect(box.kind).toBe("invalid");
+    if (box.kind === "invalid") expect(box.finding.toLowerCase()).toContain("p.o. box");
+    const nowhere = await resolveAddressCheck({
+      facts: facts({ location: "0 Nowhere Lane, New York, NY 10001" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(nowhere?.status).toBe("FAIL");
+    expect(nowhere?.finding.toLowerCase()).toContain("did not check out");
+
+    const invalid = await resolveAddressCheck({
+      facts: facts({ location: "9 Main Street, Newark, NJ 07102" }),
+      watchlist: [],
+      network: true,
+      fetchText: async () => ({ ok: true, status: 200, text: "This address is invalid." }),
+    });
+    expect(invalid?.status).toBe("FAIL");
+    expect(invalid?.finding.toLowerCase()).toContain("did not check out");
+    expect(invalid?.finding.toLowerCase()).toContain("invalid");
+  });
+
+  it("flags an unregistered domain with no company evidence and scores it below a company-confirmed file", () => {
+    expect(tokenLooksGibberish("Throvnik")).toBe(false);
+    expect(tokenLooksGibberish("Qwvzn")).toBe(true);
+    expect(tokenLooksGibberish("Blorptex")).toBe(false);
+    expect(tokenLooksGibberish("Prologis")).toBe(false);
+    expect(tokenLooksGibberish("Gilbane")).toBe(false);
+    expect(tokenLooksGibberish("Brookfield")).toBe(false);
+    expect(tokenLooksGibberish("Tishman")).toBe(false);
+    expect(tokenLooksGibberish("Brambleton")).toBe(false);
+    expect(tokenLooksGibberish("Keystone")).toBe(false);
+    expect(companyNameLooksReal("Throvnik Pellusar Capital LLC")).toBe(true);
+    expect(companyNameLooksReal("Prologis")).toBe(true);
+    expect(companyNameLooksReal("Gilbane Building Company")).toBe(true);
+    expect(companyNameLooksReal("Fried Frank")).toBe(true);
+    const readableSurname = plausibilityCheck(facts({ name: "Throvnik Pellusar", applicantName: "Throvnik Pellusar", org: "CBRE Group" }));
+    expect(readableSurname.status).toBe("PASS");
+    expect(readableSurname.finding.toLowerCase()).not.toContain("does not look like real words");
+    const readablePerson = plausibilityCheck(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "CBRE Group" }));
+    expect(readablePerson.status).toBe("PASS");
+
+    const fakeFacts = facts({
+      name: "Throvnik Pellusar",
+      applicantName: "Throvnik Pellusar",
+      org: "Throvnik Pellusar Capital LLC",
+      location: "Phoenix, AZ",
+      website: "https://throvnik-pellusar.example",
+    });
+    const fakeChecks = [
+      plausibilityCheck(fakeFacts),
+      row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "RDAP has no registration for throvnik-pellusar.example. domain is not registered. This counts against the company.", source: "RDAP" }),
+      row({ key: "website", status: "FAIL", finding: "Searched: https://throvnik-pellusar.example. domain does not resolve.", source: "Company website" }),
+      row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name.", source: "SEC EDGAR" }),
+      registryLinkCheck(fakeFacts),
+    ];
+    expect(companyCouldNotBeFound(fakeChecks)).toBe(true);
+    expect(companyExistsEvidence(fakeChecks)).toBe(false);
+    const fake = gradeChecks(fakeChecks, fakeFacts);
+    expect(fake.attention[0]?.title).toBe("Company could not be found");
+    expect(fake.attention[0]?.severity).toBe("High");
+    expect(fake.banner || "").toContain("Company could not be found");
+    expect(fake.summary.company).toContain("Company could not be found");
+    const fakeRole = fake.categories.find((category) => category.id === "role");
+    expect(fakeRole?.reason).toContain("Company could not be found (0 of 8)");
+    expect(fakeRole?.reason).not.toContain("8 of 8");
+    expect(fake.summary.checkedOut.toLowerCase()).not.toContain("filled in and can be read");
+
+    const realFacts = facts({
+      name: "Alex Morgan",
+      applicantName: "Alex Morgan",
+      org: "CBRE Group",
+      website: "https://www.cbre.com/",
+    });
+    const realChecks = [
+      plausibilityCheck(realFacts),
+      row({
+        key: "website",
+        status: "PASS",
+        companyOnly: true,
+        selfReported: true,
+        url: "https://www.cbre.com/",
+        finding: "Company: yes. The company's own site names the company.",
+        source: "Company website",
+      }),
+      row({
+        key: "edgar",
+        status: "INCONCLUSIVE",
+        companyOnly: true,
+        finding: "EDGAR lists CBRE GROUP INC (CBRE), CIK 1138118. A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.",
+        source: "SEC EDGAR",
+        url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+      }),
+    ];
+    expect(companyExistsEvidence(realChecks)).toBe(true);
+    expect(companyCouldNotBeFound(realChecks)).toBe(false);
+    const real = gradeChecks(realChecks, realFacts);
+    expect(real.attention.some((item) => item.title === "Company could not be found")).toBe(false);
+    expect(real.banner || "").not.toContain("Company could not be found");
+    expect(real.recommendation).toBe("NEEDS MORE INFO");
+    expect(fake.score).toBeLessThan(real.score);
+    expect(real.categories.find((category) => category.id === "role")?.reason).toContain("8 of 8");
+    expect(real.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person");
+  });
+});
+
+describe("company-only live QA fixtures", () => {
+  // Live grades on mvp bbd1072, company-only applicants: CBRE F38, Brookfield F44,
+  // AECOM Tishman F38, Prologis F38, Gilbane F44, Fried Frank F38, fake F36.
+  const liveBefore = {
+    cbre: 38,
+    brookfield: 44,
+    aecom: 38,
+    prologis: 38,
+    gilbane: 44,
+    fried: 38,
+    fake: 36,
+  };
+
+  function localPasses(): CheckOutput[] {
+    return [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member or a declined applicant." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up has no fraud-pattern phrasing." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst of applications." }),
+    ];
+  }
+
+  function registeredDomain(): CheckOutput {
+    return row({ key: "rdap", status: "PASS", finding: "A domain registration record responded.", source: "RDAP", url: "https://rdap.org/" });
+  }
+
+  function censusMiss(): CheckOutput {
+    return row({
+      key: "address",
+      status: "UNAVAILABLE",
+      finding: "Could not check. The Census geocoder and OpenStreetMap Nominatim returned no match. This is inconclusive. It is not a pass and not a failure.",
+      source: "US Census Geocoder",
+    });
+  }
+
+  function companySite(url: string): CheckOutput {
+    return row({
+      key: "website",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url,
+      finding: "Company: yes. The company's own site names the company.",
+      source: "Company website",
+    });
+  }
+
+  function linkedinCompany(url: string): CheckOutput {
+    return row({
+      key: "linkedin-fetch",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url,
+      finding: "The LinkedIn company page confirms the company. Company confirmed, person not confirmed.",
+      source: "LinkedIn",
+    });
+  }
+
+  it("grades the six company-only firms and the fake without raising the fake", () => {
+    const person = "Alex Morgan";
+    const cbre = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "CBRE Group" })),
+        registeredDomain(),
+        censusMiss(),
+        row({
+          key: "website",
+          status: "UNAVAILABLE",
+          finding: "The company website could not be checked. The site blocked this agent.",
+          source: "Company website",
+        }),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1138118",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "CBRE Group", website: "https://www.cbre.com/", location: "250 Vesey St, New York, NY 10281" }),
+    );
+    const brookfield = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Brookfield Properties" })),
+        registeredDomain(),
+        companySite("https://www.brookfieldproperties.com/"),
+        linkedinCompany("https://www.linkedin.com/company/brookfield-properties/"),
+        censusMiss(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          reviewFlag: true,
+          finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review. A former name is not an exact match and does not corroborate.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1680277",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/", location: "250 Vesey St, New York, NY 10281" }),
+    );
+    const aecom = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "AECOM Tishman" })),
+        registeredDomain(),
+        censusMiss(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          reviewFlag: true,
+          finding: "Parent match, needs review. EDGAR lists AECOM (ACM), CIK 868857. A parent or affiliate is not an exact match and is not a pass.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=868857",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "AECOM Tishman", location: "One New York Plaza, New York, NY 10004" }),
+    );
+    const prologis = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Prologis" })),
+        registeredDomain(),
+        row({
+          key: "edgar",
+          status: "INCONCLUSIVE",
+          companyOnly: true,
+          finding: "EDGAR's current name for CIK 1045609 is PROLOGIS INC. That is an exact current-name match. It does not tie the person to the firm.",
+          url: "https://www.sec.gov/edgar/browse/?CIK=1045609",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: person, applicantName: person, org: "Prologis", website: "https://www.prologis.com/" }),
+    );
+    const gilbane = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Gilbane Building Company" })),
+        registeredDomain(),
+        companySite("https://www.gilbaneco.com/"),
+        linkedinCompany("https://www.linkedin.com/company/gilbane-building-company/"),
+        registryLinkCheck(facts({ location: "Providence, RI", org: "Gilbane Building Company" })),
+      ],
+      facts({ name: person, applicantName: person, org: "Gilbane Building Company", website: "https://www.gilbaneco.com/", location: "Providence, RI" }),
+    );
+    const fried = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(facts({ name: person, applicantName: person, org: "Fried Frank" })),
+        registeredDomain(),
+      ],
+      facts({ name: person, applicantName: person, org: "Fried Frank", website: "https://www.friedfrank.com/" }),
+    );
+    const fakeFacts = facts({
+      name: "Throvnik Pellusar",
+      applicantName: "Throvnik Pellusar",
+      org: "Throvnik Pellusar Capital LLC",
+      location: "Phoenix, AZ",
+      website: "https://throvnik-pellusar.example",
+    });
+    const fake = gradeChecks(
+      [
+        ...localPasses(),
+        plausibilityCheck(fakeFacts),
+        row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "RDAP has no registration for throvnik-pellusar.example. domain is not registered.", source: "RDAP" }),
+        row({ key: "website", status: "FAIL", finding: "Searched: https://throvnik-pellusar.example. domain does not resolve.", source: "Company website" }),
+        row({ key: "edgar", status: "INCONCLUSIVE", finding: "EDGAR responded. No company on the SEC list uses this firm's name.", source: "SEC EDGAR" }),
+        registryLinkCheck(fakeFacts),
+      ],
+      fakeFacts,
+    );
+
+    const after = {
+      cbre: cbre.score,
+      brookfield: brookfield.score,
+      aecom: aecom.score,
+      prologis: prologis.score,
+      gilbane: gilbane.score,
+      fried: fried.score,
+      fake: fake.score,
+    };
+    expect(after).toEqual({ cbre: 38, brookfield: 44, aecom: 38, prologis: 38, gilbane: 44, fried: 38, fake: 28 });
+    expect(after.fake).toBeLessThan(liveBefore.fake);
+    for (const score of [after.cbre, after.brookfield, after.aecom, after.prologis, after.gilbane, after.fried]) {
+      expect(after.fake).toBeLessThan(score);
+      expect(score).toBeGreaterThanOrEqual(liveBefore.fake);
+    }
+    for (const report of [cbre, brookfield, aecom, prologis, gilbane, fried, fake]) {
+      expect(report.letter).toBe("F");
+      expect(report.recommendation).toBe("NEEDS MORE INFO");
+    }
+    expect(cbre.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(cbre.summary.didNotCheckOut.toLowerCase()).not.toContain("address");
+    expect(brookfield.summary.didNotCheckOut.toLowerCase()).not.toContain("vesey");
+    expect(aecom.summary.didNotCheckOut.toLowerCase()).not.toContain("plaza");
+    expect(brookfield.summary.company).toContain("BPI Property Inc.");
+    expect(brookfield.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(cbre.categories.find((category) => category.id === "company")?.reason).toContain("exact company name");
+    expect(fake.attention[0]?.title).toBe("Company could not be found");
+    expect(fake.categories.find((category) => category.id === "role")?.earned).toBe(0);
+    expect(cbre.categories.find((category) => category.id === "role")?.earned).toBe(8);
+
+    const prefill = emptyPrefillFacts({ name: person, org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" });
+    const brookfieldStep = suggestCompany(prefill, [
+      { checkKey: "website", status: "PASS", finding: "The company's own site names the company.", url: "https://www.brookfieldproperties.com/", source: "Company website" },
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review.", url: "https://www.sec.gov/edgar/browse/?CIK=1680277", source: "SEC EDGAR", reviewFlag: true },
+    ]);
+    expect(brookfieldStep.mark).toBe("CONCERN");
+    expect(brookfieldStep.note).toContain("Could not confirm");
+    expect(brookfieldStep.note).toContain("Needs review");
+    const cbreStep = suggestCompany(emptyPrefillFacts({ name: person, org: "CBRE Group" }), [
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "EDGAR's current name for CIK 1138118 is CBRE GROUP INC. That is an exact current-name match. It does not tie the person to the firm.", url: "https://www.sec.gov/edgar/browse/?CIK=1138118", source: "SEC EDGAR" },
+    ]);
+    expect(cbreStep.mark).toBe("PASS");
+    const aecomStep = suggestCompany(emptyPrefillFacts({ name: person, org: "AECOM Tishman", website: "https://www.aecom.com/" }), [
+      { checkKey: "website", status: "PASS", finding: "The company's own site names the company.", url: "https://www.aecom.com/", source: "Company website" },
+      { checkKey: "edgar", status: "INCONCLUSIVE", finding: "Parent match, needs review. EDGAR lists AECOM (ACM). A parent or affiliate is not an exact match.", url: "https://www.sec.gov/edgar/browse/?CIK=868857", source: "SEC EDGAR", reviewFlag: true },
+    ]);
+    expect(aecomStep.mark).toBe("CONCERN");
+    const ownerStep = suggestCompany(emptyPrefillFacts({ name: person, org: "CBRE Group" }), [
+      { checkKey: "edgar", status: "PASS", corroborates: true, finding: "A Form 4 for this CIK names Sulentic Robert E as a reporting owner.", url: "https://www.sec.gov/edgar/browse/?CIK=1138118", source: "SEC EDGAR" },
+    ]);
+    expect(ownerStep.mark).toBe("PASS");
+  });
+});
+
+describe("self-reported website credit needs an outside source", () => {
+  // Local floor is 36. A registered domain is +2. Full social links are +2. Together that is 40.
+  // The ungated half credit added 4 and was how a fake reached F 44.
+  function floor(extra: CheckOutput[] = []): CheckOutput[] {
+    return [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member or a declined applicant." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up has no fraud-pattern phrasing." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst of applications." }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are filled in and readable." }),
+      row({ key: "rdap", status: "PASS", finding: "A domain registration record responded.", source: "RDAP" }),
+      row({ key: "social-links", status: "PASS", finding: "The other social links are full web addresses." }),
+      ...extra,
+    ];
+  }
+
+  function ownSite(host: string): CheckOutput {
+    return row({
+      key: "website",
+      status: "PASS",
+      companyOnly: true,
+      selfReported: true,
+      corroborates: false,
+      url: host,
+      finding: "Company: yes. The company's own site names the company.",
+      source: "Company website",
+    });
+  }
+
+  it("drops the F 44 website credit when nothing outside the applicant confirms the company", () => {
+    const fakeFacts = facts({
+      name: "Jordan Hale",
+      applicantName: "Jordan Hale",
+      org: "Northbridge Meridian Holdings LLC",
+      website: "https://www.northbridgemeridian.example",
+      role: "DEVELOPER",
+    });
+    const checks = floor([ownSite("https://www.northbridgemeridian.example")]);
+    expect(outsideSourceConfirmsCompany(checks)).toBe(false);
+    const graded = gradeChecks(checks, fakeFacts);
+    // 38 is the local floor (36) plus a registered domain (2). The ungated half credit would make this 42.
+    // Richard's live read of this pattern was F 44; the same 4-point gate takes that file to F 40.
+    expect(graded.score).toBe(38);
+    expect(graded.letter).toBe("F");
+    expect(graded.recommendation).toBe("NEEDS MORE INFO");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("No outside source confirmed the company (0 of 8)");
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    expect(graded.summary.checkedOut.toLowerCase()).not.toContain("own site confirms the company");
+    expect(companyCouldNotBeFound(checks)).toBe(false);
+    expect(graded.score + 4).toBe(42);
+    expect(graded.score).toBeLessThan(44);
+  });
+
+  it("keeps the half credit for Gilbane, Joshua Stein, Skanska, RXR, and Ulbrich when an outside source confirms the company", () => {
+    const gilbane = gradeChecks(
+      floor([
+        ownSite("https://www.gilbaneco.com/"),
+        row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "The LinkedIn company page confirms the company.", url: "https://www.linkedin.com/company/gilbane-building-company/", source: "LinkedIn" }),
+      ]),
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company", website: "https://www.gilbaneco.com/", location: "Providence, RI" }),
+    );
+    const stein = gradeChecks(
+      floor([
+        ownSite("https://www.joshuastein.com/"),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists JOSHUA STEIN PLLC.", url: "https://data.ny.gov/", source: "NY registry" }),
+      ]),
+      facts({ name: "Joshua Stein", applicantName: "Joshua Stein", org: "Joshua Stein PLLC", website: "https://www.joshuastein.com/", location: "New York, NY" }),
+    );
+    const skanska = gradeChecks(
+      floor([
+        ownSite("https://www.skanska.com/"),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists SKANSKA USA BUILDING INC.", url: "https://data.ny.gov/", source: "NY registry" }),
+      ]),
+      facts({ name: "QA TestAB", applicantName: "QA TestAB", org: "Skanska USA", website: "https://www.usa.skanska.com/", location: "New York, NY" }),
+    );
+    const rxr = gradeChecks(
+      floor([
+        row({ key: "website", status: "PASS", selfReported: true, corroborates: false, finding: "Name: yes. Company: yes. The page names Scott Rechler at RXR.", url: "https://www.rxr.com/", source: "Company website" }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company. RXR CEO Scott Rechler says the tower is open.", source: "News" }),
+      ]),
+      facts({ name: "Scott Rechler", applicantName: "Scott Rechler", org: "RXR", website: "https://www.rxr.com/", location: "New York, NY" }),
+    );
+    const ulbrich = gradeChecks(
+      floor([
+        ownSite("https://www.jll.com/"),
+        row({ key: "edgar", status: "PASS", corroborates: true, finding: "EDGAR lists JONES LANG LASALLE INC (JLL), CIK 1037976. A Form 4 names Ulbrich Christian as a reporting owner.", url: "https://www.sec.gov/edgar/browse/?CIK=1037976", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "Christian Ulbrich", applicantName: "Christian Ulbrich", org: "Jones Lang LaSalle", website: "https://www.jll.com/", location: "Chicago, IL" }),
+    );
+
+    expect(gilbane.score).toBe(44);
+    expect(stein.score).toBe(44);
+    expect(skanska.score).toBe(44);
+    expect(rxr.score).toBe(62);
+    expect(ulbrich.score).toBe(56);
+    for (const report of [gilbane, stein, skanska, rxr, ulbrich]) {
+      expect(report.recommendation).not.toBe("DECLINE");
+      expect(report.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    }
+    expect(gilbane.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
+    expect(stein.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(rxr.categories.find((category) => category.id === "company")?.reason).toContain("8 of 8");
+    expect(ulbrich.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
+    expect(rxr.letter).toBe("D");
+    expect(rxr.recommendation).toBe("NEEDS MORE INFO");
+    expect(ulbrich.letter).toBe("F");
+  });
+
+  it("does not treat a former name or a parent match as the outside confirmation", () => {
+    const brookfield = gradeChecks(
+      floor([
+        ownSite("https://www.brookfieldproperties.com/"),
+        row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "EDGAR's current name for CIK 1680277 is BPI Property Inc. Brookfield Properties, Inc. is a former name. Needs review.", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "QA TestAF", applicantName: "QA TestAF", org: "Brookfield Properties", website: "https://www.brookfieldproperties.com/" }),
+    );
+    const aecom = gradeChecks(
+      floor([
+        ownSite("https://www.aecom.com/"),
+        row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Parent match, needs review. EDGAR lists AECOM (ACM). A parent or affiliate is not an exact match.", source: "SEC EDGAR" }),
+      ]),
+      facts({ name: "QA Test", applicantName: "QA Test", org: "AECOM Tishman", website: "https://www.aecom.com/" }),
+    );
+    expect(outsideSourceConfirmsCompany([
+      ownSite("https://www.brookfieldproperties.com/"),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Brookfield Properties, Inc. is a former name.", source: "SEC EDGAR" }),
+    ])).toBe(false);
+    expect(outsideSourceConfirmsCompany([
+      ownSite("https://www.aecom.com/"),
+      row({ key: "edgar", status: "INCONCLUSIVE", reviewFlag: true, finding: "Parent match, needs review. EDGAR lists AECOM (ACM).", source: "SEC EDGAR" }),
+    ])).toBe(false);
+    expect(brookfield.score).toBe(38);
+    expect(aecom.score).toBe(38);
+    expect(brookfield.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
+    expect(aecom.categories.find((category) => category.id === "company")?.reason).toContain("0 of 8");
+    expect(brookfield.summary.didNotCheckOut.toLowerCase()).not.toContain("website");
+    expect(aecom.recommendation).not.toBe("DECLINE");
+  });
+
+  it("leaves Brinkwell on the dead-domain score and keeps the fake under the outside-confirmed reals", () => {
+    const brinkwellFacts = facts({
+      name: "Thaddeus Brinkwell",
+      applicantName: "Thaddeus Brinkwell",
+      org: "Ormsley Vantage Lending Partners LLC",
+      website: "https://www.ormsleyvantage.com",
+      role: "LENDER",
+    });
+    const brinkwellChecks = [
+      row({ key: "email-syntax", status: "PASS", finding: "The email is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "sanctions", status: "PASS", finding: "No sanctions-list name matched." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a member." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up is clear." }),
+      row({ key: "velocity", status: "PASS", finding: "No burst." }),
+      plausibilityCheck(brinkwellFacts),
+      row({ key: "social-links", status: "PASS", finding: "The other social links are full web addresses." }),
+      row({ key: "website", status: "FAIL", finding: "Searched: https://www.ormsleyvantage.com. domain does not resolve.", source: "Company website" }),
+      row({ key: "rdap", status: "FAIL", reviewFlag: true, finding: "domain is not registered.", source: "RDAP" }),
+    ];
+    const brinkwell = gradeChecks(brinkwellChecks, brinkwellFacts);
+    const fake = gradeChecks(
+      floor([ownSite("https://www.northbridgemeridian.example")]),
+      facts({ name: "Jordan Hale", applicantName: "Jordan Hale", org: "Northbridge Meridian Holdings LLC", website: "https://www.northbridgemeridian.example" }),
+    );
+    const gilbane = gradeChecks(
+      floor([
+        ownSite("https://www.gilbaneco.com/"),
+        row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, finding: "The LinkedIn company page confirms the company.", source: "LinkedIn" }),
+      ]),
+      facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company" }),
+    );
+    expect(brinkwell.letter).toBe("F");
+    expect(brinkwell.recommendation.startsWith("APPROVE")).toBe(false);
+    expect(brinkwell.score).toBe(28);
+    expect(brinkwell.score).toBeLessThan(40);
+    expect(fake.score).toBe(38);
+    expect(fake.score).toBeLessThan(44);
+    // Fixture gap is 6 (Gilbane 44, gated fake 38). Richard's live pair was Gilbane and Joshua Stein at F 48
+    // against a fake at F 44. Removing the 4 points makes that live gap 8. Both are short of the 15-point target.
+    expect(gilbane.score - fake.score).toBe(6);
+    expect(gilbane.score - fake.score).toBeLessThan(15);
+    expect(brinkwell.score).toBeLessThan(fake.score);
+    expect(brinkwell.score).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("batch 12 surnames, aliases, and company pages", () => {
+  function rolePoints(name: string, org: string): number {
+    const applicant = facts({ name, applicantName: name, org });
+    return gradeChecks([plausibilityCheck(applicant)], applicant).categories.find((category) => category.id === "role")?.earned ?? -1;
+  }
+
+  it("passes real surnames and still fails a no-vowel company token", () => {
+    for (const [name, org] of [
+      ["Belinda Schwartz", "Herrick, Feinstein LLP"],
+      ["Ralph Herzka", "Meridian Capital Group"],
+      ["Chaim Katzman", "Gazit Group"],
+      ["Ara Hovnanian", "Hovnanian Enterprises"],
+      ["Moshe Schwartz", "Schwartz Realty LLC"],
+      ["Andrzej Duda", "Example Partners"],
+      ["Ilya Kravchenko", "Example Partners"],
+      ["Richard Osika", "Osika Construction"],
+      ["Zbigniew Example", "Example Partners"],
+      ["Yitzchak Example", "Example Partners"],
+    ] as const) {
+      const row = plausibilityCheck(facts({ name, applicantName: name, org }));
+      expect(row.status, `${name} / ${org}`).toBe("PASS");
+      expect(row.finding.toLowerCase()).not.toContain("does not look like real words");
+    }
+    expect(rolePoints("Belinda Schwartz", "Herrick, Feinstein LLP")).toBe(8);
+    expect(rolePoints("Ralph Herzka", "Meridian Capital Group")).toBe(8);
+    expect(rolePoints("Ara Hovnanian", "Hovnanian Enterprises")).toBe(8);
+    expect(companyNameLooksReal("Hovnanian Enterprises")).toBe(true);
+    expect(companyNameLooksReal("Schwartz Realty LLC")).toBe(true);
+
+    const companyMash = plausibilityCheck(facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "Blorptex Qwvzn Builders LLC" }));
+    expect(companyMash.status).toBe("FAIL");
+    expect(companyMash.finding.toLowerCase()).toContain("company name");
+    expect(plausibilityCheck(facts({ name: "Jane Roe", applicantName: "Jane Roe", org: "asdf" })).status).toBe("FAIL");
+    expect(tokenLooksGibberish("bcdf")).toBe(true);
+    expect(tokenLooksGibberish("Schwartz")).toBe(false);
+    expect(tokenLooksGibberish("Hovnanian")).toBe(false);
+
+    const personMash = plausibilityCheck(facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "CBRE Group" }));
+    expect(personMash.status).toBe("PASS");
+    expect(personNameTokensLookMadeUp("Nix Qwvzn")).toBe(true);
+    const noted = gradeChecks([personMash], facts({ name: "Nix Qwvzn", applicantName: "Nix Qwvzn", org: "CBRE Group" }));
+    expect(noted.categories.find((category) => category.id === "role")?.earned).toBe(8);
+    expect(noted.attention.some((item) => item.title === "Person name may not be real words")).toBe(true);
+    expect(noted.letter).not.toBe("A");
+  });
+
+  it("does not treat twotreesny as a second brand, and keeps a street out of the person and company query", () => {
+    expect(domainMatchesOrgStem("twotreesny", "Two Trees Management")).toBe(true);
+    expect(domainMatchesOrgStem("twotreesnyc", "Two Trees Management")).toBe(true);
+    expect(brandAliases("Two Trees Management", "https://www.twotreesny.com")).not.toContain("twotreesny");
+    expect(queryCity("7 Jackson Walkway, Providence, RI 02903")).toBe("Providence");
+    expect(queryCity("250 Vesey St, New York, NY 10281")).toBe("New York");
+    expect(newsSearchQueries(facts({ name: "Alex Morgan", applicantName: "Alex Morgan", org: "Gilbane Building Company", location: "7 Jackson Walkway, Providence, RI 02903" })).join(" ")).not.toMatch(/jackson|walkway/i);
+  });
+
+  it("treats a plaintiff-firm class-action solicitation as company-level attention", () => {
+    const headline = "Deadline Alert: Compass, Inc. Stockholders Face December 8, 2026 Lead Plaintiff Deadline in Securities Fraud Class Action";
+    const judged = judgeHeadline(headline, {
+      name: "Robert Reffkin",
+      applicantName: "Robert Reffkin",
+      org: "Compass",
+      location: "New York, NY",
+    });
+    expect(judged.person).toBe(false);
+    expect(judged.company).toBe(true);
+    expect(judged.kind).toBe("civil");
+    const rows = classifyNews(
+      facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass", location: "New York, NY" }),
+      [{ title: headline, snippet: headline, url: "https://news.example/compass", source: "Example", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((row) => row.key === "news");
+    expect(news?.status).not.toBe("FAIL");
+    expect(news?.finding).toContain("Company-level litigation");
+    const story = rows.find((row) => row.key === "news-story");
+    expect(story?.finding.startsWith("Company litigation")).toBe(true);
+    expect(story?.status).not.toBe("FAIL");
+    const graded = gradeChecks(rows, facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass" }));
+    expect(graded.caps.join(" ")).not.toMatch(/capped at F|capped at D/i);
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(true);
+  });
+
+  it("does not accept a sister LinkedIn company page from one shared token", async () => {
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/gilbane-building-company/", "Gilbane Building Company")).toBe(true);
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/gilbane-development-company/", "Gilbane Building Company")).toBe(false);
+    expect(linkedinCompanyMatchesOrg("https://www.linkedin.com/company/walker-dunlop/", "Walker & Dunlop")).toBe(true);
+    let webQuery = "";
+    const checks = await runPublicScreen(
+      facts({
+        name: "Alex Morgan",
+        applicantName: "Alex Morgan",
+        org: "Gilbane Building Company",
+        website: "https://www.gilbaneco.com/",
+        location: "7 Jackson Walkway, Providence, RI 02903",
+      }),
+      async (url) => {
+        if (url.includes("duckduckgo.com") || url.includes("bing.com")) {
+          webQuery = decodeURIComponent(url);
+          return { ok: false, status: 403, text: "" };
+        }
+        if (url.includes("gilbaneco.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: '<html><p>Gilbane Building Company</p><a href="https://www.linkedin.com/company/gilbane-development-company/">LinkedIn</a></html>',
+          };
+        }
+        if (url.includes("gilbane-development-company")) {
+          return { ok: true, status: 200, text: "<html><title>Gilbane Development Company | LinkedIn</title><p>Gilbane Development Company</p></html>" };
+        }
+        return { ok: false, status: 403, text: "" };
+      },
+    );
+    expect(webQuery.toLowerCase()).not.toContain("jackson");
+    expect(webQuery.toLowerCase()).toContain("gilbane");
+    const linkedin = checks.find((check) => check.key === "linkedin-fetch");
+    expect(linkedin?.status).not.toBe("PASS");
+    expect(linkedin?.companyOnly).not.toBe(true);
+  });
+});
+
+describe("Willy Walker live inputs", () => {
+  const walkerLocation = "One Vanderbilt Ave, Suite 3300, New York NY 10017";
+  const walker = facts({
+    name: "Willy Walker",
+    applicantName: "Willy Walker",
+    org: "Walker & Dunlop",
+    role: "MORTGAGE_BROKER",
+    location: walkerLocation,
+    phone: "212-555-0100",
+    website: "https://www.walkerdunlop.com",
+  });
+
+  it("treats a Census and Nominatim miss for One Vanderbilt as inconclusive, not a failure", async () => {
+    const parsed = parseApplicationLocation(walkerLocation);
+    expect(parsed?.state).toBe("NY");
+    expect(parsed?.zip).toBe("10017");
+    expect(parsed?.city.toLowerCase()).toBe("new york");
+    expect(parsed?.street.toLowerCase()).toContain("vanderbilt");
+    expect(parsed?.street.toLowerCase()).not.toContain("suite");
+    expect(parsed?.city.toLowerCase()).not.toContain("suite");
+
+    const address = await resolveAddressCheck({
+      facts: walker,
+      watchlist: [],
+      network: true,
+      fetchText: async (url) => {
+        const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+        expect(decoded.toLowerCase()).toContain("new york");
+        expect(decoded.toLowerCase()).not.toContain("suite 3300");
+        if (url.includes("nominatim.openstreetmap.org")) return { ok: false, status: 0, text: "" };
+        return { ok: true, status: 200, text: JSON.stringify({ result: { addressMatches: [] } }) };
+      },
+    });
+    expect(address?.status).toBe("INCONCLUSIVE");
+    expect(address?.finding.toLowerCase()).toContain("could not check");
+    expect(address?.finding.toLowerCase()).not.toContain("did not check out");
+    const graded = gradeChecks(
+      [
+        address!,
+        row({
+          key: "news",
+          status: "PASS",
+          corroborates: true,
+          finding: "A headline names the person and the company. Willy Walker, Walker & Dunlop. Name: yes. Company: yes. Confidence: high.",
+        }),
+        row({
+          key: "web-footprint",
+          status: "INCONCLUSIVE",
+          corroborates: false,
+          finding: "No result found that names this person and this company. Name: no. Company: no. City: no. Confidence: none.",
+        }),
+      ],
+      walker,
+    );
+    expect(graded.summary.didNotCheckOut.toLowerCase()).not.toContain("address did not check out");
+    expect(graded.summary.couldNotCheck.toLowerCase()).toContain("could not check");
+    expect(graded.attention.some((item) => item.title === "Address" && item.severity === "Medium")).toBe(false);
+    expect(graded.summary.company).toContain("The public web search did not return a page naming both; a news story did.");
+    expect(graded.summary.company).not.toContain("No public web result confirmed the person and the company together.");
+    expect(graded.categories.find((category) => category.id === "footprint")?.reason).toContain(
+      "The public web search did not return a page naming both; a news story did",
+    );
+    const dialog = approveConfirmMessage({
+      dues: "Approve this person?",
+      unverified: unverifiedPersonItems([
+        { checkKey: "address", status: "INCONCLUSIVE" },
+        { checkKey: "news", status: "PASS", corroborates: true },
+      ]),
+    });
+    expect(dialog).toContain("Unverified: Address");
+    expect(dialog).not.toContain("Failed: Address");
+  });
+
+  it("points Walker & Dunlop at the Maryland registry when EDGAR says it is incorporated there", () => {
+    const identity = parseSubmissionsIdentity(JSON.stringify({ name: "WALKER & DUNLOP, INC.", stateOfIncorporation: "MD", formerNames: [] }));
+    expect(identity?.stateOfIncorporation).toBe("MD");
+    const edgar = assessEdgarMatch({
+      org: "Walker & Dunlop",
+      person: "Willy Walker",
+      tickersOk: true,
+      companies: [{ title: "WALKER & DUNLOP, INC.", ticker: "WD", cik: "1497770" }],
+      filingNames: [],
+      insiderNames: [["Walker William M (CIK 0001503841)"]],
+      identity,
+    });
+    expect(edgar.finding).toContain("1497770");
+    expect(edgar.finding).toContain("State of incorporation: MD");
+    const nyMiss = row({
+      key: "business-registry",
+      status: "INCONCLUSIVE",
+      finding: "NY Active Corporations responded. No active entity uses this exact name. A similar name is not a match, and this is not a pass.",
+      url: "https://data.ny.gov/d/n9v6-gdp6",
+      source: "NY Active Corporations",
+    });
+    const noted = noteIncorporationRegistry(nyMiss, edgar.finding, "NY");
+    expect(noted.finding.toLowerCase()).toContain("does not count against");
+    expect(noted.finding).toContain("MD");
+    expect(noted.url).toContain("maryland.gov");
+    const graded = gradeChecks([noted, row({ key: "edgar", status: edgar.status, corroborates: edgar.corroborates, companyOnly: edgar.companyOnly, finding: edgar.finding })], walker);
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("does not count against the company");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).not.toContain("did not confirm this exact company name");
+  });
+
+  it("reads a request-only file as incomplete and does not raise the fake", () => {
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are readable." }),
+    ];
+    const request = gradeChecks(
+      local,
+      facts({
+        name: "Ada Request",
+        applicantName: "Ada Request",
+        org: "Request Realty",
+        website: "",
+        phone: "",
+        applicationSubmitted: false,
+        statement: "I work in commercial real estate and would like to meet other owners.",
+      }),
+    );
+    const fake = gradeChecks(
+      [
+        ...local,
+        row({ key: "rdap", status: "FAIL", finding: "The domain is not registered." }),
+        row({ key: "website", status: "FAIL", finding: "The domain does not resolve." }),
+      ],
+      facts({
+        name: "Zuplantor Vexmire",
+        applicantName: "Zuplantor Vexmire",
+        org: "Zuplantor Vexmire Builders LLC",
+        website: "https://zuplantorvexmire.example",
+        phone: "212-555-0199",
+        applicationSubmitted: true,
+      }),
+    );
+    expect(request.summary.reasoning).toContain("Incomplete application. Request a website, phone, or business card. Send to review: incomplete.");
+    expect(request.summary.nextStep).toContain("Send to review: incomplete.");
+    expect(request.summary.applicant).toContain("fewer checks were available");
+    expect(fake.summary.reasoning).not.toContain("Incomplete application");
+    expect(request.score).toBe(36);
+    expect(fake.score).toBe(28);
+    expect(request.score - fake.score).toBeGreaterThanOrEqual(8);
+    expect(fake.letter).toBe("F");
+    expect(request.letter).toBe("F");
+  });
+});
+
+describe("a DuckDuckGo challenge does not erase a public record", () => {
+  const mullen = facts({
+    name: "Robert Mullen",
+    applicantName: "Robert Mullen",
+    org: "STO Building Group",
+    website: "https://www.stobuildinggroup.com",
+    location: "New York, NY",
+    role: "GENERAL_CONTRACTOR",
+    statement: "I lead a construction company and would like to meet owners and developers.",
+    inviteNote: "PF-BENCH-0000 · Benchmark invite code",
+  });
+  const mojeekHtml = `<ul class="results-standard"><li class="result"><a class="title" href="https://www.linkedin.com/in/robert-mullen-04796524">Robert Mullen - CEO at STO Building Group | LinkedIn</a><p class="s">Robert Mullen is CEO at STO Building Group.</p></li></ul>`;
+
+  function restOfFile(web: CheckOutput[]): CheckOutput[] {
+    return [
+      ...web,
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({
+        key: "linkedin-fetch",
+        status: "PASS",
+        companyOnly: true,
+        corroborates: false,
+        finding: "The public LinkedIn page company confirmed, person NOT confirmed. Name: no. Company: yes.",
+      }),
+      row({
+        key: "website",
+        status: "PASS",
+        selfReported: true,
+        corroborates: false,
+        finding: "Found: a page on the company site. Name: yes. Company: yes. City: yes. Confidence: high.",
+      }),
+      row({ key: "rdap", status: "PASS", finding: "RDAP responded for stobuildinggroup.com." }),
+      row({
+        key: "business-registry",
+        status: "PASS",
+        corroborates: false,
+        finding: "NY Active Corporations lists STO BUILDING GROUP INC. It does not tie a person to the firm.",
+      }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+    ];
+  }
+
+  it("keeps B10R02 at D68 when DuckDuckGo is challenged and Mojeek has the public page", async () => {
+    const checks = await runPublicScreen(mullen, async (url) => {
+      if (url.includes("mojeek.com")) return { ok: true, status: 200, text: mojeekHtml };
+      if (url.includes("stobuildinggroup.com")) return { ok: true, status: 200, text: "<html><p>STO Building Group</p></html>" };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      if (url.includes("bing.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("search.brave.com")) return { ok: true, status: 200, text: "<html></html>" };
+      return { ok: false, status: 403, text: "" };
+    });
+    const web = checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint");
+    for (const check of web) {
+      expect(check.status).toBe("PASS");
+      expect(check.corroborates).toBe(true);
+      expect(check.status).not.toBe("UNAVAILABLE");
+    }
+    expect(web.find((check) => check.key === "screen-web")?.source).toBe("Mojeek");
+    const graded = gradeChecks(restOfFile(web), mullen);
+    expect(graded.categories.find((category) => category.id === "completeness")?.earned).toBe(6);
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(12);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+    expect(graded.score).toBe(68);
+    expect(graded.letter).toBe("D");
+  });
+
+  it("keeps the application fields when every search engine is blocked, and does not score that block as a pass", async () => {
+    const checks = await runPublicScreen(mullen, async (url) => {
+      if (url.includes("stobuildinggroup.com")) return { ok: true, status: 200, text: "<html><p>STO Building Group leadership Robert Mullen</p></html>" };
+      return { ok: false, status: 202, text: "challenge" };
+    });
+    const web = checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint");
+    for (const check of web) {
+      expect(check.status).toBe("UNAVAILABLE");
+      expect(check.corroborates).not.toBe(true);
+      expect(check.finding).toContain("DuckDuckGo returned a challenge page");
+      expect(check.finding).toContain("All free search sources blocked");
+      expect(check.finding).toContain("Bing");
+      expect(check.finding).toContain("Brave");
+      expect(check.finding).toContain("Mojeek");
+      expect(check.finding).toContain("GDELT");
+    }
+    const graded = gradeChecks(restOfFile(web), mullen);
+    const completeness = graded.categories.find((category) => category.id === "completeness");
+    const company = graded.categories.find((category) => category.id === "company");
+    const footprint = graded.categories.find((category) => category.id === "footprint");
+    expect(completeness?.earned).toBe(6);
+    expect(footprint?.earned).toBe(0);
+    expect(footprint?.reason.toLowerCase()).toContain("could not check");
+    expect(footprint?.reason.toLowerCase()).toContain("search blocked");
+    expect(company?.reason.toLowerCase()).toContain("could not check, search blocked");
+    expect(company?.earned).toBe(8);
+    expect(graded.score).toBe(56);
+    expect(graded.letter).toBe("F");
+    const fake = gradeChecks(web, facts({ location: "New York, NY", statement: "I develop small buildings and keep a written record of each project for the application." }));
+    expect(fake.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
+    expect(fake.score).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("batch 13 search, particles, foreclosure topic, and affiliate filings", () => {
+  const ripka = facts({
+    name: "Peter Ripka",
+    applicantName: "Peter Ripka",
+    org: "RIPCO Real Estate",
+    website: "https://www.ripcony.com",
+    location: "New York, NY",
+    role: "BROKER",
+  });
+  const bingHtml = `<ol><li class="b_algo"><h2><a href="https://www.bisnow.com/new-york/news/peter-ripka-ripco">Peter Ripka | RIPCO Real Estate</a></h2><p>Peter Ripka is a broker at RIPCO Real Estate in New York.</p></li></ol>`;
+
+  it("uses Bing after a DuckDuckGo challenge and names every source when all of them are blocked", async () => {
+    const checks = await runPublicScreen(ripka, async (url) => {
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: bingHtml };
+      if (url.includes("ripcony.com")) return { ok: true, status: 200, text: "<html><p>RIPCO Real Estate</p></html>" };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      return { ok: false, status: 403, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.source).toBe("Bing");
+    expect(web?.finding).toContain("Tried DuckDuckGo (challenge page), Bing (result)");
+    expect(web?.finding).not.toContain("All free search sources blocked");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.status).not.toBe("UNAVAILABLE");
+    const recovered = gradeChecks(
+      [
+        ...checks.filter((check) => check.key === "screen-web" || check.key === "web-footprint"),
+        row({ key: "email-syntax", status: "PASS" }),
+        row({ key: "disposable-email", status: "PASS" }),
+        row({ key: "role-address", status: "PASS" }),
+        row({
+          key: "linkedin-fetch",
+          status: "PASS",
+          companyOnly: true,
+          corroborates: false,
+          finding: "The public LinkedIn page company confirmed, person NOT confirmed. Name: no. Company: yes.",
+        }),
+        row({
+          key: "website",
+          status: "PASS",
+          selfReported: true,
+          corroborates: false,
+          finding: "Found: a page on the company site. Name: yes. Company: yes. City: yes. Confidence: high.",
+        }),
+        row({ key: "rdap", status: "PASS", finding: "RDAP responded for ripcony.com." }),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists RIPCO. It does not tie a person to the firm." }),
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "text-risk", status: "PASS" }),
+        row({ key: "velocity", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+      ],
+      facts({ ...ripka, statement: "I lead a brokerage and would like to meet owners and developers.", inviteNote: "PF-BENCH-0000 · Benchmark invite code" }),
+    );
+    expect(footprint?.status).toBe("PASS");
+    expect(recovered.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+    expect(recovered.letter).toBe("D");
+    expect(recovered.score).toBe(68);
+    expect(recovered.recommendation).not.toBe("APPROVE");
+
+    const blocked = await runPublicScreen(ripka, async (url) => {
+      if (url.includes("ripcony.com")) return { ok: true, status: 200, text: "<html><p>RIPCO Real Estate</p></html>" };
+      return { ok: false, status: 202, text: "challenge" };
+    });
+    const missed = blocked.find((check) => check.key === "screen-web");
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.corroborates).not.toBe(true);
+    expect(missed?.finding).toContain("All free search sources blocked");
+    expect(missed?.finding).toContain("DuckDuckGo (challenge page)");
+    expect(missed?.finding).toContain("Bing (challenge page)");
+    expect(missed?.finding).toContain("Brave (challenge page)");
+    expect(missed?.finding).toContain("Mojeek (challenge page)");
+    expect(missed?.finding).toContain("GDELT (challenge page)");
+  });
+
+  it("keeps de in the Warren de Haan search queries", () => {
+    expect(personWithoutSuffix("Warren de Haan")).toBe("Warren de Haan");
+    expect(surnameForSearch("Warren de Haan")).toBe("de Haan");
+    expect(surnameForSearch("Thomas Gilbane Jr.")).toBe("Gilbane");
+    const queries = newsSearchQueries(facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital", location: "New York, NY" }));
+    expect(queries.join(" ")).toContain("de Haan");
+    expect(queries.join(" ")).not.toMatch(/"Haan"/);
+    expect(queries.join(" ")).not.toContain("Warren Haan");
+    const youtube = socialSearchQuery("Warren de Haan", "ACORE Capital");
+    expect(youtube).toContain("de Haan");
+    expect(youtube).not.toContain("Warren Haan");
+  });
+
+  it("does not treat a foreclosure topic headline as litigation against the company", () => {
+    const podcast = "PODCAST: ACORE Capital Co-CEO Warren De Haan On Foreclosure Danger Zones, Inflation Impacts";
+    const cnbc = "Warren de Haan of ACORE Capital on commercial real estate lending";
+    expect(companyForeclosure(podcast)).toBe(false);
+    expect(companyForeclosure("Vornado Realty Trust faces foreclosure, The Real Deal")).toBe(true);
+    expect(companyForeclosure("The Real Deal: Mack Real Estate Group foreclosure in 2024")).toBe(true);
+    const judged = judgeHeadline(podcast, {
+      name: "Warren de Haan",
+      applicantName: "Warren de Haan",
+      org: "ACORE Capital",
+      location: "New York, NY",
+    });
+    expect(judged.person).toBe(true);
+    expect(judged.company).toBe(true);
+    expect(judged.kind).toBe("none");
+    expect(judged.foreclosureOnly).toBe(false);
+    const rows = classifyNews(
+      facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital", location: "New York, NY" }),
+      [
+        { title: podcast, snippet: podcast, url: "https://www.bisnow.com/acore-podcast", source: "Bisnow", provider: "Google News", publishedAt: null },
+        { title: cnbc, snippet: cnbc, url: "https://www.cnbc.com/acore-de-haan", source: "CNBC", provider: "Google News", publishedAt: null },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((row) => row.key === "news");
+    expect(news?.status).toBe("PASS");
+    expect(news?.corroborates).toBe(true);
+    expect(news?.finding).not.toContain("Company-level litigation");
+    const graded = gradeChecks(rows, facts({ name: "Warren de Haan", applicantName: "Warren de Haan", org: "ACORE Capital" }));
+    expect(graded.attention.some((item) => item.title === "Company litigation headline")).toBe(false);
+  });
+
+  it("shows an affiliate filing that names the person and does not add company points", () => {
+    const edgar = assessEdgarMatch({
+      org: "The Lightstone Group",
+      person: "David Lichtenstein",
+      tickersOk: true,
+      companies: [{ title: "Lightstone Value Plus REIT IV", ticker: "", cik: "1619312" }],
+      filingNames: [],
+      textHits: [
+        {
+          names: ["Lightstone Value Plus REIT III  (CIK 0001563756)", "David Lichtenstein"],
+          form: "EX-32",
+          fileDate: "2026-03-30",
+          personMatched: true,
+        },
+      ],
+    });
+    expect(edgar.status).not.toBe("PASS");
+    expect(edgar.companyOnly).not.toBe(true);
+    expect(edgar.corroborates).not.toBe(true);
+    expect(edgar.finding).toContain("Parent match, needs review");
+    expect(edgar.finding).toContain("1619312");
+    expect(edgar.finding).toContain("EX-32");
+    expect(edgar.finding).toContain("1563756");
+    expect(edgar.finding).toContain("2026-03-30");
+    expect(edgar.finding).toContain("does not add points");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: edgar.status, corroborates: false, companyOnly: false, finding: edgar.finding, reviewFlag: true })],
+      facts({ name: "David Lichtenstein", applicantName: "David Lichtenstein", org: "The Lightstone Group" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+    expect(graded.letter).not.toBe("A");
+    expect(graded.letter).not.toBe("B");
+    expect(graded.letter).not.toBe("C");
+    expect(graded.recommendation).not.toBe("APPROVE");
+  });
+
+  it("does not let the Danvorth fake rise above F or read as an approval", () => {
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are readable." }),
+      row({ key: "rdap", status: "FAIL", finding: "The domain is not registered." }),
+      row({ key: "website", status: "FAIL", finding: "The domain does not resolve." }),
+      row({
+        key: "screen-web",
+        status: "UNAVAILABLE",
+        finding: "All free search sources blocked. Tried DuckDuckGo (challenge page). Search blocked.",
+      }),
+      row({
+        key: "web-footprint",
+        status: "UNAVAILABLE",
+        finding: "All free search sources blocked. Tried DuckDuckGo (challenge page). Search blocked.",
+      }),
+    ];
+    const fake = gradeChecks(
+      local,
+      facts({
+        name: "Ambrose Tellwright",
+        applicantName: "Ambrose Tellwright",
+        org: "Danvorth Kestrel Holdings LLC",
+        website: "https://danvorthkestrel.com",
+        phone: "212-555-0199",
+        applicationSubmitted: true,
+      }),
+    );
+    expect(fake.letter).toBe("F");
+    expect(fake.score).toBe(28);
+    expect(fake.score).toBeLessThanOrEqual(48);
+    expect(fake.recommendation).not.toBe("APPROVE");
+    expect(fake.summary.reasoning).not.toContain("Incomplete application");
   });
 });

@@ -37,11 +37,15 @@ export type StepEvidence = {
 
 /**
  * Items that were not corroborated about the person.
- * A company-name SEC hit can auto-pass the company step and still leave this unverified.
+ * A name-only or former-name SEC hit does not auto-pass the company step. The person can still be unverified.
  */
 export function unverifiedPersonItems(evidence: { checkKey: string; status: string; corroborates?: boolean }[]): string[] {
   const personTied = evidence.some((row) => row.status === "PASS" && row.corroborates === true);
-  return personTied ? [] : ["person-to-company link"];
+  const items = personTied ? [] : ["person-to-company link"];
+  if (evidence.some((row) => row.checkKey === "address" && (row.status === "INCONCLUSIVE" || row.status === "UNAVAILABLE"))) {
+    items.push("Address");
+  }
+  return items;
 }
 
 export function approveConfirmMessage(input: { dues: string; extra?: string; unverified: string[]; failed?: string[] }): string {

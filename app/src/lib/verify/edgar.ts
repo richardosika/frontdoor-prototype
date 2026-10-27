@@ -106,6 +106,45 @@ export function padCik(cik: string): string {
   return digits ? digits.padStart(10, "0") : "";
 }
 
+export type EdgarFilerIdentity = {
+  currentName: string;
+  formerNames: string[];
+  stateOfIncorporation?: string;
+};
+
+export function submissionsUrl(cik: string): string {
+  return `https://data.sec.gov/submissions/CIK${padCik(cik)}.json`;
+}
+
+/** Current legal name and former names from the SEC submissions JSON. */
+export function parseSubmissionsIdentity(text: string): EdgarFilerIdentity | null {
+  try {
+    const body = JSON.parse(text) as { name?: unknown; formerNames?: unknown; stateOfIncorporation?: unknown };
+    const currentName = String(body.name || "").trim();
+    if (!currentName) return null;
+    const formerNames = Array.isArray(body.formerNames)
+      ? body.formerNames
+          .map((row) => (row && typeof row === "object" ? String((row as { name?: unknown }).name || "").trim() : ""))
+          .filter(Boolean)
+      : [];
+    const state = String(body.stateOfIncorporation || "").trim().toUpperCase();
+    return { currentName, formerNames, stateOfIncorporation: /^[A-Z]{2}$/.test(state) ? state : "" };
+  } catch {
+    return null;
+  }
+}
+
+/** The ticker title or the typed org is a former name, and the current name is a different entity. */
+export function matchedNameIsFormer(org: string, matchedTitle: string, identity: EdgarFilerIdentity): boolean {
+  const current = normalizeFirmName(identity.currentName);
+  const wanted = [normalizeFirmName(org), normalizeFirmName(matchedTitle)].filter(Boolean);
+  if (!current || wanted.some((name) => name === current)) return false;
+  return identity.formerNames.some((former) => {
+    const normalized = normalizeFirmName(former);
+    return Boolean(normalized) && wanted.some((name) => name === normalized);
+  });
+}
+
 /** Forms 3, 4, and 5 for one CIK. The surname is quoted so a shared token is not the whole search. */
 export function insiderSearchUrl(surname: string, cik: string, form: string): string {
   const padded = padCik(cik);
@@ -172,6 +211,18 @@ function partialEdgarCandidate(rows: EdgarCompany[], org: string): EdgarCompany 
 }
 
 /**
+ * A one-word shorter filer is only a parent when its ticker is that brand
+ * (three characters or fewer, or the symbol starts with the brand).
+ * MRBK does not start with "mer", so it is a different company.
+ */
+function tickerLooksLikeSoleBrand(ticker: string, brand: string): boolean {
+  const symbol = ticker.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  if (symbol.length > 0 && symbol.length <= 3) return true;
+  const stem = brand.slice(0, 3);
+  return stem.length >= 3 && symbol.startsWith(stem);
+}
+
+/**
  * A shorter parent whose distinctive name leads the applicant's name.
  * Brookfield Corporation is the parent of Brookfield Properties.
  * AECOM is the parent of AECOM Tishman. A different brand is not.
@@ -193,6 +244,7 @@ function shorterParentCandidate(rows: EdgarCompany[], org: string): EdgarCompany
     if (!titleDistinctive.length) continue;
     if (titleDistinctive.some((token) => !orgSet.has(token))) continue;
     if (!titleDistinctive.every((token, index) => orgDistinctive[index] === token)) continue;
+    if (titleDistinctive.length === 1 && orgDistinctive.length === 1 && !tickerLooksLikeSoleBrand(row.ticker, titleDistinctive[0])) continue;
     const shorter = titleDistinctive.length < orgDistinctive.length || meaningful(titleTokens).length < meaningful(orgTokens).length;
     if (!shorter) continue;
     const titleLength = meaningful(titleTokens).length;
@@ -216,6 +268,22 @@ function personNamedWithFirm(names: string[] | string[][], person: string, firm:
     if (group.some((name) => mentionsPerson(name, person))) return true;
   }
   return false;
+}
+
+function withIncorporation(finding: string, identity?: EdgarFilerIdentity | null): string {
+  const state = (identity?.stateOfIncorporation || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(state) || /state of incorporation/i.test(finding)) return finding;
+  return `${finding} State of incorporation: ${state}.`;
+}
+
+/** An exact current-name filer. A former name or a parent match is not exact. */
+export function edgarIsExactCompany(finding: string): boolean {
+  if (/former name|parent match|not an exact match|no company on the SEC list/i.test(finding)) return false;
+  return /exact current-name match|name-only company match|confirm it is the same firm/i.test(finding);
+}
+
+export function incorporationStateFromFinding(finding: string): string {
+  return finding.match(/state of incorporation:\s*([A-Z]{2})\b/i)?.[1]?.toUpperCase() || "";
 }
 
 function listedParent(finding: string): { title: string; ticker: string } {
@@ -346,23 +414,71 @@ export function companyFromDisplayName(name: string): EdgarCompany | null {
   return { title, ticker, cik };
 }
 
-/** One array per filing. Names from different filings are not one record. */
-export function filingNames(payload: string): string[][] | null {
+export type EdgarTextHit = {
+  names: string[];
+  form: string;
+  fileDate: string;
+  /** True when this hit came from a search that required the person's name. */
+  personMatched: boolean;
+};
+
+/** EDGAR full-text hits, including the form and file date. A bad payload is null. */
+export function parseEdgarTextHits(payload: string, personMatched = false): EdgarTextHit[] | null {
   try {
-    const parsed = JSON.parse(payload) as { hits?: { hits?: { _source?: { display_names?: unknown } }[] } };
+    const parsed = JSON.parse(payload) as {
+      hits?: { hits?: { _source?: { display_names?: unknown; form?: unknown; file_type?: unknown; file_date?: unknown } }[] };
+    };
     const hits = parsed.hits?.hits;
     if (!Array.isArray(hits)) return null;
-    const groups: string[][] = [];
+    const rows: EdgarTextHit[] = [];
     for (const hit of hits.slice(0, 30)) {
-      const display = hit._source?.display_names;
+      const source = hit._source;
+      const display = source?.display_names;
       if (!Array.isArray(display)) continue;
       const names = display.map((name) => String(name)).filter((name) => name.trim());
-      if (names.length) groups.push(names);
+      if (!names.length) continue;
+      rows.push({
+        names,
+        form: String(source?.form || source?.file_type || "").trim(),
+        fileDate: String(source?.file_date || "").trim(),
+        personMatched,
+      });
     }
-    return groups.length ? groups : null;
+    return rows;
   } catch {
     return null;
   }
+}
+
+/** One array per filing. Names from different filings are not one record. */
+export function filingNames(payload: string): string[][] | null {
+  const hits = parseEdgarTextHits(payload);
+  if (!hits?.length) return null;
+  return hits.map((hit) => hit.names);
+}
+
+/**
+ * A person named on a related filer. Shown as evidence. It is not an exact match and it does not add points.
+ * A fuzzy parent stays at 0.
+ */
+export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string): string {
+  const tokens = distinctiveCompanyTokens(org)
+    .map((token) => token.toLowerCase())
+    .filter((token) => isDistinctiveCompanyToken(token) || isShortBrandToken(token));
+  if (!tokens.length || !person.trim()) return "";
+  for (const hit of hits) {
+    const companies = hit.names.map((name) => companyFromDisplayName(name)).filter((row): row is EdgarCompany => Boolean(row?.title));
+    const company = companies.find((row) => row.cik) || companies.find((row) => firmTokens(row.title).some((token) => tokens.includes(token)));
+    if (!company?.title || sameFirmName(company.title, org)) continue;
+    if (!firmTokens(company.title).some((token) => tokens.includes(token))) continue;
+    const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, person));
+    if (!named) continue;
+    const form = hit.form ? ` ${hit.form}` : "";
+    const cik = company.cik ? `, CIK ${company.cik.replace(/^0+/, "")}` : "";
+    const when = hit.fileDate ? `, filed ${hit.fileDate}` : "";
+    return `The person is named in an affiliate filing:${form} ${company.title}${cik}${when}. That filing is not an exact match for ${org} and does not add points.`.replace(/\s+/g, " ").trim();
+  }
+  return "";
 }
 
 /** A flat list is one filing. A list of lists keeps each filing separate. */
@@ -404,6 +520,8 @@ export function assessEdgarMatch(input: {
   filingNames: string[] | string[][];
   website?: string;
   insiderNames?: string[] | string[][];
+  identity?: EdgarFilerIdentity | null;
+  textHits?: EdgarTextHit[];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   const groups = filingGroups(input.filingNames);
   const flat = groups.flat();
@@ -426,7 +544,12 @@ export function assessEdgarMatch(input: {
   }
   if (!match) {
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
-    if (parent) return parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
+    if (parent) {
+      const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
+      return result;
+    }
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -435,6 +558,15 @@ export function assessEdgarMatch(input: {
     };
   }
   const titled = `${match.title}${match.ticker ? ` (${match.ticker})` : ""}`;
+  if (input.identity && matchedNameIsFormer(input.org, match.title, input.identity)) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      url: edgarCompanyUrl(match.cik),
+      finding: `EDGAR's current name for CIK ${match.cik} is ${input.identity.currentName}. ${titled} is a former name. Needs review. A former name is not an exact match and does not corroborate.`,
+    };
+  }
   if (!sameFirmName(match.title, input.org) && !tickerAccepted) {
     return {
       status: "INCONCLUSIVE",
@@ -455,19 +587,35 @@ export function assessEdgarMatch(input: {
     const tickerNote = tickerAccepted
       ? " The ticker matches the company name on the application, and the website domain stem is that ticker."
       : "";
+    const currentName = input.identity?.currentName || "";
+    if (currentName && sameFirmName(currentName, input.org)) {
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: edgarCompanyUrl(match.cik),
+        finding: withIncorporation(
+          `EDGAR's current name for CIK ${match.cik} is ${currentName}. That is an exact current-name match. It does not tie the person to the firm.`,
+          input.identity,
+        ),
+      };
+    }
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
       companyOnly: true,
       url: edgarCompanyUrl(match.cik),
-      finding: `EDGAR lists ${titled}, CIK ${match.cik}.${tickerNote} A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+      finding: withIncorporation(
+        `EDGAR lists ${titled}, CIK ${match.cik}.${tickerNote} A name-only company match is inconclusive and does not corroborate. It does not tie the person to the firm.`,
+        input.identity,
+      ),
     };
   }
   return {
     status: "PASS",
     corroborates: true,
     url: edgarCompanyUrl(match.cik),
-    finding: `EDGAR lists ${titled}, CIK ${match.cik}. Confirm it is the same firm.${personSentence}`,
+    finding: withIncorporation(`EDGAR lists ${titled}, CIK ${match.cik}. Confirm it is the same firm.${personSentence}`, input.identity),
   };
 }
 
@@ -516,10 +664,19 @@ export async function lookupEdgar(
   const companyQuery = phrase ? `"${phrase}"` : "";
   const queries = [...new Set([personQuery, companyQuery].filter(Boolean))];
   const groups: string[][] = [];
+  const textHits: EdgarTextHit[] = [];
   for (const query of queries) {
     const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(query)}&dateRange=custom&startdt=2015-01-01&enddt=2030-01-01`;
     const filing = await fetchImpl(searchUrl).catch(() => ({ ok: false, status: 0, text: "" }));
-    if (filing.ok) groups.push(...(filingNames(filing.text) || []));
+    if (!filing.ok) continue;
+    const hits = parseEdgarTextHits(filing.text, query === personQuery) || [];
+    textHits.push(...hits);
+    groups.push(...hits.map((hit) => hit.names));
+  }
+  let identity: EdgarFilerIdentity | null = null;
+  if (listed?.cik) {
+    const submissions = await fetchImpl(submissionsUrl(listed.cik)).catch(() => ({ ok: false, status: 0, text: "" }));
+    if (submissions.ok) identity = parseSubmissionsIdentity(submissions.text);
   }
   const insiderNames: string[][] = [];
   if (listed?.cik && last.length >= 3) {
@@ -541,5 +698,7 @@ export async function lookupEdgar(
     filingNames: groups,
     website,
     insiderNames,
+    identity,
+    textHits,
   });
 }
