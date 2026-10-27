@@ -7,7 +7,7 @@ import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/v
 import { assessCourts } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, lookupEdgar, matchEdgarCompany } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
-import { applyReviewSkips, dedupeSourceLines, gradeChecks, gradeComparisonLine, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
+import { applyReviewSkips, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, neutralScreenNewsPass, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
 import { civilDocket, classifyNews, newsSearchQueries, ordinaryResults } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
@@ -195,6 +195,48 @@ describe("corroboration is independent of the applicant's own page", () => {
     expect(graded.letter).toBe("C");
     expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     expect(graded.caps.some((line) => line.startsWith("Capped at C"))).toBe(true);
+  });
+});
+
+describe("a neutral screen-news pass fills an inconclusive news check", () => {
+  const litigation = row({
+    key: "news",
+    status: "INCONCLUSIVE",
+    corroborates: false,
+    finding: "Company-level litigation headline. Name: no. Company: yes. City: no. Confidence: medium.",
+  });
+  const neutral = row({
+    key: "screen-news",
+    status: "PASS",
+    corroborates: false,
+    finding: "Starwood's Barry Sternlicht on U.S. tariff policy. Name: yes. Company: yes. City: no. Confidence: high.",
+  });
+
+  function footprintEarned(checks: CheckOutput[]): number {
+    return gradeChecks(checks, facts()).categories.find((category) => category.id === "footprint")?.earned ?? -1;
+  }
+
+  it("awards the news points and does not create a second independent source", () => {
+    expect(neutralScreenNewsPass([litigation, neutral])).toBe(true);
+    expect(footprintEarned([litigation, neutral]) - footprintEarned([litigation])).toBe(8);
+    expect(corroboratingPasses([litigation, neutral])).toHaveLength(0);
+  });
+
+  it("ignores a company-level or same-source screen-news row, and does not override a failed news check", () => {
+    const companyLevel = row({
+      key: "screen-news",
+      status: "PASS",
+      finding: "Company-level litigation headline. Name: yes. Company: yes.",
+    });
+    const sameSource = row({
+      key: "screen-news",
+      status: "PASS",
+      finding: "same source as the company site. Name: yes. Company: yes.",
+    });
+    expect(footprintEarned([litigation, companyLevel])).toBe(footprintEarned([litigation]));
+    expect(footprintEarned([litigation, sameSource])).toBe(footprintEarned([litigation]));
+    const failed = row({ key: "news", status: "FAIL", finding: "A negative headline names the person and the company." });
+    expect(footprintEarned([failed, neutral])).toBe(0);
   });
 });
 

@@ -684,6 +684,19 @@ function footprintAward(row: CheckOutput | undefined, earned: boolean, possible:
   return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
 }
 
+/**
+ * A neutral screen-news pass names the person and the company. It is not a second
+ * independent source. It fills the news points only when the news check itself is
+ * inconclusive, for example because a company-level litigation headline took that slot.
+ */
+export function neutralScreenNewsPass(checks: CheckOutput[]): boolean {
+  return checks.some((check) => {
+    if (check.key !== "screen-news" || check.status !== "PASS") return false;
+    if (/company-level/i.test(check.finding) || /same source/i.test(check.finding)) return false;
+    return /Name: yes\b/.test(check.finding) && /Company: yes\b/.test(check.finding);
+  });
+}
+
 function phoneAward(row: CheckOutput | undefined, possible: number): Line {
   if (row?.status === "INCONCLUSIVE" && /toll-free/i.test(row.finding)) {
     return { earned: 0, possible: 0, reason: "The phone is toll-free, so the area code is not applicable." };
@@ -770,9 +783,11 @@ export function gradeChecks(
     rdapAward(findCheck(checks, "rdap"), weights.company.rdap, weightsMode),
     registryAward(findCheck(checks, "business-registry"), weights.company["business-registry"], weightsMode),
   ]);
+  const newsRow = findCheck(checks, "news");
+  const newsFootprint = passed(newsRow) || (newsRow?.status === "INCONCLUSIVE" && neutralScreenNewsPass(checks));
   const footprint = sumLines([
     footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode),
-    award(passed(findCheck(checks, "news")), weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
+    award(newsFootprint, weights.footprint.news, "A headline names the person and the company", "No headline confirmed the person at the company"),
     award(
       passed(findCheck(checks, "social-links")) && independent,
       weights.footprint["social-links"],
