@@ -251,6 +251,7 @@ export function distinctiveCompanyTokens(org: string): string[] {
  * A 2- or 3-letter brand stays, with the next two words: "bk real estate", not "advisors".
  */
 export function companySearchTerm(org: string, person = ""): string {
+  org = stripQaOrg(org);
   const phrase = companyPhraseTokens(org);
   if (!phrase.length) return "";
   const parsed = parsePersonName(person);
@@ -606,14 +607,20 @@ function formerOrEx(text: string, org: string): boolean {
 export function leftTheCompany(text: string, org: string): boolean {
   if (!org.trim() || !mentionsCompany(text, org)) return false;
   if (formerOrEx(text, org)) return true;
+  const explicit = /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(text);
+  const joiningLawsuit = /\b(?:joins?|joined|joining)\b/i.test(text) && /\blawsuits?\b/i.test(text);
+  if (joiningLawsuit) return explicit;
   const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(text);
   if (move) {
     const destination = move[1];
     const origin = move[2].split(/[.]/)[0];
-    if (mentionsCompany(destination, org)) return false;
-    if (mentionsCompany(origin, org)) return true;
+    const originIsTitle = /^(?:the\s+)?(?:ceo|cfo|coo|president|chairman|chairwoman|chairperson|founder|chief)\b/i.test(origin.trim());
+    if (!originIsTitle) {
+      if (mentionsCompany(destination, org)) return false;
+      if (mentionsCompany(origin, org)) return true;
+    }
   }
-  return /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(text);
+  return explicit;
 }
 
 function looksLikeGivenName(word: string): boolean {
