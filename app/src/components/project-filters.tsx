@@ -129,6 +129,12 @@ export function ProjectFilterBar({
           </label>
         ) : null}
         {directory ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="verified" value="1" defaultChecked={filters.verified === "1"} />
+            Verified only
+          </label>
+        ) : null}
+        {directory ? (
           <label>
             <span className={labelCls}>Deal type</span>
             <select className={field} name="dealType" defaultValue={filters.dealType || ""}>
