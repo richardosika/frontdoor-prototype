@@ -295,6 +295,11 @@ function toCheckOutput(row: EvidenceRow): CheckOutput {
   };
 }
 
+/** A file with no check results yet has no grade. An empty rubric is not F 0. */
+export function initialGuidedGrade<T>(evidenceCount: number, graded: T | null): T | null {
+  return evidenceCount > 0 ? graded : null;
+}
+
 /** Fill blank steps only. A later live re-run is left in place. */
 export async function prepareGuidedCase(caseId: string): Promise<void> {
   const loaded = await factsForCase(caseId);
@@ -302,9 +307,10 @@ export async function prepareGuidedCase(caseId: string): Promise<void> {
   const stored = await storedEvidence(caseId);
   if (stored.evidence.length) await rememberSources(caseId, stored.evidence);
   const suggestions = suggestChecklist(checklistKeys(loaded.subject), loaded.facts, stored.evidence);
-  const grade = stored.evidence.length
+  const graded = stored.evidence.length
     ? stored.grade || (await gradeFor(stored.evidence.map(toCheckOutput), loaded.applicant, loaded.subject))
-    : await gradeFor([], loaded.applicant, loaded.subject);
+    : null;
+  const grade = initialGuidedGrade(stored.evidence.length, graded);
   await writeSuggestions({
     caseId,
     suggestions,

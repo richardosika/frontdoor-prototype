@@ -6,6 +6,7 @@ import {
   displayCheckStatus,
   emptyProgress,
   parseReviewProgress,
+  displayedSentences,
   publicFinding,
   reviewStepFromQuery,
   stepCountsAsPass,
@@ -69,6 +70,22 @@ describe("guided review steps", () => {
     expect(cleared.find((step) => step.id === "risk")?.status).toBe("PASS");
     expect(publicFinding("PASS", "The company site names them.")).toBe("The company site names them.");
     expect(publicFinding("INCONCLUSIVE", "SEC EDGAR returned a hit")).not.toMatch(/checked out/i);
+    const youtube = publicFinding(
+      "INCONCLUSIVE",
+      "Searched: peter ripka ripco. no match found Name: no. Company: Walker & Dunlop. City: no. Confidence: none.",
+    );
+    expect(youtube.startsWith("Not confirmed.")).toBe(true);
+    expect(youtube).toContain("No match found");
+    expect(youtube).toContain("Searched: peter ripka ripco.");
+    expect(youtube).not.toContain("Searched: Peter");
+    expect(youtube).toContain("Company: Walker & Dunlop.");
+    expect(displayedSentences("YouTube: no match found. Name: no. Company: Walker & Dunlop.")).toBe(
+      "YouTube: No match found. Name: no. Company: Walker & Dunlop.",
+    );
+    expect(displayedSentences("TikTok: no match found. Name: no.")).toBe("TikTok: No match found. Name: no.");
+    expect(displayedSentences("Google News: no match found. Name: no. Company: no.")).toBe(
+      "Google News: No match found. Name: no. Company: no.",
+    );
   });
 
   it("keeps a skip from counting as a pass and lowers confidence without raising the grade", () => {

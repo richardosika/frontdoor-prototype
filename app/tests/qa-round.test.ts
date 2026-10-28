@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
-import { approvalDialogLists, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
+import { approvalDialogLists, approvalDialogVerdict, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
 import { applicantDuesSentence, FREE_MEMBERSHIP_LINE, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
@@ -250,6 +250,13 @@ describe("QA fixes that stay outside grading", () => {
     expect(split.split("Unverified:")[1]).not.toContain("Address");
     expect(split.split("Unverified:")[1]).not.toContain("Company website");
     expect(unverifiedApprovalItems({ steps: [{ title: "Address", status: "FAIL" }] })).toEqual([]);
+    expect(approvalDialogVerdict("", "NEEDS MORE INFO")).toBe("NEEDS MORE INFO");
+    expect(approvalDialogVerdict("", "NEEDS MORE INFO")).not.toBe("Verification in progress");
+    expect(approvalDialogVerdict("LEGIT", "NEEDS MORE INFO")).toBe("Recommended legit");
+    const current = strongApprovalWarning({ letter: "F", score: 36, verdict: approvalDialogVerdict("", "NEEDS MORE INFO") });
+    expect(current).toContain("Grade F 36");
+    expect(current).toContain("Verdict: NEEDS MORE INFO");
+    expect(current).not.toContain("Verification in progress");
   });
 
   it("uses one status label and a free-membership sentence", () => {

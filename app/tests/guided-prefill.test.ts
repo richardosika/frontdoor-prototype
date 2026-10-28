@@ -8,6 +8,7 @@ import {
   suggestCompany,
   suggestOne,
 } from "@/lib/guided-prefill";
+import { initialGuidedGrade } from "@/lib/guided-prefill-db";
 import { MEMBER_CHECKS, canMarkCaseVerified, checklistComplete } from "@/lib/verification";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesCompanies, openSanctionsHits } from "@/lib/verify/free-sources";
 
@@ -244,5 +245,12 @@ describe("free company and sanctions sources", () => {
     ]);
     expect(owner.mark).toBe("PASS");
     expect(owner.note.toLowerCase()).toContain("reporting owner");
+  });
+
+  it("does not store a letter grade before any check result exists", () => {
+    const placeholder = { letter: "F", score: 0, recommendation: "NEEDS MORE INFO" };
+    expect(initialGuidedGrade(0, placeholder)).toBeNull();
+    const settled = { letter: "F", score: 36, recommendation: "NEEDS MORE INFO" };
+    expect(initialGuidedGrade(4, settled)).toEqual(settled);
   });
 });

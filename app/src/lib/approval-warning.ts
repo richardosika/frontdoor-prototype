@@ -1,3 +1,5 @@
+import { verdictLabel } from "@/lib/application-status";
+
 export function needsStrongApprovalWarning(input: {
   letter?: string | null;
   recommendation?: string | null;
@@ -198,15 +200,24 @@ export function unverifiedApprovalItems(input: {
   return approvalItemLists(input).unverified;
 }
 
+/** A stored run verdict wins. Otherwise the dialog uses the grade recommendation, not a progress label. */
+export function approvalDialogVerdict(verdict: string | null | undefined, recommendation?: string | null): string {
+  if (verdict?.trim()) return verdictLabel(verdict);
+  return recommendation?.trim() || "";
+}
+
 export function strongApprovalWarning(input: {
   letter: string;
+  score?: number | null;
   verdict: string;
   recommendation?: string;
   failed?: string[];
   unverified?: string[];
   items?: string[];
 }): string {
-  const grade = input.letter ? `Grade ${input.letter}` : "No letter grade";
+  const grade = input.letter
+    ? `Grade ${input.letter}${typeof input.score === "number" ? ` ${input.score}` : ""}`
+    : "No letter grade";
   const verdict = input.verdict || input.recommendation || "no verdict";
   const failed = input.failed ?? [];
   const unverified = input.unverified ?? input.items ?? [];

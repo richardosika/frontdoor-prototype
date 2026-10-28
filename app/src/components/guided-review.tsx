@@ -1,18 +1,17 @@
 import { saveReviewStep } from "@/actions/review";
 import { DecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
-import { ExecutiveSummary } from "@/components/grade-summary";
+import { ExecutiveSummary, GradeMark } from "@/components/grade-summary";
 import { ReviewStepFrame, StepJumpForm } from "@/components/guided-step-switcher";
 import { SkipStepForm } from "@/components/skip-step-form";
 import { StepSaveForm } from "@/components/step-save-form";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { approvalAttentionDetail, approvalAttentionTitle, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
+import { approvalAttentionDetail, approvalAttentionTitle, approvalDialogVerdict, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning } from "@/lib/approval-warning";
 import { decisionDialogBootstrap } from "@/lib/decision-dialog";
-import { verdictLabel } from "@/lib/application-status";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
 import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
-import { previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
+import { displayedSentences, previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
 
 export function GuidedReview({
@@ -62,6 +61,13 @@ export function GuidedReview({
           Step {current.index} of {total}
         </h2>
         <p className="mt-1 text-sm text-ink">Progress is saved on this application. You can leave and come back to the same step.</p>
+        {grade ? (
+          <div className="mt-3">
+            <GradeMark letter={grade.letter} score={grade.score} recommendation={grade.recommendation} confidence={grade.confidence} />
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-ink" data-grade-pending="1">Checking...</p>
+        )}
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {steps.map((step) => (
             <StepJumpForm key={step.id} applicationId={applicationId} caseId={caseId} stepId={step.id}>
@@ -116,7 +122,7 @@ export function GuidedReview({
                 {step.findings.map((finding, index) => (
                   <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
-                    <p className="mt-1 leading-relaxed text-ink">{reviewCopy(finding.text)}</p>
+                    <p className="mt-1 leading-relaxed text-ink">{displayedSentences(reviewCopy(finding.text))}</p>
                     {finding.url ? (
                       <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">
                         Open evidence
@@ -147,7 +153,7 @@ export function GuidedReview({
                 </label>
                 <label className="block">
                   <span className={labelCls}>Note</span>
-                  <textarea name="note" className={field} rows={6} defaultValue={reviewCopy(shownRegistryCheck({ finding: step.saved?.note || step.prefill?.note || "", url: "", location }).finding)} placeholder="What was found, and what was not" />
+                  <textarea name="note" className={field} rows={6} defaultValue={displayedNote(step.saved?.note || step.prefill?.note || "", location)} placeholder="What was found, and what was not" />
                 </label>
                 <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
                   Save & next
@@ -169,6 +175,10 @@ export function GuidedReview({
       </ReviewStepFrame>
     </section>
   );
+}
+
+function displayedNote(note: string, location: string): string {
+  return displayedSentences(reviewCopy(shownRegistryCheck({ finding: note, url: "", location }).finding));
 }
 
 function DecisionStep({
@@ -218,13 +228,16 @@ function DecisionStep({
   }));
   const displayGrade = grade ? { ...grade, attention } : null;
   const itemLists = approvalItemLists({ steps, attention });
-  const warningText = strongApprovalWarning({
-    letter: grade?.letter || "",
-    verdict: verdictLabel(verdict),
-    recommendation: grade?.recommendation || "",
-    failed: itemLists.failed,
-    unverified: itemLists.unverified,
-  });
+  const warningText = grade
+    ? strongApprovalWarning({
+        letter: grade.letter,
+        score: grade.score,
+        verdict: approvalDialogVerdict(verdict, grade.recommendation),
+        recommendation: grade.recommendation,
+        failed: itemLists.failed,
+        unverified: itemLists.unverified,
+      })
+    : "";
   const canRevoke = Boolean(applicationId) && (applicationStatus === "APPROVED" || applicationStatus === "PAYMENT_DUE");
   return (
     <div className="mt-4" id="decision-step">
@@ -263,7 +276,7 @@ function DecisionStep({
         <p className="mt-3 text-sm text-ink">Nothing on the unverified list. A source corroborated this person.</p>
       )}
       {grade ? <p className="mt-3 text-sm text-ink">{gradeComparisonLine(grade, applicationGrade)}</p> : null}
-      {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">No grade yet. Re-run checks before you decide.</p>}
+      {displayGrade ? <ExecutiveSummary report={displayGrade} role={role} /> : <p className="mt-3 text-sm text-ink">Checking...</p>}
       {(mode === "application" && applicationId) || mode === "invite" ? (
         <DecisionForm
           applicationId={applicationId || ""}

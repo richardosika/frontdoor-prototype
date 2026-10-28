@@ -4,6 +4,7 @@ import { rubricSections, type GradeReport, type Recommendation } from "@/lib/ver
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
+import { displayedSentences } from "@/lib/review-steps";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
 
@@ -128,7 +129,7 @@ function SummaryBlock({ title, body }: { title: string; body: string }) {
   return (
     <div>
       <h3 className="font-serif text-lg font-normal text-forest">{title}</h3>
-      <p className="mt-1">{body}</p>
+      <p className="mt-1">{displayedSentences(body)}</p>
     </div>
   );
 }

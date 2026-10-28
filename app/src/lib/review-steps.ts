@@ -1,5 +1,6 @@
 import { emptyPrefillFacts, suggestCompany, suggestOne, type PrefillFacts, type StepSuggestion } from "@/lib/guided-prefill";
 import { shownRegistryCheck } from "@/lib/state-registry-search";
+import { capitalizeSentences } from "@/lib/verify/grade";
 
 /**
  * Guided review on an application file. A saved skip is not a pass.
@@ -204,18 +205,32 @@ export function displayCheckStatus(result: string, note: string): "Pass" | "Conc
   return "Not checked";
 }
 
+const SCORE_FIELD = /^(Name|Company|City|Confidence)$/;
+const SOURCE_LABEL = /^(YouTube|TikTok|Google News|News search|Facebook|Instagram|X|Court search|Public web search|News)$/;
+
+/** Shown sentences start with a capital. A search query after "Searched:" and a company name stay as written. */
+export function displayedSentences(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const sentences = capitalizeSentences(trimmed).replace(/^([a-z])/, (letter) => letter.toUpperCase());
+  return sentences.replace(/([A-Za-z][A-Za-z0-9 &'’-]*?): ([a-z])/g, (full, label: string, letter: string) => {
+    if (label === "Searched" || SCORE_FIELD.test(label) || !SOURCE_LABEL.test(label)) return full;
+    return `${label}: ${letter.toUpperCase()}`;
+  });
+}
+
 export function publicFinding(status: string, finding: string): string {
   const text = finding.trim();
-  if (status === "PASS") return text || "This check passed.";
-  if (status === "FAIL") return text || "This check did not pass.";
-  if (status === "NOT_RUN" && /not checked/i.test(text)) return text;
+  if (status === "PASS") return displayedSentences(text || "This check passed.");
+  if (status === "FAIL") return displayedSentences(text || "This check did not pass.");
+  if (status === "NOT_RUN" && /not checked/i.test(text)) return displayedSentences(text);
   if (status === "UNAVAILABLE") {
-    if (/couldn't check for free|could not be checked|could not be verified for free|couldn't verify for free/i.test(text)) return text;
-    return text ? `${text} Couldn't check for free.` : "Couldn't check for free.";
+    if (/couldn't check for free|could not be checked|could not be verified for free|couldn't verify for free/i.test(text)) return displayedSentences(text);
+    return displayedSentences(text ? `${text} Couldn't check for free.` : "Couldn't check for free.");
   }
   if (!text) return "Not confirmed. This check did not return a result.";
-  if (/^not confirmed\./i.test(text)) return text;
-  return `Not confirmed. ${text}`;
+  if (/^not confirmed\./i.test(text)) return displayedSentences(text);
+  return displayedSentences(`Not confirmed. ${text}`);
 }
 
 function matchesKey(checkKey: string, keys: string[]): boolean {
