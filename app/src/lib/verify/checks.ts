@@ -1064,9 +1064,9 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const courtUrl = courtQuery
     ? `https://www.courtlistener.com/api/rest/v4/search/?q=${encodeURIComponent(courtQuery)}&type=o`
     : "https://www.courtlistener.com/";
-  const courtFallback = { ok: false, status: 0, text: "" };
+  const courtFallback = { ok: false, status: 0, text: "", failure: "timeout" as const };
   const court = courtQuery
-    ? await settleWithinRetry(() => fetchText(courtUrl), 20_000, courtFallback)
+    ? await settleWithin(fetchText(courtUrl).catch(() => courtFallback), 12_000, courtFallback)
     : { ok: true, status: 200, text: JSON.stringify({ results: [] }) };
   out.push(check({ ...assessCourts(court.text, court, ctx.facts), url: courtUrl }));
   const companyQuery = searchFacts.org.trim();

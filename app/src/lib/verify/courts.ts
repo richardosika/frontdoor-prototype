@@ -122,13 +122,21 @@ function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weigh
 
 export function assessCourts(
   payload: string,
-  http: { ok: boolean; status: number },
+  http: { ok: boolean; status: number; failure?: string },
   facts: ApplicantFacts,
 ): Omit<CheckOutput, "ranAt"> {
   if (http.status === 401 || http.status === 403 || http.status === 0 || !http.ok) {
+    const reason =
+      http.failure === "timeout" || http.status === 0
+        ? "CourtListener timed out. The free opinion search at /api/rest/v4/search/?type=o did not answer in time."
+        : http.status === 401
+          ? "CourtListener returned HTTP 401. The free search did not accept this request without a token."
+          : http.status === 403
+            ? "CourtListener returned HTTP 403. The request was blocked."
+            : `CourtListener returned HTTP ${http.status}.`;
     return courtRow({
       status: "UNAVAILABLE",
-      finding: "CourtListener was blocked, timed out, or did not respond. This source could not be checked.",
+      finding: `${reason} Unavailable. Not a pass.`,
     });
   }
   const results = courtResults(payload);

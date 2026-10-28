@@ -648,8 +648,9 @@ function uncheckedSentence(check: CheckOutput, checks: CheckOutput[]): string | 
   }
   if ((check.key === "screen-youtube" || check.key === "screen-tiktok") && check.status !== "UNAVAILABLE") {
     const score = scoreClause(check);
+    const nameMiss = /Name:\s*no\./i.test(check.finding);
     const nothing = !score || (/Name: no\./.test(score) && /Company: no\./.test(score) && /City: no\./.test(score));
-    if (nothing) return `${labelFor(check.key)}: no match found.`;
+    if (nameMiss || nothing) return `${labelFor(check.key)}: no match found.`;
     return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
   }
   if ((check.key === "news" || check.key === "screen-news") && check.status !== "UNAVAILABLE") {
@@ -662,6 +663,10 @@ function uncheckedSentence(check: CheckOutput, checks: CheckOutput[]): string | 
     return `${labelFor(check.key)} found nothing that names this person at this company.`;
   }
   const source = check.source || check.key;
+  if (check.status === "UNAVAILABLE" && (check.key === "screen-web" || check.key === "web-footprint" || check.key === "courts")) {
+    const finding = check.finding.trim();
+    return finding ? (finding.endsWith(".") ? finding : `${finding}.`) : `${labelFor(check.key)} could not be checked. Not a pass.`;
+  }
   if (check.status === "UNAVAILABLE") {
     return `${labelFor(check.key)} could not be checked because ${source} was blocked, timed out, or did not answer. Couldn't check for free.`;
   }
@@ -974,7 +979,8 @@ function edgarAward(row: CheckOutput | undefined, possible: number, independent:
   // impersonation of a public registrant does not gain points unless something else
   // already ties that person to the company.
   if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag) {
-    const points = independent ? companyOnlyPoints(possible) : 0;
+    const exactName = /exact current-name match|exact company name/i.test(row.finding || "");
+    const points = exactName || independent ? companyOnlyPoints(possible) : 0;
     return portionLine(points, possible, "EDGAR lists this exact company name. A name-only match is inconclusive and does not tie the person");
   }
   return award(false, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");

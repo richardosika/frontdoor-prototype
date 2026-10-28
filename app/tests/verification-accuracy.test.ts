@@ -15,7 +15,7 @@ import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand,
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
-import { approveConfirmMessage, unverifiedPersonItems } from "@/lib/review-steps";
+import { approveConfirmMessage, displayedCheckFinding, unverifiedPersonItems } from "@/lib/review-steps";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
 import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
@@ -4788,7 +4788,7 @@ describe("company-only live QA fixtures", () => {
       fried: fried.score,
       fake: fake.score,
     };
-    expect(after).toEqual({ cbre: 38, brookfield: 44, aecom: 38, prologis: 38, gilbane: 44, fried: 38, fake: 28 });
+    expect(after).toEqual({ cbre: 41, brookfield: 44, aecom: 38, prologis: 41, gilbane: 44, fried: 38, fake: 28 });
     expect(after.fake).toBeLessThan(liveBefore.fake);
     for (const score of [after.cbre, after.brookfield, after.aecom, after.prologis, after.gilbane, after.fried]) {
       expect(after.fake).toBeLessThan(score);
@@ -5796,7 +5796,7 @@ describe("batch 13 wording and own-site search", () => {
     expect(graded.summary.company).toContain("EDGAR's exact current-name match is an outside source, so the company's own site counts as company credit. It does not tie the person.");
     expect(graded.summary.company).not.toContain("No EDGAR filing was confirmed");
     expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("4 of 8");
-    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
   });
 
   it("strips a leading QA-TEST prefix before the EDGAR and website-alias checks", () => {
@@ -5974,5 +5974,147 @@ describe("corroboration, social prose, lawsuit headlines, and QA query prefix", 
     });
     expect(seen.some((url) => /QA-TEST|QA%2DTEST|QA-TEST/i.test(decodeURIComponent(url)))).toBe(false);
     expect(seen.some((url) => decodeURIComponent(url).includes("Walker"))).toBe(true);
+  });
+});
+
+describe("live search budget, exact EDGAR credit, and company-file YouTube", () => {
+  it("keeps searching when DuckDuckGo hangs and records which source answered", async () => {
+    const applicant = facts({
+      name: "Ada West",
+      applicantName: "Ada West",
+      org: "Western Alliance Bancorporation",
+      location: "Phoenix, AZ",
+      website: "",
+    });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com")) return new Promise(() => undefined);
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.reuters.com/western-alliance">Ada West leads Western Alliance Bancorporation in Phoenix</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.corroborates).toBe(true);
+    expect(web?.finding).toContain("DuckDuckGo (timed out)");
+    expect(web?.finding).toContain("Bing (result)");
+    expect(web?.finding).not.toContain("timed out or was dropped");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.status).not.toBe("UNAVAILABLE");
+    const graded = gradeChecks([web!, footprint!], applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+  }, 20000);
+
+  it("does not score a search where every free source times out", async () => {
+    const applicant = facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation", website: "" });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (/duckduckgo|bing\.com|brave\.com|mojeek|wikipedia|wikidata|gdeltproject/.test(url)) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("UNAVAILABLE");
+    expect(web?.corroborates).not.toBe(true);
+    expect(web?.finding).toContain("DuckDuckGo (timed out)");
+    expect(web?.finding).toContain("Bing (timed out)");
+    expect(web?.finding).toContain("Not checked");
+    expect(web?.finding).toContain("Not a pass");
+    const graded = gradeChecks(checks, applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+    expect(graded.summary.couldNotCheck).toContain("DuckDuckGo (timed out)");
+    expect(graded.summary.checkedOut).not.toContain("public web result names");
+  });
+
+  it("names the CourtListener failure and does not award points", () => {
+    const applicant = facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation" });
+    const denied = assessCourts("", { ok: false, status: 401 }, applicant);
+    expect(denied.status).toBe("UNAVAILABLE");
+    expect(denied.finding).toContain("HTTP 401");
+    expect(denied.finding).toContain("Not a pass");
+    const blocked = assessCourts("", { ok: false, status: 403 }, applicant);
+    expect(blocked.finding).toContain("HTTP 403");
+    const timed = assessCourts("", { ok: false, status: 0, failure: "timeout" }, applicant);
+    expect(timed.finding).toContain("timed out");
+    expect(timed.finding).toContain("/api/rest/v4/search/?type=o");
+    const graded = gradeChecks(
+      [row({ key: "courts", status: timed.status, weight: 0, finding: timed.finding, source: "CourtListener" })],
+      applicant,
+    );
+    expect(graded.score).toBeLessThan(70);
+    expect(graded.summary.couldNotCheck).toContain("timed out");
+    expect(graded.summary.checkedOut).not.toContain("CourtListener");
+  });
+
+  it("gives an exact current-name EDGAR row company credit without tying the person or lifting a fake to C", () => {
+    const exact = "EDGAR's current name for CIK 1212545 is WESTERN ALLIANCE BANCORPORATION. That is an exact current-name match. It does not tie the person to the firm.";
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      row({ key: "rdap", status: "PASS", finding: "RDAP responded." }),
+    ];
+    const real = gradeChecks(
+      [...local, row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding: exact, source: "SEC EDGAR" })],
+      facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation", website: "https://www.westernalliancebancorporation.com" }),
+    );
+    expect(real.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(real.summary.company).toContain("does not tie the person");
+    expect(real.letter).not.toBe("A");
+    expect(real.letter).not.toBe("B");
+    expect(real.letter).not.toBe("C");
+    expect(real.recommendation.startsWith("APPROVE")).toBe(false);
+    const before = gradeChecks(local, facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation" }));
+    expect(real.score - before.score).toBe(3);
+
+    const fake = gradeChecks(
+      [
+        ...local,
+        row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "Found: a page on the company site. Name: no. Company: yes. City: no. Confidence: high." }),
+        row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding: exact, source: "SEC EDGAR" }),
+      ],
+      facts({
+        name: "Nix Qwvzn",
+        applicantName: "Nix Qwvzn",
+        org: "Western Alliance Bancorporation",
+        website: "https://www.westernalliancebancorporation.com",
+        statement: "I run a made-up desk and this file should stay below a C.",
+      }),
+    );
+    expect(fake.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(fake.letter).toBe("F");
+    expect(fake.score).toBeLessThan(70);
+    expect(fake.recommendation).not.toBe("APPROVE");
+    expect(fake.recommendation).not.toBe("APPROVE WITH CONDITIONS");
+  });
+
+  it("does not say Company: yes on a YouTube miss for the company file or the application", async () => {
+    const page = '{"title":{"runs":[{"text":"Walker & Dunlop earnings call"}]}}';
+    const fetchText = async (url: string) => (url.includes("youtube.com") ? { ok: true, status: 200, text: page } : { ok: false, status: 404, text: "" });
+    const application = await runPublicScreen(
+      facts({ name: "Willy Walker", applicantName: "Willy Walker", org: "Walker & Dunlop", website: "" }),
+      fetchText,
+    );
+    const companyFile = await runPublicScreen(
+      facts({ name: "Walker & Dunlop", applicantName: "Willy Walker", org: "Walker & Dunlop", website: "" }),
+      fetchText,
+    );
+    const appRow = application.find((check) => check.key === "screen-youtube");
+    const companyRow = companyFile.find((check) => check.key === "screen-youtube");
+    expect(appRow?.finding).toContain("Name: no");
+    expect(appRow?.finding).toContain("Company: no");
+    expect(companyRow?.finding).toContain("Company: no");
+    expect(companyRow?.finding).not.toContain("Company: yes");
+    expect(displayedCheckFinding(companyRow?.finding || "")).toContain("Company: no");
+    expect(displayedCheckFinding("No result found that names this person and this company. Name: no. Company: yes. City: no. Confidence: low.")).toContain(
+      "Company: no",
+    );
   });
 });

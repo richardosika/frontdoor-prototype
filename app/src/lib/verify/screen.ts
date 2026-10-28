@@ -462,8 +462,15 @@ export function linkedinCompanyFollow(url: string, html: string): string {
 }
 
 function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean; reviewFlag?: boolean } {
-  const companyWord = attempt.score.alias && !attempt.score.company ? `alias (${attempt.score.alias})` : attempt.score.company ? "yes" : "no";
-  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${companyWord}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
+  const socialMiss = (attempt.key === "screen-youtube" || attempt.key === "screen-tiktok") && !attempt.score.name && attempt.outcome === "not-found";
+  const companyWord = socialMiss
+    ? "no"
+    : attempt.score.alias && !attempt.score.company
+      ? `alias (${attempt.score.alias})`
+      : attempt.score.company
+        ? "yes"
+        : "no";
+  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${companyWord}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${socialMiss ? "none" : attempt.score.confidence}.`;
   if (attempt.outcome === "dead") {
     return {
       status: "FAIL",
@@ -621,6 +628,27 @@ async function pull(
     return await fetchText(url, init);
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
+  }
+}
+
+/** One search engine cannot hold the rest. A hang becomes a timed-out source, not a dropped step. */
+export const SEARCH_SOURCE_MS = 7000;
+
+async function pullWithin(
+  fetchText: FetchText,
+  url: string,
+  ms = SEARCH_SOURCE_MS,
+): Promise<{ ok: boolean; status: number; text: string; url?: string; failure?: "nxdomain" | "timeout" | "network" }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pull(fetchText, url),
+      new Promise<{ ok: false; status: 0; text: ""; failure: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ ok: false, status: 0, text: "", failure: "timeout" }), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -852,6 +880,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   let website = facts.website.trim();
   if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
   const ownHost = applicantHost(website);
+  const webSearchPromise = startWebSearch();
   const flush = () => {
     while (flushed < attempts.length) {
       const row = toCheck(attempts[flushed], ownHost);
@@ -1351,11 +1380,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   }
   flush();
 
+  async function startWebSearch() {
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
   const ddgSnippetsFrom = (html: string) =>
     [...html.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
-  const [ddgFirst, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
+  const [ddgFirst, bing] = await Promise.all([pullWithin(fetchText, ddgUrl), pullWithin(fetchText, bingUrl)]);
   type SearchSnippet = { text: string; hrefs: string[] };
   type SearchEngine = { name: string; url: string; note: string; snippets: SearchSnippet[] };
   const httpHrefs = (item: SearchSnippet) => item.hrefs.filter((href) => /^https?:\/\//i.test(href));
@@ -1369,7 +1399,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (!hrefs.length) return true;
     return hrefs.some((href) => !hostIsApplicant(href, ownHost));
   };
-  const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[]): string => {
+  const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[], failure?: string): string => {
+    if (status === 0 || failure === "timeout" || failure === "network") return failure === "network" ? "network error" : "timed out";
     const challenge =
       status === 202 ||
       (/challenge|captcha/i.test(text.slice(0, 2500)) && !/result__a|result-link|b_algo|class="result"/i.test(text));
@@ -1383,9 +1414,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   };
   const engines: SearchEngine[] = [];
   const ddgSnippets = ddgSnippetsFrom(ddgFirst.text);
-  engines.push({ name: "DuckDuckGo", url: ddgUrl, snippets: ddgSnippets, note: engineNote(ddgFirst.status, ddgFirst.text, ddgUrl, ddgSnippets) });
+  engines.push({ name: "DuckDuckGo", url: ddgUrl, snippets: ddgSnippets, note: engineNote(ddgFirst.status, ddgFirst.text, ddgUrl, ddgSnippets, ddgFirst.failure) });
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
-  engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets) });
+  engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets, bing.failure) });
   if (!engines.some((engine) => engine.note === "result")) {
     const loose = [person, searchOrg].filter(Boolean).join(" ");
     const extras: { name: string; url: string; parse: (text: string) => SearchSnippet[]; delay?: boolean }[] = [];
@@ -1427,9 +1458,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     const pulled = await Promise.all(
       extras.map(async (job) => {
         if (job.delay) await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
-        const response = await pull(fetchText, job.url);
+        const response = await pullWithin(fetchText, job.url);
         const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
-        return { name: job.name, url: job.url, snippets, note: engineNote(response.status, response.text, job.url, snippets) };
+        return { name: job.name, url: job.url, snippets, note: engineNote(response.status, response.text, job.url, snippets, response.failure) };
       }),
     );
     engines.push(...pulled);
@@ -1441,13 +1472,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .map((name) => engines.find((engine) => engine.name === name && engine.note === note))
       .find((engine): engine is SearchEngine => Boolean(engine));
   const hitEngine = engineNamed("result") || engineNamed("own site");
-  const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked");
+  const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked" || engine.note === "timed out" || engine.note === "network error");
   const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
+  const allTimedOut = engines.every((engine) => engine.note === "timed out" || engine.note === "network error");
   const ddgBlocked = !engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "result");
   if (!hitEngine && allBlocked) {
-    const closing = ddgChallenge
-      ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
-      : "Web search is not checkable for free.";
+    const closing = allTimedOut
+      ? "Not checked. Not a pass."
+      : ddgChallenge
+        ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
+        : "Web search is not checkable for free.";
     attempts.push(
       blockedAttempt(
         "screen-web",
@@ -1578,7 +1612,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       });
     }
   }
+  flush();
+  }
 
+  await webSearchPromise;
   flush();
   return produced;
 }
