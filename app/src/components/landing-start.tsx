@@ -34,7 +34,7 @@ export function LandingStart({ signedIn = false }: { signedIn?: boolean }) {
           Request to join
         </a>
         <Link href="/apply" className={btnOutline}>
-          Apply
+          Request to join
         </Link>
         <Link href={memberLoginHref(signedIn)} className={btnOutline}>
           Sign in
