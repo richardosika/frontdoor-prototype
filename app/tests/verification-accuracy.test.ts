@@ -2448,6 +2448,10 @@ describe("batch 4 company search terms", () => {
     expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("durst organization");
     expect(companySearchTerm("The Brodsky Organization", "Daniel Brodsky")).toBe("brodsky organization");
     expect(companySearchTerm("LeFrak Organization", "Richard LeFrak")).toBe("lefrak organization");
+    expect(companySearchTerm("Plaza Construction", "David Wang")).toBe("plaza construction");
+    expect(companySearchTerm("Rockrose Development Corp.", "Justin Elghanayan")).toBe("rockrose");
+    expect(socialSearchQuery("David Wang", "Plaza Construction")).toBe(`"David Wang" "plaza construction"`);
+    expect(socialSearchQuery("David Wang", "Plaza Construction")).not.toBe(`"David Wang" "plaza"`);
     expect(companySearchTerm("Related Companies", "Stephen Ross")).toBe("related companies");
 
     const tutor = facts({
@@ -6184,5 +6188,96 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(missed.summary.company).not.toContain("did not return a page");
     expect(missed.categories.find((category) => category.id === "footprint")?.reason.toLowerCase()).toContain("unavailable");
     expect(missed.categories.find((category) => category.id === "footprint")?.reason).not.toContain("did not return a page");
+  });
+
+  it("retries a failed Bing page and does not call that a miss", async () => {
+    const applicant = facts({
+      name: "Justin Elghanayan",
+      applicantName: "Justin Elghanayan",
+      org: "Rockrose Development Corp.",
+      location: "New York, NY",
+      website: "",
+    });
+    let bingCalls = 0;
+    const recovered = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 0, text: "" };
+      if (url.includes("bing.com")) {
+        bingCalls += 1;
+        if (bingCalls === 1) return { ok: true, status: 200, text: "<html><body></body></html>" };
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.loopnet.com/justin-elghanayan">Justin Elghanayan | Rockrose Development Corp.</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = recovered.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).toContain("Bing (result)");
+    expect(web?.finding).toContain("loopnet.com");
+
+    const stillDown = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com") || url.includes("bing.com")) return { ok: true, status: 200, text: "<html><body></body></html>" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const missed = stillDown.find((check) => check.key === "screen-web");
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.corroborates).not.toBe(true);
+    expect(missed?.finding).toContain("Search did not complete");
+    expect(missed?.finding).toContain("Not checked");
+    expect(missed?.finding).toContain("Not a pass");
+    expect(missed?.finding).toContain("Tried");
+    const missedGrade = gradeChecks([missed!], applicant);
+    expect(missedGrade.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+
+    const unrelated = `<ol><li class="b_algo"><a href="https://example.com/other">A different firm announced a project in New York</a></li></ol>`;
+    const realMiss = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bing.com") || url.includes("duckduckgo.com")) return { ok: true, status: 200, text: unrelated };
+      return { ok: false, status: 404, text: "" };
+    });
+    const emptyHit = realMiss.find((check) => check.key === "screen-web");
+    expect(emptyHit?.status).toBe("INCONCLUSIVE");
+    expect(emptyHit?.finding).toContain("Tried");
+    expect(emptyHit?.finding).not.toContain("Search did not complete");
+    expect(gradeChecks([emptyHit!], applicant).categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+  });
+
+  it("does not treat a lowercase plaza as Plaza Construction", () => {
+    const factsForHeadline = {
+      name: "David Wang",
+      applicantName: "David Wang",
+      org: "Plaza Construction",
+      location: "New York, NY",
+    };
+    expect(judgeHeadline("Cochecton Planning Board moves Fosterdale plaza construction forward", factsForHeadline).company).toBe(false);
+    expect(judgeHeadline("Grand Army Plaza Construction Site opens downtown", factsForHeadline).company).toBe(false);
+    expect(judgeHeadline("David Wang leads Plaza Construction in New York", factsForHeadline).company).toBe(true);
+    const rows = classifyNews(
+      facts(factsForHeadline),
+      [
+        {
+          title: "Cochecton Planning Board moves Fosterdale plaza construction forward",
+          snippet: "The board discussed plaza construction.",
+          url: "https://example.com/fosterdale",
+          source: "Local",
+          provider: "Google News",
+          publishedAt: null,
+        },
+        {
+          title: "Grand Army Plaza Construction Site opens downtown",
+          snippet: "Work continues at Grand Army Plaza.",
+          url: "https://example.com/army",
+          source: "Local",
+          provider: "Google News",
+          publishedAt: null,
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((item) => item.key === "news");
+    expect(news?.finding).not.toContain("names the person or the company");
+    expect(news?.finding.toLowerCase()).not.toContain("plaza construction");
   });
 });

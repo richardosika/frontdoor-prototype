@@ -263,6 +263,47 @@ export function isSearchTermGeneric(token: string): boolean {
   return SEARCH_TERM_GENERIC.has(token) || isStandaloneGenericQueryToken(token) || isGenericFirmToken(token);
 }
 
+/** A place or dictionary word. "plaza" alone is not Plaza Construction. Matching still uses the full name. */
+const COMMON_QUERY_STEM = new Set([
+  "plaza",
+  "park",
+  "summit",
+  "capital",
+  "square",
+  "tower",
+  "place",
+  "court",
+  "center",
+  "centre",
+  "point",
+  "house",
+  "hall",
+  "bridge",
+  "garden",
+  "gardens",
+  "heights",
+  "hill",
+  "hills",
+  "green",
+  "metro",
+  "commons",
+  "crossing",
+  "landing",
+  "station",
+  "yard",
+  "yards",
+]);
+
+const INDUSTRY_QUERY_WORD = new Set(["construction", "development", "contracting", "contractor", "builders", "building"]);
+
+export function isCommonQueryStem(token: string): boolean {
+  return COMMON_QUERY_STEM.has(token);
+}
+
+export function isIndustryQueryWord(token: string): boolean {
+  return INDUSTRY_QUERY_WORD.has(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -289,6 +330,11 @@ export function companySearchTerm(org: string, person = ""): string {
   if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
   const distinctive = brand.filter((token) => !names.has(token) && !isSearchTermGeneric(token));
+  // "plaza" is a place word. Keep "construction" so the query is not every plaza.
+  if (distinctive.length === 1 && isCommonQueryStem(distinctive[0])) {
+    const industry = phrase.filter((token) => isIndustryQueryWord(token) && !names.has(token));
+    if (industry.length) return [distinctive[0], ...industry].join(" ");
+  }
   // A surname plus only a generic word, such as "Brodsky Organization", stays the whole brand.
   if (distinctive.length) return distinctive.join(" ");
   return phrase.join(" ");
@@ -765,7 +811,32 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   }
   // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
   // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.
-  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && brandMention(text, distinctive[0], phrase, org, person)) return true;
+  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && !isCommonQueryStem(distinctive[0]) && brandMention(text, distinctive[0], phrase, org, person)) return true;
+  return false;
+}
+
+/**
+ * A news headline names this firm. A common stem such as "plaza" in lowercase prose,
+ * or inside a longer place name ("Grand Army Plaza"), does not.
+ */
+export function headlineNamesFirm(text: string, org: string, person = ""): boolean {
+  if (!mentionsCompany(text, org, person)) return false;
+  const phrase = companyPhraseTokens(org);
+  const stem = phrase.find((token) => isCommonQueryStem(token));
+  if (!stem) return true;
+  const industry = phrase.filter((token) => isIndustryQueryWord(token));
+  if (industry.length && !industry.some((word) => new RegExp(`(?<![A-Za-z0-9])${word}(?![A-Za-z0-9])`, "i").test(text))) return false;
+  const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9])(${stem})(?![A-Za-z0-9])`, "gi"));
+  for (const hit of hits) {
+    const word = hit[1] || "";
+    if (!word || word[0] !== word[0].toUpperCase()) continue;
+    const before = text.slice(0, hit.index).trimEnd().match(/([A-Za-z][A-Za-z'-]*)$/);
+    const rawPrevious = before?.[1] || "";
+    const previous = rawPrevious.toLowerCase();
+    const capitalized = rawPrevious.length > 0 && rawPrevious[0] === rawPrevious[0].toUpperCase() && rawPrevious[0] !== rawPrevious[0].toLowerCase();
+    if (capitalized && previous !== "the" && !phrase.includes(previous)) continue;
+    return true;
+  }
   return false;
 }
 

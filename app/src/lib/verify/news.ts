@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -157,6 +157,10 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   }
   // The firm name is the person's name. Do not quote "Adam Leitman Bailey" a second time.
   if (words.length && words.every((word) => seen.has(bareToken(word)))) return null;
+  // "plaza" alone is every plaza. Keep "plaza construction".
+  if (words.some((word) => isCommonQueryStem(bareToken(word))) && words.some((word) => isIndustryQueryWord(bareToken(word)))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
   const kept = words.filter((word) => {
     const token = bareToken(word);
     return token.length >= 2 && !seen.has(token);
@@ -845,7 +849,7 @@ function textHasCompany(text: string, org: string, person = ""): boolean {
   const phrase = companyPhraseTokens(org);
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
   if (phrase.length === 1 && distinctive.length === 1 && SOLE_PLACE.has(distinctive[0])) return false;
-  return mentionsCompany(text, org, person);
+  return headlineNamesFirm(text, org, person);
 }
 
 function textHasLocation(text: string, location: string): boolean {

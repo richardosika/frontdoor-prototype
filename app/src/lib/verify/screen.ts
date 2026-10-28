@@ -494,7 +494,7 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   }
   const redirectNote = attempt.redirectedTo ? `The site redirected to ${attempt.redirectedTo}.` : "";
   if (attempt.outcome === "not-found") {
-    const lead = /same source as /.test(attempt.detail)
+    const lead = /Tried /.test(attempt.detail) || /same source as /.test(attempt.detail)
       ? attempt.detail
       : attempt.detail === "no match found"
         ? "no match found"
@@ -1465,6 +1465,36 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     );
     engines.push(...pulled);
   }
+  const failedNote = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page" || note === "no results";
+  const usablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
+  if (!usablePage && engines.some((engine) => failedNote(engine.note))) {
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
+    const retryJobs: { name: string; url: string; parse: (text: string) => SearchSnippet[] }[] = [
+      {
+        name: "Bing",
+        url: bingUrl,
+        parse: (text) => [...text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0])),
+      },
+      {
+        name: "DuckDuckGo lite",
+        url: `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent([person, searchOrg].filter(Boolean).join(" ") || searched)}`,
+        parse: (text) => ddgSnippetsFrom(text),
+      },
+    ];
+    for (const job of retryJobs) {
+      const response = await pullWithin(fetchText, job.url);
+      const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
+      const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : 2);
+      const existing = engines.find((engine) => engine.name === job.name);
+      if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
+      else if (rank(note) < rank(existing.note)) {
+        existing.snippets = snippets;
+        existing.note = note;
+        existing.url = job.url;
+      }
+    }
+  }
   const tried = engines.map((engine) => `${engine.name} (${engine.note})`).join(", ");
   const order = ["DuckDuckGo", "DuckDuckGo lite", "Bing", "Brave", "Mojeek", "Wikipedia", "Wikidata", "GDELT"];
   const engineNamed = (note: string) =>
@@ -1472,6 +1502,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .map((name) => engines.find((engine) => engine.name === name && engine.note === note))
       .find((engine): engine is SearchEngine => Boolean(engine));
   const hitEngine = engineNamed("result") || engineNamed("own site");
+  const sawUsablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
+  const sawFailure = engines.some((engine) => failedNote(engine.note));
   const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked" || engine.note === "timed out" || engine.note === "network error");
   const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
   const allTimedOut = engines.every((engine) => engine.note === "timed out" || engine.note === "network error");
@@ -1489,6 +1521,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         searched,
         ddgUrl,
         `All free search sources blocked. Tried ${tried}. ${closing}`.replace(/\s+/g, " ").trim(),
+      ),
+    );
+  } else if (!hitEngine && !sawUsablePage && sawFailure) {
+    attempts.push(
+      blockedAttempt(
+        "screen-web",
+        "Web search",
+        searched,
+        ddgBlocked ? bingUrl : ddgUrl,
+        `Search did not complete. Not checked. Not a pass. Tried ${tried}.`.replace(/\s+/g, " ").trim(),
       ),
     );
   } else if (!hitEngine) {
