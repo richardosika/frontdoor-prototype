@@ -184,6 +184,16 @@ Equity raise amounts stay in the deal room. The public feed and the deal list sh
 4. A sponsor may upload their own NDA as a document. The platform acknowledgement is still required. **Remove from deal team** ends access immediately. The audit log records the add and the removal.
 5. Open the public feed. A raising post shows the title, market, and asset. The dollar amount, if any, is on the deal room page for the team.
 
+## Directory setup
+
+This is on the `platform-p5` branch. These pages edit rows that are already in the database. There is no new migration. Asset types, fields, markets, and specialties are reference data. `npm run db:cleanup-platform -- --delete` still removes only `@platform-test.example` members and does not retire the taxonomy.
+
+1. `/admin/taxonomy`. Add an asset type under a group, move it up or down, and retire it. Retired types stay on old profiles and drop off new ones. Add a field. The form stops at 12 active fields for one type.
+2. `/admin/markets`. Mark a metro or state as focus, seeding, or active. Focus is for outreach. County rows are not on this list.
+3. `/admin/specialties`. Add a specialty on an existing role. Retire it when it should leave the directory filters.
+4. `/admin/readiness`. The table is members by metro and role. TEST accounts are counted apart from the rest. A cell under 5 non-TEST members says **Growing market**. Asset focus is listed under the table. **Focus markets only** hides metros that are not marked focus.
+5. `/admin/audit`. Search the log and filter by asset, field, market, specialty, licence, showcase, deal team, settings, or member. A taxonomy save shows up here. Verification grades on this page stay with the administrator.
+
 ## Project filters
 
 Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.

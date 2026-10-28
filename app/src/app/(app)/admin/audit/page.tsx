@@ -1,15 +1,22 @@
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { card } from "@/components/ui";
+import { card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
 import { verdictLabel } from "@/lib/application-status";
 import { prisma } from "@/lib/prisma";
 import { auditRunScore } from "@/lib/rerun-audit";
+import { auditMatches } from "@/lib/platform/admin-taxonomy";
 
 export const dynamic = "force-dynamic";
 
-export default async function AuditPage() {
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; targetType?: string }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+  const query = { q: params.q || "", targetType: params.targetType || "" };
   const [decisions, moderation, runs] = await Promise.all([
     prisma.applicationDecision.findMany({
       orderBy: { createdAt: "desc" },
@@ -18,7 +25,7 @@ export default async function AuditPage() {
     }),
     prisma.moderationEvent.findMany({
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: query.q || query.targetType ? 200 : 40,
       include: { actor: { select: { name: true } } },
     }),
     prisma.verificationRun.findMany({
@@ -43,6 +50,25 @@ export default async function AuditPage() {
       <MobileTitle href="/admin" label="Admin" title="Audit" />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Audit log" />
+        <p className="mt-2 text-sm text-ink">Search moderation, licence, showcase, and directory setup events. Verification grades on this page stay with the administrator.</p>
+        <form className="mt-3 flex flex-wrap gap-2">
+          <input name="q" defaultValue={query.q} placeholder="Search the log" className={field} />
+          <select name="targetType" defaultValue={query.targetType} className={field}>
+            <option value="">Every type</option>
+            <option value="asset">Asset type</option>
+            <option value="field">Field</option>
+            <option value="market">Market</option>
+            <option value="specialty">Specialty</option>
+            <option value="licence">Licence</option>
+            <option value="showcase">Showcase</option>
+            <option value="deal">Deal team</option>
+            <option value="settings">Settings</option>
+            <option value="member">Member</option>
+          </select>
+          <button className="min-h-11 rounded-sm bg-forest px-4 text-sm font-semibold text-paper" type="submit">
+            Search
+          </button>
+        </form>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Application decisions</h2>
           <ul className="mt-2 divide-y divide-line text-sm">
@@ -73,9 +99,17 @@ export default async function AuditPage() {
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Moderation</h2>
           <ul className="mt-2 divide-y divide-line text-sm">
-            {moderation.map((row) => (
+            {moderation
+              .filter((row) =>
+                auditMatches(
+                  { summary: row.summary, action: row.action, targetType: row.targetType, targetUserId: row.targetUserId || "" },
+                  query,
+                ),
+              )
+              .map((row) => (
               <li key={row.id} className="py-2">
-                {formatAuditTime(row.createdAt)} · {row.actor?.name || "Private Floor"} · {row.summary}
+                {formatAuditTime(row.createdAt)} · {row.actor?.name || "Private Floor"}
+                {row.targetType ? ` · ${row.targetType}` : ""} · {row.summary}
               </li>
             ))}
           </ul>
