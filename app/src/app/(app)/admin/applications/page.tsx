@@ -219,7 +219,9 @@ export default async function ApplicationsPage({
                       </p>
                       <p className="text-xs text-mut">
                         {formatAuditTime(application.createdAt)} · {personStageLabel(standing.stage)} · {applicationStatusLabel(application.status)}
-                        {application.user ? ` · ${paymentStatusLabel(application.user.paymentStatus)}` : ""}
+                        {application.user && paymentStatusLabel(application.user.paymentStatus)
+                          ? ` · ${paymentStatusLabel(application.user.paymentStatus)}`
+                          : ""}
                         {application.user?.renewalAt ? ` · renews ${formatLongEtDate(application.user.renewalAt)}` : ""}
                       </p>
                     </div>

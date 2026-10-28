@@ -109,7 +109,7 @@ Reply
     subject: "You're approved to Private Floor",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no monthly dues. Developers, investors and LPs, family offices, and lenders are free.
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed.
 
 Sign in with the email and password you chose.
 
@@ -369,6 +369,19 @@ Sign in at {login_link} with the email and password you chose. The decision is a
     `Hello {first_name},
 
 A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no annual dues. Developers, investors and LPs, family offices, and lenders are free.
+
+Sign in with the email and password you chose.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. You are approved. Reviewed membership means every member is personally reviewed. This role has no monthly dues. Developers, investors and LPs, family offices, and lenders are free.
 
 Sign in with the email and password you chose.
 

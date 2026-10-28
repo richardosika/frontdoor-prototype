@@ -22,18 +22,21 @@ describe("monthly dues wording", () => {
     expect(DUES_TABLE[1].amount).toContain("$99.50");
     expect(DUES_TABLE[1].amount).toContain("$199 per month");
     expect(DUES_TABLE[2].amount).toContain("$199 per month");
-    expect(DUES_TABLE[3].amount).toBe("Free");
+    expect(DUES_TABLE).toHaveLength(3);
+    expect(DUES_TABLE.some((row) => /free|developer|lender|family office/i.test(`${row.role} ${row.amount}`))).toBe(false);
     expect(DUES_SCHEDULE_SENTENCE).toContain("General contractors:");
     expect(DUES_SCHEDULE_SENTENCE).toContain(DUES_BILLING_NOTE);
     expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/founding|per year|once a year/i);
     expect(duesLabel(PAID_MONTHLY_CENTS)).toBe("$199 per month");
-    expect(duesLabel(0)).toBe("No monthly dues");
+    expect(duesLabel(0)).toBe("");
+    expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/free for developers|no monthly dues|no dues/i);
     expect(DUES_LOCALES.map((row) => row.id)).toEqual(["en", "es", "de", "ja"]);
     for (const row of DUES_LOCALES) {
       expect(row.text).toContain("$199");
       expect(row.text).toContain("$99.50");
       expect(row.text).not.toContain("$149");
       expect(row.text).not.toContain("$129");
+      expect(row.text).not.toMatch(/gratis para|kostenlos für|は無料|free for developers/i);
       expect(row.text.toLowerCase()).not.toContain("founding");
     }
   });

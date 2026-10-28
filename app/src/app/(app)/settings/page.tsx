@@ -27,9 +27,7 @@ export default async function SettingsPage({
       </div>
       <section className={`${card} mt-4 p-4 text-sm`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Billing</h2>
-        {user.paymentStatus === "NOT_REQUIRED" ? (
-          <p className="mt-2 text-ink">No monthly dues are due on this membership. {DUES_BILLING_NOTE}</p>
-        ) : (
+        {user.paymentStatus === "NOT_REQUIRED" ? null : (
           <div className="mt-2 space-y-1 text-ink">
             <Receipt user={user} />
             {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}

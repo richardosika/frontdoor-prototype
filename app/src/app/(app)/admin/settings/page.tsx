@@ -83,7 +83,7 @@ export default async function AdminSettingsPage({
               </tr>
             </thead>
             <tbody>
-              {dues.map((row) => (
+              {dues.filter((row) => row.cents > 0).map((row) => (
                 <tr key={row.role} className="border-b border-line">
                   <td className="py-2">{row.label}</td>
                   <td className="py-2">{row.text}</td>

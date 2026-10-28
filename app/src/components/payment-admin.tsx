@@ -38,7 +38,7 @@ export function PaymentPanel({
     return (
       <section className={`${card} mt-4 p-4 text-sm`}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Dues</h2>
-        <p className="mt-2 text-ink">No monthly dues. This role activates as soon as you approve it.</p>
+        <p className="mt-2 text-ink">This role activates as soon as you approve it.</p>
       </section>
     );
   }

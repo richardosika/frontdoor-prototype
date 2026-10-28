@@ -49,7 +49,7 @@ export async function createDuesCheckout(input: {
   couponId?: string;
 }): Promise<StripeResult<{ url: string }>> {
   if (!input.secret.startsWith("sk_test")) return { ok: false, error: "Stripe checkout stays in test mode." };
-  if (input.unitAmount <= 0) return { ok: false, error: "This role has no monthly dues." };
+  if (input.unitAmount <= 0) return { ok: false, error: "Checkout is not used for this role." };
   const body = new URLSearchParams();
   body.set("mode", "subscription");
   body.set("line_items[0][price_data][currency]", "usd");

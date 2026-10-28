@@ -27,7 +27,7 @@ export function eligibleForDirectory(member: { status: string; paymentStatus: st
 }
 
 export function paymentStatusLabel(status: string): string {
-  if (status === "NOT_REQUIRED") return "No dues";
+  if (status === "NOT_REQUIRED") return "";
   if (status === "DUE") return "Payment due";
   if (status === "PAID") return "Paid";
   if (status === "WAIVED") return "Waived";

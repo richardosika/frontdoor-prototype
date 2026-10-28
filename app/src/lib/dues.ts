@@ -48,13 +48,13 @@ export function formatMoney(cents: number): string {
 }
 
 export function duesLabel(cents: number): string {
-  if (cents <= 0) return "No monthly dues";
+  if (cents <= 0) return "";
   return `${formatMoney(cents)} per month`;
 }
 
 /** Full price sits next to the half-price first month. */
 export function offerLabel(monthlyCents: number): string {
-  if (monthlyCents <= 0) return "No monthly dues";
+  if (monthlyCents <= 0) return "";
   return `First month ${formatMoney(firstMonthCents(monthlyCents))} (50% off), then ${formatMoney(monthlyCents)} per month`;
 }
 
@@ -103,13 +103,10 @@ export const DUES_DUE_NOW_NOTE = DUES_BILLING_NOTE.replace(
 /** Same sentence as the billing note. Older imports still compile. */
 export const DUES_ANNUAL_NOTE = DUES_BILLING_NOTE;
 
-export const DUES_FREE_LINE = "Free for developers, investors and LPs, family offices, and lenders.";
-
 export const DUES_TABLE: { role: string; amount: string }[] = [
   { role: "General contractors", amount: offerLabel(GC_MONTHLY_CENTS) },
   { role: "Brokers", amount: offerLabel(BROKER_MONTHLY_CENTS) },
   { role: "Attorneys and advisors", amount: offerLabel(ADVISOR_MONTHLY_CENTS) },
-  { role: "Developers, investors and LPs, family offices, and lenders", amount: "Free" },
 ];
 
 /** Paid rows for an applicant who has a price. A free role does not see a Free line. */
@@ -117,7 +114,7 @@ export function paidDuesRows(): { role: string; amount: string }[] {
   return DUES_TABLE.filter((row) => row.amount !== "Free");
 }
 
-export const DUES_SCHEDULE_SENTENCE = `${DUES_TABLE[0].role}: ${DUES_TABLE[0].amount}. ${DUES_TABLE[1].role}: ${DUES_TABLE[1].amount}. ${DUES_TABLE[2].role}: ${DUES_TABLE[2].amount}. ${DUES_FREE_LINE} ${DUES_BILLING_NOTE}`;
+export const DUES_SCHEDULE_SENTENCE = `${DUES_TABLE[0].role}: ${DUES_TABLE[0].amount}. ${DUES_TABLE[1].role}: ${DUES_TABLE[1].amount}. ${DUES_TABLE[2].role}: ${DUES_TABLE[2].amount}. ${DUES_BILLING_NOTE}`;
 
 /** Apply page schedule. Paid prices stay. It does not say a free role has no dues. */
 export function applyDuesSchedule(): string {
@@ -131,22 +128,22 @@ export const DUES_LOCALES: { id: DuesLocale; label: string; text: string }[] = [
   {
     id: "es",
     label: "Español",
-    text: "Contratistas generales: primer mes $99.50 (50% de descuento), luego $199 al mes. Corredores: primer mes $99.50 (50% de descuento), luego $199 al mes. Abogados y asesores: primer mes $99.50 (50% de descuento), luego $199 al mes. Gratis para desarrolladores, inversionistas y LPs, family offices y prestamistas. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación. Es una cuota fija y no depende de ningún trato.",
+    text: "Contratistas generales: primer mes $99.50 (50% de descuento), luego $199 al mes. Corredores: primer mes $99.50 (50% de descuento), luego $199 al mes. Abogados y asesores: primer mes $99.50 (50% de descuento), luego $199 al mes. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación. Es una cuota fija y no depende de ningún trato.",
   },
   {
     id: "de",
     label: "Deutsch",
-    text: "Generalunternehmer: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Makler: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Anwälte und Berater: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Kostenlos für Entwickler, Investoren und LPs, Family Offices und Kreditgeber. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe. Eine feste Gebühr, unabhängig von einem Geschäft.",
+    text: "Generalunternehmer: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Makler: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Anwälte und Berater: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe. Eine feste Gebühr, unabhängig von einem Geschäft.",
   },
   {
     id: "ja",
     label: "日本語",
-    text: "ゼネコン：初月 $99.50（50%引き）、その後は月額 $199。ブローカー：初月 $99.50（50%引き）、その後は月額 $199。弁護士とアドバイザー：初月 $99.50（50%引き）、その後は月額 $199。デベロッパー、投資家とLP、ファミリーオフィス、レンダーは無料。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。取引に連動しない定額です。",
+    text: "ゼネコン：初月 $99.50（50%引き）、その後は月額 $199。ブローカー：初月 $99.50（50%引き）、その後は月額 $199。弁護士とアドバイザー：初月 $99.50（50%引き）、その後は月額 $199。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。取引に連動しない定額です。",
   },
 ];
 
 export function adminDuesLine(cents: number, waived: boolean): string {
-  if (cents <= 0) return "Free role - no dues";
+  if (cents <= 0) return "";
   const label = offerLabel(LEGACY_STORED_CENTS.has(cents) ? PAID_MONTHLY_CENTS : cents);
   if (waived) return `${label}. ${DUES_WAIVED}`;
   return `${label}. ${DUES_BILLING_NOTE}`;

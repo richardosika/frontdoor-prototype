@@ -74,7 +74,9 @@ export default async function MembersAdminPage({
                 {member.isAdmin ? <span className="text-[10px] uppercase tracking-wider text-brass">Admin</span> : null}
               </div>
               <p className="mt-1 text-xs text-mut">
-                {roleShort(roleLabel(member.role))} · {member.org} · {paymentStatusLabel(member.paymentStatus)} · {personStageLabel(standing.stage)}
+                {[roleShort(roleLabel(member.role)), member.org, paymentStatusLabel(member.paymentStatus), personStageLabel(standing.stage)]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
               <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${fileLabel === "Verified" ? "text-brass" : "text-ink"}`}>
                 {fileLabel}

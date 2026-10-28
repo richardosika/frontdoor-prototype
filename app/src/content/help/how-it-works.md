@@ -24,7 +24,7 @@ The member who created a deal room decides who may enter. Before entering, a mem
 
 ## Dues
 
-Developers, investors and LPs, family offices, and lenders pay no monthly dues and become active when a Private Floor administrator approves them. General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. They are never based on a deal. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues for a person. A waiver is not automatic.
+General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. They are never based on a deal. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues for a person. A waiver is not automatic.
 
 ## Getting a person
 

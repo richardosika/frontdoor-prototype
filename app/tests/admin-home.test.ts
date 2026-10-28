@@ -81,6 +81,8 @@ describe("admin command center", () => {
   it("reads the flat dues schedule from the role amounts", () => {
     const schedule = duesSchedule();
     expect(schedule.find((row) => row.role === "DEVELOPER")?.cents).toBe(0);
+    expect(schedule.find((row) => row.role === "DEVELOPER")?.text).toBe("");
+    expect(schedule.find((row) => row.role === "LENDER")?.text).toBe("");
     expect(schedule.find((row) => row.role === "INVESTOR_PE")?.cents).toBe(0);
     expect(schedule.find((row) => row.role === "FAMILY_OFFICE")?.cents).toBe(0);
     expect(schedule.find((row) => row.role === "LENDER")?.cents).toBe(0);

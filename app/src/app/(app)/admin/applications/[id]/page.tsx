@@ -152,9 +152,11 @@ export default async function ApplicationDetailPage({
           <p>
             <b>Role:</b> {roleLabel(application.role)} · {application.org} · {application.location}
           </p>
-          <p>
-            <b>Dues:</b> {adminDuesLine(application.duesCents, application.duesWaived)}
-          </p>
+          {adminDuesLine(application.duesCents, application.duesWaived) ? (
+            <p>
+              <b>Dues:</b> {adminDuesLine(application.duesCents, application.duesWaived)}
+            </p>
+          ) : null}
           {application.phone ? (
             <p>
               <b>Phone:</b> {application.phone}
