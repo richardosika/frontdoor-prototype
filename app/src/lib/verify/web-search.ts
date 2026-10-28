@@ -1,5 +1,6 @@
 import { nameTokens, normalizeName } from "@/lib/verify/fuzzy";
 import { leftTheCompany } from "@/lib/verify/public-match";
+import { stripQaOrg } from "@/lib/verify/qa-marker";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const NEGATIVE = /\b(fraud|lawsuit|indicted|scam|ponzi)\b/i;
@@ -150,7 +151,8 @@ type FetchText = (url: string) => Promise<{ ok: boolean; status: number; text: s
 type Attempt = { provider: string; state: "unavailable" | "no-data" | "hit" | "negative" | "departed"; sample: string; url: string };
 
 export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchText): Promise<CheckOutput> {
-  const query = `"${facts.name}" "${facts.org}"`;
+  const org = stripQaOrg(facts.org);
+  const query = `"${facts.name}" "${org}"`;
   const attempts: Attempt[] = [];
   const providers: { provider: string; url: string; parse: (text: string) => string[] }[] = [
     {
@@ -165,12 +167,12 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
     },
     {
       provider: "Wikidata",
-      url: `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(`${facts.name} ${facts.org}`)}&language=en&format=json&limit=8`,
+      url: `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(`${facts.name} ${org}`)}&language=en&format=json&limit=8`,
       parse: wikidataResultTexts,
     },
     {
       provider: "GDELT",
-      url: `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`${facts.name} ${facts.org}`)}&mode=artlist&format=json&maxrecords=8`,
+      url: `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`${facts.name} ${org}`)}&mode=artlist&format=json&maxrecords=8`,
       parse: gdeltResultTexts,
     },
     {
@@ -200,14 +202,14 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       continue;
     }
     const negative = snippets.find(
-      (text) => mentionsPersonAndCompany(text, facts.name, facts.org) && NEGATIVE.test(text),
+      (text) => mentionsPersonAndCompany(text, facts.name, org) && NEGATIVE.test(text),
     );
     if (negative) {
       attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
-    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && !leftTheCompany(text, facts.org));
-    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, facts.org) && leftTheCompany(text, facts.org));
+    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && !leftTheCompany(text, org));
+    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && leftTheCompany(text, org));
     if (hit) {
       attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
       break;

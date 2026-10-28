@@ -284,8 +284,35 @@ function withData(check: CheckOutput): boolean {
   return check.status === "PASS" || check.status === "FAIL";
 }
 
+const SEARCH_ENGINE_HOST = /(^|\.)(duckduckgo\.com|bing\.com|brave\.com|mojeek\.com|wikipedia\.org|wikidata\.org|google\.com|gdeltproject\.org)$/i;
+
+function resultHosts(check: CheckOutput): string[] {
+  const found = `${check.url} ${check.finding}`.match(/https?:\/\/[^\s)\]"'<>]+/gi) || [];
+  const hosts: string[] = [];
+  for (const raw of found) {
+    try {
+      const host = new URL(raw.replace(/[.,]+$/, "")).hostname.replace(/^www\./, "").toLowerCase();
+      if (!host || SEARCH_ENGINE_HOST.test(host) || hosts.includes(host)) continue;
+      hosts.push(host);
+    } catch {
+      // A broken URL in the finding is not a second source.
+    }
+  }
+  return hosts;
+}
+
 export function corroboratingPasses(checks: CheckOutput[]): CheckOutput[] {
-  return checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
+  const passes = checks.filter((check) => check.status === "PASS" && check.corroborates && !check.selfReported);
+  const seenHosts = new Set<string>();
+  const out: CheckOutput[] = [];
+  for (const check of passes) {
+    const webPair = check.key === "screen-web" || check.key === "web-footprint" || check.key === "fixture-web";
+    const hosts = webPair ? resultHosts(check) : [];
+    if (webPair && hosts.length && hosts.some((host) => seenHosts.has(host))) continue;
+    hosts.forEach((host) => seenHosts.add(host));
+    out.push(check);
+  }
+  return out;
 }
 
 /** Both public web checks were blocked. An unavailable search is not a pass and not a miss. */
@@ -618,6 +645,12 @@ function uncheckedSentence(check: CheckOutput, checks: CheckOutput[]): string | 
     const verdict = webSearchLine(checks);
     if (verdict === "independent") return null;
     if (verdict === "own-site") return OWN_SITE_WEB;
+  }
+  if ((check.key === "screen-youtube" || check.key === "screen-tiktok") && check.status !== "UNAVAILABLE") {
+    const score = scoreClause(check);
+    const nothing = !score || (/Name: no\./.test(score) && /Company: no\./.test(score) && /City: no\./.test(score));
+    if (nothing) return `${labelFor(check.key)}: no match found.`;
+    return `${labelFor(check.key)}: no match found. ${score}`.replace(/\s+/g, " ").trim();
   }
   if ((check.key === "news" || check.key === "screen-news") && check.status !== "UNAVAILABLE") {
     const news = checks.find((item) => item.key === "news");

@@ -2,6 +2,7 @@ import { classifyFetchError, decodeHtmlEntities } from "@/lib/verify/fetch";
 import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
@@ -835,14 +836,15 @@ export function completeScreenRows(present: CheckOutput[]): CheckOutput[] {
 
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
+  const searchOrg = stripQaOrg(facts.org || "");
   let queryFacts: { name: string; org: string; location: string; aliases: string[] } = {
     name: person,
-    org: facts.org,
+    org: searchOrg,
     location: facts.location,
-    aliases: brandAliases(facts.org, facts.website || ""),
+    aliases: brandAliases(searchOrg, facts.website || ""),
   };
   const place = queryCity(facts.location);
-  const searched = [person, facts.org, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
+  const searched = [person, searchOrg, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
   const attempts: Attempt[] = [];
   const produced: CheckOutput[] = [];
   let flushed = 0;
@@ -990,15 +992,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           }
         }
       }
-      queryFacts = { ...queryFacts, aliases: brandAliases(facts.org, website || homeUrl, pages.map((page) => page.raw).join("\n")) };
+      queryFacts = { ...queryFacts, aliases: brandAliases(searchOrg, website || homeUrl, pages.map((page) => page.raw).join("\n")) };
       const best = pages
         .map((page) => ({ ...page, score: scorePublicText(page.text, queryFacts, { ownFirm: true }) }))
         .sort((left, right) => rank(right.score) - rank(left.score))[0];
       const label = crossDomain ? hostLabel(crossDomain) : "";
-      const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, facts.org, person));
+      const mentionsOriginal = pages.some((page) => mentionsCompany(page.text, searchOrg, person));
       const compact = pages.map((page) => page.text).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
       const brand = mentionsBrandAlias(pages.map((page) => `${page.text}\n${page.raw}`).join("\n"), queryFacts.aliases);
-      const labelIsThisFirm = Boolean(label && domainMatchesOrgStem(label, facts.org));
+      const labelIsThisFirm = Boolean(label && domainMatchesOrgStem(label, searchOrg));
       const aliasOnly = Boolean(
         !labelIsThisFirm && ((crossDomain && !mentionsOriginal && label.length >= 4 && compact.includes(label)) || (brand && !mentionsOriginal)),
       );
@@ -1074,7 +1076,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       if (/linkedin\.com\/company\//i.test(item.url)) {
         const slug = decodeURIComponent(item.url.match(/linkedin\.com\/company\/([^/?#]+)/i)?.[1] || "");
         if (/^\d+$/.test(slug)) return true;
-        return linkedinCompanyMatchesOrg(item.url, facts.org);
+        return linkedinCompanyMatchesOrg(item.url, searchOrg);
       }
       return linkedinProfileMatchesPerson(item.url, person);
     })?.url || "";
@@ -1114,10 +1116,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
       const ownProfile = /linkedin\.com\/in\//i.test(url);
       const companyPage = /linkedin\.com\/company\//i.test(url);
-      if (companyPage && !linkedinCompanyMatchesOrg(url, facts.org)) {
+      if (companyPage && !linkedinCompanyMatchesOrg(url, searchOrg)) {
         continue;
       }
-      const selfNamedFirm = firmContainsApplicantName(facts.org, person);
+      const selfNamedFirm = firmContainsApplicantName(searchOrg, person);
       const score = scorePublicText(visible(linked.text), queryFacts, { ownFirm: ownProfile || (companyPage && selfNamedFirm) });
       const selfNamedProfile = score.name && selfNamedFirm && (ownProfile || companyPage);
       const blockedTyped = typedLinkedin && typedLinkedin !== url;
@@ -1152,8 +1154,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   }
   flush();
 
-  const shortQuery = socialSearchQuery(person, facts.org);
-  const companyTag = instagramCompanyTag(facts.org, person);
+  const shortQuery = socialSearchQuery(person, searchOrg);
+  const companyTag = instagramCompanyTag(searchOrg, person);
   const profileUrl = (platform: string, fallback: string) => socials.find((item) => item.platform === platform)?.url || fallback;
   const platformJobs: { key: string; platform: string; url: string; searched: string; fromSite: boolean; read: (text: string) => string }[] = [
     {
@@ -1179,7 +1181,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         "Instagram",
         companyTag ? `https://www.instagram.com/explore/tags/${encodeURIComponent(companyTag)}/` : "https://www.instagram.com/",
       ),
-      searched: `${facts.org} on Instagram`,
+      searched: `${searchOrg} on Instagram`,
       fromSite: socials.some((item) => item.platform === "Instagram"),
       read: visible,
     },
@@ -1223,7 +1225,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       if (job.platform === "YouTube" && !job.fromSite && !socialMatch(scorePublicText(text, queryFacts))) {
         const altName = alternatePersonNames(person).find((item) => item.toLowerCase() !== person.trim().toLowerCase());
         if (altName) {
-          const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(socialSearchQuery(altName, facts.org))}`;
+          const altUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(socialSearchQuery(altName, searchOrg))}`;
           const second = await pull(fetchText, altUrl);
           const extra = [...youtubeTitles(second.text), ...youtubeSnippets(second.text)];
           if (!accessBlocked(second.status, second.text, altUrl) && extra.length && socialMatch(scorePublicText(extra.join("\n"), queryFacts))) {
@@ -1280,7 +1282,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
 
   const allNews = newsSearchQueries(facts);
   const newsQueries = allNews.filter((_, index) => index < 2 || index >= 3).slice(0, 3);
-  const searchedNews = newsQueries.join(" | ") || `${person} ${facts.org}`;
+  const searchedNews = newsQueries.join(" | ") || `${person} ${searchOrg}`;
   let newsBlocked = 0;
   let newsResponded = 0;
   let bestNews: { title: string; score: MatchScore; url: string; kind: "hard" | "civil" | "none"; foreclosureOnly: boolean; rank: number } | null = null;
@@ -1385,7 +1387,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
   engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets) });
   if (!engines.some((engine) => engine.note === "result")) {
-    const loose = [person, facts.org].filter(Boolean).join(" ");
+    const loose = [person, searchOrg].filter(Boolean).join(" ");
     const extras: { name: string; url: string; parse: (text: string) => SearchSnippet[]; delay?: boolean }[] = [];
     if (engines[0]?.note === "challenge page" || engines[0]?.note === "blocked") {
       extras.push({
@@ -1418,7 +1420,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       },
       {
         name: "GDELT",
-        url: `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`${person} ${facts.org}`.trim())}&mode=artlist&format=json&maxrecords=8`,
+        url: `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`${person} ${searchOrg}`.trim())}&mode=artlist&format=json&maxrecords=8`,
         parse: (text) => gdeltResultTexts(text).map((text) => ({ text, hrefs: [] })),
       },
     );
@@ -1485,7 +1487,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: hitEngine.url,
         outcome: "found",
         score: hit.score,
-        detail: `Tried ${tried}. ${hit.text.slice(0, 180)}`,
+        detail: `Tried ${tried}. ${hit.text.slice(0, 180)} ${hit.hrefs[0] || ""}`.trim(),
         linkedUrl: hit.hrefs.join(" "),
         moreUrls: matched.slice(1).flatMap((item) => item.hrefs).join(" "),
       });

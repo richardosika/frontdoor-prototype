@@ -1,6 +1,7 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
 import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 
@@ -173,12 +174,13 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
 /** Quoted person-and-company query used by news, YouTube, and the other public searches. */
 export function socialSearchQuery(person: string, org: string): string {
   const cleaned = personWithoutSuffix(stripQuotes(person));
-  const term = companySearchTerm(stripQuotes(org), cleaned);
+  const term = companySearchTerm(stripQuotes(stripQaOrg(org)), cleaned);
   return personCompanyQuery(cleaned, term) || (cleaned ? `"${cleaned}"` : "");
 }
 
 /** Instagram tag. A tag that is only the applicant's surname is not used. */
 export function instagramCompanyTag(org: string, person: string): string {
+  org = stripQaOrg(org);
   const cleaned = personWithoutSuffix(stripQuotes(person));
   const term = companySearchTerm(stripQuotes(org), cleaned);
   const surname = surnameForSearch(cleaned).toLowerCase();
@@ -195,7 +197,7 @@ export function instagramCompanyTag(org: string, person: string): string {
 
 export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = []): string[] {
   const person = personWithoutSuffix(stripQuotes(facts.applicantName));
-  const company = stripQuotes(facts.org || facts.name);
+  const company = stripQuotes(stripQaOrg(facts.org || facts.name));
   const city = stripQuotes(queryCity(facts.location));
   const term = companySearchTerm(company, person);
   const last = surnameForSearch(person);
@@ -222,7 +224,7 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
 
 export function gdeltQuery(facts: ApplicantFacts): string {
   const person = quote(personWithoutSuffix(facts.applicantName));
-  const company = quote(facts.org || facts.name);
+  const company = quote(stripQaOrg(facts.org || facts.name));
   const city = quote(queryCity(facts.location));
   const parts: string[] = [];
   if (person && person !== company) parts.push(person);
@@ -350,7 +352,7 @@ export function classifyNews(
   const queries = newsSearchQueries(facts);
   const ranAt = now.toISOString();
   const personName = facts.applicantName.trim();
-  const companyName = (facts.org || facts.name).trim();
+  const companyName = stripQaOrg((facts.org || facts.name).trim());
   const kept = dedupe(
     dedupeNewsItems(items)
       .filter((item) => withinNewsWindow(item.publishedAt, now))
@@ -367,13 +369,16 @@ export function classifyNews(
         const blob = `${item.title} ${item.snippet}`;
         const fromTitle = judgeHeadline(item.title, factsForJudge);
         const fromBlob = judgeHeadline(blob, factsForJudge);
-        // The title decides whether this is litigation. A dividend headline stays ordinary
-        // when the snippet happens to contain the word lawsuit.
+        // The title decides whether this is litigation, and whether the applicant is named.
+        // A snippet that only says "CEO", or a possessive such as "David Martin's Terra", does not.
+        const lawsuitTitle = fromTitle.kind === "civil" && /\blawsuits?\b/i.test(item.title);
         const judged = {
           ...fromBlob,
           tone: fromTitle.tone,
           kind: fromTitle.kind,
-          departed: fromTitle.departed || fromBlob.departed,
+          person: fromTitle.kind === "none" ? fromBlob.person || fromTitle.person : fromTitle.person,
+          company: fromBlob.company || fromTitle.company,
+          departed: lawsuitTitle ? false : fromTitle.departed || fromBlob.departed,
           foreclosureOnly: fromTitle.foreclosureOnly,
           aliasOnly: !fromTitle.company && !fromBlob.company && (fromTitle.aliasOnly || fromBlob.aliasOnly),
           alias: fromTitle.alias || fromBlob.alias,
@@ -626,6 +631,19 @@ export function foreclosureOnly(text: string): boolean {
   return !/\b(lawsuits?|sued|bankruptc(?:y|ies)|investigations?|liens?)\b/i.test(text);
 }
 
+/** "David Martin's Terra" names the firm. It is not a civil allegation against David Martin. */
+function possessiveFirmLabel(text: string, person: string, org: string): boolean {
+  const name = personWithoutSuffix(person).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!name) return false;
+  const match = new RegExp(`\\b${name}['’]s\\b`, "i").exec(text);
+  if (!match) return false;
+  const after = text.slice((match.index ?? 0) + match[0].length).trim();
+  const next = after.match(/^([A-Za-z][A-Za-z0-9'’.-]*)/);
+  if (!next) return false;
+  const token = next[1].toLowerCase().replace(/[^a-z0-9]/g, "");
+  return companyPhraseTokens(org).includes(token);
+}
+
 /**
  * The same headline judgement used by the news check and by screen-news.
  * "trust" is not enough to make a company hit. A foreclosure is company-level review.
@@ -637,8 +655,8 @@ export function judgeHeadline(
   const personName = (facts.applicantName || facts.name).trim();
   const companyName = facts.org.trim();
   const hit = personName ? personHit(text, personName, companyName) : "none";
-  const person = hit === "match";
-  const company = Boolean(companyName) && textHasCompany(text, companyName, personName);
+  const possessiveFirm = hit === "match" && possessiveFirmLabel(text, personName, companyName);
+  const company = Boolean(companyName) && (textHasCompany(text, companyName, personName) || possessiveFirm);
   const aliases = [...(facts.aliases || [])];
   const domain = facts.website ? domainBrand(facts.website) : "";
   const typed = companyPhraseTokens(companyName);
@@ -646,7 +664,8 @@ export function judgeHeadline(
   if (domain && domain !== typedCompact && !typed.includes(domain) && !domainMatchesOrgStem(domain, companyName)) aliases.push(domain);
   const alias = company ? "" : mentionsBrandAlias(text, aliases);
   let kind = negativeKind(text);
-  if (kind === "hard" && !person && plaintiffSolicitation(text)) kind = "civil";
+  if (kind === "hard" && hit !== "match" && plaintiffSolicitation(text)) kind = "civil";
+  const person = hit === "match" && !(kind === "civil" && possessiveFirm);
   return {
     tone: kind === "none" ? "neutral" : "negative",
     kind,

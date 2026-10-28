@@ -427,6 +427,7 @@ export function matchEdgarCompany(rows: EdgarCompany[], org: string): EdgarCompa
 
 /** Quoted company-name search. Generic-only names such as "Group" or "Holdings" are not searched. */
 export function edgarCompanySearchPhrase(org: string): string {
+  org = stripQaOrg(org);
   const distinctive = distinctiveCompanyTokens(org).filter((token) => isDistinctiveCompanyToken(token));
   if (!distinctive.length) return "";
   return org

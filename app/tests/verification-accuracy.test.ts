@@ -8,7 +8,7 @@ import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
@@ -5813,5 +5813,166 @@ describe("batch 13 wording and own-site search", () => {
     expect(edgar.companyOnly).toBe(true);
     expect(edgar.status).toBe("INCONCLUSIVE");
     expect(matchEdgarCompany([{ title: "CBRE GROUP, INC.", ticker: "CBRE", cik: "1138118" }], "QA-TEST CBRE Group, Inc.")).toBeNull();
+  });
+});
+
+describe("corroboration, social prose, lawsuit headlines, and QA query prefix", () => {
+  it("counts screen-web and web-footprint once when they name the same page", () => {
+    const page = "https://startupfundraising.com/investors/willy-walker";
+    const shared = `Found: Willy Walker is CEO of Walker & Dunlop. ${page} Name: yes. Company: yes. City: no. Confidence: high.`;
+    const pair = [
+      row({ key: "screen-web", status: "PASS", corroborates: true, url: "https://www.bing.com/search?q=willy", finding: shared, source: "Bing" }),
+      row({ key: "web-footprint", status: "PASS", corroborates: true, url: page, finding: shared, source: "Bing" }),
+    ];
+    expect(corroboratingPasses(pair)).toHaveLength(1);
+    const separate = [
+      row({ key: "screen-web", status: "PASS", corroborates: true, url: "https://www.bisnow.com/walker", finding: "Found: Willy Walker at Walker & Dunlop. https://www.bisnow.com/walker Name: yes. Company: yes.", source: "Bing" }),
+      row({ key: "web-footprint", status: "PASS", corroborates: true, url: "https://www.cnbc.com/walker", finding: "Found: Willy Walker at Walker & Dunlop. https://www.cnbc.com/walker Name: yes. Company: yes.", source: "CNBC" }),
+    ];
+    expect(corroboratingPasses(separate)).toHaveLength(2);
+    const graded = gradeChecks(
+      [
+        ...pair,
+        row({ key: "email-syntax", status: "PASS" }),
+        row({ key: "disposable-email", status: "PASS" }),
+        row({ key: "role-address", status: "PASS" }),
+        row({ key: "phone-state", status: "PASS", corroborates: false }),
+        row({ key: "linkedin-format", status: "PASS", corroborates: false }),
+        row({ key: "linkedin-fetch", status: "PASS", corroborates: false, finding: "A public LinkedIn page included the person's name." }),
+        row({ key: "website", status: "PASS", corroborates: false, finding: "A public web page included the person or the company name." }),
+        row({ key: "rdap", status: "PASS", finding: "RDAP responded." }),
+        row({ key: "business-registry", status: "PASS", corroborates: false, finding: "A registry lists the company. It does not tie the person." }),
+        row({ key: "news", status: "PASS", corroborates: false, finding: "A headline names the person and the company." }),
+        row({ key: "social-links", status: "PASS", corroborates: false }),
+        row({ key: "sanctions", status: "PASS" }),
+        row({ key: "duplicate", status: "PASS" }),
+        row({ key: "text-risk", status: "PASS" }),
+        row({ key: "velocity", status: "PASS" }),
+        row({ key: "plausibility", status: "PASS" }),
+        row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+        row({ key: "business-card", status: "PASS", corroborates: false, finding: "The card includes the name and company." }),
+      ],
+      facts({
+        name: "Willy Walker",
+        applicantName: "Willy Walker",
+        org: "Walker & Dunlop",
+        website: "https://www.walkerdunlop.com",
+        phone: "212-555-0100",
+        linkedinUrl: "https://www.linkedin.com/in/willy-walker",
+        cardUploaded: true,
+        referenceCount: 1,
+        statement: "I lead a commercial real estate finance firm and want to meet other owners.",
+      }),
+    );
+    expect(graded.caps.some((line) => line.startsWith("Capped at C"))).toBe(true);
+    expect(graded.letter).not.toBe("A");
+    expect(graded.letter).not.toBe("B");
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBeGreaterThan(0);
+  });
+
+  it("does not print the raw YouTube or TikTok score under what could not be checked", () => {
+    const graded = gradeChecks(
+      [
+        row({
+          key: "screen-youtube",
+          status: "INCONCLUSIVE",
+          finding: "Searched: Willy Walker on YouTube. no match found Name: no. Company: no. City: no. Confidence: none.",
+          source: "YouTube",
+        }),
+        row({
+          key: "screen-tiktok",
+          status: "INCONCLUSIVE",
+          finding: "Searched: Willy Walker on TikTok. no match found Name: no. Company: no. City: no. Confidence: none.",
+          source: "TikTok",
+        }),
+        row({
+          key: "screen-youtube",
+          status: "UNAVAILABLE",
+          finding: "Searched: Willy Walker on YouTube. Name: no. Company: no. City: no. Confidence: none.",
+          source: "YouTube",
+        }),
+      ],
+      facts({ name: "Willy Walker", applicantName: "Willy Walker", org: "Walker & Dunlop" }),
+    );
+    expect(graded.summary.couldNotCheck).toContain("YouTube: no match found.");
+    expect(graded.summary.couldNotCheck).toContain("TikTok: no match found.");
+    expect(graded.summary.couldNotCheck).toContain("YouTube could not be checked");
+    expect(graded.summary.couldNotCheck).not.toMatch(/Name:|Company:|City:|Confidence:/);
+  });
+
+  it("keeps a company lawsuit that names a title, not the applicant, from failing news or reading as a departure", () => {
+    const compassTitle = "OneKey Joins CRMLS's Lawsuit Against Compass, Citing Months of Emailed Litigation Threats From CEO";
+    const compassFacts = facts({ name: "Robert Reffkin", applicantName: "Robert Reffkin", org: "Compass", location: "New York, NY" });
+    const compass = classifyNews(
+      compassFacts,
+      [
+        { title: compassTitle, snippet: "The filing cites the Compass CEO.", url: "https://www.rismedia.com/onekey", source: "RISMedia", publishedAt: "2026-10-27T15:00:00.000Z", provider: "Google News" },
+        { title: "Robert Reffkin leads Compass in New York", snippet: "Robert Reffkin leads Compass in New York.", url: "https://example.com/reffkin", source: "Desk", publishedAt: "2026-02-01T15:00:00.000Z", provider: "Google News" },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const compassNews = compass.find((item) => item.key === "news");
+    expect(compassNews?.status).toBe("PASS");
+    expect(compassNews?.corroborates).toBe(true);
+    expect(compass.some((item) => item.finding.startsWith("Departure"))).toBe(false);
+    expect(compass.some((item) => item.finding.includes(compassTitle) && item.finding.startsWith("Company litigation"))).toBe(true);
+    const compassGrade = gradeChecks(compass, compassFacts);
+    expect(compassGrade.categories.find((category) => category.id === "footprint")?.reason).toContain("8 of 8");
+    expect(compassGrade.attention.some((item) => item.severity === "High" && item.title.startsWith("News"))).toBe(false);
+
+    const terraTitle = "David Martin’s Terra Had A Good Year, Despite Lawsuit Over Deadly Condo Collapse";
+    const terraFacts = facts({ name: "David Martin", applicantName: "David Martin", org: "Terra Group", location: "Miami, FL" });
+    const terra = classifyNews(
+      terraFacts,
+      [
+        { title: terraTitle, snippet: "Surviving victims sued Terra. Commercial Observer, 2022.", url: "https://commercialobserver.com/2022/05/terra", source: "Commercial Observer", publishedAt: "2022-05-24T15:00:00.000Z", provider: "Google News" },
+        { title: "David Martin leads Terra Group in Miami", snippet: "David Martin leads Terra Group in Miami.", url: "https://example.com/martin", source: "Desk", publishedAt: "2026-02-01T15:00:00.000Z", provider: "Google News" },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const terraNews = terra.find((item) => item.key === "news");
+    expect(terraNews?.status).toBe("PASS");
+    expect(terra.some((item) => item.finding.startsWith("Departure"))).toBe(false);
+    expect(terra.some((item) => item.status === "FAIL")).toBe(false);
+    const terraGrade = gradeChecks(terra, terraFacts);
+    expect(terraGrade.categories.find((category) => category.id === "footprint")?.reason).toContain("8 of 8");
+    expect(terraGrade.attention.some((item) => item.severity === "High" && item.title.startsWith("News"))).toBe(false);
+
+    const named = classifyNews(
+      terraFacts,
+      [
+        { title: "David Martin was sued over a Terra Group project", snippet: "The civil complaint names David Martin.", url: "https://example.com/sued", source: "Law.com", publishedAt: "2026-03-01T15:00:00.000Z", provider: "Google News" },
+        { title: "David Martin leads Terra Group in Miami", snippet: "David Martin leads Terra Group in Miami.", url: "https://example.com/martin", source: "Desk", publishedAt: "2026-02-01T15:00:00.000Z", provider: "Google News" },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    expect(named.find((item) => item.key === "news")?.status).toBe("FAIL");
+    expect(named.find((item) => item.key === "news")?.reviewFlag).toBe(true);
+  });
+
+  it("strips a leading QA-TEST prefix in every search query for a non-marker email", async () => {
+    const applicant = facts({
+      name: "Willy Walker",
+      applicantName: "Willy Walker",
+      email: "person@gmail.com",
+      org: "QA-TEST Walker & Dunlop",
+      location: "New York, NY",
+      website: "https://www.walkerdunlop.com",
+    });
+    expect(factsForSearch(applicant).org).toBe("QA-TEST Walker & Dunlop");
+    expect(newsSearchQueries(applicant).join(" ")).not.toContain("QA-TEST");
+    expect(newsSearchQueries(applicant).join(" ")).toContain("Dunlop");
+    expect(socialSearchQuery(applicant.applicantName, applicant.org)).not.toContain("QA-TEST");
+    expect(gdeltQuery(applicant)).not.toContain("QA-TEST");
+    expect(instagramCompanyTag(applicant.org, applicant.applicantName).toLowerCase()).not.toContain("qatest");
+    expect(edgarCompanySearchPhrase(applicant.org)).not.toContain("QA-TEST");
+    expect(edgarCompanySearchPhrase(applicant.org)).toContain("Walker");
+    const seen: string[] = [];
+    await runPublicScreen(applicant, async (url) => {
+      seen.push(url);
+      return { ok: false, status: 404, text: "" };
+    });
+    expect(seen.some((url) => /QA-TEST|QA%2DTEST|QA-TEST/i.test(decodeURIComponent(url)))).toBe(false);
+    expect(seen.some((url) => decodeURIComponent(url).includes("Walker"))).toBe(true);
   });
 });
