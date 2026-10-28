@@ -586,7 +586,9 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
     .join("");
   const leadingInitial = String.raw`(?:(?<![A-Za-z0-9-])[A-Z]\.?\s+)?`;
   const forward = new RegExp(`${leadingInitial}${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
-  const reverse = new RegExp(`${surname}\\s*,?\\s+(?:[A-Z]\\.?\\s+)?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
+  // "Kelly William Matthew" is surname, formal first name, then the middle name Matt goes by.
+  const otherGiven = String.raw`(?:[A-Za-z]\.?|[A-Za-z]{2,24})\s+`;
+  const reverse = new RegExp(`${surname}\\s*,?\\s+(?:${otherGiven})?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
   const spans: NameSpan[] = [];
   const pushSurname = (start: number, whole: string) => {
     const local = new RegExp(surname, "g");

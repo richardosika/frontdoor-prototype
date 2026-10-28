@@ -552,6 +552,7 @@ const EDGAR_SUFFIX_WORD = new Set([
   "ltd",
   "limited",
   "co",
+  "international",
 ]);
 
 /** "JBG SMITH Properties" is "JBG SMITH" plus a suffix word. "JBG SMITH Capital Partners Fund" is not. */
@@ -612,7 +613,16 @@ export function assessEdgarMatch(input: {
     flat.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
     input.org,
   );
-  const match = fromList || tickerMatch || fromFiling;
+  let match = fromList || tickerMatch || fromFiling;
+  // "Colliers International Group Inc." is Colliers plus wrapper words, not a parent.
+  let wrapperSame = false;
+  if (!match && firmTokens(input.org).length === 1) {
+    const wrapped = input.companies.find((row) => suffixOnlyExtension(row.title, input.org));
+    if (wrapped) {
+      match = wrapped;
+      wrapperSame = true;
+    }
+  }
   const tickerAccepted = Boolean(tickerMatch) && match === tickerMatch;
   const personLine = personOnFiling(groups, input.person, input.org, input.website || "");
   if (!input.tickersOk && flat.length === 0) {
@@ -655,7 +665,7 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR's current name for CIK ${match.cik} is ${input.identity.currentName}. ${titled} is a former name. Needs review. A former name is not an exact match and does not corroborate.`,
     };
   }
-  const suffixSame = suffixOnlyExtension(match.title, input.org) && domainAgreesWithFirm(input.org, match.title, input.website || "");
+  const suffixSame = wrapperSame || (suffixOnlyExtension(match.title, input.org) && domainAgreesWithFirm(input.org, match.title, input.website || ""));
   if (!sameFirmName(match.title, input.org) && !tickerAccepted && !suffixSame) {
     return {
       status: "INCONCLUSIVE",
@@ -665,7 +675,7 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR lists ${titled}, CIK ${match.cik}. A parent, affiliate, or different name is not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass.`,
     };
   }
-  const ownerLine = tickerAccepted || sameFirmName(match.title, input.org) ? reportingOwnerLine(input.insiderNames || [], input.person) : "";
+  const ownerLine = tickerAccepted || sameFirmName(match.title, input.org) || suffixSame ? reportingOwnerLine(input.insiderNames || [], input.person) : "";
   const personSentence = personLine
     ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.`
     : ownerLine

@@ -6670,4 +6670,63 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(mentionsCompany("Banc of California reported earnings", "Banc of California")).toBe(true);
     expect(mentionsCompany("Bank of America reported earnings", "Bank of America")).toBe(true);
   });
+
+  it("ties a reporting owner when the nickname is the EDGAR middle name", () => {
+    expect(personHit("Kelly William Matthew", "Matt Kelly")).toBe("match");
+    expect(personHit("KELLY WILLIAM MATTHEW", "Matt Kelly")).toBe("match");
+    expect(personHit("Silverstein", "Larry Silverstein")).toBe("none");
+    const tied = assessEdgarMatch({
+      org: "JBG SMITH",
+      person: "Matt Kelly",
+      tickersOk: true,
+      companies: [{ title: "JBG SMITH Properties", ticker: "JBGS", cik: "1689796" }],
+      filingNames: [["JBG SMITH Properties (JBGS) (CIK 0001689796)"]],
+      insiderNames: [["Kelly William Matthew"]],
+      website: "https://www.jbgsmith.com",
+    });
+    expect(tied.status).toBe("PASS");
+    expect(tied.corroborates).toBe(true);
+    expect(tied.finding).toContain("Kelly William Matthew");
+    const impersonation = assessEdgarMatch({
+      org: "Toll Brothers",
+      person: "Larry Silverstein",
+      tickersOk: true,
+      companies: [{ title: "TOLL BROTHERS INC", ticker: "TOL", cik: "794170" }],
+      filingNames: [["TOLL BROTHERS INC (TOL) (CIK 0000794170)"]],
+      insiderNames: [],
+      website: "https://www.tollbrothers.com",
+    });
+    expect(impersonation.corroborates).not.toBe(true);
+    expect(impersonation.finding).not.toContain("Silverstein");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: impersonation.status, companyOnly: impersonation.companyOnly, corroborates: impersonation.corroborates, finding: impersonation.finding })],
+      facts({ name: "Larry Silverstein", applicantName: "Larry Silverstein", org: "Toll Brothers" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+  });
+
+  it("treats Colliers International Group as Colliers, not a parent", () => {
+    const colliers = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers International Group Inc.", ticker: "CIGI", cik: "913353" }],
+      filingNames: [],
+      website: "https://www.colliers.com",
+    });
+    expect(colliers.finding.toLowerCase()).not.toContain("parent match");
+    expect(colliers.status).not.toBe("PASS");
+    expect(colliers.corroborates).not.toBe(true);
+    expect(colliers.companyOnly).toBe(true);
+    const fund = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers Capital Partners Fund", ticker: "X", cik: "1" }],
+      filingNames: [],
+    });
+    expect(fund.corroborates).not.toBe(true);
+    expect(fund.finding.toLowerCase()).toContain("parent match");
+    expect(fund.companyOnly).not.toBe(true);
+  });
 });
