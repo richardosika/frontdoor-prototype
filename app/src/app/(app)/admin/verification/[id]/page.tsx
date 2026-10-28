@@ -226,6 +226,8 @@ export default async function VerificationCasePage({
             verdict={memberReview.verdict}
             role={record.application?.role || record.user?.role || record.inviteRequest?.role || ""}
             location={memberReview.location}
+            person={record.application?.name || record.inviteRequest?.name || record.user?.name || ""}
+            org={record.application?.org || record.inviteRequest?.org || record.user?.org || ""}
             unverified={memberReview.unverified}
             applicationGrade={memberReview.applicationGrade}
           />

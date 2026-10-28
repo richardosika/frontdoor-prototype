@@ -4,7 +4,7 @@ import { rubricSections, type GradeReport, type Recommendation } from "@/lib/ver
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { reviewCheckKey, reviewCopy } from "@/lib/review-copy";
-import { displayedSentences } from "@/lib/review-steps";
+import { displayedCheckFinding, displayedSentences } from "@/lib/review-steps";
 import { formatAuditTime } from "@/lib/format";
 import { card, sectionLabel } from "@/components/ui";
 
@@ -138,10 +138,12 @@ export function CheckTable({
   evidence,
   location = "",
   org = "",
+  person = "",
 }: {
   evidence: { id: string; checkKey: string; status: string; finding: string; source: string; url: string; ranAt: Date }[];
   location?: string;
   org?: string;
+  person?: string;
 }) {
   return (
     <details className="mt-4">
@@ -167,7 +169,7 @@ export function CheckTable({
                   <EvidenceLabel row={row} />
                 </td>
                 <td className="max-w-xs py-2 pr-2 break-words">
-                  {reviewCopy(shown.finding)}
+                  {displayedCheckFinding(reviewCopy(shown.finding), { person, org })}
                   {shown.url ? (
                     <>
                       {" "}
