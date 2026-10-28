@@ -49,6 +49,15 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
     ],
   },
   {
+    label: "Directory setup",
+    links: [
+      { href: "/admin/taxonomy", label: "Asset types and fields" },
+      { href: "/admin/markets", label: "Markets" },
+      { href: "/admin/specialties", label: "Specialties" },
+      { href: "/admin/readiness", label: "Readiness" },
+    ],
+  },
+  {
     label: "Payments",
     links: [{ href: "/admin/payments", label: "Payments" }],
   },

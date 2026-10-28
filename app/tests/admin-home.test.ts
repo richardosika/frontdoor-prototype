@@ -47,6 +47,7 @@ describe("admin command center", () => {
     expect(ADMIN_GROUPS.map((group) => group.label)).toEqual([
       "Applications & Verification",
       "Members",
+      "Directory setup",
       "Payments",
       "CRM",
       "Email templates & Outbox",
