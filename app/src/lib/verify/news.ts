@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -157,7 +157,7 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   }
   // The firm name is the person's name. Do not quote "Adam Leitman Bailey" a second time.
   if (words.length && words.every((word) => seen.has(bareToken(word)))) return null;
-  // "plaza" alone is every plaza. Keep "plaza construction".
+  // "plaza" alone is every plaza. Keep "plaza construction". "ocean" alone is every ocean. Keep "ocean bank".
   if (words.some((word) => isCommonQueryStem(bareToken(word))) && words.some((word) => isIndustryQueryWord(bareToken(word)))) {
     return `"${cleanedPerson}" "${words.join(" ")}"`;
   }
@@ -169,6 +169,9 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
     const token = bareToken(word);
     return isDistinctiveCompanyToken(token) && !isSearchTermGeneric(token);
   });
+  if (distinctive.length === 1 && words.length >= 2 && (isOrdinaryDictionaryWord(bareToken(distinctive[0])) || isCommonQueryStem(bareToken(distinctive[0])))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
   // "building" alone is not the firm. Keep the whole name, including a short token and the surname.
   if (words.length >= 2) return `"${cleanedPerson}" "${words.join(" ")}"`;

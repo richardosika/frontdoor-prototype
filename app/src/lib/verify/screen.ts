@@ -3,7 +3,7 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -903,6 +903,11 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     });
   } else {
     let home = await pull(fetchText, website);
+    if (home.status === 403) {
+      await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+      const again = await pull(fetchText, website);
+      if (again.status !== 403) home = again;
+    }
     let homeUrl = website;
     if (home.status === 0 && home.failure !== "nxdomain") {
       const alt = withWww(website);
@@ -1399,6 +1404,18 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (!hrefs.length) return true;
     return hrefs.some((href) => !hostIsApplicant(href, ownHost));
   };
+  const surname = surnameForSearch(person).toLowerCase();
+  const companyOnly = !parsePersonName(person)?.given.length;
+  const companyAnchors = distinctiveCompanyTokens(searchOrg);
+  const containsWord = (text: string, token: string) => {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "i").test(text);
+  };
+  // A page that never says the surname did not answer the quoted query. Quotes were ignored.
+  const snippetAnswers = (item: SearchSnippet) => {
+    if (companyOnly) return companyAnchors.some((token) => containsWord(item.text, token));
+    return Boolean(surname) && containsWord(item.text, surname);
+  };
   const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[], failure?: string): string => {
     if (status === 0 || failure === "timeout" || failure === "network") return failure === "network" ? "network error" : "timed out";
     const challenge =
@@ -1406,7 +1423,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       (/challenge|captcha/i.test(text.slice(0, 2500)) && !/result__a|result-link|b_algo|class="result"/i.test(text));
     if (challenge) return "challenge page";
     if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
-    if (!snippets.length) return "no results";
+    if (!snippets.length || !snippets.some(snippetAnswers)) return "no results";
     const named = snippets.filter(namesBothSnippet);
     if (!named.length) return "no name and company";
     if (named.some(independentSnippet)) return "result";
@@ -1619,7 +1636,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: screenWeb?.url || ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: "The only web search hit was the applicant's own site.",
+        detail: `Tried ${tried}. The only web search hit was the applicant's own site.`,
       });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
       const web = attempts.find((item) => item.key === "screen-web");
@@ -1650,7 +1667,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: "no free page named both this person and this company",
+        detail: screenWeb?.detail && /Tried /.test(screenWeb.detail) ? screenWeb.detail : `Tried ${tried}. No free search source returned a page naming both.`,
       });
     }
   }

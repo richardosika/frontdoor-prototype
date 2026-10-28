@@ -2190,6 +2190,7 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     );
     expect(calls.filter((url) => url.startsWith("https://bramblewick-group.example"))).toEqual([
       "https://bramblewick-group.example",
+      "https://bramblewick-group.example",
       "https://bramblewick-group.example/sitemap.xml",
     ]);
     for (const host of ["bramblewick-group.example", "www.linkedin.com", "x.com", "www.facebook.com", "www.instagram.com", "www.youtube.com", "www.tiktok.com"]) {
@@ -6232,7 +6233,7 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     const missedGrade = gradeChecks([missed!], applicant);
     expect(missedGrade.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
 
-    const unrelated = `<ol><li class="b_algo"><a href="https://example.com/other">A different firm announced a project in New York</a></li></ol>`;
+    const unrelated = `<ol><li class="b_algo"><a href="https://example.com/other">Justin Elghanayan announced a project for a different firm in New York</a></li></ol>`;
     const realMiss = await runPublicScreen(applicant, async (url) => {
       if (url.includes("bing.com") || url.includes("duckduckgo.com")) return { ok: true, status: 200, text: unrelated };
       return { ok: false, status: 404, text: "" };
@@ -6279,5 +6280,136 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     const news = rows.find((item) => item.key === "news");
     expect(news?.finding).not.toContain("names the person or the company");
     expect(news?.finding.toLowerCase()).not.toContain("plaza construction");
+  });
+
+  it("does not treat a Bing page of unrelated first names as an answer", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "",
+    });
+    const todd = [
+      "Todd Smith joined a Chicago firm",
+      "Todd Allen spoke at a conference",
+      "Todd Harris bought a house",
+      "Todd Nguyen opened a cafe",
+      "Todd Patel ran a marathon",
+      "Todd Brooks published a novel",
+      "Todd Bennett coaches youth sports",
+      "Todd Carter visited Denver",
+      "Todd Edwards teaches chemistry",
+      "Todd Foster listed a car for sale",
+    ];
+    const page = `<ol>${todd.map((title, index) => `<li class="b_algo"><a href="https://example.com/todd-${index}">${title}</a></li>`).join("")}</ol>`;
+    let bingCalls = 0;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bing.com")) {
+        bingCalls += 1;
+        return { ok: true, status: 200, text: page };
+      }
+      if (url.includes("duckduckgo.com")) return { ok: true, status: 200, text: "<html><body></body></html>" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    const footprint = rows.find((check) => check.key === "web-footprint");
+    expect(bingCalls).toBeGreaterThan(1);
+    expect(web?.status).toBe("UNAVAILABLE");
+    expect(web?.corroborates).not.toBe(true);
+    expect(web?.finding).toContain("Search did not complete");
+    expect(web?.finding).toContain("Not checked");
+    expect(web?.finding).toContain("Not a pass");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).toContain("Bing (no results)");
+    expect(footprint?.status).toBe("UNAVAILABLE");
+    expect(footprint?.finding).toContain("Tried");
+    expect(footprint?.corroborates).not.toBe(true);
+    const graded = gradeChecks([web!, footprint!], applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+    expect(graded.score).toBeLessThanOrEqual(49);
+    expect(graded.letter).toBe("F");
+  });
+
+  it("keeps an ordinary dictionary word with the rest of the brand", () => {
+    expect(companySearchTerm("Ocean Bank", "Carlos Alfonso")).toBe("ocean bank");
+    expect(companySearchTerm("Ocean Bank", "Carlos Alfonso")).not.toBe("ocean");
+    expect(socialSearchQuery("Carlos Alfonso", "Ocean Bank")).toBe(`"Carlos Alfonso" "ocean bank"`);
+    expect(companySearchTerm("Related Group", "Jorge Perez")).toBe("related group");
+    expect(companySearchTerm("Plaza Construction", "David Wang")).toBe("plaza construction");
+    expect(companySearchTerm("Rockrose Development Corp.", "Justin Elghanayan")).toBe("rockrose");
+    const falseLines = [
+      ["related group of burglaries", "Related Group"],
+      ["ocean waters flood bank parking lot", "Ocean Bank"],
+      ["ocean bank reports record quarter", "Ocean Bank"],
+      ["related group breaks ground in brickell", "Related Group"],
+    ] as const;
+    for (const [line, org] of falseLines) {
+      expect(mentionsCompany(line, org)).toBe(false);
+      expect(judgeHeadline(line, { name: "Alex Example", org, location: "Miami, FL" }).company).toBe(false);
+    }
+    expect(mentionsCompany("Ocean Bank reports record quarter", "Ocean Bank")).toBe(true);
+    expect(mentionsCompany("Related Group breaks ground in Brickell", "Related Group")).toBe(true);
+    expect(judgeHeadline("Ocean Bank reports record quarter", { name: "Carlos Alfonso", org: "Ocean Bank", location: "Miami, FL" }).company).toBe(true);
+    expect(judgeHeadline("Related Group breaks ground in Brickell", { name: "Jorge Perez", org: "Related Group", location: "Miami, FL" }).company).toBe(true);
+  });
+
+  it("keeps the search engine notes on the web footprint row", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "https://www.bassberry.com",
+    });
+    const hit = `<ol><li class="b_algo"><a href="https://www.bassberry.com/people/todd-rolapp">Todd Rolapp is a partner at Bass, Berry &amp; Sims</a></li></ol>`;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bassberry.com") && !url.includes("bing") && !url.includes("duckduckgo")) {
+        return { ok: true, status: 200, text: "<html><p>Todd Rolapp is a partner at Bass, Berry & Sims in Nashville.</p></html>" };
+      }
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: hit };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    const footprint = rows.find((check) => check.key === "web-footprint");
+    expect(web?.finding).toContain("Tried");
+    expect(footprint?.finding).toContain("Tried");
+    expect(footprint?.finding).toContain("applicant's own site");
+    expect(footprint?.finding).not.toContain("No result found that names this person and this company");
+    expect(footprint?.corroborates).not.toBe(true);
+  });
+
+  it("retries one company-site 403 and leaves a second 403 unchecked", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "https://www.bassberry.com",
+    });
+    let calls = 0;
+    const recovered = await runPublicScreen(applicant, async (url) => {
+      if (url.startsWith("https://www.bassberry.com")) {
+        calls += 1;
+        if (calls === 1) return { ok: false, status: 403, text: "" };
+        return { ok: true, status: 200, text: "<html><p>Todd Rolapp is a partner at Bass, Berry & Sims in Nashville.</p></html>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = recovered.find((check) => check.key === "website");
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(website?.status).toBe("PASS");
+    expect(website?.corroborates).not.toBe(true);
+
+    const blocked = await runPublicScreen(applicant, async (url) => {
+      if (url.startsWith("https://www.bassberry.com")) return { ok: false, status: 403, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const denied = blocked.find((check) => check.key === "website");
+    expect(denied?.status).toBe("UNAVAILABLE");
+    expect(denied?.corroborates).not.toBe(true);
+    expect(denied?.finding).toContain("403");
+    expect(gradeChecks([denied!], applicant).categories.find((category) => category.id === "company")?.earned || 0).toBe(0);
   });
 });

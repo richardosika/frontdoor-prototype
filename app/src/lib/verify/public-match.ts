@@ -1,3 +1,4 @@
+import { ORDINARY_WORDS } from "@/lib/verify/ordinary-words";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 
 const NICKNAMES: Record<string, string[]> = {
@@ -300,6 +301,11 @@ export function isCommonQueryStem(token: string): boolean {
   return COMMON_QUERY_STEM.has(token);
 }
 
+/** An ordinary dictionary word, not a coined brand. "ocean" is one. "rockrose" is not. */
+export function isOrdinaryDictionaryWord(token: string): boolean {
+  return ORDINARY_WORDS.has(token);
+}
+
 export function isIndustryQueryWord(token: string): boolean {
   return INDUSTRY_QUERY_WORD.has(token);
 }
@@ -330,10 +336,9 @@ export function companySearchTerm(org: string, person = ""): string {
   if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
   const distinctive = brand.filter((token) => !names.has(token) && !isSearchTermGeneric(token));
-  // "plaza" is a place word. Keep "construction" so the query is not every plaza.
-  if (distinctive.length === 1 && isCommonQueryStem(distinctive[0])) {
-    const industry = phrase.filter((token) => isIndustryQueryWord(token) && !names.has(token));
-    if (industry.length) return [distinctive[0], ...industry].join(" ");
+  // "ocean" and "plaza" are dictionary words. Keep the whole brand, minus legal suffixes.
+  if (distinctive.length === 1 && (isOrdinaryDictionaryWord(distinctive[0]) || isCommonQueryStem(distinctive[0]))) {
+    return phrase.join(" ");
   }
   // A surname plus only a generic word, such as "Brodsky Organization", stays the whole brand.
   if (distinctive.length) return distinctive.join(" ");
@@ -786,6 +791,27 @@ function consecutivePhrase(text: string, prefix: string[]): boolean {
   return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(PHRASE_GAP)}(?![A-Za-z0-9-])`).test(text);
 }
 
+/** The only distinctive token is a dictionary word, or the whole name is ordinary words such as "Related Group". */
+function dictionaryBrand(phrase: string[], distinctive: string[]): boolean {
+  if (phrase.length < 2) return false;
+  const stems = distinctive.filter((token) => !isSearchTermGeneric(token));
+  if (stems.length === 1 && (isOrdinaryDictionaryWord(stems[0]) || isCommonQueryStem(stems[0]))) return true;
+  if (stems.length) return false;
+  return phrase.every((token) => isGenericFirmToken(token) || isSearchTermGeneric(token) || isOrdinaryDictionaryWord(token));
+}
+
+/** "Ocean Bank" is the firm. "ocean bank" in lowercase prose, and "ocean ... bank" apart, are not. */
+function properNamePhrase(text: string, prefix: string[]): boolean {
+  if (prefix.length < 2) return false;
+  const body = prefix.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(PHRASE_GAP);
+  const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9-])${body}(?![A-Za-z0-9-])`, "gi"));
+  for (const hit of hits) {
+    const words = (hit[0].match(/[A-Za-z][A-Za-z'-]*/g) || []).filter((word) => !STOP.has(word.toLowerCase()));
+    if (words.length >= 2 && words.every((word) => word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase())) return true;
+  }
+  return false;
+}
+
 /**
  * Two or more words have to appear in order, next to each other.
  * "Starwood Property" matches Starwood Property Trust. "Starwood Capital" does not.
@@ -803,6 +829,12 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
     void person;
     return true;
   }
+  if (dictionaryBrand(phrase, distinctive)) {
+    for (let length = phrase.length; length >= 2; length -= 1) {
+      if (properNamePhrase(text, phrase.slice(0, length))) return true;
+    }
+    return false;
+  }
   const firstDistinctive = distinctive[0] || phrase[0];
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
@@ -811,7 +843,16 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   }
   // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
   // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.
-  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && !isCommonQueryStem(distinctive[0]) && brandMention(text, distinctive[0], phrase, org, person)) return true;
+  if (
+    distinctive.length === 1 &&
+    distinctive[0] === phrase[0] &&
+    !PLACE_BRAND.has(distinctive[0]) &&
+    !isCommonQueryStem(distinctive[0]) &&
+    !isOrdinaryDictionaryWord(distinctive[0]) &&
+    brandMention(text, distinctive[0], phrase, org, person)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -822,7 +863,10 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
 export function headlineNamesFirm(text: string, org: string, person = ""): boolean {
   if (!mentionsCompany(text, org, person)) return false;
   const phrase = companyPhraseTokens(org);
-  const stem = phrase.find((token) => isCommonQueryStem(token));
+  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  const stem =
+    distinctive.find((token) => isOrdinaryDictionaryWord(token) || isCommonQueryStem(token)) ||
+    (!distinctive.length ? phrase.find((token) => isOrdinaryDictionaryWord(token) || isCommonQueryStem(token)) : undefined);
   if (!stem) return true;
   const industry = phrase.filter((token) => isIndustryQueryWord(token));
   if (industry.length && !industry.some((word) => new RegExp(`(?<![A-Za-z0-9])${word}(?![A-Za-z0-9])`, "i").test(text))) return false;
