@@ -163,6 +163,17 @@ export function surnameForSearch(name: string): string {
   return parsePersonName(name)?.surname || "";
 }
 
+/** "Bill" is William. "Rob" is Robert. A name that is already a full given name is left as written. */
+export function formalGivenName(name: string): string | null {
+  const given = parsePersonName(name)?.given[0]?.toLowerCase();
+  if (!given || NICKNAMES[given]) return null;
+  let formal = "";
+  for (const [key, nicks] of Object.entries(NICKNAMES)) {
+    if (key !== given && nicks.includes(given) && key.length > formal.length) formal = key;
+  }
+  return formal ? formal.charAt(0).toUpperCase() + formal.slice(1) : null;
+}
+
 export type PersonHit = "match" | "suffix-mismatch" | "none";
 
 /**
@@ -326,6 +337,8 @@ export function companySearchTerm(org: string, person = ""): string {
   org = stripQaOrg(org);
   const phrase = companyPhraseTokens(org);
   if (!phrase.length) return "";
+  const spoken = tokens(org).filter((token) => !LEGAL.has(token) && token !== "the");
+  if (spoken.includes("of")) return spoken.join(" ");
   const parsed = parsePersonName(person);
   const names = new Set(
     [...(parsed?.given || []), parsed?.surname || "", ...tokens(person)]
@@ -333,7 +346,8 @@ export function companySearchTerm(org: string, person = ""): string {
       .filter(Boolean),
   );
   const shortAt = phrase.findIndex((token) => isShortBrandToken(token) && !names.has(token));
-  if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
+  const longerBefore = shortAt > 0 && phrase.slice(0, shortAt).some((token) => isDistinctiveCompanyToken(token) && !names.has(token));
+  if (shortAt >= 0 && !longerBefore) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
   const distinctive = brand.filter((token) => !names.has(token) && !isSearchTermGeneric(token));
   // "ocean" and "plaza" are dictionary words. Keep the whole brand, minus legal suffixes.
@@ -520,8 +534,11 @@ function caseFold(token: string): string {
 
 function givenPattern(part: string): string {
   const key = part.toLowerCase();
-  const alts = [...new Set((NICKNAMES[key] || [key]).map((item) => item.toLowerCase()))];
-  return `(?:${alts.map(caseFold).join("|")})`;
+  const alts = new Set<string>([key, ...(NICKNAMES[key] || [])]);
+  for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+    if (formal !== key && nicks.includes(key)) alts.add(formal);
+  }
+  return `(?:${[...alts].map((item) => caseFold(item.toLowerCase())).join("|")})`;
 }
 
 /** Hyphenated surnames also match with a space. A hyphen beside the word is still the same word. */
@@ -771,7 +788,7 @@ export function companyPhraseTokens(org: string): string[] {
   return tokens(org).filter((token) => !LEGAL.has(token) && !STOP.has(token));
 }
 
-const PHRASE_GAP = `[\\s,.'’:"&/+-]+`;
+const PHRASE_GAP = `(?:[\\s,.'’:"&/+-]+(?:(?:of|and|the)\\s+)?)`;
 
 function tokenBody(token: string): string {
   const folded = `${caseFold(token)}(?:'s)?`;

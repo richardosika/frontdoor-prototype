@@ -1133,8 +1133,8 @@ export function gradeChecks(
   ]);
   const statementOk = (facts.statement || "").trim().length >= 40;
   const contactPage = Boolean(facts.website?.trim() || facts.linkedinUrl?.trim());
-  // A blocked search is not a miss. Application fields stay on the completeness line when the company is already confirmed elsewhere.
-  const keepFields = independent || (webSearchCouldNotBeChecked(checks) && outsideSourceConfirmsCompany(checks));
+  // Completeness stays only when an independent source tied this person. A company-only EDGAR or registry hit does not.
+  const keepFields = independent;
   const completeness = sumLines([
     applicationField(Boolean(facts.phone?.trim()), weights.completeness.phone, "A phone number is on the application", "No phone number is on the application", independent, keepFields),
     locationAward(checks, facts, weights.completeness.location, independent, keepFields),

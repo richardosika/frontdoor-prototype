@@ -3,7 +3,7 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -1423,7 +1423,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       (/challenge|captcha/i.test(text.slice(0, 2500)) && !/result__a|result-link|b_algo|class="result"/i.test(text));
     if (challenge) return "challenge page";
     if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
-    if (!snippets.length || !snippets.some(snippetAnswers)) return "no results";
+    if (!snippets.length) return "no results";
+    if (!snippets.some(snippetAnswers)) return "no name and company";
     const named = snippets.filter(namesBothSnippet);
     if (!named.length) return "no name and company";
     if (named.some(independentSnippet)) return "result";
@@ -1512,6 +1513,43 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       }
     }
   }
+  const formal = formalGivenName(person);
+  const quotesIgnored =
+    Boolean(formal) &&
+    !engines.some((engine) => engine.note === "result" || engine.note === "own site") &&
+    engines.some((engine) => engine.note === "no name and company");
+  if (quotesIgnored && formal) {
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
+    const parsed = parsePersonName(person);
+    const formalPerson = parsed ? [formal, ...parsed.given.slice(1), parsed.surname].filter(Boolean).join(" ") : person;
+    const formalSearched = [formalPerson, searchOrg, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
+    const loose = [formalPerson, searchOrg].filter(Boolean).join(" ");
+    const nicknameJobs: { name: string; url: string; parse: (text: string) => SearchSnippet[] }[] = [
+      {
+        name: "Bing",
+        url: `https://www.bing.com/search?q=${encodeURIComponent(formalSearched)}`,
+        parse: (text) => [...text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0])),
+      },
+      {
+        name: "DuckDuckGo lite",
+        url: `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(loose)}`,
+        parse: (text) => ddgSnippetsFrom(text),
+      },
+    ];
+    for (const job of nicknameJobs) {
+      const response = await pullWithin(fetchText, job.url);
+      const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
+      const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : 2);
+      const existing = engines.find((engine) => engine.name === job.name);
+      if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
+      else if (rank(note) <= rank(existing.note)) {
+        existing.snippets = snippets;
+        existing.note = note;
+        existing.url = job.url;
+      }
+    }
+  }
   const tried = engines.map((engine) => `${engine.name} (${engine.note})`).join(", ");
   const order = ["DuckDuckGo", "DuckDuckGo lite", "Bing", "Brave", "Mojeek", "Wikipedia", "Wikidata", "GDELT"];
   const engineNamed = (note: string) =>
@@ -1558,7 +1596,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       url: ddgBlocked ? bingUrl : ddgUrl,
       outcome: "not-found",
       score: emptyScore(),
-      detail: `Tried ${tried}. No free search source returned a page naming both.`,
+      detail: `Tried ${tried}. Not found. No free search source returned a page naming both.`,
     });
   } else {
     const independentHit = hitEngine.note === "result";
@@ -1592,7 +1630,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: `Tried ${tried}. No free search source returned a page naming both.`,
+        detail: `Tried ${tried}. Not found. No free search source returned a page naming both.`,
       });
     }
   }
@@ -1667,7 +1705,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: screenWeb?.detail && /Tried /.test(screenWeb.detail) ? screenWeb.detail : `Tried ${tried}. No free search source returned a page naming both.`,
+        detail: screenWeb?.detail && /Tried /.test(screenWeb.detail) ? screenWeb.detail : `Tried ${tried}. Not found. No free search source returned a page naming both.`,
       });
     }
   }
