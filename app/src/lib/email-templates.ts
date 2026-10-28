@@ -43,7 +43,7 @@ ${JOIN_CTA}
 
 A Private Floor administrator reviews every request to join. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
 
-Referral code, optional: {invite_code}${SIGN}`,
+Referral code, optional: {referral_code}${SIGN}`,
   },
   {
     key: "invite_received",
@@ -197,7 +197,7 @@ export const TEMPLATE_VARIABLES = [
   "intro_amount",
   "renewal_date",
   "note",
-  "invite_code",
+  "referral_code",
   "code",
 ] as const;
 
@@ -258,6 +258,16 @@ A Private Floor administrator reviews every application. The check uses public r
 Referral code, optional: {invite_code}
 
 ${DUES_SCHEDULE_SENTENCE} Nothing is charged on the application.${SIGN}`,
+    `Hello {first_name},
+
+${MEMBERSHIP_PHRASE}. Members are developers, general contractors, investors, family offices, lenders, brokers, and attorneys who want a private place to find the right people for a deal.
+
+${JOIN_CTA}
+{apply_link}
+
+A Private Floor administrator reviews every request to join. The check uses public records. You will see Verified or Verification in progress. You will not see a score or a source list.
+
+Referral code, optional: {invite_code}${SIGN}`,
   ],
   invite_received: [
     `Hello {first_name},
@@ -548,11 +558,20 @@ export function repairDoubledTerminalPeriod(text: string): string {
   return text.replace(/(\p{L})\.\.(?!\.)/gu, "$1.");
 }
 
+/** `{referral_code}` is the admin name. `{invite_code}` still fills from the same value. */
+function templateTokenValue(vars: Record<string, string>, key: string): string | undefined {
+  const name = key.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(vars, name)) return vars[name];
+  if (name === "referral_code" && Object.prototype.hasOwnProperty.call(vars, "invite_code")) return vars.invite_code;
+  if (name === "invite_code" && Object.prototype.hasOwnProperty.call(vars, "referral_code")) return vars.referral_code;
+  return undefined;
+}
+
 /** Replaces {tokens}. Unknown tokens stay so a typo is visible. The founder sign-off is for bodies, not subjects. */
 export function renderTemplate(source: string, vars: Record<string, string>, options?: { signOff?: boolean }): string {
   const rendered = repairDoubledTerminalPeriod(
     source.replace(/\{([a-z0-9_]+)\}/gi, (match, key: string) => {
-      const value = vars[key.toLowerCase()];
+      const value = templateTokenValue(vars, key);
       return value === undefined ? match : value;
     }),
   );
@@ -577,6 +596,7 @@ export function sampleTemplateVars(): Record<string, string> {
     intro_amount: "$99.50",
     renewal_date: "2026-11-24",
     note: "A short note from the administrator.",
+    referral_code: "PF-PREVIEW",
     invite_code: "PF-PREVIEW",
     code: "1234",
   };

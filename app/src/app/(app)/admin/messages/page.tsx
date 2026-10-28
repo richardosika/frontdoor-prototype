@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireModerationAdmin } from "@/lib/current-user";
 import { formatAuditTime } from "@/lib/format";
+import { moderationActionLabel } from "@/lib/moderation-label";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ export default async function ModerationQueuePage() {
             <li key={event.id} className="py-2 text-sm text-ink">
               {event.summary}
               <span className="block text-xs text-mut">
-                {event.actor?.name ?? "System"} · {event.action} · {formatAuditTime(event.createdAt)}
+                {event.actor?.name ?? "System"} · {moderationActionLabel(event.action)} · {formatAuditTime(event.createdAt)}
               </span>
             </li>
           ))}

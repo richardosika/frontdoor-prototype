@@ -5,6 +5,7 @@ import { STAGE_OVERRIDE_OPTIONS, crmStage, csvCell, followUpDue, isDecisionStage
 import {
   SIGN_OFF,
   TEMPLATE_DEFS,
+  TEMPLATE_VARIABLES,
   TEMPLATE_PREVIOUS_BODIES,
   deliveryTarget,
   firstName,
@@ -27,6 +28,8 @@ describe("email templates", () => {
     expect(body.match(/Richard Osika, Founder/g)).toHaveLength(1);
     expect(renderTemplate("Hello {first_name}.", { first_name: "Alex" })).toContain(SIGN_OFF);
     expect(renderTemplate("Hello {unknown_token}.", {})).toContain("{unknown_token}");
+    expect(renderTemplate("Code {referral_code}.", { invite_code: "PF-2" }, { signOff: false })).toBe("Code PF-2.");
+    expect(renderTemplate("Code {invite_code}.", { referral_code: "PF-3" }, { signOff: false })).toBe("Code PF-3.");
     expect(firstName("Alex Rivera")).toBe("Alex");
     expect(firstName("QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
   });
@@ -71,8 +74,12 @@ describe("email templates", () => {
     expect(rendered).toContain("Richard Osika, Founder, Private Floor Club");
     expect(rendered.match(/Richard Osika, Founder/g)).toHaveLength(1);
     expect(templateDef("application_code")?.body).toContain("{code}");
-    const info = renderTemplate(templateDef("info")?.body || "", { ...sampleTemplateVars(), invite_code: "" });
+    const info = renderTemplate(templateDef("info")?.body || "", { ...sampleTemplateVars(), referral_code: "", invite_code: "" });
     expect(templateDef("info")?.subject).toBe("About Private Floor");
+    expect(templateDef("info")?.body).toContain("{referral_code}");
+    expect(templateDef("info")?.body).not.toContain("{invite_code}");
+    expect(TEMPLATE_VARIABLES).toContain("referral_code");
+    expect(TEMPLATE_VARIABLES).not.toContain("invite_code");
     expect(templateDef("approved")?.subject).toBe("You're approved to Private Floor");
     expect(info).toContain("Request to join");
     expect(info).toContain("reviews every request to join");

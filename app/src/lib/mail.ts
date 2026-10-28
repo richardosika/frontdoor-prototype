@@ -60,10 +60,27 @@ export async function ensureTemplates() {
       },
     });
   }
+  await rewordInfoTemplateHistory();
   await prisma.mailSettings.upsert({
     where: { id: "default" },
     update: {},
     create: { id: "default", delivery: process.env.NOTICE_DELIVERY === "live" ? "live" : "outbox" },
+  });
+}
+
+const INFO_HISTORY_SUBJECT = "You're invited to Private Floor";
+
+/** Reword the stored info-template history subjects. The rows stay. */
+async function rewordInfoTemplateHistory(): Promise<void> {
+  const info = await prisma.emailTemplate.findUnique({ where: { key: "info" }, select: { id: true, subject: true } });
+  if (!info) return;
+  await prisma.emailTemplateVersion.updateMany({
+    where: {
+      templateId: info.id,
+      version: { in: [1, 2] },
+      subject: INFO_HISTORY_SUBJECT,
+    },
+    data: { subject: info.subject },
   });
 }
 
@@ -108,6 +125,7 @@ export function buildMailVars(input: {
     intro_amount: input.introAmount || "",
     renewal_date: input.renewalDate || "",
     note: input.note || "",
+    referral_code: input.inviteCode || "",
     invite_code: input.inviteCode || "",
     code: input.code || "",
   };
