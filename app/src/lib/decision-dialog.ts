@@ -4,6 +4,16 @@ export const DECISION_MEMORY_KEY = "pf-decision";
 export const DECISION_ACK_KEY = "pf-decision-ack";
 export const DECISION_DIALOG_ID = "pf-decision-dialog";
 
+/**
+ * Close the confirm dialog only after a real decision notice.
+ * A request-only approval says the referral code was issued. An application says Approved.
+ * A step save ("Checklist saved") must not close it.
+ */
+export function approvalNoticeClosesDialog(notice: string | null | undefined): boolean {
+  const text = notice || "";
+  return /approved|declined|asked for more info|referral code issued|this file is verified/i.test(text);
+}
+
 export type DecisionDialogSnapshot = {
   approveBody: string;
   declineBody: string;

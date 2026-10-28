@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { btn, btnOutline } from "@/components/ui";
 import {
   DECISION_ACK_KEY,
   DECISION_DIALOG_ID,
   DECISION_MEMORY_KEY,
+  approvalNoticeClosesDialog,
   getDecisionDialogServerSnapshot,
   getDecisionDialogSnapshot,
   subscribeDecisionDialog,
@@ -28,7 +29,7 @@ function decisionNotice(): string {
 }
 
 function approvalLanded(notice: string): boolean {
-  return /approved|declined|asked for more info/i.test(notice);
+  return approvalNoticeClosesDialog(notice);
 }
 
 function readPending(): "APPROVED" | "DECLINED" | null {
@@ -71,6 +72,7 @@ function setInput(form: HTMLFormElement, name: string, value: string) {
  */
 export function DecisionDialogHost() {
   const pathname = usePathname();
+  const notice = useSearchParams().get("notice") || "";
   const dialogRef = useRef<HTMLDialogElement>(null);
   const boxRef = useRef<HTMLInputElement>(null);
   const snapshot = useSyncExternalStore(subscribeDecisionDialog, getDecisionDialogSnapshot, getDecisionDialogServerSnapshot);
@@ -100,7 +102,9 @@ export function DecisionDialogHost() {
   function showIfWanted() {
     const node = dialogRef.current;
     if (!node) return;
-    if (approvalLanded(decisionNotice())) {
+    if (approvalLanded(notice || decisionNotice())) {
+      savingRef.current = false;
+      setSaveBusy(false);
       clearDecisionQueue();
       clearMemory();
       closeDialog(true);
@@ -135,10 +139,14 @@ export function DecisionDialogHost() {
   function replayQueued() {
     const queued = readDecisionQueue();
     if (!queued) return;
-    if (approvalLanded(decisionNotice())) {
+    if (approvalLanded(notice || decisionNotice())) {
+      savingRef.current = false;
+      setSaveBusy(false);
       clearDecisionQueue();
       clearMemory();
       closeDialog(true);
+      setPending(null);
+      setModalError("");
       return;
     }
     if (stepSaveBusy()) return;
@@ -184,6 +192,16 @@ export function DecisionDialogHost() {
     window.addEventListener("pf-step-save", onSave);
     window.addEventListener("pf-decision-open", onOpen);
     const timer = window.setInterval(() => {
+      if (approvalLanded(decisionNotice())) {
+        savingRef.current = false;
+        setSaveBusy(false);
+        clearDecisionQueue();
+        clearMemory();
+        closeDialog(true);
+        setPending(null);
+        setModalError("");
+        return;
+      }
       if (readDecisionQueue()) replayQueued();
     }, 400);
     return () => {
