@@ -725,9 +725,9 @@ function headlineImportance(judged: {
   if (judged.kind === "hard" && judged.person && (judged.company || judged.location)) return 0;
   if (judged.kind === "hard" && !judged.person && judged.company) return 1;
   if (judged.kind === "civil" && judged.person && (judged.company || judged.location) && !judged.foreclosureOnly) return 2;
-  if (judged.foreclosureOnly && judged.company) return 3;
-  if (judged.kind === "civil" && !judged.person && judged.company) return 3;
-  if (judged.kind === "none" && judged.person && judged.company) return 4;
+  if (judged.kind === "none" && judged.person && judged.company) return 3;
+  if (judged.foreclosureOnly && judged.company) return 4;
+  if (judged.kind === "civil" && !judged.person && judged.company) return 4;
   return 5;
 }
 
@@ -1356,12 +1356,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const [ddgFirst, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
   type SearchSnippet = { text: string; hrefs: string[] };
   type SearchEngine = { name: string; url: string; note: string; snippets: SearchSnippet[] };
-  const namesBoth = (snippets: SearchSnippet[]) =>
-    snippets.some((item) => {
-      if (isLinkedInDirectory(item.text) || item.hrefs.some((href) => isLinkedInDirectory(href))) return false;
-      const score = scorePublicText(item.text, queryFacts);
-      return score.name && score.company;
-    });
+  const httpHrefs = (item: SearchSnippet) => item.hrefs.filter((href) => /^https?:\/\//i.test(href));
+  const namesBothSnippet = (item: SearchSnippet) => {
+    if (isLinkedInDirectory(item.text) || item.hrefs.some((href) => isLinkedInDirectory(href))) return false;
+    const score = scorePublicText(item.text, queryFacts);
+    return score.name && score.company;
+  };
+  const independentSnippet = (item: SearchSnippet) => {
+    const hrefs = httpHrefs(item);
+    if (!hrefs.length) return true;
+    return hrefs.some((href) => !hostIsApplicant(href, ownHost));
+  };
   const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[]): string => {
     const challenge =
       status === 202 ||
@@ -1369,8 +1374,10 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (challenge) return "challenge page";
     if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
     if (!snippets.length) return "no results";
-    if (!namesBoth(snippets)) return "no name and company";
-    return "result";
+    const named = snippets.filter(namesBothSnippet);
+    if (!named.length) return "no name and company";
+    if (named.some(independentSnippet)) return "result";
+    return "own site";
   };
   const engines: SearchEngine[] = [];
   const ddgSnippets = ddgSnippetsFrom(ddgFirst.text);
@@ -1427,9 +1434,11 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   }
   const tried = engines.map((engine) => `${engine.name} (${engine.note})`).join(", ");
   const order = ["DuckDuckGo", "DuckDuckGo lite", "Bing", "Brave", "Mojeek", "Wikipedia", "Wikidata", "GDELT"];
-  const hitEngine = order
-    .map((name) => engines.find((engine) => engine.name === name && engine.note === "result"))
-    .find((engine): engine is SearchEngine => Boolean(engine));
+  const engineNamed = (note: string) =>
+    order
+      .map((name) => engines.find((engine) => engine.name === name && engine.note === note))
+      .find((engine): engine is SearchEngine => Boolean(engine));
+  const hitEngine = engineNamed("result") || engineNamed("own site");
   const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked");
   const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
   const ddgBlocked = !engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "result");
@@ -1457,9 +1466,15 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       detail: `Tried ${tried}. No free search source returned a page naming both.`,
     });
   } else {
+    const independentHit = hitEngine.note === "result";
     const matched = hitEngine.snippets
-      .filter((item) => !isLinkedInDirectory(item.text) && !item.hrefs.some((href) => isLinkedInDirectory(href)))
-      .map((item) => ({ ...item, score: scorePublicText(item.text, queryFacts) }))
+      .filter((item) => namesBothSnippet(item) && (independentHit ? independentSnippet(item) : !independentSnippet(item)))
+      .map((item) => {
+        const http = httpHrefs(item);
+        const other = http.filter((href) => !hostIsApplicant(href, ownHost));
+        const own = http.filter((href) => hostIsApplicant(href, ownHost));
+        return { ...item, hrefs: independentHit ? [...other, ...own] : [...own, ...other], score: scorePublicText(item.text, queryFacts) };
+      })
       .filter((item) => item.score.name && item.score.company);
     const hit = matched[0];
     if (hit) {
@@ -1514,12 +1529,24 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         item.score.company &&
         !attemptOnOwnSite(item, ownHost),
     );
+    const screenWeb = attempts.find((item) => item.key === "screen-web");
+    const screenOwnSite = Boolean(screenWeb && attemptOnOwnSite(screenWeb, ownHost));
     if (webHit && fresh) {
       attempts.push({ ...webHit, key: "web-footprint", url: fresh, linkedUrl: undefined });
+    } else if (screenOwnSite) {
+      attempts.push({
+        key: "web-footprint",
+        platform: "Web search",
+        searched,
+        url: screenWeb?.url || ddgUrl,
+        outcome: "not-found",
+        score: emptyScore(),
+        detail: "The only web search hit was the applicant's own site.",
+      });
     } else if (alreadyCredited) {
       attempts.push({
         key: "web-footprint",
-        platform: alreadyCredited.platform,
+        platform: "Web search",
         searched,
         url: alreadyCredited.url,
         outcome: "not-found",

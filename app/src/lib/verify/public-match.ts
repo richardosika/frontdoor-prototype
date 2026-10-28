@@ -1,3 +1,5 @@
+import { stripQaOrg } from "@/lib/verify/qa-marker";
+
 const NICKNAMES: Record<string, string[]> = {
   richard: ["richard", "rich"],
   robert: ["robert", "bob", "rob"],
@@ -336,7 +338,7 @@ export function companyNameStem(org: string): string {
 
 /** The domain label is this firm, including a trailing state code such as ny or nyc. */
 export function domainMatchesOrgStem(label: string, org: string): boolean {
-  const stem = companyNameStem(org);
+  const stem = companyNameStem(stripQaOrg(org));
   const compact = label.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (!stem || compact.length < 2) return false;
   if (compact === stem) return true;

@@ -495,6 +495,19 @@ function newsSummary(
       finding: `Possible match, needs review. A headline names this person near a negative term without the company or city. This is not a failure. ${feeds}`.trim(),
     };
   }
+  if (aligned) {
+    const neutralItem = items.find((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
+    const lawsuitNote = companyLitigation
+      ? "Company-level litigation headline is an attention item only and does not replace the stories that name this person and this company."
+      : "";
+    return {
+      ...base,
+      status: "PASS",
+      corroborates: true,
+      url: neutralItem?.url || evidenceUrl,
+      finding: `Neutral coverage names this person and company. ${lawsuitNote} ${neutralItem?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
+    };
+  }
   if (companyLitigation) {
     return {
       ...base,
@@ -516,14 +529,6 @@ function newsSummary(
       status: "INCONCLUSIVE",
       reviewFlag: true,
       finding: `This may no longer be at ${companyName || "the company on the application"}. The headline is an announced departure, not current employment. ${feeds}`.trim(),
-    };
-  }
-  if (aligned) {
-    return {
-      ...base,
-      status: "PASS",
-      corroborates: true,
-      finding: `Neutral coverage names this person and company. ${deciding?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
     };
   }
   const aliasItem = items.find((item) => item.aliasOnly && !item.company);
