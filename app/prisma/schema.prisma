@@ -213,6 +213,8 @@ model User {
   refundNote     String           @default("")
   lastRenewalReminderAt DateTime?
   cancelRequestedAt DateTime?
+  nationwide     Boolean          @default(false)
+  homeCity       String           @default("")
   createdAt      DateTime         @default(now())
 
   posts                Post[]
@@ -251,8 +253,13 @@ model User {
   crmProfile           CrmPerson?           @relation("CrmMember")
   crmNotes             CrmNote[]
   savedFilters         SavedFilter[]
+  memberMarkets        MemberMarket[]
+  assetFocus           MemberAssetFocus[]
+  specialties          MemberSpecialty[]
+  fieldSettings        ProfileFieldSetting[]
 
   @@index([paymentStatus])
+  @@index([status, role])
 }
 
 model InviteCode {
@@ -445,15 +452,19 @@ model Deal {
 }
 
 model SavedFilter {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  surface   String
-  query     String
-  createdAt DateTime @default(now())
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  surface       String
+  query         String
+  alert         Boolean            @default(false)
+  lastAlertedAt DateTime?
+  createdAt     DateTime           @default(now())
+  alerts        SavedSearchAlert[]
 
   @@index([userId, surface])
+  @@index([alert, surface])
 }
 
 model DealAccess {
@@ -926,4 +937,187 @@ model DealEvent {
   createdAt DateTime @default(now())
 
   @@index([dealId, createdAt])
+}
+
+enum MarketKind {
+  STATE
+  METRO
+  COUNTY
+}
+
+enum MarketTier {
+  SEEDING
+  ACTIVE
+}
+
+enum MarketRelation {
+  HOME
+  OPERATES
+  INTERESTED
+}
+
+model Market {
+  id           String         @id @default(cuid())
+  kind         MarketKind
+  code         String
+  name         String
+  stateCode    String         @default("")
+  tier         MarketTier     @default(SEEDING)
+  focus        Boolean        @default(false)
+  active       Boolean        @default(true)
+  members      MemberMarket[]
+  asAncestor   MarketLink[]   @relation("MarketAncestor")
+  asDescendant MarketLink[]   @relation("MarketDescendant")
+
+  @@unique([kind, code])
+  @@index([kind, stateCode])
+  @@index([active, kind])
+}
+
+model MarketLink {
+  ancestorId   String
+  descendantId String
+  ancestor     Market @relation("MarketAncestor", fields: [ancestorId], references: [id], onDelete: Cascade)
+  descendant   Market @relation("MarketDescendant", fields: [descendantId], references: [id], onDelete: Cascade)
+
+  @@id([ancestorId, descendantId])
+  @@index([descendantId])
+}
+
+model MemberMarket {
+  userId   String
+  marketId String
+  relation MarketRelation
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market   Market         @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, marketId, relation])
+  @@index([marketId, relation])
+}
+
+enum FieldKind {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SELECT
+  MULTISELECT
+}
+
+enum FieldScope {
+  PROFILE
+  DEAL
+  PROJECT
+  VENDOR
+}
+
+enum FieldAudience {
+  MEMBERS
+  DEAL_TEAM
+  ADMIN
+}
+
+model AssetType {
+  id          String             @id @default(cuid())
+  slug        String             @unique
+  label       String
+  parentId    String?
+  parent      AssetType?         @relation("AssetTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    AssetType[]        @relation("AssetTree")
+  sortOrder   Int                @default(0)
+  active      Boolean            @default(true)
+  fields      AssetField[]
+  focus       MemberAssetFocus[]
+  specialties Specialty[]
+
+  @@index([parentId, active])
+}
+
+model AssetField {
+  id          String         @id @default(cuid())
+  assetTypeId String?
+  assetType   AssetType?     @relation(fields: [assetTypeId], references: [id], onDelete: SetNull)
+  scope       FieldScope
+  key         String
+  label       String
+  kind        FieldKind
+  unit        String         @default("")
+  options     Json?
+  filterable  Boolean        @default(false)
+  audience    FieldAudience  @default(MEMBERS)
+  sortOrder   Int            @default(0)
+  active      Boolean        @default(true)
+
+  @@index([assetTypeId, scope])
+  @@index([filterable, active])
+}
+
+enum FocusStance {
+  DEVELOPS
+  OPERATES
+  SERVES
+  INVESTS
+  LENDS
+}
+
+model MemberAssetFocus {
+  userId      String
+  assetTypeId String
+  stance      FocusStance
+  details     Json?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetType   AssetType   @relation(fields: [assetTypeId], references: [id])
+
+  @@id([userId, assetTypeId, stance])
+  @@index([assetTypeId, stance])
+  @@index([details], type: Gin)
+}
+
+model Specialty {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  label       String
+  forRoles    MemberRole[]
+  assetTypeId String?
+  assetType   AssetType?        @relation(fields: [assetTypeId], references: [id], onDelete: SetNull)
+  active      Boolean           @default(true)
+  members     MemberSpecialty[]
+
+  @@index([active])
+}
+
+model MemberSpecialty {
+  userId      String
+  specialtyId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty   Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, specialtyId])
+  @@index([specialtyId])
+}
+
+enum Audience {
+  MEMBERS
+  CONNECTIONS
+  DEAL_TEAM
+  PRIVATE
+}
+
+model ProfileFieldSetting {
+  userId   String
+  fieldKey String
+  audience Audience
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, fieldKey])
+}
+
+model SavedSearchAlert {
+  id            String      @id @default(cuid())
+  savedFilterId String
+  savedFilter   SavedFilter @relation(fields: [savedFilterId], references: [id], onDelete: Cascade)
+  memberId      String
+  createdAt     DateTime    @default(now())
+
+  @@unique([savedFilterId, memberId])
+  @@index([memberId])
 }

@@ -62,6 +62,18 @@ export function ProfileView({
     lookingFor: string;
     offering: string;
     createdAt: Date;
+    homeCity?: string;
+    homeState?: string;
+    homeMetro?: string;
+    nationwide?: boolean;
+    homeBase?: string;
+    operating?: string;
+    assetLabels?: string[];
+    assetSlugs?: string[];
+    specialtyLabels?: string[];
+    specialtySlugs?: string[];
+    operateMetros?: string[];
+    audiences?: { lookingFor?: string; offering?: string; checkSize?: string };
   };
   projects: Project[];
   isSelf: boolean;
@@ -118,8 +130,19 @@ export function ProfileView({
           <VerifiedMark view={verification} />
         </div>
         <p className="mt-1 text-sm text-mut">
-          {member.org} · {member.location}
+          {member.org} · {member.homeBase || member.location}
         </p>
+        {member.nationwide ? <p className="mt-1 text-xs font-semibold text-forest">Works nationwide</p> : null}
+        {member.assetLabels?.length ? (
+          <p className="mt-2 flex flex-wrap gap-1">
+            {member.assetLabels.slice(0, 3).map((label) => (
+              <span key={label} className="rounded-sm border border-line bg-cream px-2 py-0.5 text-[11px] text-ink">
+                {label}
+              </span>
+            ))}
+          </p>
+        ) : null}
+        {member.specialtyLabels?.length ? <p className="mt-2 text-xs text-ink">{member.specialtyLabels.join(" · ")}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-sm bg-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-paper">
             {roleShort(roleLabel(member.role))}
@@ -130,10 +153,10 @@ export function ProfileView({
         </div>
         {member.bio ? <p className="mt-4 text-sm leading-relaxed text-ink">{member.bio}</p> : null}
         <dl className="mt-3 grid gap-2 text-sm text-ink">
-          {member.markets ? (
+          {member.operating || member.markets ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Markets</dt>
-              <dd>{member.markets}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">Operating markets</dt>
+              <dd>{member.operating || member.markets}</dd>
             </div>
           ) : null}
           {member.dealTypes ? (

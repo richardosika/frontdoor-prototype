@@ -8,9 +8,11 @@ import { PageHeader } from "@/components/page-header";
 import { ProjectFilterBar } from "@/components/project-filters";
 import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
-import { directoryMatch } from "@/lib/member-network";
-import { directoryNeedMatch, projectQuery, settleProjectQuery, sortDirectory } from "@/lib/project-filter";
+import { assetBySlug, legacyAssetSlugs, THIN_MARKET_MIN } from "@/lib/platform/catalog";
+import { planLocationBackfill, homeBaseLabel } from "@/lib/platform/backfill";
+import { searchDirectory, type DirectoryPerson } from "@/lib/platform/directory";
+import { populationWhere, resultWhere, stateScopeWhere } from "@/lib/platform/directory-query";
+import { projectQuery, settleProjectQuery } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
 import { ROLES, roleLabel, roleShort } from "@/lib/roles";
 import { toPublicVerification, type VerificationStatus } from "@/lib/verification";
@@ -28,53 +30,109 @@ export default async function NetworkPage({
   if (settled.redirectTo) redirect(settled.redirectTo);
   const filters = settled.filters;
   const role = filters.role || "";
-  const state = filters.state || "";
-  const dealType = filters.dealType || "";
-  const assetClass = filters.assetClass || "";
-  const [rows, saved] = await Promise.all([
-    prisma.user.findMany({
-      where: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, id: { not: user.id } },
-      orderBy: { name: "asc" },
-    }),
+  const directoryFilter = {
+    role: filters.role,
+    group: filters.group,
+    state: filters.state,
+    metro: filters.metro,
+    asset: filters.assetClass,
+    specialty: filters.specialty,
+    size: filters.size,
+    dealType: filters.dealType,
+    need: filters.need,
+    q: filters.q,
+    place: filters.place,
+    verified: filters.verified,
+    sort: filters.sort,
+  };
+  const stateScope = stateScopeWhere(directoryFilter);
+  const [saved, localCount, stateCount] = await Promise.all([
     prisma.savedFilter.findMany({
       where: { userId: user.id, surface: "network" },
       orderBy: { createdAt: "desc" },
       take: 12,
     }),
-  ]);
-  const members = sortDirectory(
-    rows.filter(
-      (member) =>
-        directoryMatch(
-          {
-            role: member.role,
-            location: member.location,
-            markets: member.markets,
-            dealTypes: member.dealTypes,
-            assetClasses: member.assetClasses,
-            name: member.name,
-            org: member.org,
-            bio: member.bio,
+    prisma.user.count({ where: populationWhere(directoryFilter) }),
+    stateScope
+      ? prisma.user.count({
+          where: {
+            AND: [
+              populationWhere({ role: directoryFilter.role, group: directoryFilter.group }),
+              stateScope,
+            ],
           },
-          { role, state, dealType, assetClass, q: filters.q },
-        ) &&
-        directoryNeedMatch(member, filters.need),
-    ),
-    filters.sort,
-  );
-  const [introductions, cases] = await Promise.all([
-    prisma.introduction.findMany({
-      where: {
-        OR: [{ fromId: user.id }, { toId: user.id }],
-        status: { in: ["PENDING", "ACCEPTED"] },
-      },
-      include: { from: true, to: true },
-    }),
-    prisma.verificationCase.findMany({
-      where: { userId: { in: members.map((member) => member.id) }, subject: "MEMBER" },
-      select: { userId: true, status: true, verifiedAt: true, expiresAt: true, checks: { select: { result: true } } },
-    }),
+        })
+      : Promise.resolve(0),
   ]);
+  let widened: "none" | "state" | "nationwide" = "none";
+  if ((directoryFilter.metro || directoryFilter.state) && localCount < THIN_MARKET_MIN) {
+    widened = directoryFilter.metro ? (stateCount < THIN_MARKET_MIN ? "nationwide" : "state") : "nationwide";
+  }
+  const rows = await prisma.user.findMany({
+    where: resultWhere(user.id, directoryFilter, widened),
+    include: {
+      memberMarkets: { include: { market: true } },
+      assetFocus: { include: { assetType: true } },
+      specialties: { include: { specialty: true } },
+      memberVerification: { select: { status: true, verifiedAt: true, expiresAt: true, checks: { select: { result: true } } } },
+    },
+  });
+  const people: DirectoryPerson[] = rows.map((member) => {
+    const parsed = planLocationBackfill(member);
+    const homeState = member.memberMarkets.find((row) => row.relation === "HOME" && row.market.kind === "STATE")?.market.code || parsed.homeState;
+    const homeMetro = member.memberMarkets.find((row) => row.relation === "HOME" && row.market.kind === "METRO")?.market.code || parsed.homeMetro || "";
+    const badge = toPublicVerification(
+      member.memberVerification
+        ? { ...member.memberVerification, status: member.memberVerification.status as VerificationStatus }
+        : null,
+    );
+    return {
+      id: member.id,
+      role: member.role,
+      name: member.name,
+      initials: member.initials,
+      org: member.org,
+      bio: member.bio,
+      location: member.location,
+      markets: member.markets,
+      dealTypes: member.dealTypes,
+      assetClasses: member.assetClasses,
+      checkSize: member.checkSize,
+      lookingFor: member.lookingFor,
+      offering: member.offering,
+      nationwide: member.nationwide,
+      homeCity: member.homeCity || parsed.homeCity,
+      homeState,
+      homeMetro,
+      operateStates: member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "STATE").map((row) => row.market.code),
+      operateMetros: member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "METRO").map((row) => row.market.code),
+      operateCounties: member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "COUNTY").map((row) => row.market.code),
+      assetSlugs: member.assetFocus.length ? member.assetFocus.map((row) => row.assetType.slug) : legacyAssetSlugs(member.assetClasses),
+      specialtySlugs: member.specialties.map((row) => row.specialty.slug),
+      verified: badge.showBadge,
+      createdAt: member.createdAt,
+      completeness: [member.bio, member.homeCity, homeState, member.lookingFor, member.offering, member.checkSize].filter((item) => item.trim()).length,
+    };
+  });
+  const directory = searchDirectory(people, directoryFilter, { local: localCount, statePop: stateCount });
+  const members = directory.rows;
+  const badges = new Map(
+    rows.map((member) => [
+      member.id,
+      toPublicVerification(
+        member.memberVerification
+          ? { ...member.memberVerification, status: member.memberVerification.status as VerificationStatus }
+          : null,
+      ),
+    ]),
+  );
+  const introductions = await prisma.introduction.findMany({
+    where: {
+      OR: [{ fromId: user.id }, { toId: user.id }],
+      status: { in: ["PENDING", "ACCEPTED"] },
+    },
+    include: { from: true, to: true },
+  });
   const incoming = introductions.filter((item) => item.toId === user.id && item.status === "PENDING");
 
   function introFor(id: string) {
@@ -86,8 +144,7 @@ export default async function NetworkPage({
   }
 
   function badgeFor(id: string) {
-    const record = cases.find((item) => item.userId === id);
-    return toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null);
+    return badges.get(id) ?? toPublicVerification(null);
   }
 
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -139,9 +196,8 @@ export default async function NetworkPage({
           </RoleChip>
         ))}
       </div>
-      <p className="mt-3 text-xs text-mut">
-        {members.length} member{members.length === 1 ? "" : "s"}
-      </p>
+      {directory.banner ? <p className="mt-3 font-serif text-lg text-forest">{directory.banner}</p> : null}
+      <p className="mt-3 text-xs text-mut">{directory.showCount ? directory.countLabel : "Growing market"}</p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {members.map((member) => {
           const intro = introFor(member.id);
@@ -154,12 +210,23 @@ export default async function NetworkPage({
                   <span className="block text-[11px] text-mut">
                     {roleShort(roleLabel(member.role))} · {member.org}
                   </span>
-                  <span className="block text-[11px] text-mut">{member.location}</span>
+                  <span className="block text-[11px] text-mut">{homeBaseLabel(member)}</span>
                 </span>
               </Link>
               <div className="mt-2">
                 <VerifiedMark view={badgeFor(member.id)} />
               </div>
+              {member.reason ? <p className="mt-2 text-[11px] text-mut">{member.reason}</p> : null}
+              {member.assetSlugs.length ? (
+                <p className="mt-2 flex flex-wrap gap-1">
+                  {member.assetSlugs.slice(0, 3).map((slug) => (
+                    <span key={slug} className="rounded-sm border border-line bg-cream px-2 py-0.5 text-[11px] text-ink">
+                      {assetBySlug(slug)?.label ?? slug}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+              {member.nationwide ? <p className="mt-2 text-[11px] font-semibold text-forest">Works nationwide</p> : null}
               {member.lookingFor ? <p className="mt-2 line-clamp-2 text-xs text-ink">{member.lookingFor}</p> : null}
               <div className="mt-3">
                 {intro === "ACCEPTED" ? (

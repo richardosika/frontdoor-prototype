@@ -113,6 +113,36 @@ Help is the button on the lower right of signup, the public pages, and the signe
 4. `/admin/help` lists questions, with filters for unanswered, refused, and thumbs down. The list has the question text and the answer. It does not show a name or email. `/admin/help/faq` edits the articles Help retrieves. Unpublished articles drop out. The legal drafts stay in their files.
 5. Help pauses after 20 questions in an hour for that browser session.
 
+## Member platform (home base, assets, directory)
+
+This is on the `platform-p0-p1` branch. It is not on the live test site. Apply the migration only on a local database, or on a database you intend to update after the current mvp test:
+
+```
+cd app
+npx prisma migrate deploy
+npm run db:seed-platform
+```
+
+`db:seed-platform` refuses a Render connection string. It loads states, major metros, principal counties, asset types, fields, and specialties, then backfills home base from the free-text city and state. It also adds TEST members at `@platform-test.example` with password `cornicio-demo`. Their names and companies start with TEST.
+
+Remove only those rows with:
+
+```
+npm run db:cleanup-platform
+npm run db:cleanup-platform -- --delete
+```
+
+The first command prints counts and deletes nothing. The second deletes the TEST platform members and outbox notices addressed to them. Market and asset rows stay. If those TEST members were the only extra rows, the baseline is Members 19, Applications 2, CRM 2 pending and 19 approved, Outbox 12, Verification 37.
+
+County is stored and is not a filter. A member still in verification appears in the directory. The directory card shows Verified or Verification in progress. It does not show a grade, a score, an email, or a phone.
+
+1. Sign in as a member whose dues are not outstanding. Open **Profile**. Set a home city, a home state, and a home metro. Check operating states and metros, asset focus, a specialty for your role, and a deal size band. Set who can see looking for, offering, and deal size: Members, Connections only, or Private. Save.
+2. Open another member. Private and connections-only fields are hidden until you are connected. Home base, operating markets, and up to three asset labels can show. Email and phone do not.
+3. Open **Network**. Filter by role, role group, state, metro, place (based in or works in), asset type, deal size, specialty, and a keyword. State **IN** does not match Austin. State **CA** does not match Chicago. A metro search can include a statewide operating row and a county inside that metro.
+4. Pick a role and metro with fewer than five members. The line says **Growing market** and does not print that count. The list widens to the state, then nationwide, and says so. Phoenix has one TEST general contractor, so that search is a growing market. Dallas has five TEST developers, so a Dallas developer search can show a count.
+5. Save a directory filter and check **Email me when a member matches**. When a later profile save matches it, `/admin/outbox` gets one notice. The notice names the member and the saved search. It has no grade and no phone number. The same pair is not sent again.
+6. Open a member from the directory. The page still has no grade letter, score, or source list.
+
 ## Project filters
 
 Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.

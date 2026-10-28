@@ -1,4 +1,5 @@
 import type { MemberRole } from "@prisma/client";
+import { textHasStateCode } from "@/lib/platform/state-codes";
 
 export const ASSET_CLASSES = ["Multifamily", "Condo", "Industrial", "Office", "Retail", "Mixed-use", "Hospitality", "Land", "Storage", "Other"] as const;
 
@@ -109,6 +110,8 @@ export type DirectoryMember = {
   name: string;
   org: string;
   bio: string;
+  /** Structured postal codes. When present they are the state filter, not a text search. */
+  stateCodes?: readonly string[];
 };
 
 export function directoryMatch(
@@ -118,8 +121,11 @@ export function directoryMatch(
   if (filter.role && member.role !== filter.role) return false;
   if (filter.state) {
     const state = filter.state.toUpperCase();
-    const hay = `${member.location} ${member.markets}`.toUpperCase();
-    if (!hay.includes(state)) return false;
+    const codes = member.stateCodes?.length
+      ? new Set(member.stateCodes.map((code) => code.toUpperCase()))
+      : null;
+    const matched = codes ? codes.has(state) : textHasStateCode(member.location, member.markets, state);
+    if (!matched) return false;
   }
   if (filter.dealType && !member.dealTypes.toLowerCase().includes(filter.dealType.toLowerCase())) return false;
   if (filter.assetClass && !member.assetClasses.toLowerCase().includes(filter.assetClass.toLowerCase())) return false;
