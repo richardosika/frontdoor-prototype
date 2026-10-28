@@ -110,10 +110,11 @@ describe("mail subjects and renewal dates", () => {
 describe("member-facing copy", () => {
   it("shows real dues on signup and strips draft markers from member legal text", () => {
     const html = signupConsentCopy().beforeHtml;
-    expect(html).toContain("$149");
-    expect(html).toContain("$74.50");
-    expect(html).toContain("$129");
-    expect(html).toContain("$64.50");
+    expect(html).toContain("$199");
+    expect(html).toContain("$99.50");
+    expect(html).not.toContain("Membership is free for developers");
+    expect(html).not.toContain("$149");
+    expect(html).not.toContain("$129");
     expect(html).not.toContain("[amounts");
     expect(html).not.toContain("[DATE]");
     const shown = memberFacingLegal(

@@ -8,7 +8,8 @@ import { formatLongEtDate } from "@/lib/format";
 import { mailDuesAmounts } from "@/lib/dues";
 import { firstName } from "@/lib/email-templates";
 import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
-import { blocksMembership, checkoutModeForRole, isStripeTestSecret, paymentRenewalLabel, paymentRequired, renewalInOneMonth, stripePriceForRole } from "@/lib/payments";
+import { monthlyDuesCents } from "@/lib/dues";
+import { blocksMembership, checkoutModeForRole, isStripeTestSecret, paymentRenewalLabel, paymentRequired, renewalInOneMonth } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { cancelStripeAtPeriodEnd, createBillingPortal, createDuesCheckout, createIntroCoupon, retrieveCheckoutSession, sessionPaid, sessionUserId } from "@/lib/stripe-checkout";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
@@ -73,7 +74,6 @@ export async function startStripeCheckout(formData: FormData) {
   const account = token ? await payerByToken(token) : await requireAccount();
   if (!account) redirect("/login");
   const secret = process.env.STRIPE_SECRET_KEY || "";
-  const priceId = stripePriceForRole(account.role);
   if (checkoutModeForRole(account.role) !== "stripe") {
     redirect(`/pay/${account.paymentToken || ""}?error=Stripe+test+keys+are+not+set`);
   }
@@ -81,7 +81,7 @@ export async function startStripeCheckout(formData: FormData) {
   const couponId = await createIntroCoupon(secret);
   const created = await createDuesCheckout({
     secret,
-    priceId,
+    unitAmount: monthlyDuesCents(account.role),
     userId: account.id,
     email: account.email,
     customerId: account.stripeCustomerId,

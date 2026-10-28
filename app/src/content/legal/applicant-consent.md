@@ -18,7 +18,7 @@ Private Floor is a vetted network. To review your application:
 - **Not a consumer report.** Private Floor is not a consumer reporting agency. These checks are used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
 - **Optional items.** A business card and references are optional. We may email references only to confirm they know you. We never ask for government ID or license numbers.
 - **Communication and privacy.** All member communication happens inside the Platform. Other members do not see your email, phone, LinkedIn, or business card. Moderators and administrators can read messages for safety and verification, and every access is logged.
-- **Dues.** Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Nothing is based on a deal.
+- **Dues.** General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Nothing is based on a deal.
 - **Electronic records.** You agree to receive our documents and notices electronically and that checking the boxes below is your electronic signature.
 - **Language.** The English version of our legal documents governs over any translation.
 

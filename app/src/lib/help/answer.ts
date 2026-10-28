@@ -79,8 +79,8 @@ export function cleanHelpText(text: string): string {
   return text
     .replace(/\*\*/g, "")
     .replace(/\[DATE\]/g, "October 24, 2026")
-    .replace(/\[amounts to be confirmed\]/gi, "General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50")
-    .replace(/\[amounts are placeholders\]/gi, "General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50")
+    .replace(/\[amounts to be confirmed\]/gi, "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50")
+    .replace(/\[amounts are placeholders\]/gi, "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50")
     .split("\n")
     .filter((line) => !/bracketed items are placeholders/i.test(line) && !/^\s*DRAFT\b/i.test(line))
     .join(" ")
@@ -110,7 +110,7 @@ export function rankChunks(question: string, chunks: HelpChunk[]): { chunk: Help
         if (forms.some((form) => title.has(form))) score += chunk.kind === "faq" ? 4 : 3;
         else if (forms.some((form) => body.has(form))) score += 1;
       }
-      if (priceAsk && (chunk.body.includes("$149") || chunk.body.includes("$129") || chunk.body.includes("$74.50"))) score += 6;
+      if (priceAsk && (chunk.body.includes("$199") || chunk.body.includes("$99.50"))) score += 6;
       return { chunk, score };
     })
     .filter((row) => row.score > 0)

@@ -9,7 +9,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 
 **The key points (plain-English summary, not a substitute for the full Terms)**
 - Private Floor is a private network where every member is personally reviewed. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
-- Membership is free for developers, investors and LPs, family offices, and lenders. General contractors: $149 per month, first month $74.50. Brokers: $129 per month, first month $64.50. Attorneys and advisors: $129 per month, first month $64.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
+- General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Dues are never tied to any deal, raise, loan, or transaction, and we never take referral fees or commissions or hold or move members' money.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
 - A Verified badge is a limited, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
@@ -140,27 +140,25 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 8.0 **Dues terms.** Our Membership Dues and Refund Terms give more detail and are part of these Terms. Checkout is Stripe test mode or a labelled simulated payment. No live card is charged. We will tell you before any live charge begins.
 
-8.1 **Free memberships.** Membership is free for members approved in these categories: developers, investors and limited partners, family offices, and lenders.
+8.1 **Monthly dues.** Members approved in these categories pay a flat monthly fee, due only after approval:
 
-8.2 **Monthly dues.** Members approved in these categories pay a flat monthly fee, due only after approval:
-
-- General contractors: $149 per month. The first month is $74.50.
-- Brokers: $129 per month. The first month is $64.50.
-- Attorneys and advisors: $129 per month. The first month is $64.50.
+- General contractors: $199 per month. The first month is $99.50.
+- Brokers: $199 per month. The first month is $99.50.
+- Attorneys and advisors: $199 per month. The first month is $99.50.
 
 We decide which category applies based on the professional role you are approved under. The first charge is half the monthly price. Every charge after that is the full monthly price. We send a reminder before the first full-price charge.
 
-8.3 **Month to month.** Dues are month to month. There is no long-term contract and no annual term. You can cancel anytime. Cancellation stops the next charge. If you have already paid for the current month, access continues until that month ends.
+8.2 **Month to month.** Dues are month to month. There is no long-term contract and no annual term. You can cancel anytime. Cancellation stops the next charge. If you have already paid for the current month, access continues until that month ends.
 
-8.4 **Billing.** The first month is 50% off the monthly price shown above. The following months are the full monthly price. A reminder email goes out before the first full-price charge, with the amount, the date, and how to cancel.
+8.3 **Billing.** The first month is 50% off the monthly price shown above. The following months are the full monthly price. A reminder email goes out before the first full-price charge, with the amount, the date, and how to cancel.
 
-8.5 **Cancellation.** You can cancel on the payment page or in Settings, or by emailing connect@privatefloorclub.com. Cancellation stops future charges.
+8.4 **Cancellation.** You can cancel on the payment page or in Settings, or by emailing connect@privatefloorclub.com. Cancellation stops future charges.
 
-8.6 **Refunds.** Cancellation stops the next monthly charge. A charge already recorded for the current month is not returned automatically. A Private Floor administrator can note a refund. Private Floor does not store a card number.
+8.5 **Refunds.** Cancellation stops the next monthly charge. A charge already recorded for the current month is not returned automatically. A Private Floor administrator can note a refund. Private Floor does not store a card number.
 
-8.7 **Payments.** Dues run through Stripe test mode when test keys are set, or through a labelled simulated payment when they are not. No live card is charged. Card details, when Stripe test mode is used, are entered into Stripe. Private Floor does not store full card numbers. Applicable taxes may be added to dues.
+8.6 **Payments.** Dues run through Stripe test mode when test keys are set, or through a labelled simulated payment when they are not. No live card is charged. Card details, when Stripe test mode is used, are entered into Stripe. Private Floor does not store full card numbers. Applicable taxes may be added to dues.
 
-8.8 **Flat fees only — never tied to any deal.** Our dues are flat fees for access to the Platform. They are never based on, and never change because of, whether any deal, investment, capital raise, loan, sale, lease, or other transaction happens between members, or its size or terms. We do not charge or accept referral fees, finder's fees, commissions, success fees, carried interest, or any other transaction-based compensation from anyone. We never hold, receive, transfer, or move members' money or securities, and we do not process payments between members.
+8.7 **Flat fees only — never tied to any deal.** Our dues are flat fees for access to the Platform. They are never based on, and never change because of, whether any deal, investment, capital raise, loan, sale, lease, or other transaction happens between members, or its size or terms. We do not charge or accept referral fees, finder's fees, commissions, success fees, carried interest, or any other transaction-based compensation from anyone. We never hold, receive, transfer, or move members' money or securities, and we do not process payments between members.
 
 ## 9. Intellectual property
 

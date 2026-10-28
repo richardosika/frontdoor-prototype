@@ -39,7 +39,8 @@ export async function cancelStripeAtPeriodEnd(secret: string, subscriptionId: st
 
 export async function createDuesCheckout(input: {
   secret: string;
-  priceId: string;
+  /** Full monthly price in cents. The first invoice uses the 50% coupon. Test secrets only. */
+  unitAmount: number;
   userId: string;
   email: string;
   customerId: string;
@@ -47,9 +48,14 @@ export async function createDuesCheckout(input: {
   cancelUrl: string;
   couponId?: string;
 }): Promise<StripeResult<{ url: string }>> {
+  if (!input.secret.startsWith("sk_test")) return { ok: false, error: "Stripe checkout stays in test mode." };
+  if (input.unitAmount <= 0) return { ok: false, error: "This role has no monthly dues." };
   const body = new URLSearchParams();
   body.set("mode", "subscription");
-  body.set("line_items[0][price]", input.priceId);
+  body.set("line_items[0][price_data][currency]", "usd");
+  body.set("line_items[0][price_data][unit_amount]", String(input.unitAmount));
+  body.set("line_items[0][price_data][recurring][interval]", "month");
+  body.set("line_items[0][price_data][product_data][name]", "Private Floor Club membership");
   body.set("line_items[0][quantity]", "1");
   body.set("success_url", input.successUrl);
   body.set("cancel_url", input.cancelUrl);

@@ -42,18 +42,24 @@ export async function ensureHelpArticles() {
   }
 }
 
-/** Rewrites an older yearly dues phrase to the monthly schedule. */
+/** Rewrites an older yearly or previous monthly dues phrase to the current schedule. */
 export function clarifyAnnualDues(body: string): string {
-  if (body.includes("$149 per month")) return body;
-  if (!/(\$2,400|\$1,800|\$1,200|once a year|per year|a year)/.test(body)) return body;
+  if (body.includes("$199 per month")) return body;
   let next = body
-    .replaceAll("$2,400 per year", "$149 per month, first month $74.50")
-    .replaceAll("$2,400 a year", "$149 per month, first month $74.50")
-    .replaceAll("$1,800 per year", "$129 per month, first month $64.50")
-    .replaceAll("$1,800 a year", "$129 per month, first month $64.50")
-    .replaceAll("$1,200 per year", "$129 per month, first month $64.50")
-    .replaceAll("$1,200 a year", "$129 per month, first month $64.50")
+    .replaceAll("$149 per month, first month $74.50", "$199 per month, first month $99.50")
+    .replaceAll("$129 per month, first month $64.50", "$199 per month, first month $99.50")
+    .replaceAll("$2,400 per year", "$199 per month, first month $99.50")
+    .replaceAll("$2,400 a year", "$199 per month, first month $99.50")
+    .replaceAll("$1,800 per year", "$199 per month, first month $99.50")
+    .replaceAll("$1,800 a year", "$199 per month, first month $99.50")
+    .replaceAll("$1,200 per year", "$199 per month, first month $99.50")
+    .replaceAll("$1,200 a year", "$199 per month, first month $99.50")
+    .replaceAll("$149 per month", "$199 per month")
+    .replaceAll("$129 per month", "$199 per month")
+    .replaceAll("$74.50", "$99.50")
+    .replaceAll("$64.50", "$99.50")
     .replaceAll("billed once a year", "billed month to month");
+  if (!/(\$199|\$99\.50|\$2,400|\$1,800|\$1,200|once a year|per year|a year|\$149|\$129)/.test(body)) return body;
   if (next === body) return body;
   if (!next.includes("per month") && !next.includes("month to month")) next = `${next} Membership is month to month.`;
   return next;

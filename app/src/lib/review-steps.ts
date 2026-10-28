@@ -213,6 +213,7 @@ export function displayedSentences(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
   const prepared = trimmed
+    .replace(/Searched: the website field on the application/g, "Searched: The website field on the application")
     .replace(/\bno match found\b(?!\.)/gi, "No match found.")
     .replace(/\b(Found|Not found): ([a-z])/g, (_, label: string, letter: string) => `${label}: ${letter.toUpperCase()}`);
   const sentences = capitalizeSentences(prepared).replace(/^([a-z])/, (letter) => letter.toUpperCase());

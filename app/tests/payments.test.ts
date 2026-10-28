@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel, matchesApplicationFilter } from "@/lib/application-status";
-import { annualDuesCents } from "@/lib/dues";
+import { annualDuesCents, firstMonthCents } from "@/lib/dues";
 import {
   blocksMembership,
   checkoutIsPaid,
@@ -18,11 +18,12 @@ const DAY = 24 * 60 * 60 * 1000;
 
 describe("annual dues", () => {
   it("charges the flat role amounts and never a deal fee", () => {
-    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(14_900);
-    expect(annualDuesCents("BROKER")).toBe(12_900);
-    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(12_900);
-    expect(annualDuesCents("RE_ATTORNEY")).toBe(12_900);
-    expect(annualDuesCents("ARCHITECT_ENGINEER")).toBe(12_900);
+    expect(annualDuesCents("GENERAL_CONTRACTOR")).toBe(19_900);
+    expect(annualDuesCents("BROKER")).toBe(19_900);
+    expect(annualDuesCents("MORTGAGE_BROKER")).toBe(19_900);
+    expect(annualDuesCents("RE_ATTORNEY")).toBe(19_900);
+    expect(annualDuesCents("ARCHITECT_ENGINEER")).toBe(19_900);
+    expect(firstMonthCents(19_900)).toBe(9_950);
     expect(annualDuesCents("DEVELOPER")).toBe(0);
     expect(annualDuesCents("INVESTOR_PE")).toBe(0);
     expect(annualDuesCents("FAMILY_OFFICE")).toBe(0);

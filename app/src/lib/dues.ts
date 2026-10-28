@@ -1,13 +1,15 @@
 import type { RoleId } from "@/lib/roles";
 
-/** Full monthly price. The first charge is half of this. Free roles stay at zero. */
-export const GC_MONTHLY_CENTS = 14_900;
-export const BROKER_MONTHLY_CENTS = 12_900;
-export const ADVISOR_MONTHLY_CENTS = 12_900;
+/** Full monthly price for every paid role. The first charge is half of this. Free roles stay at zero. */
+export const PAID_MONTHLY_CENTS = 19_900;
+export const GC_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
+export const BROKER_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
+export const ADVISOR_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
 
 const FREE_ROLES = new Set(["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE", "LENDER"]);
 const BROKER_ROLES = new Set(["BROKER", "MORTGAGE_BROKER"]);
-const LEGACY_YEARLY_CENTS = new Set([240_000, 180_000, 120_000]);
+/** Older yearly totals, and the previous $149 and $129 monthly prices. */
+const LEGACY_STORED_CENTS = new Set([240_000, 180_000, 120_000, 14_900, 12_900]);
 
 export function monthlyDuesCents(role: string): number {
   if (FREE_ROLES.has(role)) return 0;
@@ -20,7 +22,7 @@ export function monthlyDuesCents(role: string): number {
 export function currentMonthlyCents(role: string, stored = 0): number {
   const monthly = monthlyDuesCents(role);
   if (monthly === 0) return 0;
-  if (stored <= 0 || LEGACY_YEARLY_CENTS.has(stored)) return monthly;
+  if (stored <= 0 || LEGACY_STORED_CENTS.has(stored)) return monthly;
   return stored;
 }
 
@@ -129,24 +131,23 @@ export const DUES_LOCALES: { id: DuesLocale; label: string; text: string }[] = [
   {
     id: "es",
     label: "Español",
-    text: "Contratistas generales: primer mes $74.50 (50% de descuento), luego $149 al mes. Corredores: primer mes $64.50 (50% de descuento), luego $129 al mes. Abogados y asesores: primer mes $64.50 (50% de descuento), luego $129 al mes. Gratis para desarrolladores, inversionistas y LPs, family offices y prestamistas. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación. Es una cuota fija y no depende de ningún trato.",
+    text: "Contratistas generales: primer mes $99.50 (50% de descuento), luego $199 al mes. Corredores: primer mes $99.50 (50% de descuento), luego $199 al mes. Abogados y asesores: primer mes $99.50 (50% de descuento), luego $199 al mes. Gratis para desarrolladores, inversionistas y LPs, family offices y prestamistas. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación. Es una cuota fija y no depende de ningún trato.",
   },
   {
     id: "de",
     label: "Deutsch",
-    text: "Generalunternehmer: erster Monat $74.50 (50% Rabatt), danach $149 pro Monat. Makler: erster Monat $64.50 (50% Rabatt), danach $129 pro Monat. Anwälte und Berater: erster Monat $64.50 (50% Rabatt), danach $129 pro Monat. Kostenlos für Entwickler, Investoren und LPs, Family Offices und Kreditgeber. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe. Eine feste Gebühr, unabhängig von einem Geschäft.",
+    text: "Generalunternehmer: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Makler: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Anwälte und Berater: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Kostenlos für Entwickler, Investoren und LPs, Family Offices und Kreditgeber. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe. Eine feste Gebühr, unabhängig von einem Geschäft.",
   },
   {
     id: "ja",
     label: "日本語",
-    text: "ゼネコン：初月 $74.50（50%引き）、その後は月額 $149。ブローカー：初月 $64.50（50%引き）、その後は月額 $129。弁護士とアドバイザー：初月 $64.50（50%引き）、その後は月額 $129。デベロッパー、投資家とLP、ファミリーオフィス、レンダーは無料。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。取引に連動しない定額です。",
+    text: "ゼネコン：初月 $99.50（50%引き）、その後は月額 $199。ブローカー：初月 $99.50（50%引き）、その後は月額 $199。弁護士とアドバイザー：初月 $99.50（50%引き）、その後は月額 $199。デベロッパー、投資家とLP、ファミリーオフィス、レンダーは無料。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。取引に連動しない定額です。",
   },
 ];
 
 export function adminDuesLine(cents: number, waived: boolean): string {
   if (cents <= 0) return "Free role - no dues";
-  const monthly = LEGACY_YEARLY_CENTS.has(cents) ? 0 : cents;
-  const label = offerLabel(monthly > 0 ? monthly : cents === 240_000 ? GC_MONTHLY_CENTS : cents === 180_000 ? BROKER_MONTHLY_CENTS : cents === 120_000 ? ADVISOR_MONTHLY_CENTS : cents);
+  const label = offerLabel(LEGACY_STORED_CENTS.has(cents) ? PAID_MONTHLY_CENTS : cents);
   if (waived) return `${label}. ${DUES_WAIVED}`;
   return `${label}. ${DUES_BILLING_NOTE}`;
 }

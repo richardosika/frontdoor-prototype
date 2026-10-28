@@ -6,17 +6,13 @@ DRAFT - for attorney review, not legal advice. This page restates Section 8 of t
 
 **Last updated:** [DATE]
 
-## Free memberships
-
-Membership is free for members approved as developers, investors and limited partners, family offices, and lenders. Approval activates that membership. No dues are collected.
-
 ## Monthly dues
 
 Members approved in these categories pay a flat monthly fee:
 
-- General contractors: $149 per month. The first month is $74.50.
-- Brokers: $129 per month. The first month is $64.50.
-- Attorneys and advisors: $129 per month. The first month is $64.50.
+- General contractors: $199 per month. The first month is $99.50.
+- Brokers: $199 per month. The first month is $99.50.
+- Attorneys and advisors: $199 per month. The first month is $99.50.
 
 Private Floor decides the category from the professional role on the approved application. Monthly dues are due only after a Private Floor administrator approves the application. They are never based on a deal. The first charge is half the monthly price. The next charge is the full monthly price, one month later. A reminder goes out before that full-price charge.
 

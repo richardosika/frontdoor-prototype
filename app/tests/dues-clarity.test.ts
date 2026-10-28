@@ -1,33 +1,52 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { BEFORE_SUBMIT_INTRO, CONSENT_LEGAL_LINKS, CONSENT_SECTIONS } from "@/lib/apply-consent";
-import { DUES_BILLING_NOTE, DUES_LOCALES, DUES_SCHEDULE_SENTENCE, DUES_TABLE, duesLabel, firstMonthCents, monthlyDuesCents } from "@/lib/dues";
+import { DUES_BILLING_NOTE, DUES_LOCALES, DUES_SCHEDULE_SENTENCE, DUES_TABLE, PAID_MONTHLY_CENTS, duesLabel, firstMonthCents, monthlyDuesCents } from "@/lib/dues";
 import { replacementTemplateBody, templateDef } from "@/lib/email-templates";
 import { clarifyAnnualDues } from "@/lib/help/store";
 import { paymentRenewalLabel, renewalInOneMonth } from "@/lib/payments";
 import { withRenewalLine } from "@/lib/mail";
 
+const LEGAL = path.resolve(__dirname, "../src/content/legal");
+
 describe("monthly dues wording", () => {
   it("states the month-to-month schedule and the half-price first month", () => {
-    expect(monthlyDuesCents("GENERAL_CONTRACTOR")).toBe(14_900);
-    expect(firstMonthCents(14_900)).toBe(7_450);
-    expect(firstMonthCents(12_900)).toBe(6_450);
-    expect(DUES_TABLE[0].amount).toContain("$74.50");
-    expect(DUES_TABLE[0].amount).toContain("$149 per month");
-    expect(DUES_TABLE[1].amount).toContain("$64.50");
-    expect(DUES_TABLE[1].amount).toContain("$129 per month");
+    expect(monthlyDuesCents("GENERAL_CONTRACTOR")).toBe(PAID_MONTHLY_CENTS);
+    expect(monthlyDuesCents("BROKER")).toBe(PAID_MONTHLY_CENTS);
+    expect(monthlyDuesCents("RE_ATTORNEY")).toBe(PAID_MONTHLY_CENTS);
+    expect(monthlyDuesCents("DEVELOPER")).toBe(0);
+    expect(firstMonthCents(PAID_MONTHLY_CENTS)).toBe(9_950);
+    expect(DUES_TABLE[0].amount).toContain("$99.50");
+    expect(DUES_TABLE[0].amount).toContain("$199 per month");
+    expect(DUES_TABLE[1].amount).toContain("$99.50");
+    expect(DUES_TABLE[1].amount).toContain("$199 per month");
+    expect(DUES_TABLE[2].amount).toContain("$199 per month");
     expect(DUES_TABLE[3].amount).toBe("Free");
     expect(DUES_SCHEDULE_SENTENCE).toContain("General contractors:");
     expect(DUES_SCHEDULE_SENTENCE).toContain(DUES_BILLING_NOTE);
     expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/founding|per year|once a year/i);
-    expect(duesLabel(14_900)).toBe("$149 per month");
+    expect(duesLabel(PAID_MONTHLY_CENTS)).toBe("$199 per month");
     expect(duesLabel(0)).toBe("No monthly dues");
     expect(DUES_LOCALES.map((row) => row.id)).toEqual(["en", "es", "de", "ja"]);
     for (const row of DUES_LOCALES) {
-      expect(row.text).toContain("$149");
-      expect(row.text).toContain("$74.50");
-      expect(row.text).toContain("$129");
-      expect(row.text).toContain("$64.50");
+      expect(row.text).toContain("$199");
+      expect(row.text).toContain("$99.50");
+      expect(row.text).not.toContain("$149");
+      expect(row.text).not.toContain("$129");
       expect(row.text.toLowerCase()).not.toContain("founding");
+    }
+  });
+
+  it("keeps free-role cost wording off the named legal pages", () => {
+    for (const file of ["terms.md", "disclosures.md", "applicant-consent.md"]) {
+      const text = readFileSync(path.join(LEGAL, file), "utf8");
+      expect(text).toContain("$199");
+      expect(text).toContain("$99.50");
+      expect(text).not.toContain("Membership is free for developers");
+      expect(text).not.toContain("Free memberships");
+      expect(text).not.toContain("$149");
+      expect(text).not.toContain("$129");
     }
   });
 
@@ -76,7 +95,9 @@ describe("monthly dues wording", () => {
     expect(letter).toContain("Membership is month to month.");
     expect(letter).toContain("Next charge date: 2026-11-25 if recorded today.");
     expect(letter.endsWith("Richard Osika, Founder")).toBe(true);
-    expect(clarifyAnnualDues("General contractors pay $2,400 a year.")).toContain("$149 per month");
-    expect(clarifyAnnualDues("General contractors pay $2,400 a year.")).toContain("first month $74.50");
+    expect(clarifyAnnualDues("General contractors pay $2,400 a year.")).toContain("$199 per month");
+    expect(clarifyAnnualDues("General contractors pay $2,400 a year.")).toContain("first month $99.50");
+    expect(clarifyAnnualDues("Brokers pay $129 per month, first month $64.50.")).toContain("$199 per month");
+    expect(clarifyAnnualDues("Brokers pay $129 per month, first month $64.50.")).toContain("$99.50");
   });
 });

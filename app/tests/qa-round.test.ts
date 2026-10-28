@@ -272,9 +272,9 @@ describe("QA fixes that stay outside grading", () => {
     }
     expect(monthlyDuesCents("GENERAL_CONTRACTOR")).toBeGreaterThan(0);
     expect(paidDuesRows().some((row) => row.amount === "Free" || /developers, investors/i.test(row.role))).toBe(false);
-    expect(paidDuesRows().some((row) => row.amount.includes("$149"))).toBe(true);
+    expect(paidDuesRows().every((row) => row.amount.includes("$199") && row.amount.includes("$99.50"))).toBe(true);
     const wizard = readFileSync(path.join(ROOT, "components/apply-wizard.tsx"), "utf8");
-    expect(wizard).toContain('dues.cents > 0 ? "Nothing was charged. " : ""');
+    expect(wizard).not.toContain("Nothing was charged");
     expect(wizard).toContain("showDues={dues.cents > 0}");
     expect(applicantDuesSentence(14_900, true)).toContain("Dues waived by an administrator.");
     expect(applicantDuesSentence(14_900, false)).not.toContain("Dues waived");
@@ -319,14 +319,14 @@ describe("QA fixes that stay outside grading", () => {
     const receipt = paymentReceiptText({
       firstName: "Ada",
       role: "General Contractor",
-      firstCharge: "$74.50",
-      monthly: "$149",
+      firstCharge: "$99.50",
+      monthly: "$199",
       renewal: "November 26, 2026",
       modeLine: "Recorded as a simulated TEST payment. No card was charged.",
       loginLink: "https://cornicio-mvp.onrender.com/login",
     });
-    expect(receipt).toContain("First month $74.50");
-    expect(receipt).toContain("Full price $149 per month starts");
+    expect(receipt).toContain("First month $99.50");
+    expect(receipt).toContain("Full price $199 per month starts");
     expect(receipt).not.toContain("per month per month");
     expect(receipt).toContain("Sign in\nhttps://cornicio-mvp.onrender.com/login");
     expect(receipt.trimEnd().endsWith("Richard Osika, Founder")).toBe(true);

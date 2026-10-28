@@ -279,10 +279,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
           <div className="py-4">
             <h1 className="font-serif text-2xl">Application received</h1>
             <p className="mt-2 text-sm text-ink">{applicationReceivedMessage(firstName)}</p>
-            <p className="mt-2 text-sm text-ink">
-              {dues.cents > 0 ? "Nothing was charged. " : ""}
-              Keep the status link. Messages about this application stay on that page.
-            </p>
+            <p className="mt-2 text-sm text-ink">Keep the status link. Messages about this application stay on that page.</p>
             {statusToken ? (
               <Link href={publicStatusPath(statusToken)} className={`${btn} mt-4 w-full`}>
                 View application status

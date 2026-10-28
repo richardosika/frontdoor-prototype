@@ -31,8 +31,8 @@ describe("round 3 copy", () => {
   it("calls a free role free instead of waived", () => {
     expect(adminDuesLine(0, true)).toBe("Free role - no dues");
     expect(adminDuesLine(14_900, true)).toContain("Dues waived by an administrator.");
-    expect(adminDuesLine(14_900, false)).toContain("$149 per month");
-    expect(adminDuesLine(14_900, false)).toContain("$74.50");
+    expect(adminDuesLine(14_900, false)).toContain("$199 per month");
+    expect(adminDuesLine(14_900, false)).toContain("$99.50");
     expect(adminDuesLine(14_900, false)).toContain("Month to month");
     expect(adminDuesLine(240_000, false)).not.toContain("waived");
   });

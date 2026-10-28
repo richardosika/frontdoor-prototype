@@ -84,12 +84,12 @@ describe("admin command center", () => {
     expect(schedule.find((row) => row.role === "INVESTOR_PE")?.cents).toBe(0);
     expect(schedule.find((row) => row.role === "FAMILY_OFFICE")?.cents).toBe(0);
     expect(schedule.find((row) => row.role === "LENDER")?.cents).toBe(0);
-    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.cents).toBe(14900);
-    expect(schedule.find((row) => row.role === "BROKER")?.cents).toBe(12900);
-    expect(schedule.find((row) => row.role === "MORTGAGE_BROKER")?.cents).toBe(12900);
-    expect(schedule.find((row) => row.role === "RE_ATTORNEY")?.cents).toBe(12900);
-    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toContain("$149 per month");
-    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toContain("$74.50");
+    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.cents).toBe(19900);
+    expect(schedule.find((row) => row.role === "BROKER")?.cents).toBe(19900);
+    expect(schedule.find((row) => row.role === "MORTGAGE_BROKER")?.cents).toBe(19900);
+    expect(schedule.find((row) => row.role === "RE_ATTORNEY")?.cents).toBe(19900);
+    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toContain("$199 per month");
+    expect(schedule.find((row) => row.role === "GENERAL_CONTRACTOR")?.text).toContain("$99.50");
   });
 
   it("rolls the funnel and the seven-day window without a database", () => {
