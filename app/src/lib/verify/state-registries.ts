@@ -1,5 +1,20 @@
 import { normalizeRegistryName, registryNameLiterals } from "@/lib/verify/ny-registry";
+import { domainBrand } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
+
+const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies"]);
+
+/** "Hensel Phelps Construction Co." is Hensel Phelps plus an industry word, when the domain agrees. */
+function registryNameExtends(listed: string, org: string, website: string): boolean {
+  const orgTokens = normalizeRegistryName(org).split(/\s+/).filter(Boolean);
+  const listedTokens = normalizeRegistryName(listed).split(/\s+/).filter(Boolean);
+  if (!orgTokens.length || listedTokens.length <= orgTokens.length) return false;
+  if (listedTokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) return false;
+  const extra = listedTokens.slice(orgTokens.length);
+  if (!extra.length || !extra.every((token) => REGISTRY_EXTRA.has(token))) return false;
+  const stem = domainBrand(website);
+  return Boolean(stem) && stem === orgTokens.join("");
+}
 
 /**
  * Official open-data portals that answered a keyless request from this server.
@@ -102,6 +117,7 @@ export function assessStateRegistry(
   portal: RegistryPortal,
   org: string,
   response: { ok: boolean; status: number; text: string },
+  website = "",
 ): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
   const url = portal.portalUrl;
   if (!org.trim()) {
@@ -151,6 +167,21 @@ export function assessStateRegistry(
       corroborates: false,
       url,
       finding: `${portal.label} has this exact name, but not in an active status. This is not a pass.`,
+    };
+  }
+  const extended = website
+    ? rows.find((row) => {
+        const listed = String(row[portal.nameField] || "");
+        return registryNameExtends(listed, org, website) && (!portal.statusField || statusIsActive(String(row[portal.statusField] || "")));
+      })
+    : undefined;
+  if (extended) {
+    const listed = String(extended[portal.nameField] || org);
+    return {
+      status: "PASS",
+      corroborates: false,
+      url,
+      finding: `${portal.label} lists ${listed}. That shows a company by this name exists. It does not tie a person to the firm.`,
     };
   }
   return {

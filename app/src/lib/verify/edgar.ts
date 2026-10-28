@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, reportingOwnerDisplayMatches, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import type { CheckOutput } from "@/lib/verify/types";
 
@@ -155,7 +155,7 @@ export function insiderSearchUrl(surname: string, cik: string, form: string): st
 /** A reporting-owner display name on a CIK-scoped Form 3, 4, or 5. The company line in the same filing is not the person. */
 export function reportingOwnerLine(names: string[] | string[][], person: string): string {
   for (const group of filingGroups(names)) {
-    const hit = group.find((name) => mentionsPerson(name, person));
+    const hit = group.find((name) => reportingOwnerDisplayMatches(name, person));
     if (hit) return hit.replace(/\s+/g, " ").trim();
   }
   return "";
@@ -617,7 +617,9 @@ export function assessEdgarMatch(input: {
   // "Colliers International Group Inc." is Colliers plus wrapper words, not a parent.
   let wrapperSame = false;
   if (!match && firmTokens(input.org).length === 1) {
-    const wrapped = input.companies.find((row) => suffixOnlyExtension(row.title, input.org));
+    const wrapped = input.companies.find(
+      (row) => suffixOnlyExtension(row.title, input.org) && domainAgreesWithFirm(input.org, row.title, input.website || ""),
+    );
     if (wrapped) {
       match = wrapped;
       wrapperSame = true;

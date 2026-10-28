@@ -1584,7 +1584,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         `All free search sources blocked. Tried ${tried}. ${closing}`.replace(/\s+/g, " ").trim(),
       ),
     );
-  } else if (!hitEngine && sawIgnored && sawHardFailure && !sawUsablePage) {
+  } else if (!hitEngine && !sawClean && sawIgnored && sawHardFailure && !sawUsablePage) {
     attempts.push(
       blockedAttempt(
         "screen-web",

@@ -5,10 +5,10 @@ import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, 
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
+import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, reportingOwnerLine, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, plaintiffSolicitation, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
@@ -6656,9 +6656,10 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
       return { ok: true, status: 200, text: "<html><body></body></html>" };
     });
     const web = rows.find((check) => check.key === "screen-web");
-    expect(web?.status).toBe("UNAVAILABLE");
-    expect(web?.finding).toContain("Not checked");
-    expect(web?.finding).not.toContain("Not found");
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).not.toContain("Search did not complete");
     expect(web?.corroborates).not.toBe(true);
     expect(gradeChecks([web!], applicant).categories.find((category) => category.id === "footprint")?.earned).toBe(0);
   });
@@ -6672,8 +6673,10 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
   });
 
   it("ties a reporting owner when the nickname is the EDGAR middle name", () => {
-    expect(personHit("Kelly William Matthew", "Matt Kelly")).toBe("match");
-    expect(personHit("KELLY WILLIAM MATTHEW", "Matt Kelly")).toBe("match");
+    expect(personHit("Kelly William Matthew", "Matt Kelly")).toBe("none");
+    expect(reportingOwnerLine([["Kelly William Matthew"]], "Matt Kelly")).toBe("Kelly William Matthew");
+    expect(personHit("Jeanneret Bradley A", "Brad Jeanneret")).toBe("match");
+    expect(personHit("Bradley A. Jeanneret President", "Brad Jeanneret")).toBe("match");
     expect(personHit("Silverstein", "Larry Silverstein")).toBe("none");
     const tied = assessEdgarMatch({
       org: "JBG SMITH",
@@ -6718,6 +6721,16 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(colliers.status).not.toBe("PASS");
     expect(colliers.corroborates).not.toBe(true);
     expect(colliers.companyOnly).toBe(true);
+    const otherDomain = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers International Group Inc.", ticker: "CIGI", cik: "913353" }],
+      filingNames: [],
+      website: "https://some-other-domain.com",
+    });
+    expect(otherDomain.finding.toLowerCase()).toContain("parent match");
+    expect(otherDomain.corroborates).not.toBe(true);
     const fund = assessEdgarMatch({
       org: "Colliers",
       person: "Jay Hennick",
@@ -6728,5 +6741,63 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(fund.corroborates).not.toBe(true);
     expect(fund.finding.toLowerCase()).toContain("parent match");
     expect(fund.companyOnly).not.toBe(true);
+  });
+
+  it("does not fail a Canadian province as a bad US state", async () => {
+    const local = assessLocalAddress("Toronto, ON");
+    expect(local.kind).toBe("non-us");
+    const row = await resolveAddressCheck({
+      facts: facts({ location: "Toronto, ON" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(row?.status).toBe("INCONCLUSIVE");
+    expect(row?.finding).toContain("Non-US address");
+    expect(row?.finding).not.toContain("did not check out");
+    const garbage = assessLocalAddress("Nowhere, ZZ");
+    expect(garbage.kind).toBe("invalid");
+  });
+
+  it("keeps a clean empty search answer as not found", async () => {
+    const applicant = facts({ name: "Michael Heller", applicantName: "Michael Heller", org: "Cozen O'Connor", location: "Philadelphia, PA", website: "" });
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("html.duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://example.com/other">A different Michael</a></li></ol>` };
+      if (url.includes("lite.duckduckgo.com") || url.includes("mojeek.com") || url.includes("wikidata.org")) return { ok: true, status: 200, text: "<html></html>" };
+      if (url.includes("brave.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("gdeltproject.org")) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).not.toContain("Search did not complete");
+    expect(web?.corroborates).not.toBe(true);
+  });
+
+  it("keeps an apostrophe in the Cozen query and ignores a class-action hiring headline", () => {
+    expect(companySearchTerm("Cozen O'Connor", "Michael Heller")).toContain("o'connor");
+    expect(socialSearchQuery("Michael Heller", "Cozen O'Connor")).toContain("o'connor");
+    expect(mentionsCompany("Cozen O Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen O'Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen O\u2019Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen OConnor opened an office", "Cozen O'Connor")).toBe(true);
+    const headline = "Cozen O'Connor loses class action leaders to New York's Skadden";
+    expect(plaintiffSolicitation(headline)).toBe(false);
+    expect(judgeHeadline(headline, { name: "Michael Heller", org: "Cozen O'Connor", location: "Philadelphia, PA" }).kind).not.toBe("civil");
+  });
+
+  it("accepts a registry name that only adds construction when the domain agrees", () => {
+    const colorado = registryPortal("CO");
+    const rows = JSON.stringify([{ entityname: "Hensel Phelps Construction Co.", entitystatus: "Good Standing" }]);
+    const hit = assessStateRegistry(colorado!, "Hensel Phelps", { ok: true, status: 200, text: rows }, "https://www.henselphelps.com");
+    expect(hit.status).toBe("PASS");
+    expect(hit.corroborates).not.toBe(true);
+    expect(hit.finding).toContain("Hensel Phelps Construction Co.");
+    expect(hit.finding).toContain("does not tie a person");
+    const missed = assessStateRegistry(colorado!, "Hensel Phelps", { ok: true, status: 200, text: rows }, "https://not-hensel.example");
+    expect(missed.status).toBe("INCONCLUSIVE");
+    expect(missed.finding).toContain("No entity uses this exact name");
   });
 });

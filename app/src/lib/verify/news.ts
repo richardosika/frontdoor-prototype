@@ -618,6 +618,7 @@ export function ordinaryResults(text: string): boolean {
 
 /** A plaintiff-firm solicitation about the company. It is not a charge against the person. */
 export function plaintiffSolicitation(text: string): boolean {
+  if (/\bclass action\s+(?:leaders|partners|practice|group|team)\b/i.test(text)) return false;
   return /lead plaintiff deadline|securities fraud class action|\bclass action\b/i.test(text);
 }
 

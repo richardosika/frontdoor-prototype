@@ -38,6 +38,29 @@ const NICKNAMES: Record<string, string[]> = {
   gerald: ["gerald", "jerry"],
   joshua: ["joshua", "josh"],
   jacob: ["jacob", "jake"],
+  bradley: ["bradley", "brad"],
+  patrick: ["patrick", "pat"],
+  samuel: ["samuel", "sam"],
+  frederick: ["frederick", "fred"],
+  raymond: ["raymond", "ray"],
+  philip: ["philip", "phil"],
+  phillip: ["phillip", "phil"],
+  kathleen: ["kathleen", "kathy", "kate"],
+  katherine: ["katherine", "kate", "kathy"],
+  elizabeth: ["elizabeth", "liz", "beth"],
+  jennifer: ["jennifer", "jen"],
+  susan: ["susan", "sue"],
+  patricia: ["patricia", "pat", "trish"],
+  margaret: ["margaret", "peggy", "maggie"],
+  rebecca: ["rebecca", "becky"],
+  deborah: ["deborah", "deb"],
+  albert: ["albert", "al"],
+  theodore: ["theodore", "ted"],
+  francis: ["francis", "frank"],
+  frank: ["frank", "francis"],
+  harold: ["harold", "hal"],
+  henry: ["henry", "hank"],
+  john: ["john", "jack"],
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
@@ -111,8 +134,8 @@ function tokens(value: string): string[] {
   return value
     .toLowerCase()
     .replace(/&amp;/g, " ")
-    .replace(/[\u2018\u2019\u02BB\u02BC']/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[\u2018\u2019\u02BB\u02BC]/g, "'")
+    .replace(/[^a-z0-9'\s]/g, " ")
     .split(/\s+/)
     .filter((token) => token.length >= 2);
 }
@@ -586,9 +609,10 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
     .join("");
   const leadingInitial = String.raw`(?:(?<![A-Za-z0-9-])[A-Z]\.?\s+)?`;
   const forward = new RegExp(`${leadingInitial}${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
-  // "Kelly William Matthew" is surname, formal first name, then the middle name Matt goes by.
-  const otherGiven = String.raw`(?:[A-Za-z]\.?|[A-Za-z]{2,24})\s+`;
-  const reverse = new RegExp(`${surname}\\s*,?\\s+(?:${otherGiven})?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
+  const reverse = new RegExp(
+    `${surname}\\s*,?\\s+(?:[A-Z]\\.?\\s+)?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?:\\s+[A-Z]\\.?\\b)?(?![A-Za-z0-9-])`,
+    "g",
+  );
   const spans: NameSpan[] = [];
   const pushSurname = (start: number, whole: string) => {
     const local = new RegExp(surname, "g");
@@ -707,6 +731,30 @@ export function personHit(text: string, name: string, org = "", options?: { ownF
 
 export function mentionsPerson(text: string, name: string, org = ""): boolean {
   return personHit(text, name, org) === "match";
+}
+
+/**
+ * A Form 3, 4, or 5 display name. "Kelly William Matthew" is surname, first name, middle name.
+ * The middle name may be the name the applicant goes by. This is not used on free text.
+ */
+export function reportingOwnerDisplayMatches(display: string, person: string): boolean {
+  if (mentionsPerson(display, person)) return true;
+  const parsed = parsePersonName(person);
+  if (!parsed?.surname || !parsed.given.length) return false;
+  const parts = display.replace(/\([^)]*\)/g, " ").split(/[^A-Za-z]+/).filter((part) => part.length >= 2);
+  if (parts.length < 2 || parts[0].toLowerCase() !== parsed.surname.toLowerCase()) return false;
+  const accepted = new Set<string>();
+  for (const given of parsed.given) {
+    const key = given.toLowerCase();
+    accepted.add(key);
+    for (const nick of NICKNAMES[key] || []) accepted.add(nick);
+    for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+      if (!nicks.includes(key)) continue;
+      accepted.add(formal);
+      for (const nick of nicks) accepted.add(nick);
+    }
+  }
+  return parts.slice(1).some((part) => accepted.has(part.toLowerCase()));
 }
 
 function formerOrEx(text: string, org: string): boolean {
@@ -831,7 +879,12 @@ function phraseGapFor(org: string): string {
 
 function tokenBody(token: string): string {
   const bare = token.replace(/['’‘\u02BB\u02BC]/g, "");
-  const folded = `${[...bare].map((char) => caseFold(char)).join(`['’‘\u02BB\u02BC]?`)}(?:'s)?`;
+  const apostrophe = `['’‘\u02BB\u02BC]`;
+  const letters = [...bare].map((char) => caseFold(char));
+  const joined = /^o[^aeiouy]/i.test(bare) && bare.length >= 5
+    ? `${letters[0]}(?:${apostrophe}|\\s)?${letters.slice(1).join(`${apostrophe}?`)}`
+    : letters.join(`${apostrophe}?`);
+  const folded = `${joined}(?:'s)?`;
   if (token.length < 8) return folded;
   const splits = [folded];
   for (let index = 4; index <= token.length - 3; index += 1) {

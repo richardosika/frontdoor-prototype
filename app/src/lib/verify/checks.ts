@@ -1001,7 +1001,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       status: 0,
       text: "",
     });
-    const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp);
+    const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp, searchFacts.website);
     out.push(
       check({
         key: "business-registry",
@@ -1045,7 +1045,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
         status: 0,
         text: "",
       });
-      const home = homePortal.state === "NY" ? assessNyRegistry(searchFacts.org, homeHttp) : assessStateRegistry(homePortal, searchFacts.org, homeHttp);
+      const home = homePortal.state === "NY" ? assessNyRegistry(searchFacts.org, homeHttp) : assessStateRegistry(homePortal, searchFacts.org, homeHttp, searchFacts.website);
       if (home.status === "PASS") {
         incorporationPass = check({
           key: "business-registry",
@@ -1132,6 +1132,9 @@ export async function resolveAddressCheck(ctx: CheckContext): Promise<CheckOutpu
   const local = assessLocalAddress(ctx.facts.location || "");
   const base = { key: "address", weight: 2, source: ADDRESS_SOURCE, url: "" };
   if (local.kind === "absent") return null;
+  if (local.kind === "non-us") {
+    return check({ ...base, status: "INCONCLUSIVE", corroborates: false, finding: local.finding });
+  }
   if (local.kind === "invalid") {
     return check({ ...base, status: "FAIL", reviewFlag: true, corroborates: false, finding: local.finding });
   }
