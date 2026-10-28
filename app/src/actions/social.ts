@@ -5,8 +5,17 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/current-user";
 import { eligibleForDirectory } from "@/lib/payments";
 import { canConnect, orderedPair } from "@/lib/domain";
-import { canMessageAfterIntro } from "@/lib/member-network";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
+import {
+  activeMessagingRestriction,
+  canStartThread,
+  declineSenderNotice,
+  introRequestDecision,
+  isReportCategory,
+  restrictionMessage,
+  threadEmailPlan,
+} from "@/lib/platform/messaging-policy";
+import { loadMessagingSettings } from "@/lib/platform/messaging-settings";
 import { deliverPortalMessage, isBlocked } from "@/lib/portal-message";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { sendEmail } from "@/lib/email";
@@ -55,18 +64,15 @@ export async function requestConnection(formData: FormData) {
     await prisma.connection.create({ data: { fromId: user.id, toId, status: "PENDING" } });
   }
 
-  const sent = await deliverPortalMessage({
-    from: user,
-    toId,
-    kind: "CONNECTION",
-    body: `${user.name} requested to connect. Accept or decline in Network.`,
+  await notify(toId, {
+    title: "Connection request",
+    body: `${user.name} requested to connect. A thread opens after an introduction is accepted.`,
+    href: "/network",
   });
-  if (!sent.ok) redirect(`/members/${toId}?error=${encodeURIComponent(sent.reason)}`);
 
   revalidatePath("/network");
   revalidatePath(`/members/${toId}`);
-  revalidatePath("/messages");
-  redirect(`/messages/${sent.conversationId}`);
+  redirect(`/members/${toId}?notice=Request+sent.+A+thread+opens+after+an+introduction+is+accepted.`);
 }
 
 export async function respondConnection(formData: FormData) {
@@ -83,14 +89,12 @@ export async function respondConnection(formData: FormData) {
     where: { id: connection.id },
     data: { status: decision },
   });
-  await deliverPortalMessage({
-    from: user,
-    toId: connection.fromId,
-    kind: "CONNECTION",
-    body: decision === "ACCEPTED" ? `${user.name} accepted your connection request.` : `${user.name} declined your connection request.`,
+  await notify(connection.fromId, {
+    title: decision === "ACCEPTED" ? "Connection accepted" : "Not available now",
+    body: decision === "ACCEPTED" ? `${user.name} accepted your connection request.` : "Not available now.",
+    href: "/network",
   });
   revalidatePath("/network");
-  revalidatePath("/messages");
   redirect("/network");
 }
 
@@ -108,12 +112,29 @@ export async function introduceMember(formData: FormData) {
   if (await isBlocked(user.id, otherId)) {
     redirect(`${back}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
-  const recent = await prisma.introduction.count({
-    where: { fromId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
+  const settings = await loadMessagingSettings();
+  const now = new Date();
+  const [recent, outstanding, lastDeclined, senderLimits] = await Promise.all([
+    prisma.introduction.count({ where: { fromId: user.id, createdAt: { gte: new Date(now.getTime() - DAY) } } }),
+    prisma.introduction.count({ where: { fromId: user.id, status: "PENDING" } }),
+    prisma.introduction.findFirst({
+      where: { fromId: user.id, toId: otherId, status: "DECLINED" },
+      orderBy: { decidedAt: "desc" },
+      select: { decidedAt: true },
+    }),
+    prisma.userRestriction.findMany({ where: { userId: user.id }, select: { kind: true, startsAt: true, endsAt: true } }),
+  ]);
+  const stopped = restrictionMessage(activeMessagingRestriction(senderLimits, now));
+  if (stopped) redirect(`${back}?error=${encodeURIComponent(stopped)}`);
+  const allowance = introRequestDecision({
+    sentToday: recent,
+    outstanding,
+    accountCreatedAt: user.createdAt,
+    now,
+    lastDeclinedAt: lastDeclined?.decidedAt ?? null,
+    settings,
   });
-  if (!withinRateLimit(recent, RATE_LIMITS.introductionsPerDay)) {
-    redirect(`${back}?error=${encodeURIComponent("You have sent too many introductions today.")}`);
-  }
+  if (!allowance.ok) redirect(`${back}?error=${encodeURIComponent(allowance.reason)}`);
   const existing = await prisma.introduction.findFirst({
     where: {
       status: { in: ["PENDING", "ACCEPTED"] },
@@ -133,11 +154,15 @@ export async function introduceMember(formData: FormData) {
   });
   if (other.notifyIntros) {
     const base = await appBaseUrl();
-    await sendEmail({
-      to: other.email,
-      subject: "You have a new message on Private Floor",
-      text: `You have an introduction request on Private Floor.\n\nOpen messages\n${base}/network\n`,
+    const mail = threadEmailPlan({
+      isRequest: true,
+      mode: "INSTANT",
+      lastSentAt: null,
+      now: new Date(),
+      windowMinutes: settings.threadWindowMinutes,
+      inboxUrl: `${base}/network`,
     });
+    await sendEmail({ to: other.email, subject: mail.subject, text: mail.text });
   }
   revalidatePath("/network");
   revalidatePath("/alerts");
@@ -156,11 +181,8 @@ export async function respondIntroduction(formData: FormData) {
     data: { status: decision, decidedAt: new Date() },
   });
   if (decision === "DECLINED") {
-    await notify(intro.fromId, {
-      title: "Introduction declined",
-      body: `${user.name} declined the introduction.`,
-      href: "/network",
-    });
+    const notice = declineSenderNotice();
+    await notify(intro.fromId, { title: notice.title, body: notice.body, href: "/network" });
     revalidatePath("/network");
     redirect("/network?notice=Introduction+declined");
   }
@@ -170,6 +192,12 @@ export async function respondIntroduction(formData: FormData) {
     kind: "INTRO",
     body: `${intro.from.name} requested an introduction. ${intro.note}`,
   });
+  if (sent.ok) {
+    await prisma.conversation.update({
+      where: { id: sent.conversationId },
+      data: { state: "ACTIVE", initiatedById: intro.fromId, requestNote: intro.note, acceptedAt: new Date() },
+    });
+  }
   await notify(intro.fromId, {
     title: "Introduction accepted",
     body: `${user.name} accepted your introduction.`,
@@ -191,18 +219,8 @@ export async function openConversation(formData: FormData) {
   if (await isBlocked(user.id, otherId)) {
     redirect(`/members/${otherId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
-  const [intro, connection, existing] = await Promise.all([
+  const [intro, existing] = await Promise.all([
     prisma.introduction.findFirst({
-      where: {
-        status: "ACCEPTED",
-        OR: [
-          { fromId: user.id, toId: otherId },
-          { fromId: otherId, toId: user.id },
-        ],
-      },
-      select: { status: true },
-    }),
-    prisma.connection.findFirst({
       where: {
         status: "ACCEPTED",
         OR: [
@@ -222,8 +240,9 @@ export async function openConversation(formData: FormData) {
       select: { id: true },
     }),
   ]);
-  if (!existing && !canMessageAfterIntro({ intro: intro?.status ?? null, connection: connection?.status ?? null })) {
-    redirect(`/members/${otherId}?error=${encodeURIComponent("Request an introduction first. Messaging opens after they accept.")}`);
+  const threadGate = canStartThread({ hasConversation: Boolean(existing), introStatus: intro?.status ?? null });
+  if (!threadGate.ok) {
+    redirect(`/members/${otherId}?error=${encodeURIComponent(threadGate.reason)}`);
   }
   const [userAId, userBId] = orderedPair(user.id, otherId);
   const conversation = await prisma.conversation.upsert({
@@ -257,20 +276,30 @@ export async function reportMember(formData: FormData) {
   const targetUserId = String(formData.get("userId") || "");
   const conversationId = String(formData.get("conversationId") || "");
   const reason = String(formData.get("reason") || "").trim().slice(0, 500);
+  const categoryRaw = String(formData.get("category") || "OTHER");
+  const messageId = String(formData.get("messageId") || "").slice(0, 80);
   const back = conversationId ? `/messages/${conversationId}` : `/members/${targetUserId}`;
   if (reason.length < 3 || !targetUserId || targetUserId === user.id) {
     redirect(`${back}?error=${encodeURIComponent("Add a short reason for the report.")}`);
   }
+  const settings = await loadMessagingSettings();
   const recent = await prisma.report.count({
     where: { reporterId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
   });
-  if (!withinRateLimit(recent, RATE_LIMITS.reportsPerDay)) {
+  if (!withinRateLimit(recent, settings.reportsDaily)) {
     redirect(`${back}?error=${encodeURIComponent("You have filed too many reports today.")}`);
   }
   const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, name: true } });
   if (!target) redirect("/messages");
   await prisma.report.create({
-    data: { reporterId: user.id, targetUserId, conversationId, reason },
+    data: {
+      reporterId: user.id,
+      targetUserId,
+      conversationId,
+      messageId,
+      category: isReportCategory(categoryRaw) ? categoryRaw : "OTHER",
+      reason,
+    },
   });
   await prisma.moderationEvent.create({
     data: {
@@ -295,10 +324,11 @@ export async function reportPost(formData: FormData) {
   const reason = String(formData.get("reason") || "").trim().slice(0, 500);
   const back = String(formData.get("back") || "/feed");
   if (reason.length < 3 || !postId) redirect(`${back}?error=${encodeURIComponent("Add a short reason for the report.")}`);
+  const settings = await loadMessagingSettings();
   const recent = await prisma.report.count({
     where: { reporterId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
   });
-  if (!withinRateLimit(recent, RATE_LIMITS.reportsPerDay)) {
+  if (!withinRateLimit(recent, settings.reportsDaily)) {
     redirect(`${back}?error=${encodeURIComponent("You have filed too many reports today.")}`);
   }
   const post = await prisma.post.findUnique({ where: { id: postId }, include: { author: { select: { id: true, name: true } } } });

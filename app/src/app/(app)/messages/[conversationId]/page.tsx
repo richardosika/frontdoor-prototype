@@ -136,7 +136,17 @@ export default async function ThreadPage({
               </div>
             </>
           )}
-          <ReportDialog userId={other.id} conversationId={conversation.id} label="Report" />
+          <div className="flex flex-wrap gap-2">
+            <ReportDialog userId={other.id} conversationId={conversation.id} label="Report member" />
+            {conversation.messages.some((message) => message.senderId === other.id) ? (
+              <ReportDialog
+                userId={other.id}
+                conversationId={conversation.id}
+                messageId={[...conversation.messages].reverse().find((message) => message.senderId === other.id)?.id}
+                label="Report a message"
+              />
+            ) : null}
+          </div>
         </div>
       </section>
     </div>

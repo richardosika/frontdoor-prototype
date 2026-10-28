@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { moderatePost, resolveReport } from "@/actions/admin";
+import { moderatePost } from "@/actions/admin";
+import { setReportStatus } from "@/actions/messaging-admin";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
+import { REPORT_CATEGORY_LABELS, type ReportCategoryId } from "@/lib/platform/messaging-policy";
 import { timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
@@ -23,7 +25,7 @@ export default async function ModerationPage({
       include: { author: true },
     }),
     prisma.report.findMany({
-      where: { status: "OPEN" },
+      where: { status: { in: ["OPEN", "REVIEWING"] } },
       orderBy: { createdAt: "asc" },
       include: { reporter: true, target: true },
     }),
@@ -76,16 +78,23 @@ export default async function ModerationPage({
               <Link href={`/admin/members/${report.targetUserId}`} className="underline decoration-brass">
                 {report.target.name}
               </Link>
+              <span className="text-mut"> · {REPORT_CATEGORY_LABELS[report.category as ReportCategoryId] || report.category}</span>
+              <span className="text-mut"> · {report.status}</span>
               {report.postId ? <span className="text-mut"> · post</span> : null}
-              {report.conversationId ? <span className="text-mut"> · message</span> : null}
+              {report.messageId ? <span className="text-mut"> · message</span> : null}
+              {report.conversationId && !report.messageId ? <span className="text-mut"> · thread</span> : null}
               <p className="mt-1 text-ink">{report.reason}</p>
               <p className="text-xs text-mut">{timeAgo(report.createdAt)}</p>
-              <form action={resolveReport} className="mt-2">
-                <input type="hidden" name="reportId" value={report.id} />
-                <button className={btnOutline} type="submit">
-                  Close report
-                </button>
-              </form>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(["REVIEWING", "ACTIONED", "DISMISSED"] as const).map((status) => (
+                  <form key={status} action={setReportStatus}>
+                    <input type="hidden" name="reportId" value={report.id} />
+                    <button className={status === "ACTIONED" ? btn : btnOutline} name="status" value={status} type="submit">
+                      {status === "REVIEWING" ? "Mark reviewing" : status === "ACTIONED" ? "Actioned" : "Dismiss"}
+                    </button>
+                  </form>
+                ))}
+              </div>
             </li>
           ))}
         </ul>

@@ -6,6 +6,7 @@ import { DuesLanguages } from "@/components/dues-languages";
 import { PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
+import { prisma } from "@/lib/prisma";
 import { DUES_BILLING_NOTE, currentMonthlyCents, firstMonthCents, formatMoney } from "@/lib/dues";
 import { formatAuditTime, formatLongEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
@@ -19,6 +20,7 @@ export default async function SettingsPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
+  const pref = await prisma.notificationPref.findUnique({ where: { userId: user.id } });
   return (
     <div className="mx-auto max-w-3xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title="Settings" />
@@ -70,6 +72,14 @@ export default async function SettingsPage({
           <label className="flex items-center gap-2">
             <input type="checkbox" name="notifyMessages" defaultChecked={user.notifyMessages} />
             Messages
+          </label>
+          <label>
+            <span className={labelCls}>Message email</span>
+            <select name="messageEmail" className={field} defaultValue={pref?.messages === "OFF" ? "THROTTLED" : pref?.messages || "THROTTLED"}>
+              <option value="THROTTLED">First note right away, then at most one per thread every 4 hours</option>
+              <option value="DIGEST">Daily digest</option>
+              <option value="INSTANT">Every message</option>
+            </select>
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="notifyIntros" defaultChecked={user.notifyIntros} />

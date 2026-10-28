@@ -16,7 +16,7 @@ The logo on forest backgrounds is a stand-in PF mark and reversed lockup. The ap
 
 ## Member side
 
-1. Open `/`. The intro under the tagline does not mention a business card. **Request to join** is the filled button and the outline button beside **Sign in**. The filled button opens the form on this page. The outline button opens Apply. The request form sits in the brass-edged section directly under those buttons.
+1. Open `/`. The intro under the tagline does not mention a business card. **Request to join** is the filled button and opens the form on this page. **Apply** is the outline button and opens `/apply`. **Sign in** is beside them. The request form sits in the brass-edged section directly under those buttons.
 2. On that form, enter a first name, a last name, an email, a role, a company, a street, a city, a two-letter state, and a ZIP. Submit. The page says **Thank you for applying** and that a Private Floor administrator reviews every application and you will hear by email. It does not show a sign-in button or a status URL. In the admin Outbox, open the `invite_received` notice. It is signed Richard Osika, Founder, Private Floor Club, and it includes **Check your status** with `/invite-status/<token>`. That status page says **Application received**.
 3. Open `/apply`. The header says the more detail you share, the better the match with members and deals. Step 1, **Invite code**. Enter `PF-7K2M-91QX`.
 4. Step 2, **Choose role**. The monthly dues schedule is on the page: general contractors $149 per month, first month $74.50; brokers $129 per month, first month $64.50; attorneys and advisors $129 per month, first month $64.50; developers, investors and LPs, family offices, and lenders free. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. The fee is due only after approval, flat, and never based on a deal. The role you pick repeats its own amount.
@@ -142,6 +142,22 @@ County is stored and is not a filter. A member still in verification appears in 
 4. Pick a role and metro with fewer than five members. The line says **Growing market** and does not print that count. The list widens to the state, then nationwide, and says so. Phoenix has one TEST general contractor, so that search is a growing market. Dallas has five TEST developers, so a Dallas developer search can show a count.
 5. Save a directory filter and check **Email me when a member matches**. When a later profile save matches it, `/admin/outbox` gets one notice. The notice names the member and the saved search. It has no grade and no phone number. The same pair is not sent again.
 6. Open a member from the directory. The page still has no grade letter, score, or source list.
+
+## Messaging (introduction first)
+
+This is on the `platform-p2` branch. Apply `npx prisma migrate deploy` on a local database only. The new tables cascade when `npm run db:cleanup-platform -- --delete` removes `@platform-test.example` members. Site settings for caps stay. That cleanup does not change the baseline counts unless those TEST members or their outbox rows were the only additions: Members 19, Applications 2, CRM 2 pending and 19 approved, Outbox 12, Verification 37.
+
+A thread does not open until the other member accepts an introduction request. A refusal tells the sender **Not available now** and does not name who refused. No email is sent for a refusal.
+
+1. From **Network** or a profile, **Request introduction** with a short note. The other member sees the request on Network. The Outbox gets an introduction notice with a link and no note text, no grade, and no phone number.
+2. Decline the request. The sender's bell says **Not available now**. The thread list does not gain a conversation.
+3. Accept a different request. A thread opens. The first message email is in the Outbox and does not quote the note.
+4. Send two more messages in that thread within a few minutes. The second notice in the Outbox is held (`message_held`) and says the next email waits. It does not contain the message text.
+5. **Settings** → Message email → **Daily digest**. Further thread emails are saved for the digest. `npm run db:message-digest` writes one Outbox row per member who is waiting. It refuses a Render database. The letter has no message text.
+6. **Report member** or **Report a message**. Pick a category and a reason. `/admin/moderation` lists it with the category and reason. Mark reviewing, actioned, or dismiss. The audit log records the change.
+7. **Block** on the thread. The other member cannot message you, and you cannot message them.
+8. As admin, open the member and **Pause messaging** or **Suspend messaging** with a reason. Sending and new introduction requests stop. The audit log has the entry. **Clear messaging restrictions** restores them.
+9. `/admin/settings` → **Messaging caps**. Change introduction requests per day and save. The next request uses the new cap. The audit log says the caps were updated.
 
 ## Project filters
 

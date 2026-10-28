@@ -257,6 +257,9 @@ model User {
   assetFocus           MemberAssetFocus[]
   specialties          MemberSpecialty[]
   fieldSettings        ProfileFieldSetting[]
+  notificationPref     NotificationPref?
+  emailThrottles       EmailThrottle[]
+  restrictions         UserRestriction[]
 
   @@index([paymentStatus])
   @@index([status, role])
@@ -484,15 +487,27 @@ model DealAccess {
   @@unique([dealId, requesterId])
 }
 
+enum ConversationState {
+  REQUESTED
+  ACTIVE
+  CLOSED
+}
+
 model Conversation {
-  id        String    @id @default(cuid())
-  userAId   String
-  userBId   String
-  userA     User      @relation("ConvA", fields: [userAId], references: [id])
-  userB     User      @relation("ConvB", fields: [userBId], references: [id])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
+  id            String            @id @default(cuid())
+  userAId       String
+  userBId       String
+  userA         User              @relation("ConvA", fields: [userAId], references: [id])
+  userB         User              @relation("ConvB", fields: [userBId], references: [id])
+  state         ConversationState @default(ACTIVE)
+  initiatedById String            @default("")
+  requestNote   String            @default("")
+  acceptedAt    DateTime?
+  mutedByA      Boolean           @default(false)
+  mutedByB      Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  messages      Message[]
 
   @@unique([userAId, userBId])
 }
@@ -637,19 +652,33 @@ model Block {
   @@unique([blockerId, blockedId])
 }
 
+enum ReportCategory {
+  SPAM
+  SOLICITATION
+  HARASSMENT
+  IMPERSONATION
+  OTHER
+}
+
 model Report {
-  id             String   @id @default(cuid())
+  id             String         @id @default(cuid())
   reporterId     String
-  reporter       User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter       User           @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
   targetUserId   String
-  target         User     @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
-  conversationId String   @default("")
-  postId         String   @default("")
+  target         User           @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  conversationId String         @default("")
+  messageId      String         @default("")
+  postId         String         @default("")
+  category       ReportCategory @default(OTHER)
   reason         String
-  status         String   @default("OPEN")
-  createdAt      DateTime @default(now())
+  status         String         @default("OPEN")
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String         @default("")
+  createdAt      DateTime       @default(now())
 
   @@index([createdAt])
+  @@index([status, createdAt])
 }
 
 model ModerationEvent {
@@ -659,9 +688,12 @@ model ModerationEvent {
   action         String
   summary        String
   conversationId String   @default("")
+  targetUserId   String?
+  targetType     String   @default("")
   createdAt      DateTime @default(now())
 
   @@index([createdAt])
+  @@index([targetUserId, createdAt])
 }
 
 model Introduction {
@@ -1120,4 +1152,58 @@ model SavedSearchAlert {
 
   @@unique([savedFilterId, memberId])
   @@index([memberId])
+}
+
+enum EmailMode {
+  INSTANT
+  THROTTLED
+  DIGEST
+  OFF
+}
+
+model NotificationPref {
+  userId       String    @id
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     EmailMode @default(THROTTLED)
+  requests     EmailMode @default(INSTANT)
+  dealUpdates  EmailMode @default(DIGEST)
+  quietStartHr Int?
+  quietEndHr   Int?
+  timezone     String    @default("America/New_York")
+}
+
+model EmailThrottle {
+  userId          String
+  key             String
+  lastSentAt      DateTime
+  suppressedCount Int      @default(0)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
+}
+
+enum RestrictionKind {
+  MESSAGING_PAUSED
+  MESSAGING_SUSPENDED
+}
+
+model UserRestriction {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        RestrictionKind
+  reason      String
+  startsAt    DateTime        @default(now())
+  endsAt      DateTime?
+  createdById String
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, endsAt])
+}
+
+model SiteSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+  updatedById String?
 }
