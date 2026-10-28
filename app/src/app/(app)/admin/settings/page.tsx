@@ -2,6 +2,7 @@ import Link from "next/link";
 import { setDeliveryMode } from "@/actions/crm";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
+import { saveDocSettings } from "@/actions/deal-team";
 import { saveMessagingSettings } from "@/actions/messaging-admin";
 import { btn, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { duesSchedule } from "@/lib/admin-home";
@@ -9,7 +10,9 @@ import { noticeTestRecipient } from "@/lib/brand";
 import { resendKeyConfigured } from "@/lib/resend-mail";
 import { requireAdmin } from "@/lib/current-user";
 import { mailDeliveryMode } from "@/lib/mail";
+import { prisma } from "@/lib/prisma";
 import { MESSAGING_DEFAULTS, type MessagingSettings } from "@/lib/platform/messaging-policy";
+import { DEFAULT_DOC_MAX_MB, parseDocSettings } from "@/lib/platform/deal-team";
 import { loadMessagingSettings } from "@/lib/platform/messaging-settings";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +24,12 @@ export default async function AdminSettingsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const [mode, caps] = await Promise.all([mailDeliveryMode(), loadMessagingSettings()]);
+  const [mode, caps, docRows] = await Promise.all([
+    mailDeliveryMode(),
+    loadMessagingSettings(),
+    prisma.siteSetting.findMany({ where: { key: { in: ["doc.maxMb", "doc.allowedTypes"] } } }),
+  ]);
+  const docs = parseDocSettings(docRows);
   const recipient = noticeTestRecipient();
   const live = mode === "live";
   const resend = resendKeyConfigured();
@@ -114,6 +122,25 @@ export default async function AdminSettingsPage({
             </button>
           </form>
           <p className="mt-2 text-xs text-mut">Defaults if unset: {MESSAGING_DEFAULTS.introDaily} introduction requests a day, {MESSAGING_DEFAULTS.threadWindowMinutes} minutes between thread emails.</p>
+        </section>
+
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className={sectionLabel}>Deal files</h2>
+          <p className="mt-2 text-sm text-ink">The test build stores files on local disk. Private object storage is not connected and uses no cloud credentials.</p>
+          <form action={saveDocSettings} className="mt-3 grid gap-3">
+            <label>
+              <span className={labelCls}>Maximum size in MB</span>
+              <input name="maxMb" type="number" min={1} max={100} defaultValue={docs.maxMb} className={field} />
+            </label>
+            <label>
+              <span className={labelCls}>Allowed types</span>
+              <input name="types" defaultValue={docs.types.join(", ")} className={field} />
+            </label>
+            <button className={btn} type="submit">
+              Save file settings
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-mut">Default maximum is {DEFAULT_DOC_MAX_MB} MB.</p>
         </section>
 
         <section className={`${card} mt-4 p-4 text-sm`}>

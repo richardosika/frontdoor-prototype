@@ -263,6 +263,7 @@ model User {
   vendorProfile        VendorProfile?
   vendorCredentials    VendorCredential[]
   licenses             License[]
+  dealTeam             DealTeamMember[]
 
   @@index([paymentStatus])
   @@index([status, role])
@@ -456,6 +457,8 @@ model Deal {
   documents      DealDocument[]
   messages       DealMessage[]
   events         DealEvent[]
+  team           DealTeamMember[]
+  folders        DealFolder[]
 
   @@index([market, sizeBand, kind])
 }
@@ -570,7 +573,14 @@ model DealDocument {
   fileName    String   @default("")
   contentType String   @default("")
   sizeBytes   Int      @default(0)
+  folderId    String?
+  folder      DealFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  storageKey  String   @default("")
+  version     Int      @default(1)
+  scanStatus  String   @default("PENDING")
+  sponsorOnly Boolean  @default(false)
   createdAt   DateTime @default(now())
+  accessLog   DocumentAccessLog[]
 
   @@index([dealId, createdAt])
 }
@@ -1212,6 +1222,69 @@ model SiteSetting {
   value       Json
   updatedAt   DateTime @updatedAt
   updatedById String?
+}
+
+enum TeamStatus {
+  REQUESTED
+  ADDED
+  DECLINED
+  REMOVED
+}
+
+enum TeamRole {
+  SPONSOR
+  LENDER
+  INVESTOR
+  GC
+  DESIGN
+  ATTORNEY
+  BROKER
+  ADVISOR
+  OTHER
+}
+
+model DealTeamMember {
+  id             String     @id @default(cuid())
+  dealId         String
+  deal           Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamRole       TeamRole   @default(OTHER)
+  status         TeamStatus @default(REQUESTED)
+  addedBySponsor Boolean    @default(false)
+  note           String     @default("")
+  ndaVersion     String     @default("")
+  ndaAckAt       DateTime?
+  ndaIpHash      String     @default("")
+  addedAt        DateTime?
+  removedAt      DateTime?
+  createdAt      DateTime   @default(now())
+
+  @@unique([dealId, userId])
+  @@index([userId, status])
+}
+
+model DealFolder {
+  id            String         @id @default(cuid())
+  dealId        String
+  deal          Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  name          String
+  audienceRoles TeamRole[]
+  sortOrder     Int            @default(0)
+  documents     DealDocument[]
+
+  @@index([dealId, sortOrder])
+}
+
+model DocumentAccessLog {
+  id         String       @id @default(cuid())
+  documentId String
+  document   DealDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  action     String
+  at         DateTime     @default(now())
+
+  @@index([documentId, at])
 }
 
 enum Availability {

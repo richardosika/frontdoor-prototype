@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { addDealDocument, postDealQuestion, removeParticipant } from "@/actions/deals";
+import { addDealDocument, postDealQuestion } from "@/actions/deals";
+import { addDealFolder, addToDealTeam, removeFromDealTeam } from "@/actions/deal-team";
 import { TierBadge } from "@/components/badge";
 import { Banner } from "@/components/banner";
 import { MobileTitle } from "@/components/page-header";
@@ -10,6 +11,7 @@ import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { timeAgo } from "@/lib/format";
+import { PLATFORM_NDA_NOTICE, TEAM_ROLE_LABELS, type TeamRoleId } from "@/lib/platform/deal-team";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -29,13 +31,15 @@ export default async function DealRoomPage({
     include: {
       sponsor: true,
       access: { where: { status: "APPROVED" }, include: { requester: true } },
-      documents: { orderBy: { createdAt: "desc" }, include: { author: true } },
+      documents: { orderBy: { createdAt: "desc" }, include: { author: true, folder: true } },
+      team: { include: { user: { select: { id: true, name: true, role: true, org: true, tier: true } } } },
+      folders: { orderBy: { sortOrder: "asc" } },
       messages: { orderBy: { createdAt: "asc" }, include: { author: true, replies: { include: { author: true }, orderBy: { createdAt: "asc" } } } },
       events: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
   if (!deal) notFound();
-  const allowed = deal.sponsorId === user.id || deal.access.some((item) => item.requesterId === user.id);
+  const allowed = user.isAdmin || deal.sponsorId === user.id || deal.access.some((item) => item.requesterId === user.id);
   if (!allowed) redirect(`/deals/${deal.id}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
 
   const members = [
@@ -43,6 +47,28 @@ export default async function DealRoomPage({
     ...deal.access.map((item) => item.requester).filter((person) => person.id !== deal.sponsorId),
   ];
   const questions = deal.messages.filter((message) => !message.parentId);
+  const isSponsor = deal.sponsorId === user.id;
+  const partners = isSponsor
+    ? await prisma.conversation.findMany({
+        where: { OR: [{ userAId: user.id }, { userBId: user.id }] },
+        select: { userA: { select: { id: true, name: true } }, userB: { select: { id: true, name: true } } },
+        take: 40,
+      })
+    : [];
+  const partnerOptions = partners
+    .map((row) => (row.userA.id === user.id ? row.userB : row.userA))
+    .filter((person) => person.id !== user.id);
+  const logs = isSponsor || user.isAdmin
+    ? await prisma.documentAccessLog.findMany({
+        where: { document: { dealId: deal.id } },
+        orderBy: { at: "desc" },
+        take: 30,
+      })
+    : [];
+  const logNames = logs.length
+    ? await prisma.user.findMany({ where: { id: { in: logs.map((row) => row.userId) } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(logNames.map((row) => [row.id, row.name]));
 
   return (
     <div>
@@ -56,7 +82,7 @@ export default async function DealRoomPage({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Deal room</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
           <p className="mt-2 text-sm text-ink">
-            Approved members and {deal.sponsor.name} can list documents, ask questions, and see what changed. {BRAND.name} stores the file name, type, and size. It does not keep the file and does not process a payment.
+            The deal team can store documents here. Raise amounts stay in this room. {PLATFORM_NDA_NOTICE} {BRAND.name} does not process a payment.
           </p>
           <ul className="mt-4 divide-y divide-line">
             {members.map((person) => (
@@ -71,11 +97,11 @@ export default async function DealRoomPage({
                 <span className="flex items-center gap-2">
                   <TierBadge tier={person.tier} />
                   {deal.sponsorId === user.id && person.id !== deal.sponsorId ? (
-                    <form action={removeParticipant}>
+                    <form action={removeFromDealTeam}>
                       <input type="hidden" name="dealId" value={deal.id} />
-                      <input type="hidden" name="requesterId" value={person.id} />
+                      <input type="hidden" name="userId" value={person.id} />
                       <button className={btnOutline} type="submit">
-                        Remove
+                        Remove from deal team
                       </button>
                     </form>
                   ) : null}
@@ -85,9 +111,54 @@ export default async function DealRoomPage({
           </ul>
         </div>
 
+        {deal.kind === "DEAL" ? (
+          <p className="mt-4 text-sm text-ink">
+            Raise {deal.raiseLabel}
+            {deal.targetIrr ? ` · ${deal.targetIrr}` : ""}
+            {deal.minCheck ? ` · ${deal.minCheck}` : ""}
+            {deal.equityMultiple ? ` · ${deal.equityMultiple}` : ""}. These figures stay in the deal room.
+          </p>
+        ) : null}
+        {isSponsor ? (
+          <form action={addToDealTeam} className={`mt-4 grid gap-2 p-4 ${card}`}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Add to deal team</h2>
+            <p className="text-xs text-mut">This sends an in-app request to someone you can already message. It does not send a separate email.</p>
+            <select name="userId" className={field} required>
+              <option value="">Choose a member</option>
+              {partnerOptions.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+            <input type="hidden" name="dealId" value={deal.id} />
+            <select name="teamRole" className={field} defaultValue="OTHER">
+              {Object.entries(TEAM_ROLE_LABELS)
+                .filter(([id]) => id !== "SPONSOR")
+                .map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+            <button className={btn} type="submit">
+              Add to deal team
+            </button>
+          </form>
+        ) : null}
+        {isSponsor ? (
+          <form action={addDealFolder} className={`mt-4 grid gap-2 p-4 ${card}`}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Folder</h2>
+            <input type="hidden" name="dealId" value={deal.id} />
+            <input name="name" className={field} placeholder="Folder name" required />
+            <button className={btnOutline} type="submit">
+              Add folder
+            </button>
+          </form>
+        ) : null}
         <section className={`mt-4 p-5 ${card}`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Documents</h2>
-          <p className="mt-1 text-xs text-mut">PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.</p>
+          <p className="mt-1 text-xs text-mut">Files stay on the local disk for this test. Open a file and the access log records it. Acknowledge the platform NDA before documents open.</p>
           {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">No documents listed yet.</p> : null}
           <ul className="mt-3 divide-y divide-line">
             {deal.documents.map((document) => (
@@ -96,7 +167,13 @@ export default async function DealRoomPage({
                 <p className="text-xs text-mut">
                   {document.fileName || "File"} · {document.contentType || "unknown type"} · {document.sizeBytes ? `${Math.ceil(document.sizeBytes / 1024)} KB` : "size not recorded"} · {document.author.name} · {timeAgo(document.createdAt)}
                 </p>
+                {document.folder ? <p className="text-xs text-mut">{document.folder.name}</p> : null}
                 {document.note ? <p className="mt-1 text-sm text-ink">{document.note}</p> : null}
+                {document.storageKey ? (
+                  <a className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brass" href={`/api/deals/${deal.id}/files/${document.id}?download=1`}>
+                    Download
+                  </a>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -114,12 +191,31 @@ export default async function DealRoomPage({
               <label className={labelCls}>Note</label>
               <input name="note" className={field} placeholder="What this file is for" />
             </div>
+            {isSponsor ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="sponsorOnly" />
+                Sponsor only
+              </label>
+            ) : null}
             <button className={btnOutline} type="submit">
-              List document
+              Add document
             </button>
           </form>
         </section>
 
+        {isSponsor || user.isAdmin ? (
+          <section className={`mt-4 p-5 ${card}`}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">File access log</h2>
+            {logs.length === 0 ? <p className="mt-3 text-sm text-mut">No file has been opened.</p> : null}
+            <ul className="mt-3 divide-y divide-line">
+              {logs.map((row) => (
+                <li key={row.id} className="py-2 text-sm">
+                  {nameById.get(row.userId) || "Member"} · {row.action} · {timeAgo(row.at)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <section className={`mt-4 p-5 ${card}`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Questions</h2>
           {questions.length === 0 ? <p className="mt-3 text-sm text-mut">No questions yet.</p> : null}

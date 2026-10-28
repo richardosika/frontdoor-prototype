@@ -14,7 +14,8 @@ import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
-import { matchAudience, marketToken, matchScore } from "@/lib/domain";
+import { matchAudience, marketToken, matchScore, sizeLabel } from "@/lib/domain";
+import { publicRaiseLabel } from "@/lib/platform/deal-team";
 import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
@@ -252,7 +253,7 @@ export default async function FeedPage({
                 </div>
                 {post.deal ? (
                   <h2 className="mt-3 font-serif text-lg font-normal">
-                    {post.kind === "DEAL" ? `Raising ${post.deal.raiseLabel} — ${post.deal.title}` : post.deal.title}
+                    {post.deal.title}
                   </h2>
                 ) : null}
                 {!postIsPublic(post) ? (
@@ -265,7 +266,7 @@ export default async function FeedPage({
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.market}</span>
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.assetClass}</span>
-                    <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.raiseLabel}</span>
+                    <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{publicRaiseLabel({ kind: post.kind, raiseLabel: post.deal.raiseLabel, sizeLabel: sizeLabel(post.deal.sizeBand) || post.sizeRange })}</span>
                     {stageLabel(post.stage || post.deal.stage) ? (
                       <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{stageLabel(post.stage || post.deal.stage)}</span>
                     ) : null}
