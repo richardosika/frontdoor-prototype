@@ -2,12 +2,15 @@ import Link from "next/link";
 import { setDeliveryMode } from "@/actions/crm";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { btn, card, sectionLabel } from "@/components/ui";
+import { saveMessagingSettings } from "@/actions/messaging-admin";
+import { btn, card, field, labelCls, sectionLabel } from "@/components/ui";
 import { duesSchedule } from "@/lib/admin-home";
 import { noticeTestRecipient } from "@/lib/brand";
 import { resendKeyConfigured } from "@/lib/resend-mail";
 import { requireAdmin } from "@/lib/current-user";
 import { mailDeliveryMode } from "@/lib/mail";
+import { MESSAGING_DEFAULTS, type MessagingSettings } from "@/lib/platform/messaging-policy";
+import { loadMessagingSettings } from "@/lib/platform/messaging-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,7 @@ export default async function AdminSettingsPage({
 }) {
   await requireAdmin();
   const params = await searchParams;
-  const mode = await mailDeliveryMode();
+  const [mode, caps] = await Promise.all([mailDeliveryMode(), loadMessagingSettings()]);
   const recipient = noticeTestRecipient();
   const live = mode === "live";
   const resend = resendKeyConfigured();
@@ -94,6 +97,25 @@ export default async function AdminSettingsPage({
           <p className="mt-3 text-xs text-mut">Architects, other attorneys, and the remaining roles use the attorney / advisor amount.</p>
         </section>
 
+        <section className={`${card} mt-4 p-4`}>
+          <h2 className={sectionLabel}>Messaging caps</h2>
+          <p className="mt-2 text-sm text-ink">These caps apply to introduction requests, messages, and reports. Notices stay in the Outbox.</p>
+          <form action={saveMessagingSettings} className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Cap name="introDaily" label="Introduction requests per day" value={caps.introDaily} />
+            <Cap name="introNewAccountDaily" label="Introduction requests per day, first two weeks" value={caps.introNewAccountDaily} />
+            <Cap name="newAccountDays" label="Days that use the newer-account cap" value={caps.newAccountDays} />
+            <Cap name="outstandingIntros" label="Waiting introduction requests" value={caps.outstandingIntros} />
+            <Cap name="reRequestDays" label="Days before another request after a refusal" value={caps.reRequestDays} />
+            <Cap name="messageHourly" label="Messages per hour" value={caps.messageHourly} />
+            <Cap name="reportsDaily" label="Reports per day" value={caps.reportsDaily} />
+            <Cap name="threadWindowMinutes" label="Minutes between thread emails" value={caps.threadWindowMinutes} />
+            <button className={`${btn} sm:col-span-2`} type="submit">
+              Save messaging caps
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-mut">Defaults if unset: {MESSAGING_DEFAULTS.introDaily} introduction requests a day, {MESSAGING_DEFAULTS.threadWindowMinutes} minutes between thread emails.</p>
+        </section>
+
         <section className={`${card} mt-4 p-4 text-sm`}>
           <h2 className={sectionLabel}>Sources and watchlists</h2>
           <p className="mt-2 text-ink">OFAC cache and the free verification sources live on their own page.</p>
@@ -103,5 +125,14 @@ export default async function AdminSettingsPage({
         </section>
       </div>
     </div>
+  );
+}
+
+function Cap({ name, label, value }: { name: keyof MessagingSettings; label: string; value: number }) {
+  return (
+    <label>
+      <span className={labelCls}>{label}</span>
+      <input name={name} type="number" min={0} defaultValue={value} className={field} />
+    </label>
   );
 }

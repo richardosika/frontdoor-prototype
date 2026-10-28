@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { setMessagingRestriction } from "@/actions/messaging-admin";
 import { removeMember, setMemberStatus } from "@/actions/owner";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
@@ -7,7 +8,7 @@ import { DemoChip } from "@/components/status-chip";
 import { PaymentPanel } from "@/components/payment-admin";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { MobileTitle, PageHeader } from "@/components/page-header";
-import { btn, btnOutline, card } from "@/components/ui";
+import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { isDemoRecord } from "@/lib/person-standing";
 import { formatAuditTime } from "@/lib/format";
@@ -28,7 +29,7 @@ export default async function AdminMemberPage({
   const query = await searchParams;
   const member = await prisma.user.findUnique({
     where: { id },
-    include: { legalAcceptances: { orderBy: { acceptedAt: "desc" } } },
+    include: { legalAcceptances: { orderBy: { acceptedAt: "desc" } }, restrictions: { orderBy: { createdAt: "desc" }, take: 8 } },
   });
   if (!member) notFound();
   return (
@@ -90,6 +91,50 @@ export default async function AdminMemberPage({
             </Link>
           </p>
         </section>
+        {member.isAdmin ? null : (
+          <section className={`${card} mt-4 p-4 text-sm`}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Messaging</h2>
+            <p className="mt-2 text-ink">Pause or suspend messaging for this member. The audit log records the reason. This does not change membership.</p>
+            {member.restrictions.length ? (
+              <ul className="mt-2 space-y-1 text-ink">
+                {member.restrictions.map((row) => (
+                  <li key={row.id}>
+                    {row.kind === "MESSAGING_PAUSED" ? "Messaging paused" : "Messaging suspended"} · {row.reason}
+                    {row.endsAt ? ` · until ${formatAuditTime(row.endsAt)}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-mut">No messaging restriction.</p>
+            )}
+            <form action={setMessagingRestriction} className="mt-3 grid gap-2">
+              <input type="hidden" name="userId" value={member.id} />
+              <label>
+                <span className={labelCls}>Action</span>
+                <select name="kind" className={field} defaultValue="MESSAGING_PAUSED">
+                  <option value="MESSAGING_PAUSED">Pause messaging</option>
+                  <option value="MESSAGING_SUSPENDED">Suspend messaging</option>
+                </select>
+              </label>
+              <label>
+                <span className={labelCls}>Reason</span>
+                <input name="reason" className={field} minLength={3} />
+              </label>
+              <label>
+                <span className={labelCls}>End date, optional</span>
+                <input name="endsOn" type="date" className={field} />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button className={btn} type="submit">
+                  Save restriction
+                </button>
+                <button className={btnOutline} name="clear" value="1" type="submit">
+                  Clear messaging restrictions
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
         <PaymentPanel
           userId={member.id}
           role={member.role}

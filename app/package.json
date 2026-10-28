@@ -11,6 +11,7 @@
     "db:seed": "prisma db seed",
     "db:seed-platform": "tsx prisma/seed-platform.ts",
     "db:cleanup-platform": "tsx prisma/cleanup-platform.ts",
+    "db:message-digest": "tsx prisma/message-digest.ts",
     "db:cleanup-walkthrough": "tsx prisma/cleanup-walkthrough.ts",
     "db:reset": "prisma migrate reset --force",
     "test": "vitest run",

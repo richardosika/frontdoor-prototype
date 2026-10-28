@@ -84,13 +84,21 @@ export async function saveProfile(formData: FormData) {
 
 export async function saveNotificationPrefs(formData: FormData) {
   const user = await requireUser();
+  const messagesOn = formData.get("notifyMessages") === "on";
+  const modeRaw = String(formData.get("messageEmail") || "THROTTLED");
+  const messages = !messagesOn ? "OFF" : modeRaw === "INSTANT" || modeRaw === "DIGEST" || modeRaw === "THROTTLED" ? modeRaw : "THROTTLED";
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      notifyMessages: formData.get("notifyMessages") === "on",
+      notifyMessages: messagesOn,
       notifyIntros: formData.get("notifyIntros") === "on",
       notifyDeals: formData.get("notifyDeals") === "on",
     },
+  });
+  await prisma.notificationPref.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, messages, requests: formData.get("notifyIntros") === "on" ? "INSTANT" : "OFF" },
+    update: { messages, requests: formData.get("notifyIntros") === "on" ? "INSTANT" : "OFF" },
   });
   revalidatePath("/settings");
   redirect("/settings?notice=Notification+settings+saved");

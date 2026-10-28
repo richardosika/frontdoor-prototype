@@ -143,6 +143,22 @@ County is stored and is not a filter. A member still in verification appears in 
 5. Save a directory filter and check **Email me when a member matches**. When a later profile save matches it, `/admin/outbox` gets one notice. The notice names the member and the saved search. It has no grade and no phone number. The same pair is not sent again.
 6. Open a member from the directory. The page still has no grade letter, score, or source list.
 
+## Messaging (introduction first)
+
+This is on the `platform-p2` branch. Apply `npx prisma migrate deploy` on a local database only. The new tables cascade when `npm run db:cleanup-platform -- --delete` removes `@platform-test.example` members. Site settings for caps stay. That cleanup does not change the baseline counts unless those TEST members or their outbox rows were the only additions: Members 19, Applications 2, CRM 2 pending and 19 approved, Outbox 12, Verification 37.
+
+A thread does not open until the other member accepts an introduction request. A refusal tells the sender **Not available now** and does not name who refused. No email is sent for a refusal.
+
+1. From **Network** or a profile, **Request introduction** with a short note. The other member sees the request on Network. The Outbox gets an introduction notice with a link and no note text, no grade, and no phone number.
+2. Decline the request. The sender's bell says **Not available now**. The thread list does not gain a conversation.
+3. Accept a different request. A thread opens. The first message email is in the Outbox and does not quote the note.
+4. Send two more messages in that thread within a few minutes. The second notice in the Outbox is held (`message_held`) and says the next email waits. It does not contain the message text.
+5. **Settings** → Message email → **Daily digest**. Further thread emails are saved for the digest. `npm run db:message-digest` writes one Outbox row per member who is waiting. It refuses a Render database. The letter has no message text.
+6. **Report member** or **Report a message**. Pick a category and a reason. `/admin/moderation` lists it with the category and reason. Mark reviewing, actioned, or dismiss. The audit log records the change.
+7. **Block** on the thread. The other member cannot message you, and you cannot message them.
+8. As admin, open the member and **Pause messaging** or **Suspend messaging** with a reason. Sending and new introduction requests stop. The audit log has the entry. **Clear messaging restrictions** restores them.
+9. `/admin/settings` → **Messaging caps**. Change introduction requests per day and save. The next request uses the new cap. The audit log says the caps were updated.
+
 ## Project filters
 
 Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.
