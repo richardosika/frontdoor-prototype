@@ -208,15 +208,49 @@ export function displayCheckStatus(result: string, note: string): "Pass" | "Conc
 const SCORE_FIELD = /^(Name|Company|City|Confidence)$/;
 const SOURCE_LABEL = /^(YouTube|TikTok|Google News|News search|Facebook|Instagram|X|Court search|Public web search|News)$/;
 
-/** Shown sentences start with a capital. A search query after "Searched:" and a company name stay as written. */
+/** Shown sentences start with a capital. A search query after "Searched:" stays as stored unless a display name is supplied. */
 export function displayedSentences(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
-  const sentences = capitalizeSentences(trimmed).replace(/^([a-z])/, (letter) => letter.toUpperCase());
+  const prepared = trimmed.replace(/\bno match found\b(?!\.)/gi, "No match found.");
+  const sentences = capitalizeSentences(prepared).replace(/^([a-z])/, (letter) => letter.toUpperCase());
   return sentences.replace(/([A-Za-z][A-Za-z0-9 &'’-]*?): ([a-z])/g, (full, label: string, letter: string) => {
     if (label === "Searched" || SCORE_FIELD.test(label) || !SOURCE_LABEL.test(label)) return full;
     return `${label}: ${letter.toUpperCase()}`;
   });
+}
+
+const SEARCH_PLATFORM = "X|Facebook|YouTube|TikTok|Instagram|Google News";
+
+/** The words the applicant wrote, in their original case. The search itself can still use a shorter query. */
+export function displayedSearchQuery(person: string, org: string): string {
+  const name = person.trim();
+  const company = org.trim();
+  if (name && company) return `"${name}" "${company}"`;
+  return `"${name || company}"`;
+}
+
+/**
+ * Checks and step notes. Capitalize a bare "no match found", and show Searched lines
+ * with the applicant's own name and company when those are known.
+ */
+export function displayedCheckFinding(text: string, input?: { person?: string; org?: string }): string {
+  let shown = text.trim();
+  if (!shown) return "";
+  const person = input?.person?.trim() || "";
+  const org = input?.org?.trim() || "";
+  if (person || org) {
+    const query = displayedSearchQuery(person, org);
+    shown = shown.replace(
+      new RegExp(`Searched: (.+?) on (${SEARCH_PLATFORM})\\.`, "g"),
+      `Searched: ${query} on $2.`,
+    );
+    shown = shown.replace(
+      /Searched: (?!https?:)("[^"]*"(?:\s+"[^"]*")?(?:\s+\|\s+"[^"]*"(?:\s+"[^"]*")?)*)\./g,
+      `Searched: ${query}.`,
+    );
+  }
+  return displayedSentences(shown);
 }
 
 export function publicFinding(status: string, finding: string): string {

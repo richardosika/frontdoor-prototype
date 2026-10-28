@@ -6,6 +6,7 @@ import {
   displayCheckStatus,
   emptyProgress,
   parseReviewProgress,
+  displayedCheckFinding,
   displayedSentences,
   publicFinding,
   reviewStepFromQuery,
@@ -86,6 +87,28 @@ describe("guided review steps", () => {
     expect(displayedSentences("Google News: no match found. Name: no. Company: no.")).toBe(
       "Google News: No match found. Name: no. Company: no.",
     );
+    const tiktok = displayedCheckFinding(
+      'Searched: "QA-TEST Walker" "dunlop" on TikTok. no match found Name: no. Company: no. City: no. Confidence: none.',
+      { person: "QA-TEST Willy Walker", org: "QA-TEST Walker & Dunlop" },
+    );
+    expect(tiktok).toContain('Searched: "QA-TEST Willy Walker" "QA-TEST Walker & Dunlop" on TikTok.');
+    expect(tiktok).toContain("No match found. Name: no.");
+    expect(tiktok).not.toContain('"dunlop"');
+    const news = displayedCheckFinding(
+      'Searched: "QA-TEST Mary Ann Request" "mike advisors" | "Request" "mike advisors". no match found Name: no. Company: no.',
+      { person: "QA-TEST Mary Ann Request", org: "Mike Advisors Group" },
+    );
+    expect(news).toContain('Searched: "QA-TEST Mary Ann Request" "Mike Advisors Group".');
+    expect(news).not.toContain("mike advisors");
+    expect(displayedCheckFinding("Searched: https://example.com. domain does not resolve.")).toContain("Searched: https://example.com.");
+    for (const platform of ["X", "Facebook", "YouTube", "Google News"]) {
+      const line = displayedCheckFinding(`Searched: "qa person" "short" on ${platform}. no match found Name: no.`, {
+        person: "QA-TEST Mary Ann",
+        org: "Mike Advisors",
+      });
+      expect(line).toContain(`Searched: "QA-TEST Mary Ann" "Mike Advisors" on ${platform}.`);
+      expect(line).toContain("No match found. Name: no.");
+    }
   });
 
   it("keeps a skip from counting as a pass and lowers confidence without raising the grade", () => {

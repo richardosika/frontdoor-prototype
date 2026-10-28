@@ -11,7 +11,7 @@ import { publicEvidenceHref } from "@/lib/evidence-link";
 import { reviewCopy } from "@/lib/review-copy";
 import { shownRegistryCheck } from "@/lib/state-registry-search";
 import { gradeComparisonLine, type GradeReport } from "@/lib/verify/grade";
-import { displayedSentences, previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
+import { displayedCheckFinding, previousStepId, skippedFrom, stepCountsAsPass, stepStatusLabel, type BuiltStep, type ReviewStepId } from "@/lib/review-steps";
 import type { MemberReviewMode } from "@/lib/applicant-review";
 
 export function GuidedReview({
@@ -30,6 +30,8 @@ export function GuidedReview({
   location = "",
   unverified = [],
   applicationGrade = null,
+  person = "",
+  org = "",
 }: {
   applicationId: string;
   caseId: string;
@@ -46,6 +48,8 @@ export function GuidedReview({
   location?: string;
   unverified?: string[];
   applicationGrade?: { letter: string; score: number } | null;
+  person?: string;
+  org?: string;
 }) {
   const current = steps.find((step) => step.id === currentId) || steps[0];
   const total = steps.length;
@@ -122,7 +126,7 @@ export function GuidedReview({
                 {step.findings.map((finding, index) => (
                   <li key={`${finding.source}-${index}`} className="rounded border border-line bg-cream p-3 text-sm">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{reviewCopy(finding.source)}</p>
-                    <p className="mt-1 leading-relaxed text-ink">{displayedSentences(reviewCopy(finding.text))}</p>
+                    <p className="mt-1 leading-relaxed text-ink">{displayedCheckFinding(reviewCopy(finding.text), { person, org })}</p>
                     {finding.url ? (
                       <a className="mt-1 inline-flex min-h-11 items-center text-forest underline" href={publicEvidenceHref(finding.url)} target="_blank" rel="noreferrer">
                         Open evidence
@@ -153,7 +157,7 @@ export function GuidedReview({
                 </label>
                 <label className="block">
                   <span className={labelCls}>Note</span>
-                  <textarea name="note" className={field} rows={6} defaultValue={displayedNote(step.saved?.note || step.prefill?.note || "", location)} placeholder="What was found, and what was not" />
+                  <textarea name="note" className={field} rows={6} defaultValue={displayedNote(step.saved?.note || step.prefill?.note || "", location, person, org)} placeholder="What was found, and what was not" />
                 </label>
                 <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
                   Save & next
@@ -177,8 +181,8 @@ export function GuidedReview({
   );
 }
 
-function displayedNote(note: string, location: string): string {
-  return displayedSentences(reviewCopy(shownRegistryCheck({ finding: note, url: "", location }).finding));
+function displayedNote(note: string, location: string, person: string, org: string): string {
+  return displayedCheckFinding(reviewCopy(shownRegistryCheck({ finding: note, url: "", location }).finding), { person, org });
 }
 
 function DecisionStep({

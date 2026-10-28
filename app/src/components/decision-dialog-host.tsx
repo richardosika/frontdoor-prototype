@@ -77,6 +77,7 @@ export function DecisionDialogHost() {
   const [pending, setPending] = useState<"APPROVED" | "DECLINED" | null>(null);
   const [modalError, setModalError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
+  const savingRef = useRef(false);
   const showing = pending || "APPROVED";
 
   function closeDialog(closing: boolean) {
@@ -124,7 +125,8 @@ export function DecisionDialogHost() {
       if (snap.markNotLegit || snap.showAck) setInput(form, "confirmNotLegit", "yes");
     }
     clearMemory();
-    closeDialog(true);
+    setSaveBusy(true);
+    setModalError("Saving approval...");
     form.setAttribute("data-decision-allow", "1");
     const button = form.querySelector(`button[name="decision"][value="${decision}"]`);
     if (button instanceof HTMLButtonElement) form.requestSubmit(button);
@@ -200,12 +202,18 @@ export function DecisionDialogHost() {
   }
 
   function confirmPending() {
+    if (saveBusy || savingRef.current) return;
+    savingRef.current = true;
     const form = decisionForm();
     let decision = readPending() || pending;
-    if (!decision) return;
+    if (!decision) {
+      savingRef.current = false;
+      return;
+    }
     const ack = ackChecked();
     const snap = getDecisionDialogSnapshot();
     if (decision === "APPROVED" && snap.showAck && !ack) {
+      savingRef.current = false;
       setModalError("Check the box to confirm this approval. Approval was not sent.");
       return;
     }
@@ -224,12 +232,17 @@ export function DecisionDialogHost() {
       setSaveBusy(true);
       return;
     }
-    if (!claimDecisionReplay(queued)) return;
+    if (!claimDecisionReplay(queued)) {
+      savingRef.current = false;
+      return;
+    }
     setModalError("");
     submitDecision(decision, queued.ack);
   }
 
   function cancelPending() {
+    savingRef.current = false;
+    setSaveBusy(false);
     const decision = readPending() || pending;
     clearDecisionQueue();
     clearMemory();
@@ -286,7 +299,7 @@ export function DecisionDialogHost() {
           aria-disabled={saveBusy || undefined}
           onClick={confirmPending}
         >
-          {showing === "DECLINED" ? "Decline" : "Approve"}
+          {saveBusy ? "Saving approval..." : showing === "DECLINED" ? "Decline" : "Approve"}
         </button>
         <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-cancel="1" onClick={cancelPending}>
           Cancel

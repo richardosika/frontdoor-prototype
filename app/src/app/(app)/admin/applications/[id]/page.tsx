@@ -233,9 +233,9 @@ export default async function ApplicationDetailPage({
         </section>
         <details className={`${card} mt-4 p-4`}>
           <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">View full checklist</summary>
-          <CheckSection title="Application checks" run={report} location={application.location} org={application.org} />
+          <CheckSection title="Application checks" run={report} location={application.location} org={application.org} person={application.name} />
           {companyGrade ? <ExecutiveSummary report={companyGrade} title="Company file" role={application.role} /> : null}
-          <CheckSection title="Company checks" run={company} location={application.location} org={application.org} />
+          <CheckSection title="Company checks" run={company} location={application.location} org={application.org} person={application.name} />
         </details>
         <div className="mt-4">
           <RunAndReload
@@ -323,10 +323,12 @@ function CheckSection({
   run,
   location = "",
   org = "",
+  person = "",
 }: {
   title: string;
   location?: string;
   org?: string;
+  person?: string;
   run?: {
     status: string;
     finishedAt: Date | null;
@@ -343,7 +345,7 @@ function CheckSection({
             {run.status}
             {run.finishedAt ? ` · ${formatAuditTime(run.finishedAt)}` : ""}
           </p>
-          <CheckTable evidence={run.evidence} location={location} org={org} />
+          <CheckTable evidence={run.evidence} location={location} org={org} person={person} />
         </>
       ) : null}
     </section>
