@@ -172,6 +172,18 @@ A vendor is on the showcase only when the membership file is verified and a Priv
 5. `/admin/licences` is the queue. Mark a row verified, not found, or rejected. A verified row is due again 12 months later. The audit log records the decision. The number is on this admin page only.
 6. `/admin/showcase` approves or hides a listing, approves a project the member asked to show, and marks a credential checked. Approving a listing does not show the vendor to developers until the membership file is also verified.
 
+## Deal team
+
+This is on the `platform-p4` branch. Apply `npx prisma migrate deploy` on a local database only. Files for this test sit on local disk under `app/.deal-files`. `npm run db:cleanup-platform -- --delete` deletes TEST members, the deals they sponsor, the deal team rows, and those stored files. Private object storage is not connected. Set `DEAL_STORAGE=object` only to exercise the stub, which stores nothing and uses no cloud credentials. A host for expiring links on the test site is still an open choice.
+
+Equity raise amounts stay in the deal room. The public feed and the deal list show a size band instead of a dollar raise.
+
+1. As a sponsor, open a deal room. **Add to deal team** lists people you can already message. Send the request. The other member gets an in-app notice. No separate email is sent for that request.
+2. As that member, open the deal. Acknowledge the platform text. It is marked as still needing counsel review. Join the deal team. Documents stay closed until that acknowledgement is stored.
+3. In the room, add a folder and **Add document**. PDF, images, and Office files are allowed up to the cap on `/admin/settings` (25 MB until you change it). Download the file. The sponsor and an administrator see the access log with the member and the time.
+4. A sponsor may upload their own NDA as a document. The platform acknowledgement is still required. **Remove from deal team** ends access immediately. The audit log records the add and the removal.
+5. Open the public feed. A raising post shows the title, market, and asset. The dollar amount, if any, is on the deal room page for the team.
+
 ## Project filters
 
 Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.

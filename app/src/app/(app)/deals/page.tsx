@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/page-header";
 import { ProjectFilterBar } from "@/components/project-filters";
 import { chipOff, chipOn, dealCard } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { matchScore } from "@/lib/domain";
+import { matchScore, sizeLabel } from "@/lib/domain";
+import { publicRaiseLabel } from "@/lib/platform/deal-team";
 import { postIsPublic } from "@/lib/member-network";
 import { prisma } from "@/lib/prisma";
 import {
@@ -135,10 +136,10 @@ export default async function DealsPage({
                 </p>
                 <div className="mt-3 flex gap-3 border-t border-line pt-3 text-xs text-mut">
                   <span>
-                    <b className="text-forest">{deal.raiseLabel}</b>
+                    <b className="text-forest">{publicRaiseLabel({ kind: deal.kind, raiseLabel: deal.raiseLabel, sizeLabel: sizeLabel(deal.sizeBand) })}</b>
                   </span>
                   <span>
-                    <b className="text-forest">{deal.kind === "DEAL" ? deal.targetIrr || "—" : deal.deadline || "Open"}</b>
+                    <b className="text-forest">{deal.kind === "DEAL" ? "Terms in the room" : deal.deadline || "Open"}</b>
                   </span>
                   <span>
                     <b className="text-forest">{deal.market}</b>

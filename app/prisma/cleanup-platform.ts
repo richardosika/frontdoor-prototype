@@ -11,6 +11,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { BASELINE_CENSUS, PLATFORM_TEST_EMAIL_DOMAIN } from "../src/lib/platform/catalog";
+import { localDealStorage } from "../src/lib/storage/local-disk";
 
 const prisma = new PrismaClient();
 
@@ -44,7 +45,17 @@ async function main() {
   console.log(
     `Reference rows stay. Baseline after a full restore: members ${BASELINE_CENSUS.members}, applications ${BASELINE_CENSUS.applications}, CRM pending ${BASELINE_CENSUS.crmPending} / approved ${BASELINE_CENSUS.crmApproved}, outbox ${BASELINE_CENSUS.outbox}, verification ${BASELINE_CENSUS.verification}.`,
   );
+  const deals = ids.length ? await prisma.deal.findMany({ where: { sponsorId: { in: ids } }, select: { id: true } }) : [];
+  const files = deals.length
+    ? await prisma.dealDocument.findMany({ where: { dealId: { in: deals.map((deal) => deal.id) }, storageKey: { not: "" } }, select: { storageKey: true } })
+    : [];
+  console.log(`${remove ? "Deleting" : "Would delete"} ${deals.length} TEST deals and ${files.length} stored files.`);
   if (!remove || !ids.length) return;
+  const storage = localDealStorage();
+  for (const file of files) {
+    await storage.delete(file.storageKey);
+  }
+  if (deals.length) await prisma.deal.deleteMany({ where: { id: { in: deals.map((deal) => deal.id) } } });
   await prisma.outboxNotice.deleteMany({
     where: { intendedTo: { endsWith: `@${PLATFORM_TEST_EMAIL_DOMAIN}`, mode: "insensitive" } },
   });

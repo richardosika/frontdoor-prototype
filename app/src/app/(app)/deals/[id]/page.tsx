@@ -9,6 +9,8 @@ import { MobileTitle } from "@/components/page-header";
 import { btn, btnOutline, dealCard, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { sizeLabel } from "@/lib/domain";
+import { PLATFORM_NDA_NOTICE, publicRaiseLabel } from "@/lib/platform/deal-team";
+import { acceptDealTeam } from "@/actions/deal-team";
 import { plural } from "@/lib/format";
 import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
@@ -34,6 +36,7 @@ export default async function DealPage({
     include: {
       sponsor: { include: { projects: { include: { confirmations: true }, orderBy: { year: "desc" } } } },
       access: { include: { requester: true }, orderBy: { createdAt: "desc" } },
+      team: { where: { userId: user.id } },
     },
   });
   if (!deal) notFound();
@@ -61,11 +64,25 @@ export default async function DealPage({
           Sponsor: {deal.sponsor.name} <TierBadge tier={deal.sponsor.tier} />
         </Link>
         <div className="mt-4 grid grid-cols-3 overflow-hidden border border-brass-line">
-          <Cell label={deal.kind === "DEAL" ? "Raise" : "Size"} value={deal.raiseLabel} />
+          <Cell label="Size" value={publicRaiseLabel({ kind: deal.kind, raiseLabel: deal.raiseLabel, sizeLabel: sizeLabel(deal.sizeBand) })} />
           <Cell label="State" value={deal.market} />
           <Cell label={deal.kind === "SEEKING" ? "Needed" : "Asset"} value={deal.kind === "SEEKING" ? roleShort(roleLabel(deal.roleNeeded)) : deal.assetClass} />
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink">{deal.blurb}</p>
+        {deal.team[0]?.status === "REQUESTED" && deal.team[0].addedBySponsor ? (
+          <form action={acceptDealTeam} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
+            <input type="hidden" name="dealId" value={deal.id} />
+            <p className="font-semibold">Add to deal team</p>
+            <p className="mt-1 text-ink">{PLATFORM_NDA_NOTICE}</p>
+            <label className="mt-2 flex items-start gap-2">
+              <input type="checkbox" name="nda" className="mt-1" required />
+              <span>I acknowledge the platform deal-room text before I open documents.</span>
+            </label>
+            <button className={`${btn} mt-3`} type="submit">
+              Join the deal team
+            </button>
+          </form>
+        ) : null}
         {isSponsor || user.role === "DEVELOPER" ? (
           <Link
             href={vendorSearchHref({ role: deal.roleNeeded || "GENERAL_CONTRACTOR", state: deal.market, asset: deal.assetClass })}
@@ -106,7 +123,7 @@ export default async function DealPage({
             <p className="mb-2">The sponsor removed you from this room. You can request access again after acknowledging the current NDA.</p>
             <NdaCopy html={ndaHtml} />
             <button className={`${btn} mt-3`} type="submit">
-              Request access again
+              Request to join the deal team again
             </button>
           </form>
         ) : mine?.status === "PENDING" ? (
@@ -126,7 +143,7 @@ export default async function DealPage({
             ) : null}
             <NdaCopy html={ndaHtml} />
             <button className={`${btn} mt-3`} type="submit">
-              Request access
+              Request to join the deal team
             </button>
           </form>
         )}

@@ -1,4 +1,5 @@
 node_modules
+.deal-files
 .next
 .env
 .env.local

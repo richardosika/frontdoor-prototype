@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { requireAdmin, requireUser } from "@/lib/current-user";
 import { canRequestDealAccess } from "@/lib/domain";
 import { documentVersion, hashClientIp, readLegalMarkdown } from "@/lib/legal";
-import { documentListEntry } from "@/lib/member-network";
+import { accessStatusToTeam, teamRoleForMember } from "@/lib/platform/deal-team";
+import { fileAllowed, loadDocSettings, storeDealFile } from "@/actions/deal-team";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
@@ -64,6 +65,19 @@ export async function requestAccess(formData: FormData) {
       data: { dealId, requesterId: user.id, ...nda },
     });
   }
+  await prisma.dealTeamMember.upsert({
+    where: { dealId_userId: { dealId, userId: user.id } },
+    create: {
+      dealId,
+      userId: user.id,
+      status: "REQUESTED",
+      teamRole: teamRoleForMember(user.role),
+      ndaVersion,
+      ndaAckAt: new Date(),
+      ndaIpHash: nda.ndaIpHash,
+    },
+    update: { status: "REQUESTED", ndaVersion, ndaAckAt: new Date(), ndaIpHash: nda.ndaIpHash, removedAt: null },
+  });
 
   const sent = await deliverPortalMessage({
     from: user,
@@ -123,6 +137,24 @@ async function settleAccess(input: {
   await prisma.dealAccess.update({
     where: { id: access.id },
     data: { status: input.decision, reviewedAt: new Date() },
+  });
+  const teamStatus = accessStatusToTeam(input.decision);
+  await prisma.dealTeamMember.upsert({
+    where: { dealId_userId: { dealId: access.dealId, userId: access.requesterId } },
+    create: {
+      dealId: access.dealId,
+      userId: access.requesterId,
+      status: teamStatus,
+      ndaVersion: access.ndaVersion,
+      ndaAckAt: access.ndaAcknowledgedAt,
+      ndaIpHash: access.ndaIpHash,
+      addedAt: teamStatus === "ADDED" ? new Date() : null,
+    },
+    update: {
+      status: teamStatus,
+      addedAt: teamStatus === "ADDED" ? new Date() : undefined,
+      removedAt: teamStatus === "REMOVED" ? new Date() : null,
+    },
   });
 
   const decisionBody = input.onBehalfOfSponsor
@@ -191,23 +223,43 @@ export async function addDealDocument(formData: FormData) {
   if (!file || title.length < 2) {
     redirect(`${room}?error=${encodeURIComponent("Add a title and a PDF, JPG, or PNG.")}`);
   }
-  const checked = documentListEntry({ fileName: file.name, contentType: file.type || "application/octet-stream", sizeBytes: file.size });
-  if (!checked.ok) redirect(`${room}?error=${encodeURIComponent(checked.error)}`);
+  const settings = await loadDocSettings();
+  const checked = fileAllowed({ fileName: file.name, contentType: file.type || "application/octet-stream", sizeBytes: file.size }, settings);
+  if (!checked.ok) redirect(`${room}?error=${encodeURIComponent(checked.reason)}`);
   const deal = await requireRoom(dealId, user.id);
   if (!deal) redirect(`/deals/${dealId}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
+  const team = await prisma.dealTeamMember.findUnique({ where: { dealId_userId: { dealId, userId: user.id } } });
+  const sponsor = deal.sponsorId === user.id;
+  if (!sponsor && team?.status === "ADDED" && !team.ndaAckAt) {
+    redirect(`${room}?error=${encodeURIComponent("Acknowledge the platform NDA before the documents open.")}`);
+  }
 
-  await prisma.dealDocument.create({
+  const created = await prisma.dealDocument.create({
     data: {
       dealId,
       authorId: user.id,
       title,
       url: "",
-      note: note || "Name, type, and size only. The file itself is not stored on this host.",
+      note,
       fileName: file.name.slice(0, 180),
-      contentType: (file.type || "application/octet-stream").slice(0, 80),
+      contentType: (file.type || "application/octet-stream").slice(0, 120),
       sizeBytes: file.size,
+      folderId: String(formData.get("folderId") || "") || null,
+      sponsorOnly: formData.get("sponsorOnly") === "on" && sponsor,
     },
   });
+  try {
+    const stored = await storeDealFile({
+      dealId,
+      documentId: created.id,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      contentType: created.contentType,
+    });
+    await prisma.dealDocument.update({ where: { id: created.id }, data: { storageKey: stored.key, scanStatus: stored.scanStatus } });
+  } catch (error) {
+    await prisma.dealDocument.delete({ where: { id: created.id } });
+    redirect(`${room}?error=${encodeURIComponent(error instanceof Error ? error.message : "The file was not stored.")}`);
+  }
   await prisma.dealEvent.create({
     data: { dealId, actorId: user.id, summary: `${user.name} listed a document: ${title} (${file.name}, ${file.size} bytes).` },
   });
@@ -265,6 +317,7 @@ export async function removeParticipant(formData: FormData) {
   const access = await prisma.dealAccess.findUnique({ where: { dealId_requesterId: { dealId, requesterId } } });
   if (!access) redirect(`/deals/${dealId}/room`);
   await prisma.dealAccess.update({ where: { id: access.id }, data: { status: "REMOVED", reviewedAt: new Date() } });
+  await prisma.dealTeamMember.updateMany({ where: { dealId, userId: requesterId }, data: { status: "REMOVED", removedAt: new Date() } });
   await prisma.dealEvent.create({
     data: { dealId, actorId: user.id, summary: `${user.name} removed a participant from the room.` },
   });
