@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { approvalDialogLists, approvalDialogVerdict, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
-import { applicantDuesSentence, applyDuesSchedule, statusMembershipLine } from "@/lib/dues";
+import { applicantDuesSentence, applyDuesSchedule, monthlyDuesCents, paidDuesRows, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
 import { DUES_LOCALES } from "@/lib/dues";
@@ -267,6 +267,15 @@ describe("QA fixes that stay outside grading", () => {
     expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 0, waived: true })).toBeNull();
     expect(statusMembershipLine({ status: "APPROVED", monthlyCents: 0, waived: true })).toBeNull();
     expect(applyDuesSchedule()).not.toMatch(/free|no dues/i);
+    for (const role of ["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE", "LENDER"]) {
+      expect(monthlyDuesCents(role)).toBe(0);
+    }
+    expect(monthlyDuesCents("GENERAL_CONTRACTOR")).toBeGreaterThan(0);
+    expect(paidDuesRows().some((row) => row.amount === "Free" || /developers, investors/i.test(row.role))).toBe(false);
+    expect(paidDuesRows().some((row) => row.amount.includes("$149"))).toBe(true);
+    const wizard = readFileSync(path.join(ROOT, "components/apply-wizard.tsx"), "utf8");
+    expect(wizard).toContain('dues.cents > 0 ? "Nothing was charged. " : ""');
+    expect(wizard).toContain("showDues={dues.cents > 0}");
     expect(applicantDuesSentence(14_900, true)).toContain("Dues waived by an administrator.");
     expect(applicantDuesSentence(14_900, false)).not.toContain("Dues waived");
   });
