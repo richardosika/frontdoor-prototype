@@ -212,7 +212,9 @@ const SOURCE_LABEL = /^(YouTube|TikTok|Google News|News search|Facebook|Instagra
 export function displayedSentences(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
-  const prepared = trimmed.replace(/\bno match found\b(?!\.)/gi, "No match found.");
+  const prepared = trimmed
+    .replace(/\bno match found\b(?!\.)/gi, "No match found.")
+    .replace(/\b(Found|Not found): ([a-z])/g, (_, label: string, letter: string) => `${label}: ${letter.toUpperCase()}`);
   const sentences = capitalizeSentences(prepared).replace(/^([a-z])/, (letter) => letter.toUpperCase());
   return sentences.replace(/([A-Za-z][A-Za-z0-9 &'’-]*?): ([a-z])/g, (full, label: string, letter: string) => {
     if (label === "Searched" || SCORE_FIELD.test(label) || !SOURCE_LABEL.test(label)) return full;

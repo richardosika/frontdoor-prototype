@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { btn, btnOutline } from "@/components/ui";
-import { BEFORE_SUBMIT_INTRO, CONSENT_LEGAL_LINKS, CONSENT_SECTIONS, DUES_TABLE } from "@/lib/apply-consent";
+import { BEFORE_SUBMIT_INTRO, CONSENT_LEGAL_LINKS, CONSENT_SECTIONS } from "@/lib/apply-consent";
+import { paidDuesRows } from "@/lib/dues";
 import type { SignupConsentCopy } from "@/lib/legal";
 
 export function BeforeSubmit({
@@ -12,6 +13,7 @@ export function BeforeSubmit({
   onVerification,
   onBack,
   onContinue,
+  showDues = true,
 }: {
   consent: SignupConsentCopy;
   acceptTerms: boolean;
@@ -20,6 +22,7 @@ export function BeforeSubmit({
   onVerification: (value: boolean) => void;
   onBack: () => void;
   onContinue: () => void;
+  showDues?: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -28,12 +31,12 @@ export function BeforeSubmit({
         <p className="mt-2 text-sm leading-relaxed text-ink">{BEFORE_SUBMIT_INTRO}</p>
       </header>
       <div className="space-y-4">
-        {CONSENT_SECTIONS.map((section) => (
+        {CONSENT_SECTIONS.filter((section) => showDues || !section.dues).map((section) => (
           <section key={section.id} className="rounded border border-line bg-cream px-4 py-4 md:px-5 md:py-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{section.label}</p>
             <h2 className="mt-1 font-serif text-lg font-normal">{section.title}</h2>
-            {section.dues ? <DuesTable /> : <p className="mt-2 text-sm leading-relaxed text-ink">{section.body}</p>}
-            {section.dues ? <p className="mt-3 text-sm leading-relaxed text-ink">{section.body}</p> : null}
+            {section.dues ? (showDues ? <DuesTable /> : null) : <p className="mt-2 text-sm leading-relaxed text-ink">{section.body}</p>}
+            {section.dues && showDues ? <p className="mt-3 text-sm leading-relaxed text-ink">{section.body}</p> : null}
           </section>
         ))}
       </div>
@@ -86,7 +89,7 @@ function DuesTable() {
         </tr>
       </thead>
       <tbody>
-        {DUES_TABLE.map((row) => (
+        {paidDuesRows().map((row) => (
           <tr key={row.role} className="border-b border-line last:border-b-0">
             <th className="py-2.5 pr-3 font-normal text-ink" scope="row">
               {row.role}

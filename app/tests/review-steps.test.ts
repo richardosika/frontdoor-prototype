@@ -101,6 +101,12 @@ describe("guided review steps", () => {
     expect(news).toContain('Searched: "QA-TEST Mary Ann Request" "Mike Advisors Group".');
     expect(news).not.toContain("mike advisors");
     expect(displayedCheckFinding("Searched: https://example.com. domain does not resolve.")).toContain("Searched: https://example.com.");
+    expect(displayedCheckFinding("Found: a page on the company site company confirmed, person NOT confirmed.")).toContain(
+      "Found: A page on the company site",
+    );
+    expect(displayedCheckFinding("Found: nothing a free source could tie to this file.")).toContain(
+      "Found: Nothing a free source could tie to this file.",
+    );
     for (const platform of ["X", "Facebook", "YouTube", "Google News"]) {
       const line = displayedCheckFinding(`Searched: "qa person" "short" on ${platform}. no match found Name: no.`, {
         person: "QA-TEST Mary Ann",

@@ -110,6 +110,11 @@ export const DUES_TABLE: { role: string; amount: string }[] = [
   { role: "Developers, investors and LPs, family offices, and lenders", amount: "Free" },
 ];
 
+/** Paid rows for an applicant who has a price. A free role does not see a Free line. */
+export function paidDuesRows(): { role: string; amount: string }[] {
+  return DUES_TABLE.filter((row) => row.amount !== "Free");
+}
+
 export const DUES_SCHEDULE_SENTENCE = `${DUES_TABLE[0].role}: ${DUES_TABLE[0].amount}. ${DUES_TABLE[1].role}: ${DUES_TABLE[1].amount}. ${DUES_TABLE[2].role}: ${DUES_TABLE[2].amount}. ${DUES_FREE_LINE} ${DUES_BILLING_NOTE}`;
 
 /** Apply page schedule. Paid prices stay. It does not say a free role has no dues. */
