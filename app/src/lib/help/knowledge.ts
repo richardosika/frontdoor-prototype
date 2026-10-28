@@ -54,7 +54,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "deal-rooms",
     title: "Deal rooms",
-    body: "The member who created a deal room decides who may enter. You acknowledge the Deal Room NDA first. Private Floor stores the document version and the time, and stores document names rather than the file bytes. The owner can remove access. Deal-room materials are confidential.",
+    body: "Only members added to the deal team can open a deal room. You acknowledge the Deal Room NDA first. Private Floor stores the document version and the time, and stores document names rather than the file bytes. The owner can remove access. Deal-room materials are confidential.",
   },
   {
     slug: "decisions",

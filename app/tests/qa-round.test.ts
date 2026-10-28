@@ -365,7 +365,7 @@ describe("QA fixes that stay outside grading", () => {
     expect(letter).toContain("/request-status/abc");
     expect(letter).not.toContain("Invite code");
     expect(letter).not.toContain("/invite-status");
-    expect(reviewTemplateKey("invite_received")).toBe("Request received email");
+    expect(reviewTemplateKey("invite_received")).toBe("Request to join received");
     expect(reviewTemplateKey("welcome")).toBe("Welcome email");
 
     expect(statusMembershipLine({ status: "DECLINED", monthlyCents: 12_900, waived: false })).toBeNull();
@@ -449,7 +449,7 @@ describe("QA fixes that stay outside grading", () => {
     expect(givenNameFrom("", "QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
     expect(givenNameFrom("", "Alex Rivera")).toBe("Alex");
     expect(crmEventDisplay("email", "invite_received · Thank you for your request to join")).toEqual({
-      label: "Request received email",
+      label: "Request to join received",
       detail: "Thank you for your request to join",
     });
     const audit = strongApprovalAudit({

@@ -368,7 +368,7 @@ async function main() {
       code: "PF-HALE-3LEFT",
       maxUses: 3,
       uses: 0,
-      note: "Marcus Hale personal invites",
+      note: "Marcus Hale personal codes",
       createdById: "user_mh",
     },
   });

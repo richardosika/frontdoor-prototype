@@ -39,8 +39,8 @@ export function reviewNotice(text: string, role?: string | null): string {
 
 const NOTICE_LABELS: Record<string, string> = {
   info: "Information email",
-  invite_received: "Request received email",
-  request_received: "Request received email",
+  invite_received: "Request to join received",
+  request_received: "Request to join received",
   application_code: "Email code",
   application_thanks: "Application received email",
   welcome: "Welcome email",

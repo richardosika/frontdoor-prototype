@@ -20,7 +20,7 @@ Members introduce themselves inside the portal before a thread opens. The person
 
 ## Deal rooms
 
-The member who created a deal room decides who may enter. Before entering, a member acknowledges the Deal Room NDA. The acknowledgement stores the document version and the time. Documents in a deal room are described by their file name and type. Private Floor does not keep the file bytes. The owner can remove someone. Materials in a deal room are confidential.
+Only members added to the deal team can open a deal room. Before entering, a member acknowledges the Deal Room NDA. The acknowledgement stores the document version and the time. Documents in a deal room are described by their file name and type. Private Floor does not keep the file bytes. The owner can remove someone. Materials in a deal room are confidential.
 
 ## Dues
 

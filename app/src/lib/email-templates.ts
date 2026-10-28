@@ -47,7 +47,7 @@ Referral code, optional: {invite_code}${SIGN}`,
   },
   {
     key: "invite_received",
-    name: "Request received",
+    name: "Request to join received",
     subject: "Thank you for your request to join",
     body: `${REQUEST_RECEIVED_TEMPLATE}
 

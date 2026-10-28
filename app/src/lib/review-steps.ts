@@ -214,7 +214,12 @@ export function displayedSentences(text: string): string {
   if (!trimmed) return "";
   const prepared = trimmed
     .replace(/Searched: the website field on the application/g, "Searched: The website field on the application")
+    .replace(
+      /Found:\s*a page on the company site\s+company confirmed,\s*person NOT confirmed\.?/gi,
+      "Found: A page on the company site. Company confirmed; person NOT confirmed.",
+    )
     .replace(/\bno match found\b(?!\.)/gi, "No match found.")
+    .replace(/no match found([\s\S]*?)Company:\s*yes\b/gi, "No match found$1Company: no")
     .replace(/\b(Found|Not found): ([a-z])/g, (_, label: string, letter: string) => `${label}: ${letter.toUpperCase()}`);
   const sentences = capitalizeSentences(prepared).replace(/^([a-z])/, (letter) => letter.toUpperCase());
   return sentences.replace(/([A-Za-z][A-Za-z0-9 &'’-]*?): ([a-z])/g, (full, label: string, letter: string) => {

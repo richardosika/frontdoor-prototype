@@ -38,6 +38,11 @@ export async function ensureTemplates() {
     const existing = await prisma.emailTemplate.findUnique({ where: { key: def.key } });
     const nextBody = existing ? replacementTemplateBody(def.key, existing.body) : null;
     const subjectStale = Boolean(existing && staleTemplateSubject(def.key, existing.subject));
+    const nameStale = Boolean(existing && /\binvite/i.test(existing.name) && existing.name !== def.name);
+    if (existing && nameStale && !nextBody && !subjectStale) {
+      await prisma.emailTemplate.update({ where: { id: existing.id }, data: { name: def.name } });
+      continue;
+    }
     if (!existing || (!nextBody && !subjectStale)) continue;
     const latest = await prisma.emailTemplateVersion.findFirst({
       where: { templateId: existing.id },
@@ -46,6 +51,7 @@ export async function ensureTemplates() {
     await prisma.emailTemplate.update({
       where: { id: existing.id },
       data: {
+        ...(nameStale ? { name: def.name } : {}),
         subject: def.subject,
         body: nextBody ?? existing.body,
         versions: {

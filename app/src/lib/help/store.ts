@@ -34,6 +34,9 @@ export async function ensureHelpArticles() {
       if (article.slug === "signup" && /invite code|have an invite|apply with an invite/i.test(existing.body)) {
         next = article.body;
       }
+      if (article.slug === "deal-rooms" && /invite/i.test(existing.body)) {
+        next = article.body;
+      }
       if (next !== existing.body) {
         await prisma.helpArticle.update({ where: { id: existing.id }, data: { body: next } });
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { checkInvite, confirmApplicationCode, sendApplicationCode, submitApplication } from "@/actions/apply";
 import { AdminEntryLink } from "@/components/admin-mark";
@@ -42,6 +42,8 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const sendingCode = useRef(false);
   const [done, setDone] = useState(false);
   const [statusToken, setStatusToken] = useState("");
   const [code, setCode] = useState("");
@@ -73,6 +75,10 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   const [continueNote, setContinueNote] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptVerification, setAcceptVerification] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[0];
   const dues = duesForRole(role);
@@ -155,6 +161,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
   }
 
   async function sendCode() {
+    if (!hydrated || sendingCode.current || pending) return;
     if (detailIssues.length) {
       setShowAllIssues(true);
       setContinueNote(DETAILS_CONTINUE_MESSAGE);
@@ -162,17 +169,22 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
       if (first) focusDetail(first.id);
       return;
     }
+    sendingCode.current = true;
     setPending(true);
     setError("");
-    const result = await sendApplicationCode(email);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await sendApplicationCode(email);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setCodeSent(true);
+      setTestHint(result.testHint);
+      setVerifiedEmail("");
+    } finally {
+      sendingCode.current = false;
+      setPending(false);
     }
-    setCodeSent(true);
-    setTestHint(result.testHint);
-    setVerifiedEmail("");
   }
 
   async function confirmCode() {
@@ -446,7 +458,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                   <button
                     className={`${btnOutline} mt-3 w-full`}
                     type="button"
-                    disabled={pending || detailIssues.length > 0}
+                    disabled={!hydrated || pending || detailIssues.length > 0}
                     aria-describedby={detailIssues.length ? "apply-still-needed" : undefined}
                     onClick={sendCode}
                   >

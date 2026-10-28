@@ -104,9 +104,12 @@ describe("guided review steps", () => {
       "Searched: The website field on the application.",
     );
     expect(displayedCheckFinding("Searched: https://example.com. domain does not resolve.")).toContain("Searched: https://example.com.");
-    expect(displayedCheckFinding("Found: a page on the company site company confirmed, person NOT confirmed.")).toContain(
-      "Found: A page on the company site",
+    expect(displayedCheckFinding("Found: a page on the company site company confirmed, person NOT confirmed.")).toBe(
+      "Found: A page on the company site. Company confirmed; person NOT confirmed.",
     );
+    expect(
+      displayedCheckFinding("Searched: Walker on YouTube. no match found Name: no. Company: yes. City: no. Confidence: none."),
+    ).toContain("No match found. Name: no. Company: no.");
     expect(displayedCheckFinding("Found: nothing a free source could tie to this file.")).toContain(
       "Found: Nothing a free source could tie to this file.",
     );
