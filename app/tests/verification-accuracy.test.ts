@@ -8,8 +8,8 @@ import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
 import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, reportingOwnerLine, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, plaintiffSolicitation, queryCity, socialSearchQuery } from "@/lib/verify/news";
-import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, companyNearPerson, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, plaintiffSolicitation, queryCity, socialSearchQuery } from "@/lib/verify/news";
+import { assessNyRegistry, normalizeRegistryName, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
 import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
@@ -6799,5 +6799,122 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     const missed = assessStateRegistry(colorado!, "Hensel Phelps", { ok: true, status: 200, text: rows }, "https://not-hensel.example");
     expect(missed.status).toBe("INCONCLUSIVE");
     expect(missed.finding).toContain("No entity uses this exact name");
+  });
+
+  it("asks the registry for names that start with the firm", () => {
+    const colorado = socrataRegistryUrl(registryPortal("CO")!, "Hensel Phelps");
+    expect(colorado.toLowerCase()).toContain("like");
+    expect(colorado.toLowerCase()).toContain("hensel");
+    expect(colorado.toLowerCase()).toContain("phelps%");
+    expect(colorado).not.toContain(" in(");
+    const ny = nyRegistryQueryUrl("Eastdil Secured");
+    expect(ny.toLowerCase()).toContain("like");
+    expect(ny.toLowerCase()).toContain("eastdil");
+    const listed = assessNyRegistry("Eastdil Secured", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "EASTDIL SECURED, L.L.C." }]),
+    });
+    expect(listed.status).toBe("PASS");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("EASTDIL SECURED, L.L.C.");
+    const foundation = assessStateRegistry(
+      registryPortal("CO")!,
+      "Hensel Phelps",
+      { ok: true, status: 200, text: JSON.stringify([{ entityname: "HENSEL PHELPS FOUNDATION", entitystatus: "Good Standing" }]) },
+      "https://www.henselphelps.com",
+    );
+    expect(foundation.status).toBe("INCONCLUSIVE");
+    expect(foundation.corroborates).not.toBe(true);
+  });
+
+  it("awards a Canadian province only when an independent source tied the person", () => {
+    const address = row({
+      key: "address",
+      status: "INCONCLUSIVE",
+      finding: "Non-US address, not checked by the Census geocoder.",
+    });
+    const applicant = facts({ name: "Jay Hennick", applicantName: "Jay Hennick", org: "Colliers", location: "Toronto, ON" });
+    const alone = gradeChecks([address], applicant);
+    expect(alone.categories.find((category) => category.id === "completeness")?.reason).toContain("No independent source");
+    expect(alone.categories.find((category) => category.id === "completeness")?.reason).not.toContain("(2 of 2)");
+    const tied = gradeChecks(
+      [address, row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names Jay Hennick at Colliers." })],
+      applicant,
+    );
+    expect(tied.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
+  });
+
+  it("uses one own-site search when the company site blocks, and ignores a lookalike", async () => {
+    const applicant = facts({
+      name: "Jay Hennick",
+      applicantName: "Jay Hennick",
+      org: "Colliers",
+      website: "https://www.colliers.com",
+      location: "Toronto, ON",
+    });
+    const own = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("colliers.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.colliers.com/en/experts/jay-hennick">Jay Hennick of Colliers</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = own.find((check) => check.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.selfReported).toBe(true);
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.finding).toContain("Own-site page found by search");
+    expect(website?.url).toContain("colliers.com/en/experts");
+
+    const lookalike = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("colliers.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.colliers-group.com/jay">Jay Hennick of Colliers Group</a></li></ol>`,
+        };
+      }
+      return { ok: true, status: 200, text: "<html></html>" };
+    });
+    const missed = lookalike.find((check) => check.key === "website");
+    expect(missed?.status).not.toBe("PASS");
+    expect(missed?.url || "").not.toContain("colliers-group.com");
+    expect(missed?.corroborates).not.toBe(true);
+  });
+
+  it("credits a person headline only when the article names the company nearby", () => {
+    const near = `${"x".repeat(20)} Roy March leads Eastdil Secured in New York. ${"y".repeat(20)}`;
+    const far = `Roy March spoke at a conference. ${"z".repeat(400)} Eastdil Secured announced a deal.`;
+    expect(companyNearPerson(near, "Roy March", "Eastdil Secured")).toBe(true);
+    expect(companyNearPerson(far, "Roy March", "Eastdil Secured")).toBe(false);
+    expect(companyNearPerson(`Larry Silverstein built a tower. ${"q".repeat(400)} Toll Brothers sold homes.`, "Larry Silverstein", "Toll Brothers")).toBe(false);
+  });
+
+  it("does not search a common-word surname by itself", () => {
+    const queries = newsSearchQueries(facts({ name: "Roy March", applicantName: "Roy March", org: "Eastdil Secured", location: "New York, NY" }));
+    expect(queries.some((query) => query === `"March" "eastdil secured"` || query.startsWith(`"March"`))).toBe(false);
+    expect(queries.some((query) => query.includes("Roy March") && query.toLowerCase().includes("eastdil"))).toBe(true);
+  });
+
+  it("treats and and ampersand as the same company connector", () => {
+    expect(mentionsCompany("Holland and Knight LLP", "Holland & Knight")).toBe(true);
+    expect(mentionsCompany("Holland & Knight LLP", "Holland and Knight")).toBe(true);
+  });
+
+  it("counts a possessive surname in a company headline at low weight", () => {
+    const score = scorePublicText("Colliers extends CEO and major shareholder Hennick's contract", {
+      name: "Jay Hennick",
+      org: "Colliers",
+      location: "Toronto, ON",
+    });
+    expect(score.company).toBe(true);
+    expect(score.name).toBe(true);
+    expect(score.confidence).toBe("low");
   });
 });

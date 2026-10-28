@@ -76,11 +76,19 @@ export function scorePublicText(
   const currentName = name && !departure;
   const city = cityPhrase(facts.location).toLowerCase();
   const cityHit = city.length >= 4 && hay.includes(city);
+  const surname = surnameForSearch(facts.name);
+  const possessiveSurname = Boolean(
+    !currentName &&
+      company &&
+      surname &&
+      text.trim().length <= 240 &&
+      new RegExp(`(?<![A-Za-z])${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}['’]s\\b`, "i").test(text),
+  );
   let confidence: MatchConfidence = "none";
   if (currentName && company) confidence = "high";
   else if ((currentName && cityHit) || (company && cityHit)) confidence = "medium";
-  else if (currentName || company || suffixMismatch || alias) confidence = "low";
-  return { name: currentName, company, city: cityHit, confidence, suffixMismatch, departure, alias: alias || undefined };
+  else if (currentName || company || suffixMismatch || alias || possessiveSurname) confidence = "low";
+  return { name: currentName || possessiveSurname, company, city: cityHit, confidence, suffixMismatch, departure, alias: alias || undefined };
 }
 
 export function emptyScore(): MatchScore {
@@ -863,6 +871,54 @@ export function completeScreenRows(present: CheckOutput[]): CheckOutput[] {
   return [...present, ...dropped];
 }
 
+function onOwnRegistrable(href: string, website: string): boolean {
+  try {
+    const page = registrableHost(new URL(href).hostname);
+    const own = registrableHost(new URL(website).hostname);
+    return Boolean(page) && page === own;
+  } catch {
+    return false;
+  }
+}
+
+/** One site:domain search. A lookalike host does not count. No answer stays blocked. A clean miss is empty. */
+async function searchOwnSitePerson(
+  fetchText: FetchText,
+  website: string,
+  person: string,
+): Promise<{ kind: "hit"; url: string } | { kind: "empty" } | { kind: "down" }> {
+  let domain = "";
+  try {
+    domain = registrableHost(new URL(website).hostname);
+  } catch {
+    return { kind: "down" };
+  }
+  if (!domain) return { kind: "down" };
+  const parsed = parsePersonName(person);
+  const surname = parsed?.surname || "";
+  const given = formalGivenName(person) || parsed?.given[0] || "";
+  if (!given || !surname) return { kind: "down" };
+  const query = `site:${domain} "${given} ${surname}"`;
+  const targets = [`https://www.bing.com/search?q=${encodeURIComponent(query)}`, `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`];
+  let sawPage = false;
+  for (const url of targets) {
+    const response = await pull(fetchText, url);
+    if (response.status < 200 || response.status >= 300) continue;
+    sawPage = true;
+    const blocks = [
+      ...response.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi),
+      ...response.text.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi),
+    ];
+    for (const block of blocks) {
+      const html = block[0];
+      const href = unwrapResultUrl(html.match(/href\s*=\s*"([^"]+)"/i)?.[1] || "");
+      if (!onOwnRegistrable(href, website)) continue;
+      if (personHit(visible(html), person) === "match") return { kind: "hit", url: href };
+    }
+  }
+  return sawPage ? { kind: "empty" } : { kind: "down" };
+}
+
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
   const searchOrg = stripQaOrg(facts.org || "");
@@ -959,6 +1015,39 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           detail: "a page on the company site",
           selfReported: true,
         });
+      } else if (!renamed && blockedBySite) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search (the site blocked a direct fetch)",
+            selfReported: true,
+          });
+        } else if (found.kind === "empty") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: emptyScore(),
+            detail: "Own-site search returned no page naming this person.",
+            selfReported: true,
+          });
+        } else {
+          const detail =
+            home.status === 403
+              ? `blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
+              : home.status === 405
+                ? `blocked the check (405). blocked by site, ask applicant for a team-page URL${renamed}`
+                : `blocked by site, ask applicant for a team-page URL${renamed}`;
+          attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
+        }
       } else {
         const detail =
           home.status === 403
@@ -1073,6 +1162,45 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           redirectedTo,
           aliasOnly: true,
         });
+      } else if (best && !best.score.name) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else if (best.score.confidence !== "none" && !(best.score.alias && !best.score.company)) {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: best.url,
+            outcome: "found",
+            score: best.score,
+            detail: "a page on the company site",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: best.score,
+            detail: "the company site responded",
+            selfReported: true,
+            redirectedTo,
+          });
+        }
       } else if (best && best.score.confidence !== "none" && !(best.score.alias && !best.score.company)) {
         attempts.push({
           key: "website",
@@ -1085,6 +1213,33 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           selfReported: true,
           redirectedTo,
         });
+      } else if (!best?.score.name) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: best?.score || emptyScore(),
+            detail: "the company site responded",
+            selfReported: true,
+            redirectedTo,
+          });
+        }
       } else {
         attempts.push({
           key: "website",

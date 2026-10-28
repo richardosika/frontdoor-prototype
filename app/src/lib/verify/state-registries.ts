@@ -1,8 +1,8 @@
-import { normalizeRegistryName, registryNameLiterals } from "@/lib/verify/ny-registry";
+import { normalizeRegistryName, registryNamePrefix } from "@/lib/verify/ny-registry";
 import { domainBrand } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
-const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies"]);
+const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies", "co"]);
 
 /** "Hensel Phelps Construction Co." is Hensel Phelps plus an industry word, when the domain agrees. */
 function registryNameExtends(listed: string, org: string, website: string): boolean {
@@ -99,11 +99,11 @@ export function registryPortal(state: string): RegistryPortal | undefined {
 }
 
 export function socrataRegistryUrl(portal: RegistryPortal, org: string): string {
-  const names = registryNameLiterals(org).map((name) => `'${name.replace(/'/g, "''")}'`);
+  const stem = registryNamePrefix(org);
   const params = new URLSearchParams();
   params.set("$select", [portal.nameField, portal.statusField].filter(Boolean).join(","));
-  params.set("$limit", names.length ? "10" : "0");
-  if (names.length) params.set("$where", `upper(${portal.nameField}) in(${names.join(",")})`);
+  params.set("$limit", stem ? "25" : "0");
+  if (stem) params.set("$where", `upper(${portal.nameField}) like '${stem}%'`);
   return `${portal.dataset}?${params.toString()}`;
 }
 

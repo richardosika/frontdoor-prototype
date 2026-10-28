@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -212,7 +212,11 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
   const personQuery = personCompanyQuery(person, term);
   if (personQuery) queries.push(personQuery);
   else if (person || company) queries.push(`"${person || company}"`);
-  if (last && normalizeName(last) !== normalizeName(person)) {
+  const commonSurname = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
+  if (last && commonSurname.has(last.toLowerCase())) {
+    const token = distinctiveCompanyTokens(company).find((word) => isDistinctiveCompanyToken(word));
+    if (person && token) queries.push(`"${person}" "${token}"`);
+  } else if (last && normalizeName(last) !== normalizeName(person)) {
     const lastQuery = personCompanyQuery(last, term);
     if (lastQuery) queries.push(lastQuery);
   }
@@ -429,7 +433,45 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
     providers.push({ name: provider.name, state: provider.state });
     collected.push(...provider.items);
   }
-  return classifyNews(facts, collected, providers, now);
+  const enriched = await attachCompanyNearPerson(facts, collected, fetchText);
+  return classifyNews(facts, enriched, providers, now);
+}
+
+/** The company name sits within about 300 characters of the person's full name. */
+export function companyNearPerson(text: string, person: string, org: string, limit = 300): boolean {
+  const hit = personSpan(text, person);
+  if (!hit) return false;
+  const window = text.slice(Math.max(0, hit.index - limit), hit.index + hit.length + limit);
+  return mentionsCompany(window, org, person);
+}
+
+async function attachCompanyNearPerson(facts: ApplicantFacts, items: NewsItem[], fetchText: FetchText): Promise<NewsItem[]> {
+  const person = facts.applicantName.trim();
+  const org = stripQaOrg((facts.org || facts.name).trim());
+  if (!person || !org) return items;
+  const factsForJudge = { name: person, applicantName: person, org, location: facts.location, website: facts.website };
+  const targets = items.filter((item) => {
+    const judged = judgeHeadline(item.title, factsForJudge);
+    return judged.person && !judged.company && Boolean(item.url);
+  }).slice(0, 2);
+  if (!targets.length) return items;
+  const fetched = new Map<string, string>();
+  for (const item of targets) {
+    try {
+      const response = await fetchText(item.url);
+      if (response.ok && response.text && companyNearPerson(response.text, person, org)) fetched.set(item.url, response.text);
+    } catch {
+      // A failed article fetch leaves the headline inconclusive.
+    }
+  }
+  if (!fetched.size) return items;
+  return items.map((item) => {
+    const body = fetched.get(item.url);
+    if (!body) return item;
+    const hit = personSpan(body, person);
+    const window = hit ? body.slice(Math.max(0, hit.index - 300), hit.index + hit.length + 300) : "";
+    return window ? { ...item, snippet: `${item.snippet} ${window}`.replace(/\s+/g, " ").trim() } : item;
+  });
 }
 
 function newsSummary(

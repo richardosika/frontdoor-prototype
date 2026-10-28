@@ -733,6 +733,27 @@ export function mentionsPerson(text: string, name: string, org = ""): boolean {
   return personHit(text, name, org) === "match";
 }
 
+/** Where the full name, or a listed nickname plus the surname, sits in the text. */
+export function personSpan(text: string, person: string): { index: number; length: number } | null {
+  const parsed = parsePersonName(person);
+  if (!parsed?.given[0] || !parsed.surname) return null;
+  const givens = new Set<string>([parsed.given[0].toLowerCase()]);
+  const key = parsed.given[0].toLowerCase();
+  for (const nick of NICKNAMES[key] || []) givens.add(nick);
+  for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+    if (!nicks.includes(key)) continue;
+    givens.add(formal);
+    for (const nick of nicks) givens.add(nick);
+  }
+  const surname = parsed.surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const given of givens) {
+    const escaped = given.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const hit = new RegExp(`(?<![A-Za-z])${escaped}\\s+${surname}(?![A-Za-z])`, "i").exec(text);
+    if (hit?.index !== undefined) return { index: hit.index, length: hit[0].length };
+  }
+  return null;
+}
+
 /**
  * A Form 3, 4, or 5 display name. "Kelly William Matthew" is surname, first name, middle name.
  * The middle name may be the name the applicant goes by. This is not used on free text.
@@ -872,7 +893,9 @@ const PHRASE_GAP = `[\\s,.'’‘\u02BB:"&/+-]+`;
 
 /** "of" is part of Banc of California. It is not part of Ocean Bank. */
 function phraseGapFor(org: string): string {
-  const allow = ["of", "and", "the"].filter((word) => new RegExp(`\\b${word}\\b`, "i").test(org));
+  const folded = org.toLowerCase().replace(/&amp;/g, "&");
+  const allow = ["of", "the"].filter((word) => new RegExp(`\\b${word}\\b`, "i").test(folded));
+  if (/\band\b/i.test(folded) || /&/.test(folded)) allow.push("and|&(?:amp;)?");
   if (!allow.length) return PHRASE_GAP;
   return `(?:${PHRASE_GAP}(?:(?:${allow.join("|")})\\s+)?)`;
 }
