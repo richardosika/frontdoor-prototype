@@ -2445,7 +2445,9 @@ describe("batch 4 company search terms", () => {
   it("searches a firm word that is not the applicant's surname", async () => {
     expect(companySearchTerm("Tutor Perini Corporation", "Ronald Tutor")).toBe("perini");
     expect(companySearchTerm("Belkin Burden Goldman LLP", "Sherwin Belkin")).toBe("burden goldman");
-    expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("organization");
+    expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("durst organization");
+    expect(companySearchTerm("The Brodsky Organization", "Daniel Brodsky")).toBe("brodsky organization");
+    expect(companySearchTerm("LeFrak Organization", "Richard LeFrak")).toBe("lefrak organization");
     expect(companySearchTerm("Related Companies", "Stephen Ross")).toBe("related companies");
 
     const tutor = facts({
@@ -2468,11 +2470,16 @@ describe("batch 4 company search terms", () => {
     });
     expect(newsSearchQueries(tutor)[0]).toBe(`"Ronald Tutor" "perini"`);
     expect(newsSearchQueries(belkin)[0]).toBe(`"Sherwin Belkin" "burden goldman"`);
-    expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "organization"`);
+    expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "durst organization"`);
+    expect(newsSearchQueries(facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization", location: "New York, NY" }))[0]).toBe(
+      `"Daniel Brodsky" "brodsky organization"`,
+    );
+    expect(socialSearchQuery("Daniel Brodsky", "The Brodsky Organization")).toBe(`"Daniel Brodsky" "brodsky organization"`);
+    expect(socialSearchQuery("Richard LeFrak", "LeFrak Organization")).toBe(`"Richard LeFrak" "lefrak organization"`);
     expect(newsSearchQueries(facts({ name: "Stephen Ross", applicantName: "Stephen Ross", org: "Related Companies" }))[0]).toBe(
       `"Stephen Ross" "related companies"`,
     );
-    noRepeatedWord([...newsSearchQueries(tutor), ...newsSearchQueries(belkin), ...newsSearchQueries(durst)]);
+    noRepeatedWord([...newsSearchQueries(tutor), ...newsSearchQueries(belkin)]);
 
     const checks = await runPublicScreen(tutor, async () => ({ ok: false, status: 404, text: "" }));
     const youtube = checks.find((check) => check.key === "screen-youtube");
@@ -6116,5 +6123,66 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(displayedCheckFinding("No result found that names this person and this company. Name: no. Company: yes. City: no. Confidence: low.")).toContain(
       "Company: no",
     );
+  });
+
+  it("says one independent source tied the person, and names an EDGAR reporting-owner filing", () => {
+    const tied = gradeChecks(
+      [
+        row({
+          key: "screen-web",
+          status: "PASS",
+          corroborates: true,
+          finding: "A public web result names the person and the company. Name: yes. Company: yes. City: yes. Confidence: high.",
+          source: "Bing",
+          url: "https://www.bisnow.com/daniel-brodsky",
+        }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization", website: "https://www.brodsky.com" }),
+    );
+    expect(tied.summary.reasoning).toContain("One independent source tied this person to this company.");
+    expect(tied.summary.reasoning).toContain("Approval needs two.");
+    expect(tied.summary.reasoning).not.toContain("Nothing tied this person to that company");
+    const edgar = gradeChecks(
+      [
+        row({
+          key: "edgar",
+          status: "PASS",
+          corroborates: true,
+          finding: "EDGAR lists Brodsky Organization. A Form 3, 4, or 5 for this CIK names Brodsky Daniel as a reporting owner.",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(edgar.summary.company).toContain("reporting-owner filing (Form 3, 4, or 5)");
+    expect(edgar.summary.checkedOut).toContain("reporting-owner filing (Form 3, 4, or 5)");
+    const samePoints = gradeChecks(
+      [row({ key: "edgar", status: "PASS", corroborates: true, finding: "EDGAR lists the company.", source: "SEC EDGAR" })],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(edgar.score).toBe(samePoints.score);
+
+    const missed = gradeChecks(
+      [
+        row({
+          key: "screen-web",
+          status: "UNAVAILABLE",
+          finding: "Tried DuckDuckGo (timed out), Bing (timed out). Not checked. Not a pass.",
+          source: "Web search",
+        }),
+        row({
+          key: "web-footprint",
+          status: "UNAVAILABLE",
+          finding: "Tried DuckDuckGo (timed out), Bing (timed out). Not checked. Not a pass.",
+          source: "Web search",
+        }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company.", source: "News" }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(missed.summary.company.toLowerCase()).toContain("unavailable");
+    expect(missed.summary.company).not.toContain("did not return a page");
+    expect(missed.categories.find((category) => category.id === "footprint")?.reason.toLowerCase()).toContain("unavailable");
+    expect(missed.categories.find((category) => category.id === "footprint")?.reason).not.toContain("did not return a page");
   });
 });

@@ -469,7 +469,7 @@ function webSearchLine(checks: CheckOutput[]): "independent" | "own-site" | "blo
     return "independent";
   }
   if (ownSite) return "own-site";
-  if (webSearchCouldNotBeChecked(checks)) return "blocked";
+  if (screen?.status === "UNAVAILABLE" || footprint?.status === "UNAVAILABLE" || webSearchCouldNotBeChecked(checks)) return "blocked";
   return "none";
 }
 
@@ -512,7 +512,9 @@ function passSentence(check: CheckOutput): string | null {
       return `A public web page included the person or the company name (${source}).`;
     case "edgar":
     case "fixture-edgar":
-      return `SEC EDGAR returned a hit for the company name (${source}). Someone still needs to confirm it is the same firm.`;
+      return /reporting owner|Form 3, 4, or 5/i.test(check.finding)
+        ? `SEC EDGAR returned a hit for the company, including a reporting-owner filing (Form 3, 4, or 5) (${source}).`
+        : `SEC EDGAR returned a hit for the company name (${source}). Someone still needs to confirm it is the same firm.`;
     case "rdap":
       return `A domain registration record responded (${source}). That is a weak signal, not proof of who the person is.`;
     case "business-card":
@@ -799,7 +801,11 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   }
   const edgar = findCheck(checks, "edgar") || findCheck(checks, "fixture-edgar");
   if (edgar?.status === "PASS") {
-    evidence.push(`SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`);
+    evidence.push(
+      /reporting owner|Form 3, 4, or 5/i.test(edgar.finding)
+        ? `SEC EDGAR returned a hit for the company, including a reporting-owner filing (Form 3, 4, or 5) (${edgar.source}).`
+        : `SEC EDGAR returned a hit for the company name (${edgar.source}). Confirm it is the same firm before you rely on it.`,
+    );
   } else if (edgar && /former name/i.test(edgar.finding)) {
     evidence.push(edgar.finding);
   } else if (edgar && /parent match, needs review|different or related company/i.test(edgar.finding)) {
@@ -819,7 +825,7 @@ function companySection(checks: CheckOutput[], facts: GradeFacts): string {
   } else if (webLine === "own-site") {
     evidence.push(OWN_SITE_WEB);
   } else if (webLine === "blocked") {
-    evidence.push("Could not check, search blocked.");
+    evidence.push("Public web search was unavailable.");
   } else if (namedElsewhere) {
     evidence.push(`The public web search did not return a page naming both; ${namedElsewhere} did.`);
   } else {
@@ -934,7 +940,7 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
 function footprintAward(row: CheckOutput | undefined, earned: boolean, possible: number, mode: GradeWeightsMode, aside = ""): Line {
   if (!earned && row?.status === "UNAVAILABLE") {
     const blocked = /challenge page|search blocked/i.test(row.finding || "");
-    return unavailableLine(possible, blocked ? "Could not check, search blocked" : "Web search is not checkable for free", mode);
+    return unavailableLine(possible, blocked ? "Could not check, search blocked" : "Public web search was unavailable", mode);
   }
   if (!earned && aside) return portionLine(0, possible, aside);
   return award(earned, possible, "A public web result names the person and the company", "No public web result confirmed the person and the company");
@@ -1095,11 +1101,13 @@ export function gradeChecks(
   const newsFootprint = passed(newsRow) || (newsRow?.status === "INCONCLUSIVE" && neutralScreenNewsPass(checks));
   const webLine = webSearchLine(checks);
   const footprintAside = !webPass
-    ? webLine === "own-site"
-      ? "The only web search hit was the applicant's own site. That is not an independent confirmation"
-      : otherSourceNamedBoth(checks, facts)
-        ? `The public web search did not return a page naming both; ${otherSourceNamedBoth(checks, facts)} did`
-        : ""
+    ? webLine === "blocked"
+      ? "Public web search was unavailable"
+      : webLine === "own-site"
+        ? "The only web search hit was the applicant's own site. That is not an independent confirmation"
+        : otherSourceNamedBoth(checks, facts)
+          ? `The public web search did not return a page naming both; ${otherSourceNamedBoth(checks, facts)} did`
+          : ""
     : "";
   const footprint = sumLines([
     footprintAward(footprintRow, webPass, weights.footprint["web-footprint"], weightsMode, footprintAside),
@@ -1264,25 +1272,22 @@ export function gradeChecks(
   }
   const bothNamed = corroboratingPasses(checks).some((check) => namesPersonAndCompany(check, facts));
   const companyConfirmed = outsideSourceConfirmsCompany(checks);
-  if (!bothNamed) {
+  if (independentCount === 1) {
+    pushAttention({
+      severity: "Medium",
+      title: "Only one independent source",
+      detail: "One independent source tied this person to this company. Approval needs two. The applicant's own site and a self-reported card do not count. This is not an approval.",
+    });
+  } else if (!bothNamed) {
     const selfReported = checks.some((check) => check.status === "PASS" && check.selfReported);
-    const weakHit = independentCount > 0;
     pushAttention({
       severity: "Medium",
       title: "Thin public record",
       detail: companyConfirmed
         ? "Company confirmed, person not confirmed. Request more info. A free source confirmed the company. Nothing tied this person to that company. This is not a rejection and not an approval. Ask for a team-page URL."
-        : weakHit
-          ? "Request more info. An independent hit is on the file, and it does not name both this person and this company. Ask for a team-page URL."
-          : selfReported
-            ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
-            : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
-    });
-  } else if (independentCount < 2) {
-    pushAttention({
-      severity: "Medium",
-      title: "Only one independent source",
-      detail: "Only one independent source tied this person to this company. The applicant's own site and a self-reported card do not count. The grade cannot go above a C, and this is not an approval.",
+        : selfReported
+          ? "Request more info. The applicant's own website or card is one self-reported source. No independent source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean."
+          : "Request more info. No free source tied this person to this company. Ask for a team-page URL. The grade stays below a C, and a thin file should not be read as clean.",
     });
   }
   for (const check of checks) {
@@ -1391,6 +1396,7 @@ export function gradeChecks(
     hard: hardChecks.length > 0,
     review: reviewRed.length > 0,
     companyConfirmed: companyConfirmed && !bothNamed,
+    independentCount,
   }));
   let nextStep = capitalizeSentences(nextStepFor({ recommendation, checks, facts, paying }));
   const incompleteRequest =
@@ -1453,6 +1459,7 @@ function reasoningFor(input: {
   hard: boolean;
   review: boolean;
   companyConfirmed?: boolean;
+  independentCount?: number;
 }): string {
   const grade = `The grade is ${input.letter} (${input.score} of 100) and confidence is ${input.confidence}.`;
   if (input.recommendation === "DECLINE") {
@@ -1460,6 +1467,11 @@ function reasoningFor(input: {
   }
   if (input.review && !input.companyConfirmed) {
     return `${grade} Something on the file might be this person, and it might be someone else. I recommend you get more information before you approve. I am not treating that hit as fact.`;
+  }
+  const tied = input.independentCount || 0;
+  if (input.recommendation === "NEEDS MORE INFO" && tied > 0) {
+    const sources = tied === 1 ? "One independent source" : `${tied} independent sources`;
+    return `${grade} ${sources} tied this person to this company. Approval needs two. This is not a rejection and not an approval.`;
   }
   if (input.recommendation === "NEEDS MORE INFO" && input.companyConfirmed) {
     return `${grade} Company confirmed, person not confirmed. Request more info. The company showed up on a free source. Nothing tied this person to that company. This is not a rejection and not an approval.`;

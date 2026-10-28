@@ -1579,7 +1579,18 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         score: emptyScore(),
         detail: "The only web search hit was the applicant's own site.",
       });
-    } else if (alreadyCredited) {
+    } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
+      const web = attempts.find((item) => item.key === "screen-web");
+      attempts.push(
+        blockedAttempt(
+          "web-footprint",
+          "Web search",
+          searched,
+          ddgUrl,
+          web?.detail || "Public web search was unavailable. Not checked. Not a pass.",
+        ),
+      );
+    } else if (alreadyCredited && alreadyCredited.key !== "screen-youtube" && alreadyCredited.key !== "screen-tiktok") {
       attempts.push({
         key: "web-footprint",
         platform: "Web search",
@@ -1589,17 +1600,6 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         score: emptyScore(),
         detail: `same source as ${alreadyCredited.key}`,
       });
-    } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
-      const web = attempts.find((item) => item.key === "screen-web");
-      attempts.push(
-        blockedAttempt(
-          "web-footprint",
-          "Web search",
-          searched,
-          ddgUrl,
-          web?.detail || "Public web search is not checkable for free.",
-        ),
-      );
     } else {
       attempts.push({
         key: "web-footprint",

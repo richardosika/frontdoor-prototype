@@ -238,6 +238,31 @@ export function isStandaloneGenericQueryToken(token: string): boolean {
   return STANDALONE_QUERY_GENERIC.has(token);
 }
 
+/**
+ * Generic leftovers for the search query only. Matching still uses GENERIC.
+ * "organization" is not a brand by itself, so "Brodsky Organization" must not search as "organization".
+ */
+const SEARCH_TERM_GENERIC = new Set([
+  "organization",
+  "group",
+  "company",
+  "companies",
+  "holdings",
+  "partners",
+  "properties",
+  "realty",
+  "development",
+  "management",
+  "associates",
+  "enterprises",
+  "services",
+  "service",
+]);
+
+export function isSearchTermGeneric(token: string): boolean {
+  return SEARCH_TERM_GENERIC.has(token) || isStandaloneGenericQueryToken(token) || isGenericFirmToken(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -263,8 +288,8 @@ export function companySearchTerm(org: string, person = ""): string {
   const shortAt = phrase.findIndex((token) => isShortBrandToken(token) && !names.has(token));
   if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
-  const distinctive = brand.filter((token) => !names.has(token) && !isStandaloneGenericQueryToken(token));
-  // "building" alone is not Gilbane Building Company. Quote the whole name, including a short token.
+  const distinctive = brand.filter((token) => !names.has(token) && !isSearchTermGeneric(token));
+  // A surname plus only a generic word, such as "Brodsky Organization", stays the whole brand.
   if (distinctive.length) return distinctive.join(" ");
   return phrase.join(" ");
 }

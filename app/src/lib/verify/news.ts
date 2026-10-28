@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -163,7 +163,7 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   });
   const distinctive = kept.filter((word) => {
     const token = bareToken(word);
-    return isDistinctiveCompanyToken(token) && !isStandaloneGenericQueryToken(token);
+    return isDistinctiveCompanyToken(token) && !isSearchTermGeneric(token);
   });
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
   // "building" alone is not the firm. Keep the whole name, including a short token and the surname.
