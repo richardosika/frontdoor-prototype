@@ -58,11 +58,9 @@ export function offerLabel(monthlyCents: number): string {
 
 export const DUES_WAIVED = "Dues waived by an administrator.";
 
-export const FREE_MEMBERSHIP_LINE = "Free membership. No dues.";
-
 /**
- * Applicant status page. Declined shows no money. A paid membership shows that it is active
- * and, when known, the next charge date. Everyone else sees the offer.
+ * Applicant status page. Declined shows no money. A free role shows no cost line.
+ * A paid membership shows that it is active and, when known, the next charge date.
  */
 export function statusMembershipLine(input: {
   status: string;
@@ -76,17 +74,17 @@ export function statusMembershipLine(input: {
     const when = input.paymentStatus === "PAID" && input.renewalLabel ? ` Next charge date ${input.renewalLabel}.` : "";
     return `This membership is active.${when}`;
   }
+  if (input.monthlyCents <= 0) return null;
   if (input.status === "APPROVED" || input.status === "PAYMENT_DUE") {
-    if (input.monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
     if (input.waived) return `${offerLabel(input.monthlyCents)}. ${DUES_WAIVED}`;
     return `${offerLabel(input.monthlyCents)}. ${DUES_DUE_NOW_NOTE}`;
   }
   return applicantDuesSentence(input.monthlyCents, input.waived);
 }
 
-/** Status-page dues line. A free role does not also say an administrator waived dues. */
+/** Status-page dues line. A free role does not get a cost sentence. */
 export function applicantDuesSentence(monthlyCents: number, waived: boolean): string {
-  if (monthlyCents <= 0) return FREE_MEMBERSHIP_LINE;
+  if (monthlyCents <= 0) return "";
   const offer = `${offerLabel(monthlyCents)}. ${DUES_BILLING_NOTE}`;
   return waived ? `${offer} ${DUES_WAIVED}` : offer;
 }
@@ -113,6 +111,11 @@ export const DUES_TABLE: { role: string; amount: string }[] = [
 ];
 
 export const DUES_SCHEDULE_SENTENCE = `${DUES_TABLE[0].role}: ${DUES_TABLE[0].amount}. ${DUES_TABLE[1].role}: ${DUES_TABLE[1].amount}. ${DUES_TABLE[2].role}: ${DUES_TABLE[2].amount}. ${DUES_FREE_LINE} ${DUES_BILLING_NOTE}`;
+
+/** Apply page schedule. Paid prices stay. It does not say a free role has no dues. */
+export function applyDuesSchedule(): string {
+  return `${DUES_TABLE[0].role}: ${DUES_TABLE[0].amount}. ${DUES_TABLE[1].role}: ${DUES_TABLE[1].amount}. ${DUES_TABLE[2].role}: ${DUES_TABLE[2].amount}. ${DUES_BILLING_NOTE}`;
+}
 
 export type DuesLocale = "en" | "es" | "de" | "ja";
 

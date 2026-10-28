@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applicationStatusLabel } from "@/lib/application-status";
 import { approvalDialogLists, approvalDialogVerdict, approvalItemLists, needsStrongApprovalWarning, strongApprovalWarning, unverifiedApprovalItems } from "@/lib/approval-warning";
-import { applicantDuesSentence, FREE_MEMBERSHIP_LINE, statusMembershipLine } from "@/lib/dues";
+import { applicantDuesSentence, applyDuesSchedule, statusMembershipLine } from "@/lib/dues";
 import { publicEvidenceHref } from "@/lib/evidence-link";
 import { inviteRequestAddress } from "@/lib/invite-request";
 import { DUES_LOCALES } from "@/lib/dues";
@@ -259,12 +259,14 @@ describe("QA fixes that stay outside grading", () => {
     expect(current).not.toContain("Verification in progress");
   });
 
-  it("uses one status label and a free-membership sentence", () => {
+  it("uses one status label and skips a free-role cost line", () => {
     expect(applicationStatusLabel("SUBMITTED")).toBe("In review");
     expect(applicationStatusLabel("PENDING")).toBe("In review");
     expect(applicationStatusLabel("IN_REVIEW")).toBe("In review");
-    expect(applicantDuesSentence(0, true)).toBe(FREE_MEMBERSHIP_LINE);
-    expect(applicantDuesSentence(0, true)).toBe("Free membership. No dues.");
+    expect(applicantDuesSentence(0, true)).toBe("");
+    expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 0, waived: true })).toBeNull();
+    expect(statusMembershipLine({ status: "APPROVED", monthlyCents: 0, waived: true })).toBeNull();
+    expect(applyDuesSchedule()).not.toMatch(/free|no dues/i);
     expect(applicantDuesSentence(14_900, true)).toContain("Dues waived by an administrator.");
     expect(applicantDuesSentence(14_900, false)).not.toContain("Dues waived");
   });
@@ -401,6 +403,11 @@ describe("QA fixes that stay outside grading", () => {
     const requestStatus = readFileSync(path.join(ROOT, "app/request-status/view/[token]/page.tsx"), "utf8");
     expect(applyStatus).toContain("statusMembershipLine");
     expect(applyStatus).not.toContain("applicantDuesSentence");
+    expect(applyStatus).not.toContain("Free membership. No dues.");
+    const applyWizard = readFileSync(path.join(ROOT, "components/apply-wizard.tsx"), "utf8");
+    expect(applyWizard).not.toContain("Free membership. No dues.");
+    expect(applyWizard).not.toContain("Nothing is charged");
+    expect(applyWizard).not.toContain("No monthly dues");
     expect(requestStatus).not.toContain("statusMembershipLine");
     expect(requestStatus).toContain("requestReceivedMessage");
     expect(requestStatus).not.toContain("Application received");

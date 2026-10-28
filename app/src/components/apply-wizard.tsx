@@ -12,7 +12,7 @@ import { applicationReceivedMessage, APPLY_ENCOURAGEMENT } from "@/lib/applicant
 import { BRAND } from "@/lib/brand";
 import { MEMBERSHIP_PHRASE } from "@/lib/membership-copy";
 import { DuesLanguages } from "@/components/dues-languages";
-import { DUES_BILLING_NOTE, DUES_FREE_LINE, DUES_SCHEDULE_SENTENCE, duesForRole, formatMoney } from "@/lib/dues";
+import { applyDuesSchedule, DUES_BILLING_NOTE, duesForRole, formatMoney } from "@/lib/dues";
 import { publicStatusPath } from "@/lib/public-status";
 import { GROUPS, ROLES } from "@/lib/roles";
 import type { RoleId } from "@/lib/roles";
@@ -313,7 +313,7 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             </StepIntro>
             <div className="mb-4 rounded border border-line bg-cream px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership dues</p>
-              <p className="mt-2 text-sm leading-relaxed text-ink">{DUES_SCHEDULE_SENTENCE}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink">{applyDuesSchedule()}</p>
             </div>
             <div className="mt-3 max-h-[420px] overflow-y-auto pr-1">
               {GROUPS.map((group) => (
@@ -336,9 +336,11 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
                       <span>
                         {item.label}
                         <small className="block text-[11px] text-mut">{item.blurb}</small>
-                        <small className="mt-0.5 block text-[11px] font-semibold tracking-wide text-brass">
-                          {duesForRole(item.id).label}
-                        </small>
+                        {duesForRole(item.id).cents > 0 ? (
+                          <small className="mt-0.5 block text-[11px] font-semibold tracking-wide text-brass">
+                            {duesForRole(item.id).label}
+                          </small>
+                        ) : null}
                       </span>
                     </button>
                   ))}
@@ -500,23 +502,17 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
             <StepIntro title="Membership dues">
               <p>{selected.label}</p>
             </StepIntro>
-            <div className="rounded border border-brass bg-brass-soft p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Membership dues</p>
-              {dues.cents > 0 ? (
-                <>
-                  <p className="mt-1 font-serif text-3xl">{formatMoney(dues.firstCents)}</p>
-                  <p className="mt-2 text-sm text-ink">First month, 50% off. Then {formatMoney(dues.cents)} per month.</p>
-                </>
-              ) : (
-                <p className="mt-1 font-serif text-3xl">{dues.label}</p>
-              )}
-              <p className="mt-2 text-sm leading-relaxed text-ink">
-                {dues.cents > 0
-                  ? `${DUES_BILLING_NOTE} No card is collected on this form. The next charge is one month after the first month is recorded. A reminder goes out before that full-price charge.`
-                  : `${DUES_FREE_LINE} Approval opens the floor. Nothing is charged.`}
-              </p>
-              {dues.cents > 0 ? <DuesLanguages /> : null}
-            </div>
+            {dues.cents > 0 ? (
+              <div className="rounded border border-brass bg-brass-soft p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">Membership dues</p>
+                <p className="mt-1 font-serif text-3xl">{formatMoney(dues.firstCents)}</p>
+                <p className="mt-2 text-sm text-ink">First month, 50% off. Then {formatMoney(dues.cents)} per month.</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink">
+                  {DUES_BILLING_NOTE} No card is collected on this form. The next charge is one month after the first month is recorded. A reminder goes out before that full-price charge.
+                </p>
+                <DuesLanguages />
+              </div>
+            ) : null}
             <section className="mt-5 rounded border border-brass bg-paper px-4 py-5">
               <h2 className="font-serif text-xl font-normal">Your agreement</h2>
               <AgreementBoxes
