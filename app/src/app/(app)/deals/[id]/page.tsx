@@ -14,6 +14,7 @@ import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
+import { findVendorLabel, vendorSearchHref } from "@/lib/platform/showcase";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,14 @@ export default async function DealPage({
           <Cell label={deal.kind === "SEEKING" ? "Needed" : "Asset"} value={deal.kind === "SEEKING" ? roleShort(roleLabel(deal.roleNeeded)) : deal.assetClass} />
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink">{deal.blurb}</p>
+        {isSponsor || user.role === "DEVELOPER" ? (
+          <Link
+            href={vendorSearchHref({ role: deal.roleNeeded || "GENERAL_CONTRACTOR", state: deal.market, asset: deal.assetClass })}
+            className={`${btnOutline} mt-4`}
+          >
+            {findVendorLabel(deal.roleNeeded)}
+          </Link>
+        ) : null}
         <p className="mt-2 text-xs text-mut">
           This page is a member note. {BRAND.name} does not offer securities, accept subscriptions, or process payments.
         </p>

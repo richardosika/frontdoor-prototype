@@ -17,6 +17,14 @@ export type PlatformTestMember = {
   specialtySlug?: string;
   checkSize: string;
   bio: string;
+  vendor?: {
+    listed: boolean;
+    verified: boolean;
+    headline: string;
+    availability: "OPEN" | "SELECTIVE" | "BOOKED";
+    licenceStatus: "SELF_REPORTED" | "VERIFIED";
+    licenceKind: "CONTRACTOR" | "BAR_ADMISSION" | "BROKER" | "FACILITY_OPERATOR";
+  };
 };
 
 /** QA members for the directory. Names and companies start with TEST so cleanup can remove them. */
@@ -37,6 +45,14 @@ export const PLATFORM_TEST_MEMBERS: PlatformTestMember[] = [
     specialtySlug: "storage-builder",
     checkSize: "1-5",
     bio: "TEST member. Storage builder based in Phoenix.",
+    vendor: {
+      listed: false,
+      verified: false,
+      headline: "TEST storage builder in Phoenix",
+      availability: "OPEN",
+      licenceStatus: "SELF_REPORTED",
+      licenceKind: "CONTRACTOR",
+    },
   },
   {
     email: `dev.austin@${PLATFORM_TEST_EMAIL_DOMAIN}`,
@@ -102,6 +118,113 @@ export const PLATFORM_TEST_MEMBERS: PlatformTestMember[] = [
     specialtySlug: "senior-living-operator",
     checkSize: "1-5",
     bio: "TEST member. Senior-living operator. Listed by the member until a file is checked.",
+    vendor: {
+      listed: true,
+      verified: true,
+      headline: "TEST senior-living operator in Phoenix",
+      availability: "SELECTIVE",
+      licenceStatus: "SELF_REPORTED",
+      licenceKind: "FACILITY_OPERATOR",
+    },
+  },
+  {
+    email: `gc.dallas@${PLATFORM_TEST_EMAIL_DOMAIN}`,
+    name: "TEST Platform Dallas GC",
+    initials: "TG",
+    role: "GENERAL_CONTRACTOR",
+    org: "TEST Platform Dallas Build",
+    location: "Dallas, TX",
+    homeCity: "Dallas",
+    homeState: "TX",
+    homeMetro: "19100",
+    operateStates: ["TX"],
+    nationwide: false,
+    assetSlug: "multifamily",
+    specialtySlug: "multifamily-gc",
+    checkSize: "5+",
+    bio: "TEST member. General contractor based in Dallas.",
+    vendor: {
+      listed: true,
+      verified: true,
+      headline: "TEST multifamily builder in Dallas",
+      availability: "OPEN",
+      licenceStatus: "VERIFIED",
+      licenceKind: "CONTRACTOR",
+    },
+  },
+  {
+    email: `attorney.austin@${PLATFORM_TEST_EMAIL_DOMAIN}`,
+    name: "TEST Platform Austin Attorney",
+    initials: "TT",
+    role: "RE_ATTORNEY",
+    org: "TEST Platform Austin Law",
+    location: "Austin, TX",
+    homeCity: "Austin",
+    homeState: "TX",
+    homeMetro: "12420",
+    operateStates: ["TX"],
+    nationwide: false,
+    assetSlug: "hospitality",
+    specialtySlug: "hospitality-attorney",
+    checkSize: "1-5",
+    bio: "TEST member. Attorney based in Austin.",
+    vendor: {
+      listed: true,
+      verified: true,
+      headline: "TEST hospitality attorney in Austin",
+      availability: "OPEN",
+      licenceStatus: "VERIFIED",
+      licenceKind: "BAR_ADMISSION",
+    },
+  },
+  {
+    email: `gc.chicago@${PLATFORM_TEST_EMAIL_DOMAIN}`,
+    name: "TEST Platform Chicago GC",
+    initials: "TC",
+    role: "GENERAL_CONTRACTOR",
+    org: "TEST Platform Chicago Build",
+    location: "Chicago, IL",
+    homeCity: "Chicago",
+    homeState: "IL",
+    homeMetro: "16980",
+    operateStates: [],
+    nationwide: false,
+    assetSlug: "industrial",
+    checkSize: "5+",
+    bio: "TEST member. General contractor based in Chicago. Showcase waiting for review.",
+    vendor: {
+      listed: false,
+      verified: true,
+      headline: "TEST industrial builder in Chicago",
+      availability: "BOOKED",
+      licenceStatus: "SELF_REPORTED",
+      licenceKind: "CONTRACTOR",
+    },
+  },
+  {
+    email: `broker.miami@${PLATFORM_TEST_EMAIL_DOMAIN}`,
+    name: "TEST Platform Miami Broker",
+    initials: "TM",
+    role: "BROKER",
+    org: "TEST Platform Miami Brokerage",
+    location: "Miami, FL",
+    homeCity: "Miami",
+    homeState: "FL",
+    homeMetro: "33100",
+    operateStates: ["FL"],
+    nationwide: false,
+    assetSlug: "self-storage",
+    specialtySlug: "storage-broker",
+    checkSize: "1-5",
+    bio: "TEST member. Broker based in Miami.",
+    vendor: {
+      listed: true,
+      verified: true,
+      headline: "TEST storage broker in Miami",
+      availability: "OPEN",
+      licenceStatus: "VERIFIED",
+      licenceKind: "BROKER",
+    },
   },
 ];
 

@@ -7,6 +7,7 @@ import { addProject, requestConfirmation } from "@/actions/profile";
 import { blockMember, introduceMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
+import { isVendorRole } from "@/lib/platform/showcase";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { tierLabel } from "@/lib/format";
 import { VERIFIED_EXPLANATION } from "@/lib/membership-copy";
@@ -196,6 +197,11 @@ export function ProfileView({
             </div>
           ) : null}
         </dl>
+        {isSelf && isVendorRole(member.role) ? (
+          <Link href="/vendors/edit" className={`${btnOutline} mt-4`}>
+            Edit showcase profile
+          </Link>
+        ) : null}
         {isSelf ? <ProfileEditor member={member} /> : null}
         {isSelf ? null : messagingClosed ? (
           <div className="mt-4 rounded border border-line bg-cream px-3 py-3 text-sm text-ink">

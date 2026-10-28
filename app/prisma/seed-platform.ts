@@ -12,7 +12,9 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { MEMBER_CHECKS } from "../src/lib/verification";
 import { defaultStance, planLocationBackfill } from "../src/lib/platform/backfill";
+import { licenceRecheckOn } from "../src/lib/platform/showcase";
 import {
   ASSET_FIELDS,
   ASSET_TYPES,
@@ -232,6 +234,62 @@ async function main() {
           create: { userId: user.id, specialtyId: specialty.id },
           update: {},
         });
+      }
+    }
+    if (member.vendor) {
+      const verifiedAt = member.vendor.licenceStatus === "VERIFIED" ? new Date() : null;
+      await prisma.vendorProfile.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          headline: member.vendor.headline,
+          services: member.bio,
+          availability: member.vendor.availability,
+          showcaseStatus: member.vendor.listed ? "LISTED" : member.vendor.verified ? "PENDING" : "HIDDEN",
+          acceptingRequests: true,
+        },
+        update: {
+          headline: member.vendor.headline,
+          services: member.bio,
+          availability: member.vendor.availability,
+          showcaseStatus: member.vendor.listed ? "LISTED" : member.vendor.verified ? "PENDING" : "HIDDEN",
+        },
+      });
+      await prisma.license.deleteMany({ where: { userId: user.id } });
+      await prisma.license.create({
+        data: {
+          userId: user.id,
+          kind: member.vendor.licenceKind,
+          stateCode: member.homeState,
+          number: `TEST-${member.homeState}-100`,
+          status: member.vendor.licenceStatus,
+          verifiedAt,
+          recheckOn: verifiedAt ? licenceRecheckOn(verifiedAt) : null,
+        },
+      });
+      if (member.vendor.verified) {
+        const existingCase = await prisma.verificationCase.findUnique({ where: { userId: user.id } });
+        if (!existingCase) {
+          const file = await prisma.verificationCase.create({
+            data: {
+              subject: "MEMBER",
+              userId: user.id,
+              status: "VERIFIED",
+              verifiedAt: new Date(),
+              expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            },
+          });
+          await prisma.verificationCheck.createMany({
+            data: MEMBER_CHECKS.map((check) => ({
+              caseId: file.id,
+              key: check.key,
+              label: check.label,
+              result: "PASS",
+              note: "",
+              autoSuggested: false,
+            })),
+          });
+        }
       }
     }
     testMembers += 1;
