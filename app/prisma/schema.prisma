@@ -260,6 +260,9 @@ model User {
   notificationPref     NotificationPref?
   emailThrottles       EmailThrottle[]
   restrictions         UserRestriction[]
+  vendorProfile        VendorProfile?
+  vendorCredentials    VendorCredential[]
+  licenses             License[]
 
   @@index([paymentStatus])
   @@index([status, role])
@@ -357,6 +360,8 @@ model TrackProject {
   year       Int
   valueLabel String
   summary    String         @default("")
+  inShowcase Boolean        @default(false)
+  showcaseRequested Boolean @default(false)
   createdAt  DateTime       @default(now())
   confirmations Confirmation[]
   verification  VerificationCase?
@@ -372,6 +377,7 @@ model Confirmation {
   status            ConfirmationStatus @default(PENDING)
   reviewStatus      VouchReview        @default(OPEN)
   note              String             @default("")
+  showName          Boolean            @default(false)
   respondedAt       DateTime?
   createdAt         DateTime           @default(now())
 }
@@ -1206,4 +1212,94 @@ model SiteSetting {
   value       Json
   updatedAt   DateTime @updatedAt
   updatedById String?
+}
+
+enum Availability {
+  OPEN
+  SELECTIVE
+  BOOKED
+}
+
+model VendorProfile {
+  userId            String       @id
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline          String       @default("")
+  services          String       @default("")
+  projectSizeBand   String       @default("")
+  yearsInBusiness   Int?
+  availability      Availability @default(OPEN)
+  availableFrom     DateTime?
+  availabilityNote  String       @default("")
+  acceptingRequests Boolean      @default(true)
+  showcaseStatus    String       @default("HIDDEN")
+  reviewedAt        DateTime?
+  reviewedById      String?
+}
+
+enum LicenseKind {
+  CONTRACTOR
+  BAR_ADMISSION
+  BROKER
+  MORTGAGE_ORIGINATOR
+  DESIGN_PROFESSIONAL
+  APPRAISER
+  INSURANCE_PRODUCER
+  CPA
+  FACILITY_OPERATOR
+  OTHER
+}
+
+enum LicenseStatus {
+  SELF_REPORTED
+  UNDER_REVIEW
+  VERIFIED
+  NOT_FOUND
+  EXPIRED
+  REJECTED
+}
+
+model License {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          LicenseKind
+  stateCode     String
+  scope         String        @default("")
+  number        String        @default("")
+  status        LicenseStatus @default(SELF_REPORTED)
+  expiresOn     DateTime?
+  verifiedAt    DateTime?
+  recheckOn     DateTime?
+  verifiedById  String?
+  sourceUrl     String        @default("")
+  showOnProfile Boolean       @default(true)
+
+  @@index([stateCode, kind, status])
+  @@index([userId, status])
+}
+
+model LicenseSource {
+  id        String      @id @default(cuid())
+  stateCode String
+  kind      LicenseKind
+  label     String
+  url       String
+  mode      String      @default("MANUAL")
+
+  @@unique([stateCode, kind])
+}
+
+model VendorCredential {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String
+  label       String
+  issuer      String    @default("")
+  expiresOn   DateTime?
+  evidenceUrl String    @default("")
+  verifiedAt  DateTime?
+  visible     Boolean   @default(true)
+
+  @@index([userId])
 }

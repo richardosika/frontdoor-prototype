@@ -159,6 +159,19 @@ A thread does not open until the other member accepts an introduction request. A
 8. As admin, open the member and **Pause messaging** or **Suspend messaging** with a reason. Sending and new introduction requests stop. The audit log has the entry. **Clear messaging restrictions** restores them.
 9. `/admin/settings` → **Messaging caps**. Change introduction requests per day and save. The next request uses the new cap. The audit log says the caps were updated.
 
+## Vendor showcase and licences
+
+This is on the `platform-p3` branch. Apply `npx prisma migrate deploy` on a local database, then `npm run db:seed-platform`. Do not point that command at the live test site. `npm run db:cleanup-platform -- --delete` removes `@platform-test.example` members, including TEST vendors, and the licence and showcase rows cascade. Baseline if those were the only additions: Members 19, Applications 2, CRM 2 pending and 19 approved, Outbox 12, Verification 37.
+
+A vendor is on the showcase only when the membership file is verified and a Private Floor administrator approves the listing. Someone still in verification can remain in the directory and stay off the showcase. There are no star ratings, reviews, or paid placement.
+
+1. Sign in as a TEST general contractor, broker, attorney, or operator (`@platform-test.example`, password `cornicio-demo`). Open **Edit showcase profile** from Profile. Save a headline, availability, a licence, and a credential. The licence you add says **Listed by member**. The number is not shown on the public card.
+2. As a developer, open **Deals** and **Vendor showcase**, or open a deal and **Find a GC**. The deal link carries that deal's state and asset type. Search by trade, state or metro, asset type, and specialty.
+3. TEST vendors are in Phoenix, Dallas, Austin, Chicago, and Miami. Dallas, Austin, and Miami can be listed. The Phoenix storage builder is not verified, so that profile stays out of the showcase. The Chicago general contractor is verified and waiting for approval, so that profile stays out until you approve it.
+4. Open a listed vendor. Licences that an administrator checked say **Verified** and show the check date. Self-reported ones say **Listed by member**. Projects show a counterparty name only when that person agreed. Otherwise the line is that a counterparty confirmed the project. The page has no grade, score, or evidence file.
+5. `/admin/licences` is the queue. Mark a row verified, not found, or rejected. A verified row is due again 12 months later. The audit log records the decision. The number is on this admin page only.
+6. `/admin/showcase` approves or hides a listing, approves a project the member asked to show, and marks a credential checked. Approving a listing does not show the vendor to developers until the membership file is also verified.
+
 ## Project filters
 
 Deals (`/deals`), the Ledger (`/feed`), and the directory (`/network`) share one filter bar. The address bar is the filter. Copy link copies that URL. A saved filter is stored for you on that page only.

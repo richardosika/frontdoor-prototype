@@ -52,6 +52,10 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
               <label className={labelCls}>Note (optional)</label>
               <textarea name="note" className={field} rows={3} placeholder="We closed this together in 2023." />
             </div>
+            <label className="flex items-start gap-2 text-sm text-ink">
+              <input type="checkbox" name="showName" className="mt-1" />
+              <span>Private Floor may show my name next to this project. Leave this unchecked and the project can still say a counterparty confirmed it, without my name.</span>
+            </label>
             <div className="flex gap-2">
               <button className={`${btnOutline} flex-1`} name="decision" value="DECLINED" type="submit">
                 Decline

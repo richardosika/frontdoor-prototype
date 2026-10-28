@@ -77,9 +77,16 @@ export default async function DealsPage({
       <PageHeader
         title="Deals"
         action={
-          <Link href="/feed" className="text-sm font-semibold text-brass">
-            Post a deal
-          </Link>
+          <span className="flex gap-3">
+            {user.role === "DEVELOPER" ? (
+              <Link href="/vendors" className="text-sm font-semibold text-brass">
+                Vendor showcase
+              </Link>
+            ) : null}
+            <Link href="/feed" className="text-sm font-semibold text-brass">
+              Post a deal
+            </Link>
+          </span>
         }
       />
       <Banner error={error} notice={notice} />

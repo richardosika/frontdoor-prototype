@@ -244,6 +244,7 @@ export async function respondConfirmation(formData: FormData) {
       status: decision,
       reviewStatus: decision === "CONFIRMED" ? "PENDING_ADMIN" : "OPEN",
       note,
+      showName: formData.get("showName") === "on",
       respondedAt: new Date(),
     },
   });
