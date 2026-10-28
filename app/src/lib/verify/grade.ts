@@ -984,12 +984,10 @@ function edgarAward(row: CheckOutput | undefined, possible: number, independent:
     const points = independentPageLinksParent(org, row.finding, pages) ? companyOnlyPoints(possible) : 0;
     return portionLine(points, possible, "parent match, needs review");
   }
-  // Exact normalized-name filer, not a different firm. Person credit stays off, so an
-  // impersonation of a public registrant does not gain points unless something else
-  // already ties that person to the company.
+  // A company-only EDGAR name, including an exact current-name match, is 0 until an
+  // independent source ties this person to the company. The row stays inconclusive.
   if (row?.status === "INCONCLUSIVE" && row.companyOnly && !row.reviewFlag) {
-    const exactName = /exact current-name match|exact company name/i.test(row.finding || "");
-    const points = exactName || independent ? companyOnlyPoints(possible) : 0;
+    const points = independent ? companyOnlyPoints(possible) : 0;
     return portionLine(points, possible, "EDGAR lists this exact company name. A name-only match is inconclusive and does not tie the person");
   }
   return award(false, possible, "EDGAR returned a company-name hit", "No EDGAR hit was confirmed");
