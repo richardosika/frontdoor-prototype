@@ -483,14 +483,6 @@ function newsSummary(
       finding: `Negative coverage names this person with the company or city near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
     };
   }
-  if (companyHard) {
-    return {
-      ...base,
-      status: "FAIL",
-      reviewFlag: true,
-      finding: `Negative coverage names this company near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
-    };
-  }
   if (personNamedCivil) {
     return {
       ...base,
@@ -509,15 +501,22 @@ function newsSummary(
   }
   if (aligned) {
     const neutralItem = items.find((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
-    const lawsuitNote = companyLitigation
-      ? "Company-level litigation headline is an attention item only and does not replace the stories that name this person and this company."
-      : "";
+    const lawsuitNote = [companyLitigation ? "Company-level litigation headline is an attention item only and does not replace the stories that name this person and this company." : "", companyHard ? "Company-level crime headline names the company and not this person. It is an attention item and does not cap the grade." : ""]
+      .filter(Boolean)
+      .join(" ");
     return {
       ...base,
       status: "PASS",
       corroborates: true,
       url: neutralItem?.url || evidenceUrl,
       finding: `Neutral coverage names this person and company. ${lawsuitNote} ${neutralItem?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (companyHard) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `Company-level crime headline. A fraud, sanctions, or criminal term names the company and not this person. The company may be the location or the victim. This is an attention item and does not cap the grade. ${feeds}`.trim(),
     };
   }
   if (companyLitigation) {
@@ -572,6 +571,7 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
   const personHard = item.kind === "hard" && item.person && (item.company || item.location);
   const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly;
   const companyCivil = (item.kind === "civil" && !item.person) || item.foreclosureOnly;
+  const companyHard = item.kind === "hard" && !item.person && item.company;
   const status: EvidenceStatus = personHard || personNamedCivil ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
   const label = item.suffixMismatch
@@ -584,9 +584,11 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
           ? "Negative"
           : personNamedCivil
             ? "Civil, names applicant"
-            : companyCivil
-              ? "Company litigation"
-              : "Neutral";
+            : companyHard
+              ? "Company crime"
+              : companyCivil
+                ? "Company litigation"
+                : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
@@ -679,7 +681,7 @@ export function judgeHeadline(
     person,
     company,
     location: textHasLocation(text, facts.location),
-    departed: person && company && leftTheCompany(text, companyName),
+    departed: person && company && leftTheCompany(text, companyName, personName),
     suffixMismatch: hit === "suffix-mismatch",
     foreclosureOnly: kind === "civil" && foreclosureOnly(text),
     aliasOnly: Boolean(alias),

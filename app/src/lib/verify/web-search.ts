@@ -208,8 +208,8 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
-    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && !leftTheCompany(text, org));
-    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && leftTheCompany(text, org));
+    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && !leftTheCompany(text, org, facts.name));
+    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && leftTheCompany(text, org, facts.name));
     if (hit) {
       attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
       break;

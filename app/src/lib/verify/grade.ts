@@ -386,7 +386,7 @@ function isDeclinedDuplicate(check: CheckOutput): boolean {
 }
 
 function isCompanyLawsuitOnly(check: CheckOutput): boolean {
-  return /company-level litigation|^Company litigation ·/i.test(check.finding);
+  return /company-level litigation|company-level crime|^Company litigation ·|^Company crime ·/i.test(check.finding);
 }
 
 function isDepartureOrSuffix(check: CheckOutput): boolean {
@@ -568,6 +568,9 @@ function failSentence(check: CheckOutput): string | null {
     return `This email already belongs to a member (${source}).`;
   }
   if (check.key === "news" && check.status === "FAIL") {
+    if (/not this person|names this company/i.test(check.finding) && !/names this person/i.test(check.finding)) {
+      return `A headline names the company near a negative word and does not name this person (${source}). It does not cap the grade.`;
+    }
     return `A headline names this person together with the company or city, near a negative word (${source}). Possible match, verify. This is not proof of wrongdoing.`;
   }
   if (check.key === "phone-state" && check.status === "FAIL") {
@@ -1295,6 +1298,13 @@ export function gradeChecks(
       pushAttention({
         severity: "Medium",
         title: "Company litigation headline",
+        detail: check.finding,
+      });
+    }
+    if (check.key === "news" && /company-level crime/i.test(check.finding)) {
+      pushAttention({
+        severity: "Medium",
+        title: "Company crime headline",
         detail: check.finding,
       });
     }

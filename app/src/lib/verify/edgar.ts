@@ -533,13 +533,54 @@ function sameFirmName(title: string, org: string): boolean {
   return Boolean(left) && left === right;
 }
 
+const EDGAR_SUFFIX_WORD = new Set([
+  "properties",
+  "realty",
+  "trust",
+  "holdings",
+  "group",
+  "corp",
+  "inc",
+  "incorporated",
+  "corporation",
+  "company",
+  "companies",
+  "llc",
+  "lp",
+  "llp",
+  "plc",
+  "ltd",
+  "limited",
+  "co",
+]);
+
+/** "JBG SMITH Properties" is "JBG SMITH" plus a suffix word. "JBG SMITH Capital Partners Fund" is not. */
+function suffixOnlyExtension(title: string, org: string): boolean {
+  const shorter = firmTokens(org);
+  const longer = firmTokens(title);
+  if (!shorter.length || longer.length <= shorter.length) return false;
+  if (longer.slice(0, shorter.length).join(" ") !== shorter.join(" ")) return false;
+  return longer.slice(shorter.length).every((token) => EDGAR_SUFFIX_WORD.has(token));
+}
+
+function domainAgreesWithFirm(org: string, title: string, website: string): boolean {
+  const stem = domainBrand(website);
+  if (!stem) return false;
+  const orgCompact = normalizeFirmName(org).replace(/\s+/g, "");
+  const titleWithoutSuffix = firmTokens(title).filter((token) => !EDGAR_SUFFIX_WORD.has(token)).join("");
+  return stem === orgCompact || stem === titleWithoutSuffix;
+}
+
 /**
  * The person counts only on a filing that also carries the exact company name.
  * A person on a parent, affiliate, or different registrant does not tie this company.
  */
-export function personOnFiling(names: string[] | string[][], person: string, org: string): string {
+export function personOnFiling(names: string[] | string[][], person: string, org: string, website = ""): string {
   for (const group of filingGroups(names)) {
-    const companyHere = group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, org));
+    const companyHere = group.some((name) => {
+      const title = companyFromDisplayName(name)?.title || name;
+      return sameFirmName(title, org) || (suffixOnlyExtension(title, org) && domainAgreesWithFirm(org, title, website));
+    });
     if (!companyHere) continue;
     const hit = group.find((name) => mentionsPerson(name, person));
     if (hit) return hit;
@@ -573,7 +614,7 @@ export function assessEdgarMatch(input: {
   );
   const match = fromList || tickerMatch || fromFiling;
   const tickerAccepted = Boolean(tickerMatch) && match === tickerMatch;
-  const personLine = personOnFiling(groups, input.person, input.org);
+  const personLine = personOnFiling(groups, input.person, input.org, input.website || "");
   if (!input.tickersOk && flat.length === 0) {
     return {
       status: "UNAVAILABLE",
@@ -614,7 +655,8 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR's current name for CIK ${match.cik} is ${input.identity.currentName}. ${titled} is a former name. Needs review. A former name is not an exact match and does not corroborate.`,
     };
   }
-  if (!sameFirmName(match.title, input.org) && !tickerAccepted) {
+  const suffixSame = suffixOnlyExtension(match.title, input.org) && domainAgreesWithFirm(input.org, match.title, input.website || "");
+  if (!sameFirmName(match.title, input.org) && !tickerAccepted && !suffixSame) {
     return {
       status: "INCONCLUSIVE",
       corroborates: false,

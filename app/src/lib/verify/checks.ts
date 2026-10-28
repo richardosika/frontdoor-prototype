@@ -690,8 +690,9 @@ export function inviteCheck(facts: ApplicantFacts): CheckOutput {
 }
 
 /**
- * A made-up company token. Strict signs only: no vowel, q not followed by u,
- * the same letter three times, or five consonants in a row once h is ignored.
+ * A made-up company token. Strict signs only: no vowel, the same letter three times,
+ * or five consonants in a row once h is ignored. A q that is not followed by u
+ * is a real brand pattern (Northmarq) and is not enough on its own.
  * A consonant pair or a q/x/z/j cluster is not enough. Those flags mark real
  * surnames such as Schwartz, Herzka, and Hovnanian.
  */
@@ -699,7 +700,6 @@ export function tokenLooksGibberish(token: string): boolean {
   const word = token.toLowerCase();
   if (word.length < 4) return false;
   if (!/[aeiouy]/.test(word)) return true;
-  if (/q(?!u)/.test(word)) return true;
   if (/(.)\1\1/.test(word)) return true;
   const withoutH = word.replace(/h/g, "");
   if (/[^aeiouy]{5,}/.test(withoutH)) return true;

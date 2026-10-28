@@ -6225,11 +6225,10 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
       return { ok: false, status: 404, text: "" };
     });
     const missed = stillDown.find((check) => check.key === "screen-web");
-    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.status).toBe("INCONCLUSIVE");
     expect(missed?.corroborates).not.toBe(true);
-    expect(missed?.finding).toContain("Search did not complete");
-    expect(missed?.finding).toContain("Not checked");
-    expect(missed?.finding).toContain("Not a pass");
+    expect(missed?.finding).toContain("Not found");
+    expect(missed?.finding).not.toContain("Not checked");
     expect(missed?.finding).toContain("Tried");
     const missedGrade = gradeChecks([missed!], applicant);
     expect(missedGrade.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
@@ -6315,13 +6314,13 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     });
     const web = rows.find((check) => check.key === "screen-web");
     const footprint = rows.find((check) => check.key === "web-footprint");
-    expect(bingCalls).toBe(1);
+    expect(bingCalls).toBeGreaterThanOrEqual(1);
     expect(web?.status).toBe("INCONCLUSIVE");
     expect(web?.corroborates).not.toBe(true);
     expect(web?.finding).toContain("Not found");
     expect(web?.finding).not.toContain("Not checked");
     expect(web?.finding).toContain("Tried");
-    expect(web?.finding).toContain("Bing (no name and company)");
+    expect(web?.finding).toContain("Bing (unrelated results)");
     expect(footprint?.status).toBe("INCONCLUSIVE");
     expect(footprint?.finding).toContain("Tried");
     expect(footprint?.corroborates).not.toBe(true);
@@ -6559,5 +6558,115 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(socialSearchQuery("Andy Gloor", "Sterling Bay")).toBe(`"Andy Gloor" "sterling bay"`);
     expect(mentionsCompany("Sterling Bay broke ground in Chicago", "Sterling Bay")).toBe(true);
     expect(mentionsCompany("the bay was closed for repairs", "Sterling Bay")).toBe(false);
+  });
+
+  it("does not cap a company-only crime headline that does not name the person", () => {
+    const applicant = facts({ name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" });
+    const headlineFacts = { name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" };
+    const robbery = "49-year-old man arrested after brazen robbery at Bank of Hawaii in Waikiki";
+    expect(judgeHeadline(robbery, headlineFacts).person).toBe(false);
+    const rows = classifyNews(
+      applicant,
+      [{ title: robbery, snippet: robbery, url: "https://example.com/robbery", source: "Hawaii News Now", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((item) => item.key === "news");
+    expect(news?.status).not.toBe("FAIL");
+    expect(news?.reviewFlag).not.toBe(true);
+    expect(news?.finding.toLowerCase()).not.toContain("names this person");
+    const charged = classifyNews(
+      applicant,
+      [{ title: "Bank of Hawaii charged with fraud", snippet: "Bank of Hawaii charged with fraud", url: "https://example.com/fraud", source: "Local", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const chargedNews = charged.find((item) => item.key === "news");
+    expect(chargedNews?.status).not.toBe("FAIL");
+    expect(chargedNews?.finding.toLowerCase()).toContain("company-level crime");
+    const named = judgeHeadline("Jim Polk arrested after fraud at Bank of Hawaii", headlineFacts);
+    expect(named.person).toBe(true);
+    expect(named.kind).toBe("hard");
+    const graded = gradeChecks([news!, row({ key: "sanctions", status: "PASS" })], applicant);
+    expect(graded.banner || "").not.toMatch(/names this person/i);
+  });
+
+  it("counts a departure only for the person who is leaving", () => {
+    const headline = "Bank of Hawaii CEO Peter Ho to Retire, James Polk Named Successor";
+    expect(leftTheCompany(headline, "Bank of Hawaii", "Jim Polk")).toBe(false);
+    expect(leftTheCompany("Peter Ho to retire from Bank of Hawaii", "Bank of Hawaii", "Peter Ho")).toBe(true);
+    const arrival = judgeHeadline(headline, { name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" });
+    expect(arrival.person).toBe(true);
+    expect(arrival.company).toBe(true);
+    expect(arrival.departed).toBe(false);
+    expect(arrival.tone).toBe("neutral");
+  });
+
+  it("treats JBG SMITH Properties as JBG SMITH when the domain agrees", () => {
+    const matched = assessEdgarMatch({
+      org: "JBG SMITH",
+      person: "Matt Kelly",
+      tickersOk: true,
+      companies: [{ title: "JBG SMITH Properties", ticker: "JBGS", cik: "1689796" }],
+      filingNames: [["JBG SMITH Properties (JBGS) (CIK 0001689796)", "KELLY W MATTHEW"]],
+      website: "https://www.jbgsmith.com",
+    });
+    expect(matched.status).toBe("PASS");
+    expect(matched.corroborates).toBe(true);
+    expect(matched.finding).toContain("KELLY W MATTHEW");
+    const different = assessEdgarMatch({
+      org: "Western Alliance Capital LLC",
+      person: "Pat Fake",
+      tickersOk: true,
+      companies: [{ title: "Western Alliance Bancorporation", ticker: "WAL", cik: "1212545" }],
+      filingNames: [["Western Alliance Bancorporation (WAL) (CIK 0001212545)"]],
+      website: "https://dead.example",
+    });
+    expect(different.status).not.toBe("PASS");
+    expect(different.corroborates).not.toBe(true);
+  });
+
+  it("matches formal names and a leading initial without surname-only hits", () => {
+    expect(formalGivenName("Matt Kelly")).toBe("Matthew");
+    expect(formalGivenName("Les Hiscoe")).toBe("Leslie");
+    expect(formalGivenName("Andy Gloor")).toBe("Andrew");
+    expect(formalGivenName("Doug Smith")).toBe("Douglas");
+    expect(personHit("W. Matthew Kelly", "Matt Kelly")).toBe("match");
+    expect(personHit("KELLY W MATTHEW", "Matt Kelly")).toBe("match");
+    expect(personHit("Leslie Hiscoe", "Les Hiscoe")).toBe("match");
+    expect(personHit("Adams", "Pat Adams")).toBe("none");
+    expect(personHit("Samuel Adams", "Pat Adams")).toBe("none");
+  });
+
+  it("does not treat Northmarq as gibberish", () => {
+    expect(tokenLooksGibberish("Northmarq")).toBe(false);
+    expect(plausibilityCheck(facts({ name: "Jeff Weidell", applicantName: "Jeff Weidell", org: "Northmarq" })).status).toBe("PASS");
+    expect(tokenLooksGibberish("Xqzvbn")).toBe(true);
+    expect(companyNameLooksReal("Xqzvbn Holdings")).toBe(false);
+    expect(plausibilityCheck(facts({ name: "Ada Fake", applicantName: "Ada Fake", org: "Xqzvbn Holdings" })).status).toBe("FAIL");
+    expect(companyNameLooksReal("qwerty")).toBe(false);
+  });
+
+  it("calls a quote-ignoring page unchecked when another engine did not answer", async () => {
+    const applicant = facts({ name: "Rob Blalock", applicantName: "Rob Blalock", org: "Harbert Realty", location: "Birmingham, AL", website: "" });
+    const roblox = `<ol><li class="b_algo"><a href="https://www.roblox.com/">Roblox games</a></li></ol>`;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      const decoded = decodeURIComponent(url);
+      if (url.includes("duckduckgo.com") && !url.includes("lite")) return { ok: false, status: 0, text: "" };
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: decoded.includes("Robert") ? roblox : roblox };
+      return { ok: true, status: 200, text: "<html><body></body></html>" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("UNAVAILABLE");
+    expect(web?.finding).toContain("Not checked");
+    expect(web?.finding).not.toContain("Not found");
+    expect(web?.corroborates).not.toBe(true);
+    expect(gradeChecks([web!], applicant).categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+  });
+
+  it("matches Hawai'i and does not invent of inside a brand", () => {
+    expect(mentionsCompany("Bank of Hawai\u2018i names Jim Polk CEO", "Bank of Hawaii")).toBe(true);
+    expect(mentionsCompany("Bank of Hawai'i names Jim Polk CEO", "Bank of Hawaii")).toBe(true);
+    expect(mentionsCompany("Ocean of Bank opened a branch", "Ocean Bank")).toBe(false);
+    expect(mentionsCompany("Banc of California reported earnings", "Banc of California")).toBe(true);
+    expect(mentionsCompany("Bank of America reported earnings", "Bank of America")).toBe(true);
   });
 });

@@ -18,6 +18,26 @@ const NICKNAMES: Record<string, string[]> = {
   stephen: ["stephen", "steve"],
   steven: ["steven", "steve"],
   jeffrey: ["jeffrey", "jeff"],
+  matthew: ["matthew", "matt"],
+  andrew: ["andrew", "andy", "drew"],
+  douglas: ["douglas", "doug"],
+  kenneth: ["kenneth", "ken"],
+  timothy: ["timothy", "tim"],
+  leslie: ["leslie", "les"],
+  edward: ["edward", "ed"],
+  gregory: ["gregory", "greg"],
+  nicholas: ["nicholas", "nick"],
+  benjamin: ["benjamin", "ben"],
+  jonathan: ["jonathan", "jon"],
+  alexander: ["alexander", "alex"],
+  peter: ["peter", "pete"],
+  charles: ["charles", "chuck", "charlie"],
+  lawrence: ["lawrence", "larry"],
+  ronald: ["ronald", "ron"],
+  donald: ["donald", "don"],
+  gerald: ["gerald", "jerry"],
+  joshua: ["joshua", "josh"],
+  jacob: ["jacob", "jake"],
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
@@ -91,6 +111,7 @@ function tokens(value: string): string[] {
   return value
     .toLowerCase()
     .replace(/&amp;/g, " ")
+    .replace(/[\u2018\u2019\u02BB\u02BC']/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((token) => token.length >= 2);
@@ -563,8 +584,9 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
   const givenSeq = parsed.given
     .map((part, index) => (index === 0 ? `(?<![A-Za-z0-9-])${givenPattern(part)}` : `${NAME_MIDDLE}\\s+${givenPattern(part)}`))
     .join("");
-  const forward = new RegExp(`${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
-  const reverse = new RegExp(`${surname}\\s*,?\\s+(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
+  const leadingInitial = String.raw`(?:(?<![A-Za-z0-9-])[A-Z]\.?\s+)?`;
+  const forward = new RegExp(`${leadingInitial}${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
+  const reverse = new RegExp(`${surname}\\s*,?\\s+(?:[A-Z]\\.?\\s+)?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
   const spans: NameSpan[] = [];
   const pushSurname = (start: number, whole: string) => {
     const local = new RegExp(surname, "g");
@@ -600,7 +622,7 @@ function companySpanRanges(text: string, org: string): { start: number; end: num
   const ranges: { start: number; end: number }[] = [];
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
-    const body = `(?<![A-Za-z0-9-])${prefix.map((token) => tokenBody(token)).join(PHRASE_GAP)}(?![A-Za-z0-9-])`;
+    const body = `(?<![A-Za-z0-9-])${prefix.map((token) => tokenBody(token)).join(phraseGapFor(org))}(?![A-Za-z0-9-])`;
     for (const match of text.matchAll(new RegExp(body, "g"))) {
       const start = match.index ?? 0;
       ranges.push({ start, end: start + match[0].length });
@@ -694,16 +716,24 @@ function formerOrEx(text: string, org: string): boolean {
 }
 
 /**
- * A headline that places the person in a past role at this company.
+ * A headline that places this person in a past role at this company.
+ * "Peter Ho to retire, James Polk named successor" is a departure for Ho and an arrival for Polk.
  * "jump to Newmark from Cushman" is a departure from Cushman and a join at Newmark.
  */
-export function leftTheCompany(text: string, org: string): boolean {
+export function leftTheCompany(text: string, org: string, person = ""): boolean {
   if (!org.trim() || !mentionsCompany(text, org)) return false;
-  if (formerOrEx(text, org)) return true;
-  const explicit = /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(text);
-  const joiningLawsuit = /\b(?:joins?|joined|joining)\b/i.test(text) && /\blawsuits?\b/i.test(text);
+  const clauses = text.split(/\s*(?:;|,)\s*/).map((clause) => clause.trim()).filter(Boolean);
+  const mine = person ? clauses.filter((clause) => mentionsPerson(clause, person, org)) : [];
+  const scope = person ? (mine.length ? mine.join(". ") : "") : text;
+  if (person && !scope) return false;
+  if (person && /\bnamed\s+(?:successor|ceo|cfo|president|chairman)\b|\b(?:to|will)\s+succeed\b/i.test(scope) && !/\b(?:retire|retires|retired|retiring|leaves|left|leaving|departs|departed)\b/i.test(scope)) {
+    return false;
+  }
+  if (formerOrEx(scope, org)) return true;
+  const explicit = /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(scope);
+  const joiningLawsuit = /\b(?:joins?|joined|joining)\b/i.test(scope) && /\blawsuits?\b/i.test(scope);
   if (joiningLawsuit) return explicit;
-  const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(text);
+  const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(scope);
   if (move) {
     const destination = move[1];
     const origin = move[2].split(/[.]/)[0];
@@ -740,7 +770,7 @@ function followedByLegalSuffix(text: string, token: string): boolean {
 
 function surnameOnly(text: string, token: string, org = ""): boolean {
   const phrase = companyPhraseTokens(org);
-  if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase)) return false;
+  if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase, org)) return false;
   if (followedByLegalSuffix(text, token)) return false;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const all = text.match(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "gi")) || [];
@@ -788,10 +818,18 @@ export function companyPhraseTokens(org: string): string[] {
   return tokens(org).filter((token) => !LEGAL.has(token) && !STOP.has(token));
 }
 
-const PHRASE_GAP = `(?:[\\s,.'’:"&/+-]+(?:(?:of|and|the)\\s+)?)`;
+const PHRASE_GAP = `[\\s,.'’‘\u02BB:"&/+-]+`;
+
+/** "of" is part of Banc of California. It is not part of Ocean Bank. */
+function phraseGapFor(org: string): string {
+  const allow = ["of", "and", "the"].filter((word) => new RegExp(`\\b${word}\\b`, "i").test(org));
+  if (!allow.length) return PHRASE_GAP;
+  return `(?:${PHRASE_GAP}(?:(?:${allow.join("|")})\\s+)?)`;
+}
 
 function tokenBody(token: string): string {
-  const folded = `${caseFold(token)}(?:'s)?`;
+  const bare = token.replace(/['’‘\u02BB\u02BC]/g, "");
+  const folded = `${[...bare].map((char) => caseFold(char)).join(`['’‘\u02BB\u02BC]?`)}(?:'s)?`;
   if (token.length < 8) return folded;
   const splits = [folded];
   for (let index = 4; index <= token.length - 3; index += 1) {
@@ -802,10 +840,10 @@ function tokenBody(token: string): string {
   return `(?:${splits.join("|")})`;
 }
 
-function consecutivePhrase(text: string, prefix: string[]): boolean {
+function consecutivePhrase(text: string, prefix: string[], org = ""): boolean {
   if (prefix.length < 2) return false;
   // The hyphen in "Kennedy-Wilson" may separate this firm's words. The hyphen in "page-turner" still blocks a different word.
-  return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(PHRASE_GAP)}(?![A-Za-z0-9-])`).test(text);
+  return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(phraseGapFor(org))}(?![A-Za-z0-9-])`).test(text);
 }
 
 /** The only distinctive token is a dictionary word, or the whole name is ordinary words such as "Related Group". */
@@ -818,12 +856,12 @@ function dictionaryBrand(phrase: string[], distinctive: string[]): boolean {
 }
 
 /** "Ocean Bank" is the firm. "ocean bank" in lowercase prose, and "ocean ... bank" apart, are not. */
-function properNamePhrase(text: string, prefix: string[]): boolean {
+function properNamePhrase(text: string, prefix: string[], org = ""): boolean {
   if (prefix.length < 2) return false;
-  const body = prefix.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(PHRASE_GAP);
+  const body = prefix.map(tokenBody).join(phraseGapFor(org));
   const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9-])${body}(?![A-Za-z0-9-])`, "gi"));
   for (const hit of hits) {
-    const words = (hit[0].match(/[A-Za-z][A-Za-z'-]*/g) || []).filter((word) => !STOP.has(word.toLowerCase()));
+    const words = (hit[0].replace(/[\u2018\u2019\u02BB\u02BC']/g, "").match(/[A-Za-z]+/g) || []).filter((word) => !STOP.has(word.toLowerCase()));
     if (words.length >= 2 && words.every((word) => word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase())) return true;
   }
   return false;
@@ -848,7 +886,7 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   }
   if (dictionaryBrand(phrase, distinctive)) {
     for (let length = phrase.length; length >= 2; length -= 1) {
-      if (properNamePhrase(text, phrase.slice(0, length))) return true;
+      if (properNamePhrase(text, phrase.slice(0, length), org)) return true;
     }
     return false;
   }
@@ -856,7 +894,7 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
     if (!prefix.includes(firstDistinctive)) continue;
-    if (consecutivePhrase(text, prefix)) return true;
+    if (consecutivePhrase(text, prefix, org)) return true;
   }
   // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
   // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.

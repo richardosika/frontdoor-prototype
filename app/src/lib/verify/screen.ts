@@ -72,7 +72,7 @@ export function scorePublicText(
   const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
   const alias = company ? "" : mentionsBrandAlias(text, facts.aliases || []);
-  const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org);
+  const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org, facts.name);
   const currentName = name && !departure;
   const city = cityPhrase(facts.location).toLowerCase();
   const cityHit = city.length >= 4 && hay.includes(city);
@@ -543,12 +543,13 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
     };
   }
   if (attempt.key === "screen-news" && attempt.headlineKind && attempt.headlineKind !== "none") {
-    const companyLevel = attempt.foreclosureOnly || (attempt.headlineKind === "civil" && !attempt.score.name);
+    const companyLevel = attempt.foreclosureOnly || ((attempt.headlineKind === "civil" || attempt.headlineKind === "hard") && !attempt.score.name);
     if (companyLevel) {
+      const label = attempt.headlineKind === "hard" ? "Company-level crime headline." : "Company-level litigation headline.";
       return {
         status: "INCONCLUSIVE",
         corroborates: false,
-        finding: `Searched: ${attempt.searched}. Company-level litigation headline. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+        finding: `Searched: ${attempt.searched}. ${label} ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
       };
     }
     return {
@@ -1424,7 +1425,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (challenge) return "challenge page";
     if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
     if (!snippets.length) return "no results";
-    if (!snippets.some(snippetAnswers)) return "no name and company";
+    if (!snippets.some(snippetAnswers)) return "unrelated results";
     const named = snippets.filter(namesBothSnippet);
     if (!named.length) return "no name and company";
     if (named.some(independentSnippet)) return "result";
@@ -1483,7 +1484,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     );
     engines.push(...pulled);
   }
-  const failedNote = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page" || note === "no results";
+  const failedNote = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page" || note === "unrelated results";
+  const hardFailure = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page";
+  const cleanAnswer = (note: string) => note === "no results" || note === "no name and company" || note === "result" || note === "own site";
   const usablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
   if (!usablePage && engines.some((engine) => failedNote(engine.note))) {
     await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
@@ -1503,7 +1506,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const response = await pullWithin(fetchText, job.url);
       const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
       const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
-      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : 2);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : value === "unrelated results" ? 2 : 3);
       const existing = engines.find((engine) => engine.name === job.name);
       if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
       else if (rank(note) < rank(existing.note)) {
@@ -1517,7 +1520,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   const quotesIgnored =
     Boolean(formal) &&
     !engines.some((engine) => engine.note === "result" || engine.note === "own site") &&
-    engines.some((engine) => engine.note === "no name and company");
+    engines.some((engine) => engine.note === "no name and company" || engine.note === "unrelated results");
   if (quotesIgnored && formal) {
     await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
     const parsed = parsePersonName(person);
@@ -1540,7 +1543,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       const response = await pullWithin(fetchText, job.url);
       const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
       const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
-      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : 2);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : value === "unrelated results" ? 2 : 3);
       const existing = engines.find((engine) => engine.name === job.name);
       if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
       else if (rank(note) <= rank(existing.note)) {
@@ -1558,6 +1561,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .find((engine): engine is SearchEngine => Boolean(engine));
   const hitEngine = engineNamed("result") || engineNamed("own site");
   const sawUsablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
+  const sawClean = engines.some((engine) => cleanAnswer(engine.note));
+  const sawIgnored = engines.some((engine) => engine.note === "unrelated results");
+  const sawHardFailure = engines.some((engine) => hardFailure(engine.note));
   const sawFailure = engines.some((engine) => failedNote(engine.note));
   const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked" || engine.note === "timed out" || engine.note === "network error");
   const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
@@ -1578,7 +1584,17 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         `All free search sources blocked. Tried ${tried}. ${closing}`.replace(/\s+/g, " ").trim(),
       ),
     );
-  } else if (!hitEngine && !sawUsablePage && sawFailure) {
+  } else if (!hitEngine && sawIgnored && sawHardFailure && !sawUsablePage) {
+    attempts.push(
+      blockedAttempt(
+        "screen-web",
+        "Web search",
+        searched,
+        ddgBlocked ? bingUrl : ddgUrl,
+        `Search did not complete. Not checked. Not a pass. Tried ${tried}.`.replace(/\s+/g, " ").trim(),
+      ),
+    );
+  } else if (!hitEngine && !sawClean && sawFailure) {
     attempts.push(
       blockedAttempt(
         "screen-web",
