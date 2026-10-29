@@ -1,4 +1,4 @@
-import { domainBrand } from "@/lib/verify/public-match";
+import { collapseAmpersandInitials, domainBrand } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const LEGAL_SUFFIX = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pc", "pllc"]);
@@ -22,14 +22,40 @@ function stripTrailingBankForm(tokens: string[]): string[] {
 
 /** Lowercase name with punctuation and legal suffixes removed, for an exact company comparison. */
 export function normalizeRegistryName(value: string): string {
-  return stripTrailingBankForm(
-    value
+  let tokens = stripTrailingBankForm(
+    collapseAmpersandInitials(value)
       .toLowerCase()
       .replace(/&amp;/g, " ")
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
       .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token)),
-  ).join(" ");
+  );
+  if (tokens.length > 1 && tokens[tokens.length - 1] === "company") tokens = tokens.slice(0, -1);
+  return tokens.join(" ");
+}
+
+const TOO_GENERIC = new Set([
+  "bank",
+  "holding",
+  "holdings",
+  "company",
+  "companies",
+  "capital",
+  "group",
+  "partners",
+  "partner",
+  "properties",
+  "property",
+  "realty",
+  "development",
+  "trust",
+  "sa",
+]);
+
+/** "bank" or "holding company" is not a firm. "mt bank" and "related companies" are. */
+export function registryNameIsGenericOnly(value: string): boolean {
+  const tokens = normalizeRegistryName(value).split(/\s+/).filter(Boolean);
+  return !tokens.length || tokens.every((token) => TOO_GENERIC.has(token));
 }
 
 /** Spellings that can store one normalized name in the NY corporations file. */
@@ -57,8 +83,15 @@ function soqlText(value: string): string {
 
 function ampVariants(value: string): string[] {
   const forms = [value];
-  if (value.includes("&")) forms.push(value.replace(/&/g, " AND ").replace(/\s+/g, " ").trim());
-  if (/\bAND\b/.test(value)) forms.push(value.replace(/\bAND\b/g, "&").replace(/\s+/g, " ").trim());
+  if (value.includes("&")) {
+    forms.push(value.replace(/&/g, " AND ").replace(/\s+/g, " ").trim());
+    forms.push(value.replace(/\s*&\s*/g, " & ").replace(/\s+/g, " ").trim());
+    forms.push(value.replace(/\s*&\s*/g, "&"));
+  }
+  if (/\bAND\b/.test(value)) {
+    forms.push(value.replace(/\bAND\b/g, "&").replace(/\s+/g, " ").trim());
+    forms.push(value.replace(/\bAND\b/g, " & ").replace(/\s+/g, " ").trim());
+  }
   return forms;
 }
 
@@ -90,7 +123,45 @@ export function registrySearchPrefixes(org: string): string[] {
   }
   const normalized = normalizeRegistryName(org).toUpperCase().replace(/[%_]/g, "");
   if (normalized) forms.add(normalized);
-  return [...forms].map(soqlText).filter((prefix) => prefix.length > 0);
+  const prefixes = [...forms].map(soqlText).filter((prefix) => prefix.length > 0);
+  const longer = prefixes.some((prefix) => !registryPrefixIsGeneric(prefix));
+  return longer ? prefixes.filter((prefix) => !registryPrefixIsGeneric(prefix)) : prefixes;
+}
+
+const GENERIC_QUERY_WORD = new Set(["bank", "holding", "company", "capital", "group", "partners", "properties", "realty", "development"]);
+
+/** "BANK" or "HOLDING COMPANY" must not crowd out "M&T BANK". */
+export function registryPrefixIsGeneric(prefix: string): boolean {
+  const tokens = prefix.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return true;
+  if (tokens.length === 1 && GENERIC_QUERY_WORD.has(tokens[0])) return true;
+  return tokens.length > 0 && tokens.every((token) => GENERIC_QUERY_WORD.has(token));
+}
+
+const EXACT_SUFFIXES = ["", " INC", " INC.", " LLC", " L.L.C.", " CORP", " CORP.", " CORPORATION", " LP", " L.P.", " CO", " CO.", " CO., L.L.C.", " COMPANY"];
+
+/** Exact spellings, including spaced "&" and a legal suffix, before any prefix search. */
+export function registryExactLiterals(org: string): string[] {
+  const raw = org.trim().toUpperCase().replace(/\s+/g, " ").replace(/&AMP;/g, "&");
+  const bases = new Set<string>();
+  if (raw) {
+    for (const form of ampVariants(raw)) {
+      bases.add(form);
+      const trimmed = withoutTrailingLegalSuffix(form);
+      if (trimmed) bases.add(trimmed);
+    }
+  }
+  const names = new Set<string>(nyRegistryCandidates(org));
+  for (const base of bases) {
+    for (const suffix of EXACT_SUFFIXES) names.add(`${base}${suffix}`.replace(/\s+/g, " ").trim());
+  }
+  return [...names].map(soqlText).filter((name) => name.length > 0);
+}
+
+export function registryExactWhere(field: string, org: string): string {
+  const names = registryExactLiterals(org).map((name) => `'${name}'`);
+  if (!names.length) return "";
+  return `upper(${field}) in(${names.join(",")})`;
 }
 
 /** SoQL OR of prefix matches. Callers still accept a row only when the normalized names are equal. */
@@ -100,13 +171,22 @@ export function registryNameWhere(field: string, org: string): string {
   return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
 }
 
-export function nyRegistryQueryUrl(org: string): string {
-  const where = registryNameWhere("current_entity_name", org);
+function registryUrl(dataset: string, select: string, where: string, orderField = ""): string {
   const params = new URLSearchParams();
-  params.set("$select", "current_entity_name,dos_id,entity_type");
-  params.set("$limit", where ? "25" : "0");
+  params.set("$select", select);
+  params.set("$limit", where ? "50" : "0");
   if (where) params.set("$where", where);
-  return `${DATASET}?${params.toString()}`;
+  if (where && orderField) params.set("$order", `length(${orderField})`);
+  return `${dataset}?${params.toString()}`;
+}
+
+/** Exact equality. This is the first request. A prefix search runs only when it returns no rows. */
+export function nyRegistryExactUrl(org: string): string {
+  return registryUrl(DATASET, "current_entity_name,dos_id,entity_type", registryExactWhere("current_entity_name", org));
+}
+
+export function nyRegistryQueryUrl(org: string): string {
+  return registryUrl(DATASET, "current_entity_name,dos_id,entity_type", registryNameWhere("current_entity_name", org), "current_entity_name");
 }
 
 const GEO_WORD = new Set(["us", "usa", "america"]);
@@ -181,6 +261,14 @@ export function assessNyRegistry(
     };
   }
   const want = normalizeRegistryName(org);
+  if (registryNameIsGenericOnly(org)) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      url,
+      finding: "NY Active Corporations responded. The name is too generic to match for free. This is not a pass.",
+    };
+  }
   const hit = rows.find((row) => normalizeRegistryName(String(row.current_entity_name || "")) === want && want);
   const qualified = hit
     ? undefined

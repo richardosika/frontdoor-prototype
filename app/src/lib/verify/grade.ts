@@ -932,7 +932,7 @@ function linkedinAward(row: CheckOutput | undefined, possible: number, mode: Gra
   }
   if (row?.status === "UNAVAILABLE") return unavailableLine(possible, "The LinkedIn page is not checkable for free", mode);
   if (row?.status === "PASS" && row.companyOnly) {
-    return portionLine(companyOnlyPoints(possible), possible, "Company confirmed, person not confirmed");
+    return portionLine(0, possible, "Company confirmed, person not confirmed");
   }
   if (row?.status === "PASS" && row.selfReported && !independent) {
     return portionLine(0, possible, "The applicant's own LinkedIn profile is self-reported and no independent source tied the person to the company");
@@ -1163,8 +1163,21 @@ export function gradeChecks(
     weightsMode === "r2"
       ? Math.max(0, Math.min(100, Math.round((100 * earnedPoints) / Math.max(checkablePoints, 1))))
       : earnedPoints;
-  let letter = letterFromScore(rawScore);
-  const caps: string[] = [];
+  const personConfirmed = corroboratingPasses(checks).length > 0 || checks.some((check) => {
+    if (check.status !== "PASS") return false;
+    if (check.key === "website" || check.key === "fixture-website") return /Name:\s*yes/i.test(check.finding);
+    if (check.key === "linkedin-fetch") return !check.companyOnly && /Name:\s*yes/i.test(check.finding);
+    return false;
+  });
+  let scored = rawScore;
+  const personCaps: string[] = [];
+  if (!personConfirmed) {
+    if (scored > 48) scored = 48;
+    const unchecked = checks.some((check) => /^(news|screen-web|web-footprint|edgar|courts|website)$/.test(check.key) && (check.status === "UNAVAILABLE" || check.status === "NOT_RUN"));
+    if (unchecked || rawScore > 48) personCaps.push("Capped at 48: no check confirmed the person. The person could not be checked for free.");
+  }
+  let letter = letterFromScore(scored);
+  const caps: string[] = [...personCaps];
   const banners: string[] = [];
   const applyCap = (ceiling: Letter, reason: string, banner?: string) => {
     const next = capLetter(letter, ceiling);
@@ -1383,7 +1396,7 @@ export function gradeChecks(
     pushAttention({ severity: "Low", title: "No references", detail: "Reference emails are optional. Ask for one if the rest of the file is thin." });
   }
 
-  const score = rawScore;
+  const score = scored;
   const confidence = confidenceOf(checks);
   const paying = payingRole(facts.role);
   const corroboration = corroboratingPasses(checks).length;

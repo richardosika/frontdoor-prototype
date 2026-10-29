@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, reportingOwnerDisplayMatches, surnameForSearch } from "@/lib/verify/public-match";
+import { collapseAmpersandInitials, distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, reportingOwnerDisplayMatches, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import type { CheckOutput } from "@/lib/verify/types";
 
@@ -49,8 +49,8 @@ function stripTrailingBankForm(tokens: string[]): string[] {
 
 /** Lowercase name with punctuation and legal suffixes removed. "CBRE Group, Inc." and "CBRE GROUP INC" both become "cbre group". */
 export function normalizeFirmName(value: string): string {
-  const tokens = stripTrailingBankForm(
-    value
+  let tokens = stripTrailingBankForm(
+    collapseAmpersandInitials(value)
       .replace(/\([^)]*\)/g, " ")
       .toLowerCase()
       .replace(/&amp;/g, " ")
@@ -58,6 +58,7 @@ export function normalizeFirmName(value: string): string {
       .split(/\s+/)
       .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token)),
   );
+  if (tokens.length > 1 && tokens[tokens.length - 1] === "company") tokens = tokens.slice(0, -1);
   return tokens.join(" ");
 }
 

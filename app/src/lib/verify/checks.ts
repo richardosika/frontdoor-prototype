@@ -20,9 +20,9 @@ import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { assessOpenCorporates, assessOpenSanctions, openCorporatesApiUrl, openSanctionsApiUrl } from "@/lib/verify/free-sources";
 import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { edgarIsExactCompany, incorporationStateFromFinding, lookupEdgar } from "@/lib/verify/edgar";
-import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
+import { assessNyRegistry, nyRegistryExactUrl, nyRegistryQueryUrl, normalizeRegistryName, registryNameIsGenericOnly } from "@/lib/verify/ny-registry";
 import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
-import { assessFdicBank, assessStateRegistry, fdicBankFindUrl, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
+import { assessFdicBank, assessStateRegistry, fdicBankFindUrl, registryPortal, socrataExactUrl, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
@@ -456,13 +456,31 @@ function ofacListDate(value: Date | string | null | undefined): string {
   return date.toISOString().slice(0, 10);
 }
 
+function registryRows(text: string): unknown[] {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** An entity hit has to be the same firm after initials are kept. Generic words alone never match. */
+function companySanctionScore(org: string, listed: string): number {
+  if (!org.trim() || !listed.trim()) return 0;
+  if (registryNameIsGenericOnly(org) || registryNameIsGenericOnly(listed)) return 0;
+  const left = normalizeRegistryName(org);
+  const right = normalizeRegistryName(listed);
+  return left && left === right ? 1 : 0;
+}
+
 export function sanctionsCheck(facts: ApplicantFacts, watchlist: WatchlistEntry[], fetchedAt?: Date | string | null): CheckOutput {
   const realLoaded = watchlist.length > 0;
   const lists = [...TEST_WATCHLIST, ...watchlist];
   let best = { score: 0, entry: null as WatchlistEntry | null, field: "" };
   for (const entry of lists) {
     const person = nameMatchScore(facts.name, entry.name);
-    const company = nameMatchScore(facts.org, entry.name);
+    const company = companySanctionScore(facts.org, entry.name);
     const score = Math.max(person, company);
     const field = person >= company ? "name" : "company";
     if (score > best.score) best = { score, entry, field };
@@ -996,12 +1014,15 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   const portal = registryState ? registryPortal(registryState) : undefined;
   const domainResolves = !out.some((row) => row.key === "website" && /does not resolve|is not registered/i.test(row.finding));
   if (portal) {
-    const registryUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
-    const registryHttp = await settleWithin(fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
-      ok: false,
-      status: 0,
-      text: "",
-    });
+    const exactUrl = portal.state === "NY" ? nyRegistryExactUrl(searchFacts.org) : socrataExactUrl(portal, searchFacts.org);
+    const likeUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
+    const emptyHttp = { ok: false, status: 0, text: "" };
+    let registryHttp = await settleWithin(fetchText(exactUrl).catch(() => emptyHttp), 20_000, emptyHttp);
+    const exactRows = registryRows(registryHttp.text);
+    if (!registryHttp.ok || !exactRows.length) {
+      const likeHttp = await settleWithin(fetchText(likeUrl).catch(() => emptyHttp), 20_000, emptyHttp);
+      if (likeHttp.ok && likeHttp.text.trim()) registryHttp = likeHttp;
+    }
     const registry = portal.state === "NY"
       ? assessNyRegistry(searchFacts.org, registryHttp, searchFacts.website, domainResolves)
       : assessStateRegistry(portal, searchFacts.org, registryHttp, searchFacts.website, domainResolves);
@@ -1067,12 +1088,14 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
     const homePortal = registryPortal(incorporated);
     let incorporationPass: CheckOutput | null = null;
     if (homePortal) {
-      const homeUrl = homePortal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(homePortal, searchFacts.org);
-      const homeHttp = await settleWithin(fetchText(homeUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
-        ok: false,
-        status: 0,
-        text: "",
-      });
+      const homeExact = homePortal.state === "NY" ? nyRegistryExactUrl(searchFacts.org) : socrataExactUrl(homePortal, searchFacts.org);
+      const homeLike = homePortal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(homePortal, searchFacts.org);
+      const homeEmpty = { ok: false, status: 0, text: "" };
+      let homeHttp = await settleWithin(fetchText(homeExact).catch(() => homeEmpty), 20_000, homeEmpty);
+      if (!homeHttp.ok || !registryRows(homeHttp.text).length) {
+        const likeHttp = await settleWithin(fetchText(homeLike).catch(() => homeEmpty), 20_000, homeEmpty);
+        if (likeHttp.ok && likeHttp.text.trim()) homeHttp = likeHttp;
+      }
       const home = homePortal.state === "NY"
         ? assessNyRegistry(searchFacts.org, homeHttp, searchFacts.website, domainResolves)
         : assessStateRegistry(homePortal, searchFacts.org, homeHttp, searchFacts.website, domainResolves);

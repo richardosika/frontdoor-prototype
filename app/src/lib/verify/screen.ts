@@ -1718,11 +1718,8 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     }
   }
   const formal = formalGivenName(person);
-  const quotesIgnored =
-    Boolean(formal) &&
-    !engines.some((engine) => engine.note === "result" || engine.note === "own site") &&
-    engines.some((engine) => engine.note === "no name and company" || engine.note === "unrelated results");
-  if (quotesIgnored && formal) {
+  const missedBoth = !engines.some((engine) => engine.note === "result" || engine.note === "own site");
+  if (missedBoth && formal) {
     await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
     const parsed = parsePersonName(person);
     const formalPerson = parsed ? [formal, ...parsed.given.slice(1), parsed.surname].filter(Boolean).join(" ") : person;

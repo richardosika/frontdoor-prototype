@@ -130,8 +130,21 @@ const GENERIC = new Set([
   "usa",
 ]);
 
+/** "M&T", "L & L", "L AND L", and "AT&T" become one token. "Robins & Morton" stays two words. */
+export function collapseAmpersandInitials(value: string): string {
+  const spaced = value.replace(
+    /(?<![A-Za-z])([A-Za-z](?:\s*(?:&|and)\s*[A-Za-z])+)(?![A-Za-z])/gi,
+    (match) => match.replace(/[^A-Za-z]/g, ""),
+  );
+  return spaced.replace(/(?<![A-Za-z])([A-Z]{1,4}(?:&[A-Z]{1,4})+)(?![A-Za-z])/g, (match) => match.replace(/&/g, ""));
+}
+
+export function foldMarks(value: string): string {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function tokens(value: string): string[] {
-  return value
+  return collapseAmpersandInitials(value)
     .toLowerCase()
     .replace(/&amp;/g, " ")
     .replace(/[\u2018\u2019\u02BB\u02BC]/g, "'")
@@ -178,11 +191,11 @@ function surnameFromParts(parts: string[]): { given: string[]; surname: string }
 }
 
 export function parsePersonName(name: string): ParsedPersonName | null {
-  const parts = name
+  const parts = foldMarks(name)
     .replace(/\b[A-Za-z]\.\s*/g, " ")
     .split(/\s+/)
-    .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
-    .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 2);
+    .map((part) => part.replace(/^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu, ""))
+    .filter((part) => part.replace(/[^\p{L}\p{N}]/gu, "").length >= 2);
   if (!parts.length) return null;
   let suffix: string | null = null;
   const tail = normalizeGenerationalSuffix(parts[parts.length - 1]);
@@ -193,6 +206,24 @@ export function parsePersonName(name: string): ParsedPersonName | null {
   if (!parts.length) return null;
   const { given, surname } = surnameFromParts(parts);
   return { given, surname, suffix };
+}
+
+function accentedPerson(name: string): string {
+  const parts = name
+    .normalize("NFC")
+    .replace(/\b\p{L}\.\s*/gu, " ")
+    .split(/\s+/)
+    .map((part) => part.replace(/^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu, ""))
+    .filter((part) => part.replace(/[^\p{L}\p{N}]/gu, "").length >= 2);
+  if (parts.length && normalizeGenerationalSuffix(foldMarks(parts[parts.length - 1]))) parts.pop();
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** Folded spelling, plus the original when it still has an accent. "René Jones" and "Rene Jones". */
+export function personSearchSpellings(name: string): string[] {
+  const folded = personWithoutSuffix(name);
+  const accented = accentedPerson(name);
+  return [...new Set([accented, folded].map((item) => item.replace(/\s+/g, " ").trim()).filter(Boolean))];
 }
 
 /** Name used in a search query. The suffix token is removed. The surname stays. */
@@ -490,7 +521,17 @@ export function domainMatchesOrgStem(label: string, org: string): boolean {
   if (!stem || compact.length < 2) return false;
   if (compact === stem) return true;
   const peeled = compact.replace(DOMAIN_STATE_TAIL, "");
-  return peeled.length >= 2 && peeled === stem;
+  if (peeled.length >= 2 && peeled === stem) return true;
+  const brand = initialBrandStem(org);
+  return brand.length >= 3 && (compact === brand || peeled === brand);
+}
+
+/** "M&T Bank" is mt plus the b in Bank, so mtb.com is this firm. */
+export function initialBrandStem(org: string): string {
+  const phrase = companyPhraseTokens(stripQaOrg(org));
+  const initials = phrase.filter((token) => isShortBrandToken(token)).join("");
+  const next = phrase.find((token) => !isShortBrandToken(token));
+  return `${initials}${next ? next[0] : ""}`;
 }
 
 /** The site's own brand label. jll.com is "jll". A generic label such as "usa" is not a brand. */
@@ -722,6 +763,8 @@ function otherGivenImmediatelyBefore(text: string, matchStart: number, parsed: P
  * That occurrence still counts for the person. A different given name in front of it does not.
  */
 export function personHit(text: string, name: string, org = "", options?: { ownFirm?: boolean }): PersonHit {
+  text = foldMarks(text);
+  name = foldMarks(name);
   const parsed = parsePersonName(name);
   if (!parsed || parsed.given.length < 1) return "none";
   const companyRanges = org ? companySpanRanges(text, org) : [];
@@ -963,7 +1006,10 @@ function properNamePhrase(text: string, prefix: string[], org = ""): boolean {
  * A single-token firm keeps a whole-word match.
  */
 export function mentionsCompany(text: string, org: string, person = ""): boolean {
+  text = collapseAmpersandInitials(foldMarks(text));
   const phrase = companyPhraseTokens(org);
+  const brand = initialBrandStem(org);
+  if (brand.length >= 3 && wordHit(text, brand)) return true;
   if (!phrase.length) return false;
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
   if (phrase.length === 1) {

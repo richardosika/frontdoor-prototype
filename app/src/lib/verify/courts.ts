@@ -1,6 +1,7 @@
 import { normalizeFirmName } from "@/lib/verify/edgar";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { normalizeGenerationalSuffix } from "@/lib/verify/public-match";
+import { registryNameIsGenericOnly } from "@/lib/verify/ny-registry";
+import { foldMarks, normalizeGenerationalSuffix } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const SEVERE = /\b(bankruptcy|fraud|indicted|ponzi)\b/i;
@@ -61,7 +62,7 @@ function anchoredName(hay: string, body: string): boolean {
  * One token is not a full name, so "TestAF" alone is not searched and not a hit.
  */
 export function courtNameParts(name: string): { given: string[]; surname: string } | null {
-  const parts = name
+  const parts = foldMarks(name)
     .split(/\s+/)
     .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
     .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 2);
@@ -107,8 +108,8 @@ function personPhrase(text: string, name: string): boolean {
 
 function companyPhrase(text: string, org: string): boolean {
   const phrase = normalizeFirmName(org);
-  if (!phrase) return false;
-  return containsPhrase(text, phrase);
+  if (!phrase || registryNameIsGenericOnly(org)) return false;
+  return containsPhrase(foldMarks(text), phrase);
 }
 
 function recordFields(result: CourtHit): string[] {

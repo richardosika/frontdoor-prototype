@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSearchSpellings, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -212,6 +212,11 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
   const personQuery = personCompanyQuery(person, term);
   if (personQuery) queries.push(personQuery);
   else if (person || company) queries.push(`"${person || company}"`);
+  for (const spelling of personSearchSpellings(facts.applicantName)) {
+    if (spelling.toLowerCase() === person.toLowerCase()) continue;
+    const accented = personCompanyQuery(spelling, term);
+    if (accented && !queries.includes(accented)) queries.push(accented);
+  }
   const commonSurname = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
   if (last && commonSurname.has(last.toLowerCase())) {
     const token = distinctiveCompanyTokens(company).find((word) => isDistinctiveCompanyToken(word));
