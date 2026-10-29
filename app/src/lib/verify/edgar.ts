@@ -32,16 +32,33 @@ export function parseCompanyTickers(payload: string): EdgarCompany[] | null {
 
 const LEGAL_SUFFIX = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pc", "pllc"]);
 
+/** Trailing bank charters. "National Bank" stays, because it is part of the brand. */
+function stripTrailingBankForm(tokens: string[]): string[] {
+  let rest = tokens;
+  const phrases = [
+    ["national", "association"],
+    ["federal", "savings", "bank"],
+  ];
+  for (const phrase of phrases) {
+    if (rest.length > phrase.length && rest.slice(-phrase.length).join(" ") === phrase.join(" ")) rest = rest.slice(0, -phrase.length);
+  }
+  const single = new Set(["fsb", "ssb", "na"]);
+  while (rest.length > 1 && single.has(rest[rest.length - 1] || "")) rest = rest.slice(0, -1);
+  return rest;
+}
+
 /** Lowercase name with punctuation and legal suffixes removed. "CBRE Group, Inc." and "CBRE GROUP INC" both become "cbre group". */
 export function normalizeFirmName(value: string): string {
-  return value
-    .replace(/\([^)]*\)/g, " ")
-    .toLowerCase()
-    .replace(/&amp;/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token))
-    .join(" ");
+  const tokens = stripTrailingBankForm(
+    value
+      .replace(/\([^)]*\)/g, " ")
+      .toLowerCase()
+      .replace(/&amp;/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token)),
+  );
+  return tokens.join(" ");
 }
 
 /**
@@ -500,15 +517,17 @@ export function filingNames(payload: string): string[][] | null {
  * A person named on a related filer. Shown as evidence. It is not an exact match and it does not add points.
  * A fuzzy parent stays at 0.
  */
-export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string): string {
+export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string, matchedCik = ""): string {
   const tokens = distinctiveCompanyTokens(org)
     .map((token) => token.toLowerCase())
     .filter((token) => isDistinctiveCompanyToken(token) || isShortBrandToken(token));
   if (!tokens.length || !person.trim()) return "";
+  const sameRegistrant = padCik(matchedCik);
   for (const hit of hits) {
     const companies = hit.names.map((name) => companyFromDisplayName(name)).filter((row): row is EdgarCompany => Boolean(row?.title));
     const company = companies.find((row) => row.cik) || companies.find((row) => firmTokens(row.title).some((token) => tokens.includes(token)));
     if (!company?.title || sameFirmName(company.title, org)) continue;
+    if (sameRegistrant && padCik(company.cik) === sameRegistrant) continue;
     if (!firmTokens(company.title).some((token) => tokens.includes(token))) continue;
     const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, person));
     if (!named) continue;
@@ -639,14 +658,14 @@ export function assessEdgarMatch(input: {
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
     if (parent) {
       const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
-      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org, parent.cik);
       if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
       return result;
     }
     const related = sharedWordAffiliate(input.companies, input.org);
     if (related) {
       const result = differentCompanyResult(related);
-      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org, related.cik);
       if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
       return result;
     }

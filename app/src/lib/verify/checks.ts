@@ -22,7 +22,7 @@ import { alignNewsRows, newsChecks } from "@/lib/verify/news";
 import { edgarIsExactCompany, incorporationStateFromFinding, lookupEdgar } from "@/lib/verify/edgar";
 import { assessNyRegistry, nyRegistryQueryUrl } from "@/lib/verify/ny-registry";
 import { manualRegistryFinding, stateRegistrySearchUrl } from "@/lib/state-registry-search";
-import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
+import { assessFdicBank, assessStateRegistry, fdicBankFindUrl, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { completeScreenRows, runPublicScreen } from "@/lib/verify/screen";
 
 const DISPOSABLE = new Set([
@@ -994,6 +994,7 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   out.push(...completeScreenRows(screenRows ?? screenSink.slice()));
   const registryState = statedUsState(ctx.facts.location || "");
   const portal = registryState ? registryPortal(registryState) : undefined;
+  const domainResolves = !out.some((row) => row.key === "website" && /does not resolve|is not registered/i.test(row.finding));
   if (portal) {
     const registryUrl = portal.state === "NY" ? nyRegistryQueryUrl(searchFacts.org) : socrataRegistryUrl(portal, searchFacts.org);
     const registryHttp = await settleWithin(fetchText(registryUrl).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
@@ -1001,7 +1002,9 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       status: 0,
       text: "",
     });
-    const registry = portal.state === "NY" ? assessNyRegistry(searchFacts.org, registryHttp) : assessStateRegistry(portal, searchFacts.org, registryHttp, searchFacts.website);
+    const registry = portal.state === "NY"
+      ? assessNyRegistry(searchFacts.org, registryHttp, searchFacts.website, domainResolves)
+      : assessStateRegistry(portal, searchFacts.org, registryHttp, searchFacts.website, domainResolves);
     out.push(
       check({
         key: "business-registry",
@@ -1013,6 +1016,31 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
         corroborates: false,
       }),
     );
+  }
+  const registryRow = out.find((row) => row.key === "business-registry");
+  const wantsBankFind = /\bbank\b/i.test(searchFacts.org) || (/\blender\b/i.test(searchFacts.role || "") && registryRow?.status !== "PASS");
+  if (wantsBankFind && registryRow?.status !== "PASS") {
+    const fdicHttp = await settleWithin(fetchText(fdicBankFindUrl(searchFacts.org)).catch(() => ({ ok: false, status: 0, text: "" })), 20_000, {
+      ok: false,
+      status: 0,
+      text: "",
+    });
+    const fdic = assessFdicBank(searchFacts.org, searchFacts.location, fdicHttp);
+    if (fdic) {
+      const row = check({
+        key: "business-registry",
+        status: fdic.status,
+        weight: 8,
+        finding: fdic.finding,
+        source: "FDIC BankFind",
+        url: fdic.url,
+        corroborates: false,
+        reviewFlag: fdic.reviewFlag,
+      });
+      const index = out.findIndex((item) => item.key === "business-registry");
+      if (index >= 0) out[index] = row;
+      else out.push(row);
+    }
   }
   const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText, searchFacts.website), 40_000, {
     status: "UNAVAILABLE" as const,
@@ -1045,7 +1073,9 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
         status: 0,
         text: "",
       });
-      const home = homePortal.state === "NY" ? assessNyRegistry(searchFacts.org, homeHttp) : assessStateRegistry(homePortal, searchFacts.org, homeHttp, searchFacts.website);
+      const home = homePortal.state === "NY"
+        ? assessNyRegistry(searchFacts.org, homeHttp, searchFacts.website, domainResolves)
+        : assessStateRegistry(homePortal, searchFacts.org, homeHttp, searchFacts.website, domainResolves);
       if (home.status === "PASS") {
         incorporationPass = check({
           key: "business-registry",

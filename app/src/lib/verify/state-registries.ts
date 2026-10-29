@@ -1,5 +1,6 @@
-import { normalizeRegistryName, registryNameWhere } from "@/lib/verify/ny-registry";
+import { normalizeRegistryName, registryNameWhere, registryQualifierMatch } from "@/lib/verify/ny-registry";
 import { domainBrand } from "@/lib/verify/public-match";
+import { statedUsState } from "@/lib/verify/address";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies", "co"]);
@@ -118,6 +119,7 @@ export function assessStateRegistry(
   org: string,
   response: { ok: boolean; status: number; text: string },
   website = "",
+  domainResolves = true,
 ): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
   const url = portal.portalUrl;
   if (!org.trim()) {
@@ -184,10 +186,76 @@ export function assessStateRegistry(
       finding: `${portal.label} lists ${listed}. That shows a company by this name exists. It does not tie a person to the firm.`,
     };
   }
+  const qualified = rows.find((row) => registryQualifierMatch(String(row[portal.nameField] || ""), org, website, domainResolves));
+  if (qualified && (!portal.statusField || statusIsActive(String(qualified[portal.statusField] || "")))) {
+    const listed = String(qualified[portal.nameField] || org);
+    return {
+      status: "PASS",
+      corroborates: false,
+      url,
+      finding: `${portal.label} lists ${listed}. That shows a company by this name exists. It does not tie a person to the firm.`,
+    };
+  }
   return {
     status: "INCONCLUSIVE",
     corroborates: false,
     url,
     finding: `${portal.label} responded. No entity uses this exact name. A similar name is not a match, and this is not a pass.`,
+  };
+}
+
+/** Keyless FDIC BankFind search. The first distinctive word is enough to retrieve the charter name. */
+export function fdicBankFindUrl(org: string): string {
+  const tokens = normalizeRegistryName(org)
+    .split(/\s+/)
+    .filter((token) => token && token !== "bank" && token !== "national");
+  const term = tokens[0] || normalizeRegistryName(org) || org.trim();
+  const params = new URLSearchParams({
+    filters: "ACTIVE:1",
+    search: `NAME:${term}`,
+    fields: "NAME,CERT,CITY,STALP,ACTIVE",
+    limit: "25",
+  });
+  return `https://api.fdic.gov/banks/institutions?${params.toString()}`;
+}
+
+type FdicInstitution = { NAME?: string; CITY?: string; STALP?: string; ACTIVE?: number | string };
+
+/** An active BankFind row whose normalized name is the applicant's bank. No person tie. */
+export function assessFdicBank(
+  org: string,
+  location: string,
+  response: { ok: boolean; status: number; text: string },
+): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag"> | null {
+  if (!response.ok || !response.text.trim()) return null;
+  let rows: FdicInstitution[] = [];
+  try {
+    const parsed = JSON.parse(response.text) as { data?: { data?: FdicInstitution }[] };
+    rows = Array.isArray(parsed.data) ? parsed.data.map((row) => row?.data || {}) : [];
+  } catch {
+    return null;
+  }
+  const want = normalizeRegistryName(org);
+  const hit = rows.find((row) => Number(row.ACTIVE) === 1 && normalizeRegistryName(String(row.NAME || "")) === want && want);
+  if (!hit) return null;
+  const state = String(hit.STALP || "").trim().toUpperCase();
+  const place = [String(hit.CITY || "").trim(), state].filter(Boolean).join(" ");
+  const listed = String(hit.NAME || org);
+  const url = "https://banks.data.fdic.gov/bankfind-suite/bankfind";
+  const applicantState = statedUsState(location);
+  if (applicantState && state && applicantState !== state) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      url,
+      finding: `FDIC BankFind lists ${listed} (active, ${place}). The bank's state is ${state}, not ${applicantState} on the application. This is an attention item and not a pass.`,
+    };
+  }
+  return {
+    status: "PASS",
+    corroborates: false,
+    url,
+    finding: `FDIC BankFind lists ${listed} (active, ${place}). That shows a company by this exact name exists. It does not tie a person to the firm.`,
   };
 }

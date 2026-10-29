@@ -3,8 +3,8 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultPages, wikipediaRestResultPages } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 const SEARCH_RETRY_MS = 400;
@@ -881,7 +881,34 @@ function onOwnRegistrable(href: string, website: string): boolean {
   }
 }
 
-/** One site:domain search. A lookalike host does not count. No answer stays blocked. A clean miss is empty. */
+function ownSiteResultRows(html: string): { href: string; text: string }[] {
+  const bing = [...html.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((block) => ({
+    href: unwrapResultUrl(block[0].match(/href\s*=\s*"([^"]+)"/i)?.[1] || ""),
+    text: visible(block[0]),
+  }));
+  if (bing.length) return bing.filter((row) => row.href);
+  const liteRows = [...html.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)].map((row) => row[0]);
+  const lite: { href: string; text: string }[] = [];
+  for (let index = 0; index < liteRows.length; index += 1) {
+    const link = /<a\b[^>]*class="[^"]*result-link[^"]*"[^>]*href\s*=\s*"([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(liteRows[index] || "");
+    if (!link) continue;
+    const snippet = /class="[^"]*result-snippet[^"]*"[^>]*>([\s\S]*?)<\/t[dr]/i.exec(liteRows[index + 1] || "")?.[1] || "";
+    const href = unwrapResultUrl(link[1] || "");
+    if (href) lite.push({ href, text: visible(`${link[2]} ${snippet}`) });
+  }
+  if (lite.length) return lite;
+  const anchors = [...html.matchAll(/<a\b[^>]*class="[^"]*result__(?:a|snippet)[^"]*"[^>]*>[\s\S]*?<\/a>/gi)].map((block) => block[0]);
+  const htmlRows: { href: string; text: string }[] = [];
+  for (let index = 0; index < anchors.length; index += 1) {
+    if (!/result__a/i.test(anchors[index] || "")) continue;
+    const href = unwrapResultUrl(anchors[index]?.match(/href\s*=\s*"([^"]+)"/i)?.[1] || "");
+    const snippet = anchors[index + 1] && /result__snippet/i.test(anchors[index + 1] || "") ? anchors[index + 1] : "";
+    if (href) htmlRows.push({ href, text: visible(`${anchors[index]} ${snippet}`) });
+  }
+  return htmlRows;
+}
+
+/** One site:domain search per name, at most two names. A lookalike host does not count. A page that ignores site: is not an answer. */
 async function searchOwnSitePerson(
   fetchText: FetchText,
   website: string,
@@ -896,27 +923,38 @@ async function searchOwnSitePerson(
   if (!domain) return { kind: "down" };
   const parsed = parsePersonName(person);
   const surname = parsed?.surname || "";
-  const given = formalGivenName(person) || parsed?.given[0] || "";
-  if (!given || !surname) return { kind: "down" };
-  const query = `site:${domain} "${given} ${surname}"`;
-  const targets = [`https://www.bing.com/search?q=${encodeURIComponent(query)}`, `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`];
-  let sawPage = false;
-  for (const url of targets) {
-    const response = await pull(fetchText, url);
-    if (response.status < 200 || response.status >= 300) continue;
-    sawPage = true;
-    const blocks = [
-      ...response.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi),
-      ...response.text.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi),
+  const typed = parsed?.given[0] || "";
+  const formals = formalGivenNames(person);
+  const givens = [...new Set(formals.length ? [...formals, typed] : [typed])].filter(Boolean).slice(0, 2);
+  if (!givens.length || !surname) return { kind: "down" };
+  let sawEmpty = false;
+  for (const given of givens) {
+    const query = `site:${domain} "${given} ${surname}"`;
+    const targets = [
+      `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`,
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
     ];
-    for (const block of blocks) {
-      const html = block[0];
-      const href = unwrapResultUrl(html.match(/href\s*=\s*"([^"]+)"/i)?.[1] || "");
-      if (!onOwnRegistrable(href, website)) continue;
-      if (personHit(visible(html), person) === "match") return { kind: "hit", url: href };
+    for (const url of targets) {
+      let response = await pull(fetchText, url);
+      if (url.includes("lite.duckduckgo.com") && response.status === 202) {
+        await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+        response = await pull(fetchText, url);
+      }
+      if (response.status < 200 || response.status >= 300 || response.status === 202 || isBotChallenge(response.text)) continue;
+      const rows = ownSiteResultRows(response.text);
+      if (!rows.length) {
+        sawEmpty = true;
+        continue;
+      }
+      const own = rows.filter((row) => onOwnRegistrable(row.href, website));
+      if (!own.length) continue;
+      sawEmpty = true;
+      const named = own.find((row) => personHit(row.text, person) === "match");
+      if (named) return { kind: "hit", url: named.href };
     }
   }
-  return sawPage ? { kind: "empty" } : { kind: "down" };
+  return sawEmpty ? { kind: "empty" } : { kind: "down" };
 }
 
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
@@ -1040,13 +1078,21 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
             selfReported: true,
           });
         } else {
-          const detail =
+          const blocked =
             home.status === 403
-              ? `blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL${renamed}`
+              ? "blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL"
               : home.status === 405
-                ? `blocked the check (405). blocked by site, ask applicant for a team-page URL${renamed}`
-                : `blocked by site, ask applicant for a team-page URL${renamed}`;
-          attempts.push(blockedAttempt("website", "Company website", website, redirectedTo || homeUrl, detail));
+                ? "blocked the check (405). blocked by site, ask applicant for a team-page URL"
+                : "blocked by site, ask applicant for a team-page URL";
+          attempts.push(
+            blockedAttempt(
+              "website",
+              "Company website",
+              website,
+              redirectedTo || homeUrl,
+              `${blocked}. Own-site search did not complete; site blocked a direct fetch.${renamed}`,
+            ),
+          );
         }
       } else {
         const detail =
@@ -1616,12 +1662,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       {
         name: "Wikipedia",
         url: `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`,
-        parse: (text) => wikipediaRestResultTexts(text).map((text) => ({ text, hrefs: [] })),
+        parse: (text) => wikipediaRestResultPages(text).map((row) => ({ text: row.text, hrefs: row.href ? [row.href] : [] })),
       },
       {
         name: "Wikidata",
         url: `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`,
-        parse: (text) => wikidataSearchResultTexts(text).map((text) => ({ text, hrefs: [] })),
+        parse: (text) => wikidataSearchResultPages(text).map((row) => ({ text: row.text, hrefs: row.href ? [row.href] : [] })),
       },
       {
         name: "GDELT",

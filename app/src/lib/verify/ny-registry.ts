@@ -1,18 +1,35 @@
+import { domainBrand } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
 const LEGAL_SUFFIX = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pc", "pllc"]);
 
 const DATASET = "https://data.ny.gov/resource/n9v6-gdp6.json";
 
+const BANK_PHRASES = [
+  ["national", "association"],
+  ["federal", "savings", "bank"],
+];
+const BANK_SINGLE = new Set(["fsb", "ssb", "na"]);
+
+function stripTrailingBankForm(tokens: string[]): string[] {
+  let rest = tokens;
+  for (const phrase of BANK_PHRASES) {
+    if (rest.length > phrase.length && rest.slice(-phrase.length).join(" ") === phrase.join(" ")) rest = rest.slice(0, -phrase.length);
+  }
+  while (rest.length > 1 && BANK_SINGLE.has(rest[rest.length - 1] || "")) rest = rest.slice(0, -1);
+  return rest;
+}
+
 /** Lowercase name with punctuation and legal suffixes removed, for an exact company comparison. */
 export function normalizeRegistryName(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/&amp;/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token))
-    .join(" ");
+  return stripTrailingBankForm(
+    value
+      .toLowerCase()
+      .replace(/&amp;/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token)),
+  ).join(" ");
 }
 
 /** Spellings that can store one normalized name in the NY corporations file. */
@@ -92,9 +109,46 @@ export function nyRegistryQueryUrl(org: string): string {
   return `${DATASET}?${params.toString()}`;
 }
 
+const GEO_WORD = new Set(["us", "usa", "america"]);
+const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies", "co"]);
+
+function stripTrailingGeo(tokens: string[]): { tokens: string[]; stripped: boolean } {
+  if (tokens.length >= 2 && tokens[tokens.length - 2] === "north" && tokens[tokens.length - 1] === "america") {
+    return { tokens: tokens.slice(0, -2), stripped: true };
+  }
+  if (GEO_WORD.has(tokens[tokens.length - 1] || "")) return { tokens: tokens.slice(0, -1), stripped: true };
+  return { tokens, stripped: false };
+}
+
+/** The website stem is the firm name, or the initials of at least three firm words. */
+export function registryDomainAgrees(org: string, website: string): boolean {
+  const stem = domainBrand(website);
+  const tokens = normalizeRegistryName(org).split(/\s+/).filter(Boolean);
+  if (!stem || !tokens.length) return false;
+  if (stem === tokens.join("")) return true;
+  const initials = tokens.map((token) => token[0] || "").join("");
+  return initials.length >= 3 && stem === initials;
+}
+
+/**
+ * "HOGAN LOVELLS CADWALADER US LLP" is Hogan Lovells Cadwalader plus a geographic word.
+ * The domain has to agree, and a domain that does not resolve does not count.
+ */
+export function registryQualifierMatch(listed: string, org: string, website: string, domainResolves = true): boolean {
+  if (!domainResolves || !website.trim() || !registryDomainAgrees(org, website)) return false;
+  const orgTokens = normalizeRegistryName(org).split(/\s+/).filter(Boolean);
+  const geo = stripTrailingGeo(normalizeRegistryName(listed).split(/\s+/).filter(Boolean));
+  if (!geo.stripped || !orgTokens.length || geo.tokens.length < orgTokens.length) return false;
+  if (geo.tokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) return false;
+  const extra = geo.tokens.slice(orgTokens.length);
+  return extra.every((token) => REGISTRY_EXTRA.has(token));
+}
+
 export function assessNyRegistry(
   org: string,
   response: { ok: boolean; status: number; text: string },
+  website = "",
+  domainResolves = true,
 ): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
   const url = "https://data.ny.gov/d/n9v6-gdp6";
   if (!org.trim()) {
@@ -128,7 +182,11 @@ export function assessNyRegistry(
   }
   const want = normalizeRegistryName(org);
   const hit = rows.find((row) => normalizeRegistryName(String(row.current_entity_name || "")) === want && want);
-  if (!hit) {
+  const qualified = hit
+    ? undefined
+    : rows.find((row) => registryQualifierMatch(String(row.current_entity_name || ""), org, website, domainResolves));
+  const chosen = hit || qualified;
+  if (!chosen) {
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -136,10 +194,18 @@ export function assessNyRegistry(
       finding: "NY Active Corporations responded. No active entity uses this exact name. A similar name is not a match, and this is not a pass.",
     };
   }
+  if (!hit && qualified) {
+    return {
+      status: "PASS",
+      corroborates: false,
+      url,
+      finding: `NY Active Corporations lists ${String(qualified.current_entity_name)}. That shows a company by this name exists. It does not tie a person to the firm.`,
+    };
+  }
   return {
     status: "PASS",
     corroborates: false,
     url,
-    finding: `NY Active Corporations lists ${String(hit.current_entity_name)}. That shows a company by this exact name exists. It does not tie a person to the firm.`,
+    finding: `NY Active Corporations lists ${String(chosen.current_entity_name)}. That shows a company by this exact name exists. It does not tie a person to the firm.`,
   };
 }

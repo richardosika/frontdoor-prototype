@@ -437,6 +437,8 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
   return classifyNews(facts, enriched, providers, now);
 }
 
+const COMMON_SURNAMES = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
+
 /** The company name sits within about 300 characters of the person's full name. */
 export function companyNearPerson(text: string, person: string, org: string, limit = 300): boolean {
   const hit = personSpan(text, person);
@@ -445,32 +447,70 @@ export function companyNearPerson(text: string, person: string, org: string, lim
   return mentionsCompany(window, org, person);
 }
 
+function isGoogleNewsUrl(value: string): boolean {
+  try {
+    return /(^|\.)news\.google\.com$/i.test(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Bing News redirect links unwrap to the publisher. A Google News redirect is not an article. */
+export function publisherArticleUrl(value: string): string {
+  const direct = value.trim();
+  if (!direct || isGoogleNewsUrl(direct)) return "";
+  return direct;
+}
+
 async function attachCompanyNearPerson(facts: ApplicantFacts, items: NewsItem[], fetchText: FetchText): Promise<NewsItem[]> {
   const person = facts.applicantName.trim();
   const org = stripQaOrg((facts.org || facts.name).trim());
   if (!person || !org) return items;
   const factsForJudge = { name: person, applicantName: person, org, location: facts.location, website: facts.website };
+  const surname = surnameForSearch(person);
+  const surnameOnly = Boolean(surname) && !COMMON_SURNAMES.has(surname.toLowerCase());
   const targets = items.filter((item) => {
+    if (!item.url) return false;
     const judged = judgeHeadline(item.title, factsForJudge);
-    return judged.person && !judged.company && Boolean(item.url);
-  }).slice(0, 2);
-  if (!targets.length) return items;
-  const fetched = new Map<string, string>();
-  for (const item of targets) {
+    if (judged.person && !judged.company) return true;
+    if (!surnameOnly || judged.person || !judged.company) return false;
+    return new RegExp(`(?<![A-Za-z])${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z])`, "i").test(item.title);
+  });
+  const ordered = [...targets.filter((item) => publisherArticleUrl(item.url)), ...targets.filter((item) => isGoogleNewsUrl(item.url))].slice(0, 2);
+  if (!ordered.length) return items;
+  const fetched = new Map<string, { body: string; url: string }>();
+  let fetches = 0;
+  let lookedUp = false;
+  for (const item of ordered) {
+    if (fetches >= 2) break;
+    let url = publisherArticleUrl(item.url);
+    if (!url && isGoogleNewsUrl(item.url) && !lookedUp && fetches < 2) {
+      lookedUp = true;
+      fetches += 1;
+      try {
+        const lookup = await fetchText(bingNewsUrl(`"${item.title}"`));
+        const match = lookup.ok ? parseRssItems(lookup.text, "Bing News").find((row) => normalizeName(row.title) === normalizeName(item.title)) : undefined;
+        url = match ? publisherArticleUrl(match.url) : "";
+      } catch {
+        url = "";
+      }
+    }
+    if (!url || fetches >= 2) continue;
+    fetches += 1;
     try {
-      const response = await fetchText(item.url);
-      if (response.ok && response.text && companyNearPerson(response.text, person, org)) fetched.set(item.url, response.text);
+      const response = await fetchText(url);
+      if (response.ok && response.text && companyNearPerson(response.text, person, org)) fetched.set(item.url, { body: response.text, url });
     } catch {
       // A failed article fetch leaves the headline inconclusive.
     }
   }
   if (!fetched.size) return items;
   return items.map((item) => {
-    const body = fetched.get(item.url);
-    if (!body) return item;
-    const hit = personSpan(body, person);
-    const window = hit ? body.slice(Math.max(0, hit.index - 300), hit.index + hit.length + 300) : "";
-    return window ? { ...item, snippet: `${item.snippet} ${window}`.replace(/\s+/g, " ").trim() } : item;
+    const found = fetched.get(item.url);
+    if (!found) return item;
+    const hit = personSpan(found.body, person);
+    const window = hit ? found.body.slice(Math.max(0, hit.index - 300), hit.index + hit.length + 300) : "";
+    return window ? { ...item, snippet: `${item.snippet} ${window}`.replace(/\s+/g, " ").trim(), url: found.url } : item;
   });
 }
 

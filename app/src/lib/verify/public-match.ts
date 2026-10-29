@@ -2,7 +2,7 @@ import { ORDINARY_WORDS } from "@/lib/verify/ordinary-words";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 
 const NICKNAMES: Record<string, string[]> = {
-  richard: ["richard", "rich"],
+  richard: ["richard", "rich", "rick", "ricky", "dick"],
   robert: ["robert", "bob", "rob"],
   william: ["william", "bill", "will", "willy"],
   willy: ["willy", "william", "bill", "will"],
@@ -47,7 +47,7 @@ const NICKNAMES: Record<string, string[]> = {
   phillip: ["phillip", "phil"],
   kathleen: ["kathleen", "kathy", "kate"],
   katherine: ["katherine", "kate", "kathy"],
-  elizabeth: ["elizabeth", "liz", "beth"],
+  elizabeth: ["elizabeth", "liz", "beth", "bess", "betsy", "betty"],
   jennifer: ["jennifer", "jen"],
   susan: ["susan", "sue"],
   patricia: ["patricia", "pat", "trish"],
@@ -207,15 +207,27 @@ export function surnameForSearch(name: string): string {
   return parsePersonName(name)?.surname || "";
 }
 
-/** "Bill" is William. "Rob" is Robert. A name that is already a full given name is left as written. */
-export function formalGivenName(name: string): string | null {
+function capitalizeName(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+}
+
+/** Every formal name for a short form. "Pat" is both Patrick and Patricia, at most two. */
+export function formalGivenNames(name: string): string[] {
   const given = parsePersonName(name)?.given[0]?.toLowerCase();
-  if (!given || NICKNAMES[given]) return null;
-  let formal = "";
-  for (const [key, nicks] of Object.entries(NICKNAMES)) {
-    if (key !== given && nicks.includes(given) && key.length > formal.length) formal = key;
-  }
-  return formal ? formal.charAt(0).toUpperCase() + formal.slice(1) : null;
+  if (!given || NICKNAMES[given]) return [];
+  const raw = Object.entries(NICKNAMES)
+    .filter(([key, nicks]) => key !== given && nicks.includes(given))
+    .map(([key]) => key);
+  const longest = raw.reduce((best, key) => (key.length > best.length ? key : best), "");
+  const formals = raw
+    .filter((key) => key === longest || !(NICKNAMES[longest] || []).includes(key))
+    .sort((left, right) => left.length - right.length || left.localeCompare(right));
+  return [...new Set(formals)].slice(0, 2).map(capitalizeName);
+}
+
+/** "Bill" is William. "Rob" is Robert. An ambiguous short form uses the shorter formal name first. */
+export function formalGivenName(name: string): string | null {
+  return formalGivenNames(name)[0] || null;
 }
 
 export type PersonHit = "match" | "suffix-mismatch" | "none";
