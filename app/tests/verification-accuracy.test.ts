@@ -5,13 +5,13 @@ import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, 
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
 import { assessFdicBank, assessStateRegistry, fdicBankFindUrl, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, normalizeFirmName, parseSubmissionsIdentity, reportingOwnerLine, submissionsUrl } from "@/lib/verify/edgar";
+import { assessEdgarMatch, bankHoldingAliases, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, fundNameExtendsFirm, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, normalizeFirmName, parseSubmissionsIdentity, reportingOwnerLine, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, companyNearPerson, gdeltQuery, instagramCompanyTag, judgeHeadline, newsChecks, newsSearchQueries, ordinaryResults, plaintiffSolicitation, publisherArticleUrl, queryCity, socialSearchQuery } from "@/lib/verify/news";
-import { assessNyRegistry, normalizeRegistryName, nyRegistryExactUrl, nyRegistryQueryUrl, registryNameIsGenericOnly } from "@/lib/verify/ny-registry";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, companyNearPerson, gdeltQuery, instagramCompanyTag, judgeHeadline, newsChecks, newsSearchQueries, ordinaryResults, plaintiffSolicitation, publisherArticleUrl, queryCity, reputationalHeadline, socialSearchQuery } from "@/lib/verify/news";
+import { assessNyRegistry, normalizeRegistryName, nyRegistryExactUrl, nyRegistryQueryUrl, registryNameIsGenericOnly, relatedBrandNames } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personSearchSpellings, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, hostMatchesOrgLetters, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, orgLettersLabel, pageBrandNames, personHit, personSearchSpellings, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
@@ -7207,7 +7207,7 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
       if (url.includes("bing.com")) return { ok: true, status: 200, text: hit };
       return { ok: true, status: 200, text: "<html></html>" };
     });
-    expect(urls.some((url) => decodeURIComponent(url).includes("Charles Bendit"))).toBe(false);
+    expect(urls.some((url) => url.includes("bing.com/search") && decodeURIComponent(url).includes("Charles Bendit"))).toBe(false);
     const missed: string[] = [];
     await runPublicScreen(applicant, async (url) => {
       missed.push(url);
@@ -7216,7 +7216,7 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
       }
       return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://example.com/other">Unrelated storage</a></li></ol>` };
     });
-    expect(missed.some((url) => decodeURIComponent(url).includes("Charles Bendit"))).toBe(true);
+    expect(missed.some((url) => url.includes("bing.com/search") && decodeURIComponent(url).includes("Charles Bendit"))).toBe(true);
     expect(formalGivenName("Chuck Bendit")).toBe("Charles");
   });
 
@@ -7285,5 +7285,171 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     const same = sanctionsCheck(facts({ name: "Robert Lapidus", org: "I&S Holding Company", location: "New York, NY" }), list, "2026-01-01");
     expect(same.status).toBe("FAIL");
     expect(same.finding).toContain("I&S HOLDING COMPANY, S.A.");
+  });
+
+  it("discovers a company site from the firm's own letters, never from an email domain", async () => {
+    expect(orgLettersLabel("Madison Realty Capital")).toBe("madisonrealtycapital");
+    expect(hostMatchesOrgLetters("www.madisonrealtycapital.com", "Madison Realty Capital")).toBe(true);
+    expect(hostMatchesOrgLetters("mail.privatefloorclub.com", "Madison Realty Capital")).toBe(false);
+    const applicant = facts({
+      name: "Josh Zegen",
+      applicantName: "Josh Zegen",
+      org: "Madison Realty Capital",
+      website: "",
+      email: "josh@some-other-domain.com",
+      location: "New York, NY",
+    });
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("madisonrealtycapital.com")) {
+        return { ok: true, status: 200, text: "<html><p>Josh Zegen is a principal at Madison Realty Capital.</p></html>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = rows.find((row) => row.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.finding).toContain("Discovered company site (not on the application)");
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.url).toContain("madisonrealtycapital.com");
+    const unnamed = await runPublicScreen(
+      facts({ name: "Thaddeus Wrenmoor", applicantName: "Thaddeus Wrenmoor", org: "Paul, Weiss, Rifkind, Wharton & Garrison LLP", website: "", location: "New York, NY" }),
+      async () => ({ ok: true, status: 200, text: "<html><p>Paul, Weiss, Rifkind, Wharton and Garrison LLP is a law firm.</p></html>" }),
+    );
+    expect(unnamed.find((row) => row.key === "website")?.status).toBe("NOT_RUN");
+  });
+
+  it("gives half EDGAR credit for a fund that starts with the firm, not for a one-word cousin", () => {
+    expect(fundNameExtendsFirm("Madison Realty Capital Debt MA I LP", "Madison Realty Capital")).toBe(true);
+    expect(fundNameExtendsFirm("Madison Air Solutions Corp", "Madison Realty Capital")).toBe(false);
+    const fund = assessEdgarMatch({
+      org: "Madison Realty Capital",
+      person: "Josh Zegen",
+      tickersOk: true,
+      companies: [{ title: "Madison Air Solutions Corp", ticker: "MAIR", cik: "2098430" }],
+      filingNames: [],
+      textHits: [
+        {
+          names: ["Madison Realty Capital Debt MA I LP (CIK 1817862)", "Josh Zegen"],
+          form: "D",
+          fileDate: "2020-07-27",
+          personMatched: true,
+        },
+      ],
+    });
+    expect(fund.status).toBe("INCONCLUSIVE");
+    expect(fund.companyOnly).toBe(true);
+    expect(fund.corroborates).not.toBe(true);
+    expect(fund.finding).toContain("Madison Realty Capital Debt MA I LP");
+    expect(fund.finding).not.toContain("Madison Air");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, finding: fund.finding, corroborates: false }), row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names Josh Zegen at Madison Realty Capital." })],
+      facts({ name: "Josh Zegen", org: "Madison Realty Capital" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+  });
+
+  it("links a bank to its bancorp or bancshares holding company", () => {
+    expect(bankHoldingAliases("Dime Commercial Bank", "Dime Commercial Bancshares Inc")).toEqual(
+      expect.arrayContaining(["Dime Commercial Bancshares Inc", "dime commercial bancorp", "dime commercial bancshares"]),
+    );
+    const dime = assessEdgarMatch({
+      org: "Dime Commercial Bank",
+      person: "Stuart Lubow",
+      tickersOk: true,
+      companies: [{ title: "Dime Commercial Bancshares, Inc.", ticker: "DCOM", cik: "846617" }],
+      filingNames: [["Dime Commercial Bancshares, Inc.", "Stuart Lubow"]],
+      holdingAliases: bankHoldingAliases("Dime Commercial Bank", "DIME COMMERCIAL BANCSHARES INC"),
+    });
+    expect(dime.status).toBe("PASS");
+    expect(dime.corroborates).toBe(true);
+    expect(dime.finding).toContain("846617");
+    const valley = assessEdgarMatch({
+      org: "Valley National Bank",
+      person: "Ira Robbins",
+      tickersOk: true,
+      companies: [{ title: "VALLEY NATIONAL BANCORP", ticker: "VLY", cik: "714310" }],
+      filingNames: [],
+      holdingAliases: bankHoldingAliases("Valley National Bank"),
+    });
+    expect(valley.status).toBe("INCONCLUSIVE");
+    expect(valley.companyOnly).toBe(true);
+    expect(valley.corroborates).not.toBe(true);
+    expect(valley.finding).toContain("VALLEY NATIONAL BANCORP");
+    expect(valley.finding).not.toContain("shares one word");
+  });
+
+  it("matches Stu to Stuart and does not match a different given name", () => {
+    expect(formalGivenNames("Stu Lubow")).toContain("Stuart");
+    expect(personHit("Stuart H. Lubow, Chief Executive Officer", "Stu Lubow")).toBe("match");
+    expect(personHit("Steve Lubow of Dime Commercial Bank", "Stu Lubow")).toBe("none");
+    const queries = newsSearchQueries(facts({ name: "Stu Lubow", applicantName: "Stu Lubow", org: "Dime Commercial Bank", location: "Hauppauge, NY" }));
+    expect(queries.some((query) => query.includes("Stuart Lubow"))).toBe(true);
+  });
+
+  it("reports a SiteGround or Vercel challenge as unavailable", async () => {
+    const sg = `<html><head><meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=1"></head><body></body></html>`;
+    const vercel = `<html><head><title>Vercel Security Checkpoint</title></head><body>429</body></html>`;
+    expect(isBotChallenge(sg)).toBe(true);
+    expect(isBotChallenge(vercel)).toBe(true);
+    const fisher = await runPublicScreen(
+      facts({ name: "Kenneth Fisher", applicantName: "Kenneth Fisher", org: "Fisher Brothers", website: "https://www.fisherbrothers.com", location: "New York, NY" }),
+      async (url) => (url.includes("fisherbrothers.com") ? { ok: true, status: 202, text: sg } : { ok: false, status: 404, text: "" }),
+    );
+    const fisherSite = fisher.find((row) => row.key === "website");
+    expect(fisherSite?.status).toBe("UNAVAILABLE");
+    expect(fisherSite?.finding).toContain("blocked by a bot challenge");
+    expect(fisherSite?.finding).not.toContain("No result found");
+    const realberry = await runPublicScreen(
+      facts({ name: "Chad McWhinney", applicantName: "Chad McWhinney", org: "Realberry", website: "https://www.realberry.com", location: "Denver, CO" }),
+      async (url) => (url.includes("realberry.com") ? { ok: false, status: 429, text: vercel } : { ok: false, status: 404, text: "" }),
+    );
+    const realberrySite = realberry.find((row) => row.key === "website");
+    expect(realberrySite?.status).toBe("UNAVAILABLE");
+    expect(realberrySite?.finding).toContain("blocked by a bot challenge");
+    expect(realberrySite?.corroborates).not.toBe(true);
+  });
+
+  it("lists brand-prefix registry names without awarding points", () => {
+    const names = relatedBrandNames(
+      ["REALBERRY REAL ESTATE SERVICES, LLC", "SOME OTHER LLC", "REALBERRY HOLDINGS"],
+      "Realberry",
+    );
+    expect(names).toContain("REALBERRY REAL ESTATE SERVICES, LLC");
+    const listed = assessNyRegistry("Fisher Brothers", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([
+        { current_entity_name: "FISHER BROTHERS MANAGEMENT CO. LLC" },
+        { current_entity_name: "FISHER BROTHERS FINANCIAL AND DEVELOPMENT COMPANY LLC" },
+      ]),
+    });
+    expect(listed.status).toBe("INCONCLUSIVE");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("FISHER BROTHERS MANAGEMENT CO. LLC");
+    expect(listed.finding).toContain("adds no points");
+  });
+
+  it("surfaces a reputational mention without scoring it, and reads a rebrand headline", () => {
+    expect(reputationalHeadline("Denver developer identified in Epstein files", "Chad McWhinney")).toBe(true);
+    expect(reputationalHeadline("Chad McWhinney identified in Epstein files", "Chad McWhinney")).toBe(false);
+    const body = `${"x".repeat(20)} Chad McWhinney leads Realberry in Denver. ${"y".repeat(20)}`;
+    expect(companyNearPerson(body, "Chad McWhinney", "Realberry")).toBe(true);
+    expect(judgeHeadline("McWhinney rebrands as Realberry", { name: "Chad McWhinney", org: "Realberry", location: "Denver, CO" }).company).toBe(true);
+    const graded = gradeChecks(
+      [
+        row({
+          key: "news-reputation",
+          status: "INCONCLUSIVE",
+          weight: 0,
+          finding: "Reputational story names this person - review. Denver developer mentioned in newly-released Epstein files. This is a mention for a reviewer, not a finding of wrongdoing, and it does not change the score.",
+          url: "https://www.denverpost.com/epstein",
+        }),
+      ],
+      facts({ name: "Chad McWhinney", org: "Realberry" }),
+    );
+    expect(graded.attention.some((item) => item.severity === "Medium" && item.title.includes("Reputational story"))).toBe(true);
+    expect(graded.attention.some((item) => /involved in/i.test(item.detail))).toBe(false);
+    expect(graded.caps.join(" ")).not.toContain("Reputational");
+    expect(graded.score).toBeLessThanOrEqual(48);
   });
 });

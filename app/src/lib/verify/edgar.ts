@@ -547,6 +547,35 @@ export function filingGroups(names: string[] | string[][]): string[][] {
   return [names as string[]];
 }
 
+const FUND_EXTRA = new Set(["debt", "fund", "funds", "partners", "partner", "holdings", "holding", "series", "ma", "feeder", "master", "credit", "equity"]);
+
+/** "Madison Realty Capital Debt MA I LP" starts with the firm and adds only fund words. "Madison Air Solutions" does not. */
+export function fundNameExtendsFirm(title: string, org: string): boolean {
+  const orgTokens = firmTokens(org);
+  const titleTokens = firmTokens(title);
+  if (orgTokens.length < 2 || titleTokens.length <= orgTokens.length) return false;
+  if (titleTokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) return false;
+  const extra = titleTokens.slice(orgTokens.length);
+  return extra.length > 0 && extra.every((token) => FUND_EXTRA.has(token) || /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)$/.test(token));
+}
+
+/** "Dime Commercial Bank" can be listed as Dime Commercial Bancshares. The FDIC holding-company name is included. */
+export function bankHoldingAliases(org: string, nameHcr = ""): string[] {
+  const names = new Set<string>();
+  if (nameHcr.trim()) names.add(nameHcr.trim());
+  const tokens = firmTokens(org);
+  const bankAt = tokens.lastIndexOf("bank");
+  if (bankAt >= 0) {
+    const stem = tokens.filter((_, index) => index !== bankAt).join(" ");
+    if (stem) {
+      names.add(`${stem} bancorp`);
+      names.add(`${stem} bancshares`);
+      names.add(`${stem} financial`);
+    }
+  }
+  return [...names];
+}
+
 function sameFirmName(title: string, org: string): boolean {
   const left = normalizeFirmName(org);
   const right = normalizeFirmName(title);
@@ -623,6 +652,7 @@ export function assessEdgarMatch(input: {
   insiderNames?: string[] | string[][];
   identity?: EdgarFilerIdentity | null;
   textHits?: EdgarTextHit[];
+  holdingAliases?: string[];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   input = { ...input, org: stripQaOrg(input.org || "") };
   const groups = filingGroups(input.filingNames);
@@ -656,6 +686,46 @@ export function assessEdgarMatch(input: {
     };
   }
   if (!match) {
+    const aliases = [...new Set([...(input.holdingAliases || []), ...bankHoldingAliases(input.org)])];
+    const holding = input.companies.find((row) => aliases.some((alias) => sameFirmName(row.title, alias)));
+    const fundHit = (input.textHits || []).find((hit) => {
+      const company = hit.names.map((name) => companyFromDisplayName(name)).find((row) => row && fundNameExtendsFirm(row.title, input.org));
+      const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, input.person));
+      return Boolean(company && named);
+    });
+    if (fundHit) {
+      const company = fundHit.names.map((name) => companyFromDisplayName(name)).find((row) => row && fundNameExtendsFirm(row.title, input.org));
+      const who = fundHit.names.find((name) => mentionsPerson(name, input.person)) || input.person;
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: company?.cik ? edgarCompanyUrl(company.cik) : "https://www.sec.gov/edgar/search/",
+        finding: `EDGAR lists ${company?.title || "a fund"}, CIK ${company?.cik || ""}. The filer name starts with the firm and adds only fund words. A filing names ${who}. This is not the company's own exact SEC name. It does not tie the person by itself.`.replace(/\s+/g, " ").trim(),
+      };
+    }
+    if (holding) {
+      const named = input.filingNames
+        ? filingGroups(input.filingNames).some(
+            (group) => group.some((name) => mentionsPerson(name, input.person)) && group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, holding.title)),
+          ) || Boolean(reportingOwnerLine(input.insiderNames || [], input.person))
+        : Boolean(reportingOwnerLine(input.insiderNames || [], input.person));
+      if (named) {
+        return {
+          status: "PASS",
+          corroborates: true,
+          url: edgarCompanyUrl(holding.cik),
+          finding: `EDGAR lists the holding company ${holding.title}${holding.ticker ? ` (${holding.ticker})` : ""}, CIK ${holding.cik}. A filing names the person at that holding company.`,
+        };
+      }
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: edgarCompanyUrl(holding.cik),
+        finding: `EDGAR lists the holding company ${holding.title}${holding.ticker ? ` (${holding.ticker})` : ""}, CIK ${holding.cik}. That is the bank's listed parent, not a person tie.`,
+      };
+    }
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
     if (parent) {
       const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
@@ -765,6 +835,7 @@ export async function lookupEdgar(
   person: string,
   fetchText?: FetchText,
   website = "",
+  nameHcr = "",
 ): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly">> {
   org = stripQaOrg(org);
   const tokens = org.trim();
@@ -822,5 +893,6 @@ export async function lookupEdgar(
     insiderNames,
     identity,
     textHits,
+    holdingAliases: bankHoldingAliases(org, nameHcr),
   });
 }

@@ -9,7 +9,7 @@ const NICKNAMES: Record<string, string[]> = {
   will: ["will", "william", "bill", "willy"],
   james: ["james", "jim"],
   michael: ["michael", "mike"],
-  christopher: ["christopher", "chris"],
+  christopher: ["christopher", "chris", "kip"],
   anthony: ["anthony", "tony"],
   joseph: ["joseph", "joe"],
   thomas: ["thomas", "tom"],
@@ -24,14 +24,14 @@ const NICKNAMES: Record<string, string[]> = {
   kenneth: ["kenneth", "ken"],
   timothy: ["timothy", "tim"],
   leslie: ["leslie", "les"],
-  edward: ["edward", "ed"],
+  edward: ["edward", "ed", "ned"],
   gregory: ["gregory", "greg"],
   nicholas: ["nicholas", "nick"],
   benjamin: ["benjamin", "ben"],
   jonathan: ["jonathan", "jon"],
   alexander: ["alexander", "alex"],
   peter: ["peter", "pete"],
-  charles: ["charles", "chuck", "charlie"],
+  charles: ["charles", "chuck", "charlie", "chip"],
   lawrence: ["lawrence", "larry"],
   ronald: ["ronald", "ron"],
   donald: ["donald", "don"],
@@ -61,6 +61,10 @@ const NICKNAMES: Record<string, string[]> = {
   harold: ["harold", "hal"],
   henry: ["henry", "hank"],
   john: ["john", "jack"],
+  stuart: ["stuart", "stu"],
+  clifford: ["clifford", "cliff"],
+  terrence: ["terrence", "terry"],
+  sandra: ["sandra", "sandy"],
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
@@ -217,6 +221,19 @@ function accentedPerson(name: string): string {
     .filter((part) => part.replace(/[^\p{L}\p{N}]/gu, "").length >= 2);
   if (parts.length && normalizeGenerationalSuffix(foldMarks(parts[parts.length - 1]))) parts.pop();
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** Letters-only label for a company site guess. "Madison Realty Capital" is madisonrealtycapital. The email domain is never used. */
+export function orgLettersLabel(org: string): string {
+  const stripped = stripQaOrg(org).replace(/\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|llp|plc|pllc|pc)\b\.?/gi, " ");
+  return stripped.replace(/[^A-Za-z]/g, "").toLowerCase();
+}
+
+/** The host label is the firm's own letters, such as berkadia.com. A mail host does not qualify. */
+export function hostMatchesOrgLetters(host: string, org: string): boolean {
+  const label = host.trim().toLowerCase().replace(/^www\./, "").split(".")[0]?.replace(/[^a-z0-9]/g, "") || "";
+  const letters = orgLettersLabel(org);
+  return letters.length >= 4 && letters.length <= 48 && label === letters;
 }
 
 /** Folded spelling, plus the original when it still has an accent. "René Jones" and "Rene Jones". */

@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSearchSpellings, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, formalGivenNames, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSearchSpellings, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -216,6 +216,13 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
     if (spelling.toLowerCase() === person.toLowerCase()) continue;
     const accented = personCompanyQuery(spelling, term);
     if (accented && !queries.includes(accented)) queries.push(accented);
+  }
+  const parsedPerson = parsePersonName(facts.applicantName);
+  for (const formal of formalGivenNames(facts.applicantName)) {
+    if (!parsedPerson) continue;
+    const full = [formal, ...parsedPerson.given.slice(1), parsedPerson.surname].join(" ");
+    const formalQuery = personCompanyQuery(full, term);
+    if (formalQuery && !queries.includes(formalQuery)) queries.push(formalQuery);
   }
   const commonSurname = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
   if (last && commonSurname.has(last.toLowerCase())) {
@@ -439,7 +446,43 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
     collected.push(...provider.items);
   }
   const enriched = await attachCompanyNearPerson(facts, collected, fetchText);
-  return classifyNews(facts, enriched, providers, now);
+  const classified = classifyNews(facts, enriched, providers, now);
+  const reputation = await reputationalStories(facts, enriched, fetchText, now);
+  return [...classified, ...reputation];
+}
+
+const REPUTATION_WORD = /\b(epstein|lawsuits?|indicted|frauds?|charged|arrested)\b/i;
+
+/** A headline with a risk word that does not itself name the person. The body has to name them. */
+export function reputationalHeadline(title: string, person: string): boolean {
+  return REPUTATION_WORD.test(title) && !mentionsPerson(title, person);
+}
+
+async function reputationalStories(facts: ApplicantFacts, items: NewsItem[], fetchText: FetchText, now: Date): Promise<CheckOutput[]> {
+  const person = facts.applicantName.trim();
+  const org = stripQaOrg((facts.org || facts.name).trim());
+  if (!person) return [];
+  const targets = items.filter((item) => item.url && publisherArticleUrl(item.url) && reputationalHeadline(item.title, person)).slice(0, 2);
+  const rows: CheckOutput[] = [];
+  for (const item of targets) {
+    try {
+      const response = await fetchText(publisherArticleUrl(item.url));
+      if (!response.ok || !response.text || !mentionsPerson(response.text, person)) continue;
+      rows.push({
+        key: "news-reputation",
+        status: "INCONCLUSIVE",
+        weight: 0,
+        corroborates: false,
+        finding: `Reputational story names this person - review. ${item.title}. This is a mention for a reviewer, not a finding of wrongdoing, and it does not change the score.`,
+        source: "News",
+        url: publisherArticleUrl(item.url),
+        ranAt: now.toISOString(),
+      });
+    } catch {
+      // A failed article fetch adds no attention item.
+    }
+  }
+  return rows;
 }
 
 const COMMON_SURNAMES = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
@@ -478,6 +521,7 @@ async function attachCompanyNearPerson(facts: ApplicantFacts, items: NewsItem[],
     if (!item.url) return false;
     const judged = judgeHeadline(item.title, factsForJudge);
     if (judged.person && !judged.company) return true;
+    if (surnameOnly && new RegExp(`${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+rebrands\\s+as\\b`, "i").test(item.title) && judged.company) return true;
     if (!surnameOnly || judged.person || !judged.company) return false;
     return new RegExp(`(?<![A-Za-z])${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z])`, "i").test(item.title);
   });

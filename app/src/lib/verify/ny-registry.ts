@@ -52,6 +52,56 @@ const TOO_GENERIC = new Set([
   "sa",
 ]);
 
+const RELATED_EXTRA = new Set([
+  "real",
+  "estate",
+  "services",
+  "service",
+  "management",
+  "commercial",
+  "mortgage",
+  "financial",
+  "development",
+  "advisors",
+  "advisor",
+  "company",
+  "companies",
+  "group",
+  "properties",
+  "realty",
+  "capital",
+  "partners",
+  "holdings",
+  "investment",
+  "investments",
+  "and",
+  "of",
+  "the",
+  "co",
+]);
+
+/** Up to three active names that start with the brand and add only generic business words. Not a match. */
+export function relatedBrandNames(names: string[], org: string): string[] {
+  const orgTokens = normalizeRegistryName(org).split(/\s+/).filter(Boolean);
+  if (!orgTokens.length || registryNameIsGenericOnly(org)) return [];
+  const found: string[] = [];
+  for (const name of names) {
+    const tokens = normalizeRegistryName(name).split(/\s+/).filter(Boolean);
+    if (tokens.length <= orgTokens.length) continue;
+    if (tokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) continue;
+    const extra = tokens.slice(orgTokens.length);
+    if (extra.length && extra.every((token) => RELATED_EXTRA.has(token)) && !found.includes(name)) found.push(name);
+    if (found.length >= 3) break;
+  }
+  return found;
+}
+
+function withRelatedNames(finding: string, names: string[], org: string): string {
+  const related = relatedBrandNames(names, org);
+  if (!related.length) return finding;
+  return `${finding} Related names a reviewer can check: ${related.join("; ")}. This is not a pass and adds no points.`;
+}
+
 /** "bank" or "holding company" is not a firm. "mt bank" and "related companies" are. */
 export function registryNameIsGenericOnly(value: string): boolean {
   const tokens = normalizeRegistryName(value).split(/\s+/).filter(Boolean);
@@ -279,7 +329,11 @@ export function assessNyRegistry(
       status: "INCONCLUSIVE",
       corroborates: false,
       url,
-      finding: "NY Active Corporations responded. No active entity uses this exact name. A similar name is not a match, and this is not a pass.",
+      finding: withRelatedNames(
+        "NY Active Corporations responded. No active entity uses this exact name. A similar name is not a match, and this is not a pass.",
+        rows.map((row) => String(row.current_entity_name || "")),
+        org,
+      ),
     };
   }
   if (!hit && qualified) {

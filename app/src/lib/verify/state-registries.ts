@@ -1,4 +1,4 @@
-import { normalizeRegistryName, registryExactWhere, registryNameIsGenericOnly, registryNameWhere, registryQualifierMatch } from "@/lib/verify/ny-registry";
+import { normalizeRegistryName, registryExactWhere, registryNameIsGenericOnly, registryNameWhere, registryQualifierMatch, relatedBrandNames } from "@/lib/verify/ny-registry";
 import { domainBrand, isGenericFirmToken } from "@/lib/verify/public-match";
 import { statedUsState } from "@/lib/verify/address";
 import type { CheckOutput } from "@/lib/verify/types";
@@ -218,7 +218,13 @@ export function assessStateRegistry(
     status: "INCONCLUSIVE",
     corroborates: false,
     url,
-    finding: `${portal.label} responded. No entity uses this exact name. A similar name is not a match, and this is not a pass.`,
+    finding: `${portal.label} responded. No entity uses this exact name. A similar name is not a match, and this is not a pass.${(() => {
+      const related = relatedBrandNames(
+        rows.map((row) => String(row[portal.nameField] || "")),
+        org,
+      );
+      return related.length ? ` Related names a reviewer can check: ${related.join("; ")}. This is not a pass and adds no points.` : "";
+    })()}`,
   };
 }
 

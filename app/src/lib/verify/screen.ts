@@ -3,7 +3,7 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, hostMatchesOrgLetters, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, orgLettersLabel, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
 import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultPages, wikipediaRestResultPages } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
@@ -115,7 +115,7 @@ export function isScriptRenderedShell(raw: string, text: string): boolean {
 
 /** HTTP 200 can still be an Imperva or Cloudflare challenge. That is not page content. */
 export function isBotChallenge(text: string): boolean {
-  if (/_Incapsula_Resource|cf-chl|challenge-platform|<title>\s*Just a moment|Attention Required!\s*\|\s*Cloudflare|Access Denied[\s\S]{0,120}Reference\s*#/i.test(text)) {
+  if (/_Incapsula_Resource|cf-chl|challenge-platform|<title>\s*Just a moment|Attention Required!\s*\|\s*Cloudflare|Access Denied[\s\S]{0,120}Reference\s*#|sgcaptcha|vercel security checkpoint|http-equiv=["']refresh["'][^>]*sgcaptcha/i.test(text)) {
     return true;
   }
   // A Next/React/Angular shell already has its own unreadability message.
@@ -986,16 +986,40 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   };
   const pages: { url: string; text: string; raw: string }[] = [];
   if (!website) {
-    attempts.push({
-      key: "website",
-      platform: "Company website",
-      searched: "the website field on the application",
-      url: "",
-      outcome: "missing",
-      score: emptyScore(),
-      detail: "No company website was on the application.",
-      selfReported: true,
-    });
+    const letters = orgLettersLabel(searchOrg);
+    const guess = letters.length >= 4 && letters.length <= 48 ? `https://www.${letters}.com` : "";
+    let discovered = false;
+    if (guess && hostMatchesOrgLetters(new URL(guess).hostname, searchOrg)) {
+      const home = await pull(fetchText, guess);
+      if (home.status >= 200 && home.status < 400 && !isBotChallenge(home.text)) {
+        const score = scorePublicText(visible(home.text), { ...queryFacts, org: searchOrg }, { ownFirm: true });
+        if (score.name && score.company) {
+          discovered = true;
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: "no website was on the application",
+            url: guess,
+            outcome: "found",
+            score,
+            detail: "Discovered company site (not on the application)",
+            selfReported: true,
+          });
+        }
+      }
+    }
+    if (!discovered) {
+      attempts.push({
+        key: "website",
+        platform: "Company website",
+        searched: "the website field on the application",
+        url: "",
+        outcome: "missing",
+        score: emptyScore(),
+        detail: "No company website was on the application.",
+        selfReported: true,
+      });
+    }
   } else {
     let home = await pull(fetchText, website);
     if (home.status === 403) {
@@ -1053,6 +1077,16 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           detail: "a page on the company site",
           selfReported: true,
         });
+      } else if (/sgcaptcha|vercel security checkpoint/i.test(home.text)) {
+        attempts.push(
+          blockedAttempt(
+            "website",
+            "Company website",
+            website,
+            homeUrl,
+            "the site blocked automated access (bot challenge). blocked by a bot challenge",
+          ),
+        );
       } else if (!renamed && blockedBySite) {
         const found = await searchOwnSitePerson(fetchText, website, person);
         if (found.kind === "hit") {
@@ -1927,6 +1961,31 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   }
 
   await webSearchPromise;
+  const missingSite = attempts.find((item) => item.key === "website" && item.outcome === "missing");
+  if (missingSite) {
+    const hrefs = attempts.flatMap((item) => `${item.url || ""} ${item.linkedUrl || ""} ${item.moreUrls || ""}`.split(/\s+/));
+    const hostUrl = hrefs.find((href) => {
+      try {
+        return /^https?:/i.test(href) && hostMatchesOrgLetters(new URL(href).hostname, searchOrg);
+      } catch {
+        return false;
+      }
+    });
+    if (hostUrl) {
+      const page = await pull(fetchText, hostUrl);
+      if (page.status >= 200 && page.status < 400 && !isBotChallenge(page.text)) {
+        const score = scorePublicText(visible(page.text), { ...queryFacts, org: searchOrg }, { ownFirm: true });
+        if (score.name && score.company) {
+          missingSite.outcome = "found";
+          missingSite.url = hostUrl;
+          missingSite.score = score;
+          missingSite.detail = "Discovered company site (not on the application)";
+          const row = produced.find((item) => item.key === "website");
+          if (row) Object.assign(row, toCheck(missingSite, ownHost));
+        }
+      }
+    }
+  }
   flush();
   return produced;
 }

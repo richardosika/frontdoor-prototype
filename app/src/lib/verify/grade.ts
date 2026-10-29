@@ -1268,6 +1268,13 @@ export function gradeChecks(
       detail: capitalizeSentences(failSentence(check) || "Possible match, verify. Do not treat this as a confirmed fact."),
     });
   }
+  for (const check of checks.filter((item) => item.key === "news-reputation")) {
+    pushAttention({
+      severity: "Medium",
+      title: "Reputational story names this person - review",
+      detail: check.finding,
+    });
+  }
   for (const check of checks.filter(isAmbiguousNews)) {
     pushAttention({
       severity: "High",

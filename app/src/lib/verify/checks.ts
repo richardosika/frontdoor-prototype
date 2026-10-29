@@ -1010,6 +1010,20 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
   }
   // A finished row stays. A row the timeout dropped is unavailable, not a miss and not a failure.
   out.push(...completeScreenRows(screenRows ?? screenSink.slice()));
+  if (!statedSite && !out.some((row) => row.key === "rdap")) {
+    const discovered = out.find((row) => row.key === "website" && row.status === "PASS" && /Discovered company site/i.test(row.finding) && row.url);
+    let discoveredHost = "";
+    try {
+      discoveredHost = discovered?.url ? registrableHost(new URL(discovered.url).host) : "";
+    } catch {
+      discoveredHost = "";
+    }
+    if (discoveredHost && !isReservedDomain(discoveredHost) && !FREE_PROVIDERS.has(discoveredHost) && !isIpHost(discoveredHost)) {
+      const rdap = await settleWithin(pageText(fetchText, `https://rdap.org/domain/${discoveredHost}`), 20_000, { ok: false, status: 0, text: "" });
+      const judged = assessRdap(discoveredHost, rdap);
+      if (judged) out.push(judged);
+    }
+  }
   const registryState = statedUsState(ctx.facts.location || "");
   const portal = registryState ? registryPortal(registryState) : undefined;
   const domainResolves = !out.some((row) => row.key === "website" && /does not resolve|is not registered/i.test(row.finding));
@@ -1063,7 +1077,8 @@ export async function networkChecks(ctx: CheckContext): Promise<CheckOutput[]> {
       else out.push(row);
     }
   }
-  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText, searchFacts.website), 40_000, {
+  const holdingName = out.find((row) => /holding company /i.test(row.finding || ""))?.finding.match(/holding company ([^,.(]+)/i)?.[1]?.trim() || "";
+  const edgar = await settleWithin(lookupEdgar(searchFacts.org, searchFacts.applicantName || searchFacts.name, fetchText, searchFacts.website, holdingName), 40_000, {
     status: "UNAVAILABLE" as const,
     corroborates: false,
     url: "https://www.sec.gov/edgar/search/",
