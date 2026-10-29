@@ -34,7 +34,7 @@ export async function saveFilter(formData: FormData) {
   const count = await prisma.savedFilter.count({ where: { userId: user.id, surface: surfaceRaw } });
   if (count >= 12) redirect(back(surfaceRaw, query, { error: "You can save 12 filters on this page" }));
   await prisma.savedFilter.create({
-    data: { userId: user.id, name, surface: surfaceRaw, query },
+    data: { userId: user.id, name, surface: surfaceRaw, query, alert: surfaceRaw === "network" && formData.get("alert") === "on" },
   });
   revalidatePath(`/${surfaceRaw}`);
   redirect(back(surfaceRaw, query, { notice: "Filter saved" }));

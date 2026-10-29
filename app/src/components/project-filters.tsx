@@ -3,6 +3,8 @@ import { ShareLink } from "@/components/share-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { SIZE_BANDS, sizeLabel } from "@/lib/domain";
 import { ASSET_CLASSES, DEAL_TYPES, US_STATES } from "@/lib/member-network";
+import { METROS, SPECIALTIES, directoryAssetOptions } from "@/lib/platform/catalog";
+import { GROUPS } from "@/lib/roles";
 import {
   DIRECTORY_SORTS,
   POSTED_WINDOWS,
@@ -22,7 +24,7 @@ export function ProjectFilterBar({
 }: {
   path: "/deals" | "/feed" | "/network";
   filters: ProjectQuery;
-  saved: { id: string; name: string; query: string }[];
+  saved: { id: string; name: string; query: string; alert?: boolean }[];
 }) {
   const directory = path === "/network";
   const href = projectQuery(path, filters);
@@ -30,6 +32,7 @@ export function ProjectFilterBar({
   const sorts = directory ? DIRECTORY_SORTS : PROJECT_SORTS;
   const assetName = directory ? "assetClass" : "asset";
   const assetValue = directory ? filters.assetClass || "" : filters.asset || "";
+  const directoryAssets = directoryAssetOptions();
   const stateName = directory ? "state" : "market";
   const stateValue = directory ? filters.state || "" : filters.market || "";
 
@@ -45,9 +48,9 @@ export function ProjectFilterBar({
           <span className={labelCls}>Asset class</span>
           <select className={field} name={assetName} defaultValue={assetValue}>
             <option value="">Any</option>
-            {ASSET_CLASSES.map((item) => (
-              <option key={item} value={item}>
-                {item}
+            {(directory ? directoryAssets : ASSET_CLASSES.map((item) => ({ value: item, label: item }))).map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
@@ -63,6 +66,74 @@ export function ProjectFilterBar({
             ))}
           </select>
         </label>
+        {directory ? (
+          <label>
+            <span className={labelCls}>Metro</span>
+            <select className={field} name="metro" defaultValue={filters.metro || ""}>
+              <option value="">Any</option>
+              {METROS.map((metro) => (
+                <option key={metro.code} value={metro.code}>
+                  {metro.short}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {directory ? (
+          <label>
+            <span className={labelCls}>Place</span>
+            <select className={field} name="place" defaultValue={filters.place || ""}>
+              <option value="">Based in or works in</option>
+              <option value="home">Based in</option>
+              <option value="operates">Works in</option>
+            </select>
+          </label>
+        ) : null}
+        {directory ? (
+          <label>
+            <span className={labelCls}>Deal size</span>
+            <select className={field} name="size" defaultValue={filters.size || ""}>
+              <option value="">Any</option>
+              {SIZE_BANDS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {directory ? (
+          <label>
+            <span className={labelCls}>Specialty</span>
+            <select className={field} name="specialty" defaultValue={filters.specialty || ""}>
+              <option value="">Any</option>
+              {SPECIALTIES.map((item) => (
+                <option key={item.slug} value={item.slug}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {directory ? (
+          <label>
+            <span className={labelCls}>Role group</span>
+            <select className={field} name="group" defaultValue={filters.group || ""}>
+              <option value="">Any</option>
+              {GROUPS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {directory ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="verified" value="1" defaultChecked={filters.verified === "1"} />
+            Verified only
+          </label>
+        ) : null}
         {directory ? (
           <label>
             <span className={labelCls}>Deal type</span>
@@ -168,6 +239,12 @@ export function ProjectFilterBar({
               <span className={labelCls}>Name</span>
               <input className={field} name="name" required maxLength={40} placeholder="NJ multifamily equity" />
             </label>
+            {directory ? (
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <input type="checkbox" name="alert" />
+                Email me when a member matches
+              </label>
+            ) : null}
             <button className={btnOutline} type="submit">
               Save filter
             </button>
@@ -181,6 +258,7 @@ export function ProjectFilterBar({
               <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <a className="font-semibold text-forest" href={`${path}?${item.query}`}>
                   {item.name}
+                  {item.alert ? <span className="ml-2 text-[11px] font-normal text-mut">Alert on</span> : null}
                 </a>
                 <form action={deleteSavedFilter}>
                   <input type="hidden" name="surface" value={path.slice(1)} />

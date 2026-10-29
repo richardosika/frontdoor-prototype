@@ -1,6 +1,7 @@
 import { SCOPE_SIZE, SIZE_BANDS, filterDeals, sizeLabel, type FilterableDeal } from "@/lib/domain";
 import { ASSET_CLASSES, DEAL_TYPES, US_STATES } from "@/lib/member-network";
-import { isRoleId, roleLabel, roleShort } from "@/lib/roles";
+import { isDirectoryAssetValue, isMetroCode, isSpecialtySlug, metroByCode, specialtyBySlug } from "@/lib/platform/catalog";
+import { GROUPS, isRoleId, roleLabel, roleShort } from "@/lib/roles";
 
 export const PROJECT_STAGES = [
   { id: "land", label: "Land / entitlement" },
@@ -34,20 +35,25 @@ export const DIRECTORY_SORTS = [
   { id: "name", label: "Name A-Z" },
   { id: "name-za", label: "Name Z-A" },
   { id: "newest", label: "Newest" },
+  { id: "match", label: "Best match" },
 ] as const;
 
 export const FILTER_SURFACES = ["deals", "feed", "network"] as const;
 export type FilterSurface = (typeof FILTER_SURFACES)[number];
 
-const FILTER_KEYS = ["role", "market", "state", "size", "asset", "assetClass", "stage", "need", "posted", "sort", "q", "tab", "dealType"] as const;
+const FILTER_KEYS = ["role", "group", "market", "state", "metro", "size", "asset", "assetClass", "specialty", "place", "stage", "need", "posted", "sort", "q", "tab", "dealType", "verified"] as const;
 
 export type ProjectQuery = {
   role?: string;
+  group?: string;
   market?: string;
   state?: string;
+  metro?: string;
   size?: string;
   asset?: string;
   assetClass?: string;
+  specialty?: string;
+  place?: string;
   stage?: string;
   need?: string;
   posted?: string;
@@ -55,6 +61,7 @@ export type ProjectQuery = {
   q?: string;
   tab?: string;
   dealType?: string;
+  verified?: string;
 };
 
 const ADVISORY_ROLES = new Set([
@@ -196,7 +203,14 @@ export function cleanProjectQuery(input: ProjectQuery, surface: FilterSurface): 
   const state = listed(input.market || input.state, US_STATES);
   if (surface === "network") {
     if (state) out.state = state;
-    if (asset) out.assetClass = asset;
+    if (input.assetClass && isDirectoryAssetValue(input.assetClass)) out.assetClass = listed(input.assetClass, ASSET_CLASSES) || input.assetClass;
+    else if (asset) out.assetClass = asset;
+    if (input.metro && isMetroCode(input.metro)) out.metro = input.metro;
+    if (input.specialty && isSpecialtySlug(input.specialty)) out.specialty = input.specialty;
+    if (input.place === "home" || input.place === "operates") out.place = input.place;
+    if (input.size && SIZE_BANDS.some((item) => item.id === input.size)) out.size = input.size;
+    if (input.group && (GROUPS as readonly string[]).includes(input.group)) out.group = input.group;
+    if (input.verified === "1") out.verified = "1";
     const dealType = listed(input.dealType, DEAL_TYPES);
     if (dealType) out.dealType = dealType;
     const sort = DIRECTORY_SORTS.some((item) => item.id === input.sort) ? input.sort : undefined;
@@ -328,6 +342,11 @@ export function filterSummary(filters: ProjectQuery): string {
     filters.need ? needLabel(filters.need) : "",
     filters.role ? roleShort(roleLabel(filters.role)) : "",
     filters.posted ? POSTED_WINDOWS.find((item) => item.id === filters.posted)?.label : "",
+    filters.metro ? `${metroByCode(filters.metro)?.short ?? filters.metro} metro` : "",
+    filters.specialty ? specialtyBySlug(filters.specialty)?.label ?? filters.specialty : "",
+    filters.place === "home" ? "Based in" : filters.place === "operates" ? "Works in" : "",
+    filters.group,
+    filters.verified === "1" ? "Verified" : "",
     filters.dealType,
     filters.q ? `"${filters.q}"` : "",
   ];

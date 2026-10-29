@@ -54,6 +54,12 @@ describe("member directory and checklist", () => {
     expect(directoryMatch(member, { state: "NJ" })).toBe(false);
     expect(directoryMatch(member, { q: "testfloor" })).toBe(true);
     expect(directoryMatch(member, { role: "LENDER" })).toBe(false);
+    expect(directoryMatch(member, { state: "IN" })).toBe(false);
+    expect(directoryMatch(member, { state: "CA" })).toBe(false);
+    expect(directoryMatch({ ...member, location: "Chicago, IL", markets: "" }, { state: "CA" })).toBe(false);
+    expect(directoryMatch({ ...member, location: "Chicago, IL", markets: "" }, { state: "IN" })).toBe(false);
+    expect(directoryMatch({ ...member, location: "Indianapolis, IN", markets: "" }, { state: "IN" })).toBe(true);
+    expect(directoryMatch({ ...member, location: "Indianapolis", markets: "IN" }, { state: "IN" })).toBe(true);
   });
 
   it("completes profile, posts, and introductions from activity", () => {

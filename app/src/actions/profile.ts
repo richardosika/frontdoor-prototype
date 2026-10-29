@@ -14,6 +14,9 @@ import { canOpenProjectToCounterparties, toPublicVerification, type Verification
 import { attachVouchEvidence, ensureVerificationCase } from "@/lib/verification-db";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
+import { SIZE_BANDS } from "@/lib/domain";
+import { readProfileForm } from "@/lib/platform/profile-form";
+import { persistStructuredProfile } from "@/lib/platform/persist-profile";
 
 export async function saveProfile(formData: FormData) {
   const user = await requireUser();
@@ -22,14 +25,39 @@ export async function saveProfile(formData: FormData) {
   const markets = formData.getAll("markets").map((value) => String(value)).filter(Boolean).join(", ");
   const dealTypes = formData.getAll("dealTypes").map((value) => String(value)).filter(Boolean).join(", ");
   const assetClasses = formData.getAll("assetClasses").map((value) => String(value)).filter(Boolean).join(", ");
-  const checkSize = String(formData.get("checkSize") || "").trim().slice(0, 80);
+  const band = String(formData.get("dealSize") || "").trim();
+  const typedSize = String(formData.get("checkSize") || "").trim().slice(0, 80);
+  const checkSize = SIZE_BANDS.some((item) => item.id === band) ? band : typedSize;
   const lookingFor = String(formData.get("lookingFor") || "").trim().slice(0, 800);
   const offering = String(formData.get("offering") || "").trim().slice(0, 800);
-  const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
+  const plan = readProfileForm(formData, user.role);
+  const location =
+    (plan.homeCity && plan.homeState ? `${plan.homeCity}, ${plan.homeState}` : String(formData.get("location") || "").trim().slice(0, 120)) ||
+    user.location;
+  const marketText = plan.operateStates.length ? plan.operateStates.join(", ") : markets;
   await prisma.user.update({
     where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, lookingFor, offering, location },
+    data: {
+      bio,
+      website,
+      markets: marketText,
+      dealTypes,
+      assetClasses,
+      checkSize,
+      lookingFor,
+      offering,
+      location,
+      homeCity: plan.homeCity,
+      nationwide: plan.nationwide,
+    },
   });
+  await persistStructuredProfile(user.id, plan);
+  try {
+    const { dispatchSavedSearchAlerts } = await import("@/lib/platform/alert-dispatch");
+    await dispatchSavedSearchAlerts(user.id);
+  } catch {
+    console.error("Saved search alert was not stored");
+  }
   const upload = formData.get("card");
   if (upload instanceof File && upload.size > 0) {
     const bytes = new Uint8Array(await upload.arrayBuffer());

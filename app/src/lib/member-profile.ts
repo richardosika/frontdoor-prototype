@@ -1,4 +1,7 @@
 import { blocksMembership } from "@/lib/payments";
+import { homeBaseLabel, planLocationBackfill } from "@/lib/platform/backfill";
+import { scrubMemberPayload } from "@/lib/platform/payload";
+import { fieldVisible, type FieldAudienceChoice } from "@/lib/platform/visibility";
 import { prisma } from "@/lib/prisma";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
@@ -7,6 +10,10 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
     where: { id: memberId },
     include: {
       projects: { include: { confirmations: true }, orderBy: { year: "desc" } },
+      memberMarkets: { include: { market: true } },
+      assetFocus: { include: { assetType: true } },
+      specialties: { include: { specialty: true } },
+      fieldSettings: true,
     },
   });
   if (!member || member.status !== "ACTIVE") return null;
@@ -74,6 +81,22 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       ? { ...memberCase, status: memberCase.status as VerificationStatus }
       : null,
   );
+  const isSelf = viewerId === memberId;
+  const connected = state === "ACCEPTED";
+  const audienceFor = (fieldKey: string): FieldAudienceChoice => {
+    const row = member.fieldSettings.find((item) => item.fieldKey === fieldKey);
+    return (row?.audience as FieldAudienceChoice) || "MEMBERS";
+  };
+  const show = (fieldKey: "lookingFor" | "offering" | "checkSize") =>
+    fieldVisible({ audience: audienceFor(fieldKey), isSelf, connected });
+  const homeState = member.memberMarkets.find((row) => row.relation === "HOME" && row.market.kind === "STATE")?.market.code || planLocationBackfill(member).homeState;
+  const homeMetro = member.memberMarkets.find((row) => row.relation === "HOME" && row.market.kind === "METRO")?.market.code || planLocationBackfill(member).homeMetro || "";
+  const operateStates = member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "STATE").map((row) => row.market.code);
+  const operateMetros = member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "METRO").map((row) => row.market.name);
+  const assetLabels = member.assetFocus.map((row) => row.assetType.label);
+  const assetSlugs = member.assetFocus.map((row) => row.assetType.slug);
+  const specialtyLabels = member.specialties.map((row) => row.specialty.label);
+  const specialtySlugs = member.specialties.map((row) => row.specialty.slug);
   const projects = member.projects.map((project) => {
     const record = cases.find((item) => item.projectId === project.id);
     return {
@@ -94,7 +117,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       verification: toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null),
     };
   });
-  return {
+  return scrubMemberPayload({
     member: {
       id: member.id,
       name: member.name,
@@ -105,13 +128,29 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       tier: member.tier,
       bio: member.bio,
       website: member.website,
-      markets: member.markets,
+      markets: operateStates.length ? operateStates.join(", ") : member.markets,
       dealTypes: member.dealTypes,
-      assetClasses: member.assetClasses,
-      checkSize: member.checkSize,
-      lookingFor: member.lookingFor,
-      offering: member.offering,
+      assetClasses: assetLabels.length ? assetLabels.join(", ") : member.assetClasses,
+      checkSize: show("checkSize") ? member.checkSize : "",
+      lookingFor: show("lookingFor") ? member.lookingFor : "",
+      offering: show("offering") ? member.offering : "",
       createdAt: member.createdAt,
+      homeCity: member.homeCity,
+      homeState,
+      homeMetro,
+      nationwide: member.nationwide,
+      homeBase: homeBaseLabel({ homeCity: member.homeCity, homeState, location: member.location }),
+      operating: [...operateStates, ...operateMetros].join(", "),
+      assetLabels,
+      assetSlugs,
+      specialtyLabels,
+      specialtySlugs,
+      operateMetros: member.memberMarkets.filter((row) => row.relation === "OPERATES" && row.market.kind === "METRO").map((row) => row.market.code),
+      audiences: {
+        lookingFor: audienceFor("lookingFor"),
+        offering: audienceFor("offering"),
+        checkSize: audienceFor("checkSize"),
+      },
     },
     projects,
     verification,
@@ -121,7 +160,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
     vouchCount,
     blockedByViewer,
     blockedByThem,
-  };
+  });
 }
 
 export type { PublicVerification };
