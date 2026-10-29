@@ -308,6 +308,7 @@ model Application {
   statement       String            @default("")
   website         String            @default("")
   socialLinks     String            @default("")
+  joinProfile     Json?
   statusToken     String            @unique
   status          ApplicationStatus @default(PENDING)
   reviewerNote    String            @default("")

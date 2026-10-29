@@ -22,6 +22,8 @@ describe("signed-in request to join", () => {
     expect(isSignedInJoinEntry("/feed", "#request-to-join")).toBe(true);
     expect(isSignedInJoinEntry("/", "#request-invite")).toBe(true);
     expect(isSignedInJoinEntry("/apply", "")).toBe(true);
+    expect(isSignedInJoinEntry("/join", "")).toBe(true);
+    expect(isSignedInJoinEntry("/join/code", "")).toBe(true);
     expect(isSignedInJoinEntry("/feed", "")).toBe(false);
     expect(isSignedInJoinEntry("/feed", "#ledger")).toBe(false);
     expect(isSignedInJoinEntry("/apply/status/token", "")).toBe(false);

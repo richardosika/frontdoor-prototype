@@ -23,6 +23,13 @@ describe("annual dues", () => {
     expect(annualDuesCents("MORTGAGE_BROKER")).toBe(19_900);
     expect(annualDuesCents("RE_ATTORNEY")).toBe(19_900);
     expect(annualDuesCents("ARCHITECT_ENGINEER")).toBe(19_900);
+    expect(annualDuesCents("INSURANCE")).toBe(19_900);
+    expect(annualDuesCents("APPRAISER")).toBe(19_900);
+    expect(annualDuesCents("PROPERTY_MANAGER")).toBe(19_900);
+    expect(annualDuesCents("ACCOUNTANT")).toBe(19_900);
+    expect(annualDuesCents("EXCHANGE_1031")).toBe(19_900);
+    expect(annualDuesCents("SECURITIES_ATTORNEY")).toBe(19_900);
+    expect(annualDuesCents("ZONING_ATTORNEY")).toBe(19_900);
     expect(firstMonthCents(19_900)).toBe(9_950);
     expect(annualDuesCents("DEVELOPER")).toBe(0);
     expect(annualDuesCents("INVESTOR_PE")).toBe(0);

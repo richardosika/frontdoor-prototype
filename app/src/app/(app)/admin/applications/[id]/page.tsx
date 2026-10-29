@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
 import { Banner } from "@/components/banner";
+import { JoinProfileReview } from "@/components/join-profile-review";
 import { RevokeApprovalForm } from "@/components/decision-form";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { PaymentPanel } from "@/components/payment-admin";
@@ -177,6 +178,7 @@ export default async function ApplicationDetailPage({
               <b>Social:</b> {application.socialLinks}
             </p>
           ) : null}
+          <JoinProfileReview profile={application.joinProfile} />
           <p>
             <b>Submitted:</b> {formatAuditTime(application.createdAt)}
           </p>

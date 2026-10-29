@@ -21,7 +21,7 @@ const JOIN_ENTRY_HASHES = new Set(["#request-to-join", "#request-invite"]);
 
 /** The public request form and the apply wizard. A signed-in visit to either gets the already-signed-in notice. */
 export function isSignedInJoinEntry(path: string, hash = ""): boolean {
-  if (path === "/apply") return true;
+  if (path === "/apply" || path === "/join" || path.startsWith("/join/")) return true;
   const fragment = hash.startsWith("#") || hash === "" ? hash : `#${hash}`;
   return JOIN_ENTRY_HASHES.has(fragment) && (path === "/" || path === "/feed");
 }

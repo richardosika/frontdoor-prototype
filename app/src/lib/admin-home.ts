@@ -109,6 +109,12 @@ const DUES_ROWS: { role: string; label: string }[] = [
   { role: "BROKER", label: "Broker" },
   { role: "MORTGAGE_BROKER", label: "Mortgage broker" },
   { role: "RE_ATTORNEY", label: "Attorney / advisor" },
+  { role: "INSURANCE", label: "Insurance" },
+  { role: "ARCHITECT_ENGINEER", label: "Architect / Engineer" },
+  { role: "APPRAISER", label: "Appraiser" },
+  { role: "PROPERTY_MANAGER", label: "Property Manager" },
+  { role: "ACCOUNTANT", label: "Accountant / Cost Seg" },
+  { role: "EXCHANGE_1031", label: "1031 Exchange Intermediary" },
 ];
 
 export function duesSchedule(): { role: string; label: string; cents: number; text: string }[] {

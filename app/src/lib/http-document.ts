@@ -74,6 +74,7 @@ const APP_PREFIXES = [
   "/feed",
   "/help",
   "/invite-status",
+  "/join",
   "/legal",
   "/login",
   "/members",

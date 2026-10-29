@@ -6,16 +6,15 @@ export const GC_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
 export const BROKER_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
 export const ADVISOR_MONTHLY_CENTS = PAID_MONTHLY_CENTS;
 
-const FREE_ROLES = new Set(["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE", "LENDER"]);
-const BROKER_ROLES = new Set(["BROKER", "MORTGAGE_BROKER"]);
+/** Developer, lender, family office, and investor/LP. Every other role pays. */
+export const FREE_ROLE_IDS = ["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE", "LENDER"] as const;
+const FREE_ROLES = new Set<string>(FREE_ROLE_IDS);
 /** Older yearly totals, and the previous $149 and $129 monthly prices. */
 const LEGACY_STORED_CENTS = new Set([240_000, 180_000, 120_000, 14_900, 12_900]);
 
 export function monthlyDuesCents(role: string): number {
   if (FREE_ROLES.has(role)) return 0;
-  if (role === "GENERAL_CONTRACTOR") return GC_MONTHLY_CENTS;
-  if (BROKER_ROLES.has(role)) return BROKER_MONTHLY_CENTS;
-  return ADVISOR_MONTHLY_CENTS;
+  return PAID_MONTHLY_CENTS;
 }
 
 /** Older rows stored a yearly amount. The price on the account is the monthly price. */
