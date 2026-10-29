@@ -37,7 +37,7 @@ export default async function AdminPaymentsPage() {
       <div className="mx-auto max-w-4xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Payments" />
         <p className="mt-1 text-sm text-ink">
-          Month to month. The first month is 50% off, then the full monthly price. Due only after approval. Never based on a deal. Due and failed payments are marked. No card number is stored. Mark paid, waive, or note a refund from the member.
+          Month to month. The first month is 50% off, then the full monthly price. Due only after approval. Due and failed payments are marked. No card number is stored. Mark paid, waive, or note a refund from the member.
         </p>
         {rows.length === 0 ? <p className="mt-6 text-sm text-mut">No payment records yet.</p> : null}
         <ul className="mt-4 space-y-3">

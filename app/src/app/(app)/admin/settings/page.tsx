@@ -73,7 +73,7 @@ export default async function AdminSettingsPage({
         <section className={`${card} mt-4 p-4`}>
           <h2 className={sectionLabel}>Membership dues</h2>
           <p className="mt-2 text-sm text-ink">
-            Month to month. The first month is 50% off, then the full monthly price. Due only after approval. They are not edited on this page and they are never based on a deal. Waive a person from their member page.
+            Month to month. The first month is 50% off, then the full monthly price. Due only after approval. They are not edited on this page. Waive a person from their member page.
           </p>
           <table className="mt-3 w-full text-left text-sm">
             <thead>

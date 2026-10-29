@@ -86,12 +86,12 @@ export function statusMembershipLine(input: {
 /** Status-page dues line. A free role does not get a cost sentence. */
 export function applicantDuesSentence(monthlyCents: number, waived: boolean): string {
   if (monthlyCents <= 0) return "";
-  const offer = `${offerLabel(monthlyCents)}. ${DUES_BILLING_NOTE}`;
-  return waived ? `${offer} ${DUES_WAIVED}` : offer;
+  const offer = offerLabel(monthlyCents);
+  return waived ? `${offer}. ${DUES_WAIVED}` : offer;
 }
 
 export const DUES_BILLING_NOTE =
-  "Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Due only after approval. Flat, never based on a deal.";
+  "Month to month. No long-term contract. Cancel anytime. The first month is 50% off, then the full monthly price. Due only after approval.";
 
 /** Same schedule, for someone already approved who still needs to pay. */
 export const DUES_DUE_NOW_NOTE = DUES_BILLING_NOTE.replace(
@@ -127,17 +127,17 @@ export const DUES_LOCALES: { id: DuesLocale; label: string; text: string }[] = [
   {
     id: "es",
     label: "Español",
-    text: "Contratistas generales: primer mes $99.50 (50% de descuento), luego $199 al mes. Corredores: primer mes $99.50 (50% de descuento), luego $199 al mes. Abogados y asesores: primer mes $99.50 (50% de descuento), luego $199 al mes. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación. Es una cuota fija y no depende de ningún trato.",
+    text: "Contratistas generales: primer mes $99.50 (50% de descuento), luego $199 al mes. Corredores: primer mes $99.50 (50% de descuento), luego $199 al mes. Abogados y asesores: primer mes $99.50 (50% de descuento), luego $199 al mes. Mes a mes. Sin contrato a largo plazo. Cancela cuando quieras. El primer mes es al 50%, y después se cobra el precio mensual completo. Se cobra solo después de la aprobación.",
   },
   {
     id: "de",
     label: "Deutsch",
-    text: "Generalunternehmer: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Makler: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Anwälte und Berater: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe. Eine feste Gebühr, unabhängig von einem Geschäft.",
+    text: "Generalunternehmer: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Makler: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Anwälte und Berater: erster Monat $99.50 (50% Rabatt), danach $199 pro Monat. Monat für Monat. Kein Langzeitvertrag. Jederzeit kündbar. Der erste Monat kostet die Hälfte, danach gilt der volle Monatspreis. Fällig erst nach der Freigabe.",
   },
   {
     id: "ja",
     label: "日本語",
-    text: "ゼネコン：初月 $99.50（50%引き）、その後は月額 $199。ブローカー：初月 $99.50（50%引き）、その後は月額 $199。弁護士とアドバイザー：初月 $99.50（50%引き）、その後は月額 $199。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。取引に連動しない定額です。",
+    text: "ゼネコン：初月 $99.50（50%引き）、その後は月額 $199。ブローカー：初月 $99.50（50%引き）、その後は月額 $199。弁護士とアドバイザー：初月 $99.50（50%引き）、その後は月額 $199。月単位。長期契約なし。いつでも解約できます。初月は半額で、その後は月額の全額です。承認後にのみ請求します。",
   },
 ];
 

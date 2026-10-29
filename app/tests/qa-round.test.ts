@@ -380,7 +380,12 @@ describe("QA fixes that stay outside grading", () => {
     expect(paid).toBe("This membership is active. Next charge date 2026-11-26.");
     expect(paid).not.toContain("Due only after approval");
     expect(paid).not.toContain("$");
-    expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 12_900, waived: false })).toContain("Due only after approval");
+    expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 12_900, waived: false })).toBe(
+      "First month $64.50 (50% off), then $129 per month",
+    );
+    expect(statusMembershipLine({ status: "IN_REVIEW", monthlyCents: 19_900, waived: false })).toBe(
+      "First month $99.50 (50% off), then $199 per month",
+    );
     const approvedUnpaid = statusMembershipLine({ status: "APPROVED", monthlyCents: 12_900, waived: false, paymentStatus: "DUE" });
     expect(approvedUnpaid).toContain("Dues are due now to activate your membership.");
     expect(approvedUnpaid).not.toContain("Due only after approval");

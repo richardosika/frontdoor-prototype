@@ -39,7 +39,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "dues",
     title: "Monthly dues and cancellation",
-    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. They are never based on a deal. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues. A waiver is not automatic. Cancel on the payment page or in Settings. A reminder goes out before the first full-price charge.",
+    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues. A waiver is not automatic. Cancel on the payment page or in Settings. A reminder goes out before the first full-price charge.",
   },
   {
     slug: "posts",
@@ -69,7 +69,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "gc-dues",
     title: "What a general contractor pays for membership",
-    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after a Private Floor administrator approves the application. They are never based on a deal.",
+    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after a Private Floor administrator approves the application.",
   },
   {
     slug: "post-held",

@@ -138,7 +138,7 @@ See the status
     subject: "You're approved — membership dues are next",
     body: `Hello {first_name},
 
-A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
+A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. Private Floor does not store a card number.
 
 Your first full-price payment would be on {renewal_date}.
 
@@ -164,9 +164,7 @@ View the decision
 Your membership dues still need attention. The first month is {intro_amount} (50% off), then {dues_amount}. Month to month. No long-term contract. Cancel anytime. Next charge date: {renewal_date}. No card number is stored.
 
 Pay membership dues
-{payment_link}
-
-The fee stays flat and is never based on a deal.${SIGN}`,
+{payment_link}${SIGN}`,
   },
   {
     key: "renewal",
@@ -179,7 +177,7 @@ Your first month was {intro_amount}, half of the monthly price. On {renewal_date
 Cancel anytime
 {billing_link}
 
-The fee is flat and is never based on a deal. No card number is stored.${SIGN}`,
+No card number is stored.${SIGN}`,
   },
 ];
 
@@ -469,6 +467,24 @@ View the decision
 {status_link}
 
 {note}${SIGN}`,
+    `Hello {first_name},
+
+A Private Floor administrator approved your application. Membership for {role} is month to month. The first month is {intro_amount} (50% off). After that, the price is {dues_amount}. There is no long-term contract. Cancel anytime. A reminder goes out before the first full-price charge. The fee is never based on a deal, and Private Floor does not store a card number.
+
+Your first full-price payment would be on {renewal_date}.
+
+Pay membership dues
+{payment_link}
+
+Until the first month is recorded, the floor stays on the payment page.
+
+Sign in
+{login_link}
+
+View the decision
+{status_link}
+
+{note}${SIGN}`,
   ],
   dues_reminder: [
     `Hello {first_name},
@@ -489,6 +505,14 @@ Pay annual dues
 {payment_link}
 
 The fee stays flat and is never based on a deal.${SIGN}`,
+    `Hello {first_name},
+
+Your membership dues still need attention. The first month is {intro_amount} (50% off), then {dues_amount}. Month to month. No long-term contract. Cancel anytime. Next charge date: {renewal_date}. No card number is stored.
+
+Pay membership dues
+{payment_link}
+
+The fee stays flat and is never based on a deal.${SIGN}`,
   ],
   renewal: [
     `Hello {first_name},
@@ -501,6 +525,14 @@ Billing: {billing_link}${SIGN}`,
 Your flat annual dues of {dues_amount} renew on {renewal_date}. They are billed once a year and are never based on a deal. Write to connect@privatefloorclub.com if you want to cancel before that date.
 
 Billing: {billing_link}${SIGN}`,
+    `Hello {first_name},
+
+Your first month was {intro_amount}, half of the monthly price. On {renewal_date} the charge is the full price, {dues_amount}. Membership is month to month. There is no long-term contract. Cancel anytime before that date and the full-price charge does not run.
+
+Cancel anytime
+{billing_link}
+
+The fee is flat and is never based on a deal. No card number is stored.${SIGN}`,
   ],
 };
 

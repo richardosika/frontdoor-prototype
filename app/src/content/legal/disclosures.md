@@ -61,7 +61,7 @@ Real estate investments and loans involve significant risk, including the possib
 
 ## Flat dues only
 
-General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Dues pay for access to the Platform only and never depend on any deal or introduction.
+General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
 
 ## Your responsibility
 

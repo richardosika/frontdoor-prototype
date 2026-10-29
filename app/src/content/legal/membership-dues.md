@@ -8,13 +8,13 @@ DRAFT - for attorney review, not legal advice. This page restates Section 8 of t
 
 ## Monthly dues
 
-Members approved in these categories pay a flat monthly fee:
+Members approved in these categories pay:
 
 - General contractors: $199 per month. The first month is $99.50.
 - Brokers: $199 per month. The first month is $99.50.
 - Attorneys and advisors: $199 per month. The first month is $99.50.
 
-Private Floor decides the category from the professional role on the approved application. Monthly dues are due only after a Private Floor administrator approves the application. They are never based on a deal. The first charge is half the monthly price. The next charge is the full monthly price, one month later. A reminder goes out before that full-price charge.
+Private Floor decides the category from the professional role on the approved application. Monthly dues are due only after a Private Floor administrator approves the application. The first charge is half the monthly price. The next charge is the full monthly price, one month later. A reminder goes out before that full-price charge.
 
 The same schedule in Spanish, German, and Japanese is on the payment page. The English text governs if a translation differs.
 
@@ -24,7 +24,7 @@ Membership is month to month. There is no long-term contract. You can cancel any
 
 ## What the fee covers
 
-The fee is one month of access to the Private Floor Club. It is a flat membership fee. It is never based on, and never changes because of, whether any deal, investment, capital raise, loan, sale, lease, or other transaction happens between members, or its size or terms. Private Floor does not charge referral fees, finder's fees, commissions, success fees, carried interest, or any other transaction-based compensation. Private Floor does not hold, receive, or move members' money or securities, and does not process payments between members.
+The fee is one month of access to the Private Floor Club. Private Floor does not charge referral fees, finder's fees, commissions, success fees, carried interest, or any other transaction-based compensation. Private Floor does not hold, receive, or move members' money or securities, and does not process payments between members.
 
 ## Cancellation
 

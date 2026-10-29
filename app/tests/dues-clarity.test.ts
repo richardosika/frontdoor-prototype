@@ -27,6 +27,8 @@ describe("monthly dues wording", () => {
     expect(DUES_SCHEDULE_SENTENCE).toContain("General contractors:");
     expect(DUES_SCHEDULE_SENTENCE).toContain(DUES_BILLING_NOTE);
     expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/founding|per year|once a year/i);
+    expect(DUES_BILLING_NOTE).not.toMatch(/deal/i);
+    expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/based on a deal|never based on|flat, never/i);
     expect(duesLabel(PAID_MONTHLY_CENTS)).toBe("$199 per month");
     expect(duesLabel(0)).toBe("");
     expect(DUES_SCHEDULE_SENTENCE).not.toMatch(/free for developers|no monthly dues|no dues/i);

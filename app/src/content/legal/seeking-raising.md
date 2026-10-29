@@ -27,4 +27,4 @@ Speak with securities counsel before posting anything about a capital raise. A P
 
 ## Acknowledgement
 
-By posting, you confirm that this post follows these rules, that you will not ask another member for contact details, and that dues are flat fees for access only. No dues are charged during testing.
+By posting, you confirm that this post follows these rules and that you will not ask another member for contact details. No dues are charged during testing.

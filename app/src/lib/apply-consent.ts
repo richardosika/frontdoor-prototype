@@ -51,7 +51,7 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
   {
     id: "dues",
     label: "Dues",
-    title: "A flat monthly fee",
+    title: "Monthly dues",
     body: DUES_BILLING_NOTE,
     dues: true,
   },

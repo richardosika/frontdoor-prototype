@@ -28,7 +28,7 @@ export function memberStatusCopy(status: string): { title: string; body: string 
   if (status === "PAYMENT_DUE") {
     return {
       title: "Approved, payment due",
-      body: "Richard Osika approved this application. Sign in and pay the first month to open the floor. Membership is month to month. The first month is 50% off, then the full monthly price. Cancel anytime. The fee is never based on a deal.",
+      body: "Richard Osika approved this application. Sign in and pay the first month to open the floor. Membership is month to month. The first month is 50% off, then the full monthly price. Cancel anytime.",
     };
   }
   if (status === "REJECTED" || status === "DECLINED") {
