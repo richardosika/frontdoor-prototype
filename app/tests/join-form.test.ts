@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { monthlyDuesCents, firstMonthCents, FREE_ROLE_IDS } from "@/lib/dues";
 import { isKnownAppPath } from "@/lib/http-document";
-import { emptyProfile, pageKind, pageOneErrors, pageTwoErrors, showsProjects } from "@/lib/join-form";
+import { companyFieldsOptional, emptyProfile, pageKind, pageOneErrors, pageTwoErrors, showsProjects } from "@/lib/join-form";
 
 function ready(role: string) {
   const profile = emptyProfile(role);
@@ -47,6 +47,29 @@ describe("two-page join form", () => {
     expect(pageOneErrors(filled).join(" ")).toMatch(/professional link/i);
     filled.links = [{ kind: "LinkedIn (personal)", url: "https://linkedin.com/in/ada" }];
     expect(pageOneErrors(filled)).toEqual([]);
+  });
+
+  it("lets developers and investors leave company name and website blank", () => {
+    expect(companyFieldsOptional("DEVELOPER")).toBe(true);
+    expect(companyFieldsOptional("INVESTOR_PE")).toBe(true);
+    for (const role of ["DEVELOPER", "INVESTOR_PE"]) {
+      const profile = ready(role);
+      profile.company = "";
+      profile.website = "";
+      expect(pageOneErrors(profile)).toEqual([]);
+    }
+    for (const role of ["GENERAL_CONTRACTOR", "BROKER", "FAMILY_OFFICE", "LENDER", "INSURANCE"]) {
+      const profile = ready(role);
+      profile.company = "";
+      profile.website = "";
+      expect(pageOneErrors(profile).join(" ")).toMatch(/company name/i);
+      expect(companyFieldsOptional(role)).toBe(false);
+    }
+    const form = readFileSync(path.join(__dirname, "../src/components/join-application.tsx"), "utf8");
+    const server = readFileSync(path.join(__dirname, "../src/actions/join.ts"), "utf8");
+    expect(form).toContain("companyFieldsOptional");
+    expect(form).toContain("optional={companyOptional}");
+    expect(server).toContain("pageOneErrors");
   });
 
   it("puts role details above projects and hides projects for attorneys", () => {

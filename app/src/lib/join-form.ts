@@ -80,6 +80,11 @@ export function projectsRequired(role: string): number {
   return role === "GENERAL_CONTRACTOR" ? 2 : 0;
 }
 
+/** Developers and investors may apply as individuals, so company fields stay optional. */
+export function companyFieldsOptional(role: string): boolean {
+  return role === "DEVELOPER" || role === "INVESTOR_PE";
+}
+
 export function showsProjects(role: string): boolean {
   return pageKind(role) !== "attorney";
 }
@@ -328,8 +333,12 @@ export function pageOneErrors(profile: JoinProfile): string[] {
   if (!EMAIL.test(profile.email.trim())) errors.push("Enter a valid email.");
   if (profile.phone.trim().replace(/\D/g, "").length < 7) errors.push("Enter a mobile phone number.");
   if (!isRoleId(profile.role) || !JOIN_ROLES.some((role) => role.id === profile.role)) errors.push("Pick a role.");
-  if (profile.company.trim().length < 2) errors.push("Enter your company name.");
-  if (profile.website.trim().length < 4) errors.push("Enter your company website.");
+  const company = profile.company.trim();
+  const website = profile.website.trim();
+  if (!companyFieldsOptional(profile.role) || company || website) {
+    if (company.length < 2) errors.push("Enter your company name.");
+    if (website.length < 4) errors.push("Enter your company website.");
+  }
   errors.push(...validateAddress({ street: profile.street, city: profile.city, state: profile.state, zip: profile.zip }));
   if (!profile.links.some((link) => link.url.trim().length > 4)) {
     errors.push("Add at least one professional link: LinkedIn, business Instagram, Facebook, or YouTube.");

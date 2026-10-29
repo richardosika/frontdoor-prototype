@@ -21,6 +21,7 @@ import {
   LOAN_GROUPS,
   PARTICIPATION,
   ROLE_SPECIALTIES,
+  companyFieldsOptional,
   emptyProfile,
   pageKind,
   pageOneErrors,
@@ -131,6 +132,7 @@ export function JoinApplication({
   }
 
   const kind = pageKind(profile.role);
+  const companyOptional = companyFieldsOptional(profile.role);
   const stateCopy = stateListCopy(profile.role);
   const specialty = ROLE_SPECIALTIES[profile.role as keyof typeof ROLE_SPECIALTIES];
 
@@ -179,8 +181,8 @@ export function JoinApplication({
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">Your company</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label="Company name" required value={profile.company} onChange={(value) => patch({ company: value })} />
-            <Field label="Company website" required value={profile.website} onChange={(value) => patch({ website: value })} />
+            <Field label="Company name" required={!companyOptional} optional={companyOptional} value={profile.company} onChange={(value) => patch({ company: value })} />
+            <Field label="Company website" required={!companyOptional} optional={companyOptional} value={profile.website} onChange={(value) => patch({ website: value })} />
             <label className="sm:col-span-2">
               <span className={labelCls}>Business street address{RQ}</span>
               <input className={field} value={profile.street} onChange={(event) => patch({ street: event.target.value })} />
