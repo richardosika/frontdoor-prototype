@@ -8,6 +8,7 @@ import { applicationStatusLabel, memberStatusCopy } from "@/lib/application-stat
 import { BRAND } from "@/lib/brand";
 import { currentMonthlyCents, statusMembershipLine } from "@/lib/dues";
 import { formatLongEtDate } from "@/lib/format";
+import { publicSiteUrl } from "@/lib/public-site";
 
 export function ApplicationStatus({
   application,
@@ -72,8 +73,8 @@ export function ApplicationStatus({
               Sign in
             </Link>
           ) : (
-            <Link href="/apply" className={`${btn} mt-4 w-full`}>
-              Back to apply
+            <Link href={publicSiteUrl()} className={`${btn} mt-4 w-full`}>
+              Back to home
             </Link>
           )}
         </div>

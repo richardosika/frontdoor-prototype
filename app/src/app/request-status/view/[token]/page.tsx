@@ -7,6 +7,7 @@ import { INVITE_STATUS_COPY, requestReceivedMessage } from "@/lib/applicant-copy
 import { givenNameFrom } from "@/lib/person-fields";
 import { BRAND } from "@/lib/brand";
 import { prisma } from "@/lib/prisma";
+import { publicSiteUrl } from "@/lib/public-site";
 import { appBaseUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function RequestStatusPage({ params }: { params: Promise<{ 
           <h1 className="mt-1 font-serif text-2xl font-normal">{copy.title}</h1>
           <p className="mt-2 font-serif text-lg">{request.name}</p>
           <p className="mt-1 text-sm text-ink">{shownBody}</p>
-          <Link href="/" className={`${btn} mt-4 w-full`}>
+          <Link href={publicSiteUrl()} className={`${btn} mt-4 w-full`}>
             Back to home
           </Link>
         </div>

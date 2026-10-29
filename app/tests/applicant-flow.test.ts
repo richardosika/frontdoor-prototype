@@ -13,6 +13,7 @@ import {
 import { applicationReceivedMessage, APPLY_ENCOURAGEMENT, INVITE_STATUS_COPY, LANDING_INTRO, requestReceivedMessage } from "@/lib/applicant-copy";
 import { validateApplication } from "@/lib/domain";
 import { duplicateJoinMessage, validateInviteRequest } from "@/lib/invite-request";
+import { PUBLIC_SITE_FALLBACK, publicSiteUrl } from "@/lib/public-site";
 import { formatAddress, validatePhone } from "@/lib/person-fields";
 
 const ADDRESS = {
@@ -89,7 +90,15 @@ describe("applicant details", () => {
     expect(statusPage).not.toContain("statusMembershipLine");
     expect(statusPage).not.toContain("Application received");
     expect(statusPage).toContain("Back to home");
+    expect(statusPage).toContain("publicSiteUrl");
     expect(statusPage).not.toContain("Back to apply");
+    const applicationStatus = readFileSync(path.resolve(__dirname, "../src/components/application-status.tsx"), "utf8");
+    expect(applicationStatus).toContain("Back to home");
+    expect(applicationStatus).toContain("publicSiteUrl");
+    expect(applicationStatus).not.toContain("Back to apply");
+    expect(PUBLIC_SITE_FALLBACK).toBe("https://private-floor-preview.onrender.com");
+    expect(publicSiteUrl("")).toBe(PUBLIC_SITE_FALLBACK);
+    expect(publicSiteUrl("https://privatefloorclub.com/")).toBe("https://privatefloorclub.com");
   });
 
   it("blocks a second request to join while an account, application, or open request exists", () => {
