@@ -561,7 +561,7 @@ function DeveloperFields({ profile, onChange }: { profile: JoinProfile; onChange
   const dev = profile.developing;
   return (
     <div className="mt-3 border-t border-line pt-3">
-      <h3 className="font-serif text-xl font-normal">Project you're looking to develop (if you have one) (optional)</h3>
+      <h3 className="font-serif text-xl font-normal">Project you&apos;re looking to develop (if you have one) (optional)</h3>
       <label className="mt-2 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={dev.notYet} onChange={(event) => onChange({ developing: { ...dev, notYet: event.target.checked } })} />
         Not yet, just building my team
