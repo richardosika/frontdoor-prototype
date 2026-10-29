@@ -29,17 +29,66 @@ export function registryNameLiterals(org: string): string[] {
   return [...new Set([raw, ...nyRegistryCandidates(org)])].filter((name) => name.length > 0);
 }
 
-/** SoQL prefix. Quotes are doubled. % and _ are not left in the stem. */
+/** SoQL prefix from the normalized name. Quotes are doubled. % and _ are not left in the stem. */
 export function registryNamePrefix(org: string): string {
   return normalizeRegistryName(org).toUpperCase().replace(/[%_]/g, "").replace(/'/g, "''");
 }
 
+function soqlText(value: string): string {
+  return value.replace(/[%_]/g, "").replace(/'/g, "''");
+}
+
+function ampVariants(value: string): string[] {
+  const forms = [value];
+  if (value.includes("&")) forms.push(value.replace(/&/g, " AND ").replace(/\s+/g, " ").trim());
+  if (/\bAND\b/.test(value)) forms.push(value.replace(/\bAND\b/g, "&").replace(/\s+/g, " ").trim());
+  return forms;
+}
+
+/** Drop a trailing Inc / LLP / L.L.C. without removing punctuation from the words that remain. */
+function withoutTrailingLegalSuffix(raw: string): string {
+  const tokens = raw.split(" ");
+  while (tokens.length > 1) {
+    const bare = tokens[tokens.length - 1].replace(/[^A-Z0-9]/g, "").toLowerCase();
+    if (!LEGAL_SUFFIX.has(bare)) break;
+    tokens.pop();
+    if (tokens.length) tokens[tokens.length - 1] = tokens[tokens.length - 1].replace(/,+$/, "");
+  }
+  return tokens.join(" ").trim();
+}
+
+/**
+ * Prefixes to ask a registry for. The normalized stem finds "X, L.L.C." and "Construction Co.".
+ * The name as typed keeps "&", commas, and periods, so "PAUL, WEISS" is actually requested.
+ */
+export function registrySearchPrefixes(org: string): string[] {
+  const raw = org.trim().toUpperCase().replace(/\s+/g, " ").replace(/&AMP;/g, "&");
+  const forms = new Set<string>();
+  if (raw) {
+    for (const form of ampVariants(raw)) forms.add(form);
+    const trimmed = withoutTrailingLegalSuffix(raw);
+    if (trimmed && trimmed !== raw) {
+      for (const form of ampVariants(trimmed)) forms.add(form);
+    }
+  }
+  const normalized = normalizeRegistryName(org).toUpperCase().replace(/[%_]/g, "");
+  if (normalized) forms.add(normalized);
+  return [...forms].map(soqlText).filter((prefix) => prefix.length > 0);
+}
+
+/** SoQL OR of prefix matches. Callers still accept a row only when the normalized names are equal. */
+export function registryNameWhere(field: string, org: string): string {
+  const clauses = registrySearchPrefixes(org).map((prefix) => `upper(${field}) like '${prefix}%'`);
+  if (!clauses.length) return "";
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
+}
+
 export function nyRegistryQueryUrl(org: string): string {
-  const stem = registryNamePrefix(org);
+  const where = registryNameWhere("current_entity_name", org);
   const params = new URLSearchParams();
   params.set("$select", "current_entity_name,dos_id,entity_type");
-  params.set("$limit", stem ? "25" : "0");
-  if (stem) params.set("$where", `upper(current_entity_name) like '${stem}%'`);
+  params.set("$limit", where ? "25" : "0");
+  if (where) params.set("$where", where);
   return `${DATASET}?${params.toString()}`;
 }
 

@@ -6828,6 +6828,52 @@ describe("live search budget, exact EDGAR credit, and company-file YouTube", () 
     expect(foundation.corroborates).not.toBe(true);
   });
 
+  it("asks for the typed spelling, then accepts only an exact normalized registry name", () => {
+    const whereOf = (url: string) => new URL(url).searchParams.get("$where")?.toUpperCase() || "";
+    const paul = whereOf(nyRegistryQueryUrl("Paul, Weiss, Rifkind, Wharton & Garrison LLP"));
+    expect(paul).toContain("LIKE 'PAUL, WEISS, RIFKIND, WHARTON & GARRISON%'");
+    expect(paul).toContain("LIKE 'PAUL, WEISS, RIFKIND, WHARTON AND GARRISON%'");
+    expect(paul).toContain("LIKE 'PAUL WEISS RIFKIND WHARTON GARRISON%'");
+    const meister = whereOf(nyRegistryQueryUrl("Meister Seelig & Schuster PLLC"));
+    expect(meister).toContain("LIKE 'MEISTER SEELIG & SCHUSTER%'");
+    expect(meister).toContain("LIKE 'MEISTER SEELIG AND SCHUSTER%'");
+    expect(meister).toContain("LIKE 'MEISTER SEELIG SCHUSTER%'");
+    const herrick = whereOf(nyRegistryQueryUrl("Herrick, Feinstein LLP"));
+    expect(herrick).toContain("LIKE 'HERRICK, FEINSTEIN%'");
+    expect(whereOf(nyRegistryQueryUrl("Madison Realty Capital"))).toContain("LIKE 'MADISON REALTY CAPITAL%'");
+
+    const listed = assessNyRegistry("Paul, Weiss, Rifkind, Wharton & Garrison LLP", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "PAUL, WEISS, RIFKIND, WHARTON & GARRISON LLP" }]),
+    });
+    expect(listed.status).toBe("PASS");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("PAUL, WEISS, RIFKIND, WHARTON & GARRISON LLP");
+    const meisterHit = assessNyRegistry("Meister Seelig & Schuster PLLC", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "MEISTER SEELIG & SCHUSTER PLLC" }]),
+    });
+    expect(meisterHit.status).toBe("PASS");
+    expect(meisterHit.corroborates).not.toBe(true);
+    const madison = assessNyRegistry("Madison Realty Capital", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "MADISON REALTY CAPITAL, L.P." }]),
+    });
+    expect(madison.status).toBe("PASS");
+    expect(madison.corroborates).not.toBe(true);
+    const prefixOnly = assessNyRegistry("Paul, Weiss, Rifkind, Wharton & Garrison LLP", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "PAUL WEISS CAPITAL LLC" }]),
+    });
+    expect(prefixOnly.status).toBe("INCONCLUSIVE");
+    expect(prefixOnly.corroborates).not.toBe(true);
+    expect(prefixOnly.finding).toContain("No active entity uses this exact name");
+  });
+
   it("awards a Canadian province only when an independent source tied the person", () => {
     const address = row({
       key: "address",

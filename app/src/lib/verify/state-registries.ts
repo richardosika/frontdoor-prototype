@@ -1,4 +1,4 @@
-import { normalizeRegistryName, registryNamePrefix } from "@/lib/verify/ny-registry";
+import { normalizeRegistryName, registryNameWhere } from "@/lib/verify/ny-registry";
 import { domainBrand } from "@/lib/verify/public-match";
 import type { CheckOutput } from "@/lib/verify/types";
 
@@ -99,11 +99,11 @@ export function registryPortal(state: string): RegistryPortal | undefined {
 }
 
 export function socrataRegistryUrl(portal: RegistryPortal, org: string): string {
-  const stem = registryNamePrefix(org);
+  const where = registryNameWhere(portal.nameField, org);
   const params = new URLSearchParams();
   params.set("$select", [portal.nameField, portal.statusField].filter(Boolean).join(","));
-  params.set("$limit", stem ? "25" : "0");
-  if (stem) params.set("$where", `upper(${portal.nameField}) like '${stem}%'`);
+  params.set("$limit", where ? "25" : "0");
+  if (where) params.set("$where", where);
   return `${portal.dataset}?${params.toString()}`;
 }
 
