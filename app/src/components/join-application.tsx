@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkJoinEmail, submitJoinApplication } from "@/actions/join";
+import { MEMBER_RISK_ERROR, MEMBER_RISK_HREF, MEMBER_RISK_LABEL } from "@/lib/member-risk";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import {
   ATTORNEY_SPECIALTIES,
@@ -87,6 +88,7 @@ export function JoinApplication({
   const [error, setError] = useState("");
   const [alert, setAlert] = useState<{ title: string; detail: string } | null>(null);
   const [pending, setPending] = useState(false);
+  const [riskError, setRiskError] = useState(false);
   const [cardName, setCardName] = useState("");
 
   function patch(partial: Partial<JoinProfile>) {
@@ -113,6 +115,7 @@ export function JoinApplication({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setRiskError(profile.acceptMemberRisk !== true);
     const issues = pageTwoErrors(profile);
     if (issues.length) {
       setError(issues[0]);
@@ -406,6 +409,32 @@ export function JoinApplication({
             <input type="checkbox" className="mt-1" checked={profile.acceptVerification} onChange={(event) => patch({ acceptVerification: event.target.checked })} />
             <span>{verificationLabel}</span>
           </label>
+          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${riskError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-risk">
+            <input
+              type="checkbox"
+              name="acceptMemberRisk"
+              className="mt-1 h-5 w-5 shrink-0"
+              aria-required="true"
+              aria-invalid={riskError ? true : undefined}
+              aria-describedby={riskError ? "member-risk-error" : undefined}
+              checked={profile.acceptMemberRisk === true}
+              onChange={(event) => {
+                patch({ acceptMemberRisk: event.target.checked });
+                if (event.target.checked) setRiskError(false);
+              }}
+            />
+            <span>
+              {MEMBER_RISK_LABEL}{" "}
+              <a href={MEMBER_RISK_HREF} target="_blank" rel="noreferrer" className="font-semibold underline decoration-brass">
+                Read Section 7A of the Member Terms
+              </a>
+            </span>
+          </label>
+          {riskError ? (
+            <p id="member-risk-error" role="alert" className="mt-1 text-sm font-semibold text-[#9b2c22]">
+              {MEMBER_RISK_ERROR}
+            </p>
+          ) : null}
           <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-between">
             <button className={btnOutline} type="button" onClick={() => { setStep(1); window.scrollTo(0, 0); }}>Back</button>
             <button className={btn} type="submit" disabled={pending}>{pending ? "Sending…" : "Submit request"}</button>

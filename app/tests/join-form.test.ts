@@ -24,6 +24,7 @@ function ready(role: string) {
   profile.password = "long-password";
   profile.acceptTerms = true;
   profile.acceptVerification = true;
+  profile.acceptMemberRisk = true;
   profile.states = [{ state: "NJ", licensed: true, looking: true, licenseNumber: "" }];
   profile.specialties = ["Tax"];
   profile.loanTypes = ["Bridge"];

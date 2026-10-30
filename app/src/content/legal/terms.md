@@ -130,11 +130,25 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 ## 7. No reliance; dealings between members
 
-7.1 **No reliance.** Information on the Platform, including profiles, project information, seeking notes, deal-room materials, and Verified badges, is provided by members or reflects our limited review. **You must not rely on it as the basis for any investment, lending, contracting, hiring, or other decision. You are solely responsible for your own independent investigation and due diligence, and for getting your own legal, tax, accounting, and financial advice.**
+7.1 **No reliance.** Information on the Platform, including profiles, project information, seeking notes, deal-room materials, and Verified badges, is provided by members or reflects our restricted, not exhaustive review. **You must not rely on it as the basis for any investment, lending, contracting, hiring, or other decision. You are solely responsible for your own independent investigation and due diligence, and for getting your own legal, tax, accounting, and financial advice.**
 
 7.2 **Your dealings are at your own risk.** Any communication, relationship, agreement, or transaction between you and another member, whether started on or off the Platform, is solely between you and that member. We are not a party to it, do not supervise it, and are not responsible for anyone's performance, conduct, statements, or compliance with law.
 
 7.3 **Release.** To the fullest extent permitted by law, you release Private Floor and its owners, managers, officers, employees, and agents from claims, demands, and damages of every kind, known or unknown, arising out of or connected with any dispute between you and another member or any third party. [If you are a California resident, you waive California Civil Code Section 1542 (citation and text to be confirmed by counsel), which says: "A general release does not extend to claims that the creditor or releasing party does not know or suspect to exist in his or her favor at the time of executing the release and that, if known by him or her, would have materially affected his or her settlement with the debtor or released party."]
+
+## 7A. Our review is not a guarantee; members carry the risk of dealing with each other {#member-risk}
+
+7A.1 **What our review is.** Membership review and verification, including the automated checks, the administrator's review, the "Verified" badge, and any verification file, are restricted, point-in-time checks of public and free sources available to us when the check runs. They are not exhaustive. They are not a guarantee, warranty, endorsement, recommendation, or certification of any member, project, or deal. They are not a background check, a consumer report, a credit check, a licensing or insurance confirmation, or due diligence of any kind, and they must not be used for any of those purposes. A record that is correct on the day we check it may change the next day, and we have no duty to monitor members after approval.
+
+7A.2 **What members hide or our checks do not surface.** Private Floor is not responsible for, and makes no promise about, any information that a member or applicant hides, withholds, omits, falsifies, or misrepresents, or any fact, record, claim, judgment, lien, license problem, dispute, or history that our regular checks did not surface. Approval, a "Verified" badge, or the absence of a warning does not mean that no such information exists.
+
+7A.3 **Member performance is not our responsibility.** Private Floor is not responsible for any member's performance or non-performance, including any deal, investment, loan, contract, bid, schedule, default, workmanship, construction defect, payment, refund, licensing, insurance, bonding, permit, legal compliance, statement, or conduct, whether on or off the Platform. If a member does not perform, the remedy is between you and that member. We have no duty to step in, mediate, collect, refund, or compensate.
+
+7A.4 **Your own due diligence.** Before you rely on, contract with, lend to, invest with, hire, or pay any member, you must do your own independent investigation and due diligence, including checking licenses, insurance, bonding, references, title, financial capacity, and litigation history, and getting your own legal, tax, accounting, and financial advice. Every deal, agreement, and transaction is solely between the members involved. Private Floor is not a party to it, and nothing on the Platform creates any agency, partnership, joint venture, fiduciary, broker, or advisory relationship between you and Private Floor.
+
+7A.5 **Assumption of risk and release.** You understand and assume all risk of dealing with other members and third parties you meet through the Platform. To the fullest extent permitted by law, you release and forever discharge Private Floor Club, Private Floor, its operator, and their owners, managers, officers, employees, contractors, and agents from all claims, demands, losses, and damages of every kind, known or unknown, suspected or unsuspected, arising out of or connected with (a) any other member's acts, omissions, statements, performance, or non-performance; (b) any information a member hid, withheld, or misrepresented; (c) anything our review or verification did or did not surface; and (d) any deal or dealing between members. This release adds to Section 7.3 and does not replace it.
+
+7A.6 **This section works with Sections 12, 13, and 14.** The warranty disclaimer in Section 12, the limitation of liability in Section 13, and the indemnity in Section 14 apply in full to everything described in this Section 7A. If any part of this Section 7A is found unenforceable, the rest of it stays in effect, and the unenforceable part is enforced to the fullest extent permitted by law.
 
 ## 8. Membership dues and payments
 
@@ -184,7 +198,9 @@ The Platform may link to or integrate third-party websites and services. We do n
 
 ## 12. Disclaimers
 
-**THE PLATFORM AND ALL CONTENT ARE PROVIDED "AS IS" AND "AS AVAILABLE." TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, AND THOSE ARISING FROM COURSE OF DEALING. WE DO NOT WARRANT THAT THE PLATFORM WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE, THAT ANY MEMBER IS WHO THEY SAY THEY ARE, THAT ANY MEMBER CONTENT IS ACCURATE OR LAWFUL, OR THAT VERIFICATION WILL DETECT FRAUD, MISREPRESENTATION, OR RISK.**
+12.1 **THE PLATFORM AND ALL CONTENT ARE PROVIDED "AS IS" AND "AS AVAILABLE." TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, AND THOSE ARISING FROM COURSE OF DEALING. WE DO NOT WARRANT THAT THE PLATFORM WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE, THAT ANY MEMBER IS WHO THEY SAY THEY ARE, THAT ANY MEMBER CONTENT IS ACCURATE OR LAWFUL, OR THAT VERIFICATION WILL DETECT FRAUD, MISREPRESENTATION, OR RISK.**
+
+12.2 **WITHOUT RESTRICTING THE ABOVE, WE MAKE NO WARRANTY OR REPRESENTATION ABOUT ANY MEMBER, INCLUDING THEIR IDENTITY, LICENSING, INSURANCE, BONDING, FINANCIAL CAPACITY, TRACK RECORD, WORKMANSHIP, CREDITWORTHINESS, OR CONDUCT, OR ABOUT ANY PROJECT OR DEAL. MEMBERSHIP REVIEW AND VERIFICATION ARE RESTRICTED, POINT-IN-TIME CHECKS OF PUBLIC AND FREE SOURCES AND ARE NOT EXHAUSTIVE. APPROVAL, A "VERIFIED" BADGE, OR THE ABSENCE OF A WARNING IS NOT A GUARANTEE, ENDORSEMENT, BACKGROUND CHECK, OR DUE DILIGENCE. YOU USE THE PLATFORM AND DEAL WITH OTHER MEMBERS AT YOUR OWN RISK.**
 
 ## 13. Limitation of liability
 
@@ -192,11 +208,13 @@ The Platform may link to or integrate third-party websites and services. We do n
 
 13.2 **OUR TOTAL LIABILITY FOR ALL CLAIMS RELATED TO THE PLATFORM OR THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM, OR (B) US $[100].**
 
+13.2A **WITHOUT RESTRICTING SECTIONS 13.1 AND 13.2, PRIVATE FLOOR AND ITS OWNERS, MANAGERS, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR ANY LOSS OR DAMAGE ARISING OUT OF OR RELATED TO (A) ANY MEMBER'S ACTS, OMISSIONS, STATEMENTS, PERFORMANCE, OR NON-PERFORMANCE; (B) ANY INFORMATION A MEMBER HID, WITHHELD, OMITTED, OR MISREPRESENTED; (C) ANYTHING OUR REVIEW OR VERIFICATION DID OR DID NOT SURFACE; OR (D) ANY DEAL, LOAN, CONTRACT, OR PAYMENT BETWEEN MEMBERS, WHETHER THE CLAIM IS BASED ON CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER THEORY. THESE EXCLUSIONS AND THE CAP IN SECTION 13.2 APPLY EVEN IF A REMEDY FAILS OF ITS ESSENTIAL PURPOSE.**
+
 13.3 Some jurisdictions do not allow certain exclusions or limitations, so some of the above may not apply to you. These limits do not limit liability that cannot be limited by law.
 
 ## 14. Indemnity
 
-You will defend, indemnify, and hold harmless Private Floor and its owners, managers, officers, employees, and agents from and against all claims, losses, liabilities, damages, penalties, costs, and expenses (including reasonable attorneys' fees) arising out of or related to: (a) your Member Content; (b) your use of the Platform; (c) your breach of these Terms or any law, including securities, licensing, and privacy laws; (d) your dealings with any other member or third party; or (e) your breach of any confidentiality obligation. We may assume control of the defense of any matter at your expense, and you will cooperate with us.
+You will defend, indemnify, and hold harmless Private Floor and its owners, managers, officers, employees, and agents from and against all claims, losses, liabilities, damages, penalties, costs, and expenses (including reasonable attorneys' fees) arising out of or related to: (a) your Member Content; (b) your use of the Platform; (c) your breach of these Terms or any law, including securities, licensing, and privacy laws; (d) your dealings with any other member or third party; (e) your breach of any confidentiality obligation; (f) any information you hid, withheld, omitted, or misrepresented in your application, profile, or on the Platform; or (g) your performance or non-performance, workmanship, payments, licensing, or conduct in any deal or dealing with another member. We may assume control of the defense of any matter at your expense, and you will cooperate with us.
 
 ## 15. Suspension, removal, and termination
 

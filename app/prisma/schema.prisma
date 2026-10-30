@@ -309,6 +309,8 @@ model Application {
   statement       String            @default("")
   website         String            @default("")
   socialLinks     String            @default("")
+  memberRiskAcceptedAt   DateTime?
+  memberRiskTermsVersion String    @default("")
   joinProfile     Json?
   statusToken     String            @unique
   status          ApplicationStatus @default(PENDING)

@@ -1,4 +1,5 @@
 "use server";
+import { MEMBER_RISK_VERSION } from "@/lib/member-risk";
 import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
@@ -18,7 +19,7 @@ import {
   pageTwoErrors,
   type JoinProfile,
 } from "@/lib/join-form";
-import { acceptanceVersions, hashClientIp } from "@/lib/legal";
+import { acceptanceVersions, legalVersion, hashClientIp } from "@/lib/legal";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { publicStatusPath } from "@/lib/public-status";
@@ -114,6 +115,8 @@ export async function submitJoinApplication(
         website: normalizeWebUrl(profile.website).slice(0, 300),
         socialLinks,
         joinProfile: stored,
+        memberRiskAcceptedAt: acceptedAt,
+        memberRiskTermsVersion: `${legalVersion("terms")}+${MEMBER_RISK_VERSION}`,
         status: "IN_REVIEW",
         duesCents: annualDuesCents(profile.role),
         duesWaived: annualDuesCents(profile.role) === 0,

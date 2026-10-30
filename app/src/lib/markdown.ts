@@ -20,7 +20,11 @@ export function renderMarkdown(source: string): string {
     }
     flush();
     if (trimmed.startsWith("### ")) html.push(`<h3 class="mt-6 font-serif text-xl font-normal">${inline(trimmed.slice(4))}</h3>`);
-    else if (trimmed.startsWith("## ")) html.push(`<h2 class="mt-6 font-serif text-2xl font-normal">${inline(trimmed.slice(3))}</h2>`);
+    else if (trimmed.startsWith("## ")) {
+      const anchor = /\s*\{#([a-z0-9-]+)\}\s*$/.exec(trimmed);
+      const text = anchor ? trimmed.slice(3, anchor.index) : trimmed.slice(3);
+      html.push(`<h2${anchor ? ` id="${anchor[1]}"` : ""} class="mt-6 scroll-mt-6 font-serif text-2xl font-normal">${inline(text)}</h2>`);
+    }
     else if (trimmed.startsWith("# ")) html.push(`<h1 class="font-serif text-3xl font-normal">${inline(trimmed.slice(2))}</h1>`);
     else html.push(`<p class="mt-3 text-sm leading-relaxed text-ink">${inline(trimmed)}</p>`);
   }

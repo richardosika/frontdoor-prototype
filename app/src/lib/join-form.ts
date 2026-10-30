@@ -1,3 +1,4 @@
+import { MEMBER_RISK_ERROR } from "@/lib/member-risk";
 import { isRoleId, type RoleId } from "@/lib/roles";
 import { US_STATES } from "@/lib/member-network";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
@@ -220,6 +221,7 @@ export type JoinProfile = {
   password: string;
   acceptTerms: boolean;
   acceptVerification: boolean;
+  acceptMemberRisk: boolean;
   title: string;
   legalName: string;
   formationState: string;
@@ -286,6 +288,7 @@ export function emptyProfile(role = "DEVELOPER", code = ""): JoinProfile {
     password: "",
     acceptTerms: false,
     acceptVerification: false,
+    acceptMemberRisk: false,
     title: "",
     legalName: "",
     formationState: "",
@@ -353,6 +356,7 @@ export function pageTwoErrors(profile: JoinProfile): string[] {
   if (profile.propertyTypes.length < 1) errors.push("Pick at least one property type.");
   if (profile.password.trim().length < 8) errors.push("Create a password of at least 8 characters.");
   if (!profile.acceptTerms || !profile.acceptVerification) errors.push("Check both agreement boxes.");
+  if (profile.acceptMemberRisk !== true) errors.push(MEMBER_RISK_ERROR);
   const kind = pageKind(profile.role);
   if (showsProjects(profile.role)) {
     const needed = projectsRequired(profile.role);
