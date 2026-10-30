@@ -73,6 +73,10 @@ export async function activatePaidMembership(input: {
     where: { userId: user.id, status: "PAYMENT_DUE" },
     data: { status: "APPROVED" },
   });
+  if (first) {
+    const { alertNewMemberMatches } = await import("@/lib/member-alerts");
+    await alertNewMemberMatches(user.id).catch(() => 0);
+  }
   if (first && input.welcome !== false) {
     const base = await appBaseUrl();
     await sendTemplate({

@@ -189,7 +189,7 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
   );
 
   const seekingMe = data.myCategory ? (
-    <section className={box} data-testid="ledger-seeking-me" key="seeking">
+    <section id="ledger-seeking" className={`${box} scroll-mt-20`} data-testid="ledger-seeking-me" key="seeking">
       <h2 className={h2}>
         {tx("Projects seeking your category")}: {tx(seekLabel(data.myCategory))}
       </h2>

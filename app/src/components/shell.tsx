@@ -62,7 +62,7 @@ export function Shell({
   locale = "en",
   children,
 }: {
-  user: { name: string; initials: string; tier: string; isAdmin: boolean };
+  user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean };
   unread: number;
   alerts: number;
   locale?: Locale;
@@ -122,7 +122,7 @@ export function Shell({
             onClick={() => setMemberOpen((open) => !open)}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-sm border border-brass/40 p-2 text-left hover:bg-paper/10 lg:justify-start"
           >
-            <Avatar initials={user.initials} size="sm" />
+            <Avatar initials={user.initials} photoId={user.photoId} size="sm" />
             <span className="hidden min-w-0 flex-1 lg:block">
               <span className="block truncate font-sans text-[13px] font-semibold">{user.name}</span>
               <span className="block font-sans text-[11px] text-sand">{memberLine}</span>

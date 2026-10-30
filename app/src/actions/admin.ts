@@ -241,6 +241,10 @@ export async function reviewApplication(formData: FormData) {
       data: { userId: user.id },
     });
   }
+  if (!paying) {
+    const { alertNewMemberMatches } = await import("@/lib/member-alerts");
+    await alertNewMemberMatches(user.id).catch(() => 0);
+  }
 
   await noteApplicationReferences({
     userId: user.id,

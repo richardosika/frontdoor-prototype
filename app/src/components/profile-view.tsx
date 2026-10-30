@@ -2,6 +2,7 @@ import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { TierBadge } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
+import { ProfilePhotos } from "@/components/profile-photos";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { requestConfirmation } from "@/actions/profile";
@@ -63,12 +64,16 @@ export async function ProfileView({
   blockedByViewer,
   blockedByThem,
   ownDeals = [],
+  gallery = [],
 }: {
   ownDeals?: { id: string; title: string }[];
+  gallery?: { id: string; caption: string; width: number; height: number }[];
   member: {
     id: string;
     name: string;
     initials: string;
+    photoId: string;
+    coverId: string;
     org: string;
     location: string;
     role: string;
@@ -101,7 +106,10 @@ export async function ProfileView({
 
   return (
     <article className="border-x border-b border-line bg-paper md:overflow-hidden md:rounded md:border">
-      <div className="cover-forest notch relative z-0 h-[calc(8rem+env(safe-area-inset-top,0px))] overflow-hidden bg-forest md:h-40">
+      <div className="cover-forest notch relative z-0 h-[calc(8rem+env(safe-area-inset-top,0px))] overflow-hidden bg-forest bg-cover bg-center md:h-40"
+        style={member.coverId ? { backgroundImage: `url(/api/member-images/${member.coverId})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+        data-testid={member.coverId ? "profile-cover" : undefined}
+      >
         {backHref ? (
           <Link href={backHref} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 inline-flex min-h-11 items-center font-sans text-sm text-paper md:hidden">
             ‹ {tx("Network")}
@@ -111,7 +119,7 @@ export async function ProfileView({
       <div className="relative z-10 flex items-end justify-between px-5">
         <div className="-mt-11">
           <span className="relative z-10 inline-grid rounded-full shadow-[0_0_0_4px_#FFFDF8]">
-            <Avatar initials={member.initials} size="lg" />
+            <Avatar initials={member.initials} photoId={member.photoId} size="lg" />
           </span>
         </div>
         <div className="mb-2 flex gap-2">
@@ -251,6 +259,7 @@ export async function ProfileView({
           <Stat value={String(vouchCount)} label={tx("Vouches")} />
           <Stat value={tx(tierLabel(member.tier))} label={tx("Membership")} />
         </div>
+        <ProfilePhotos isSelf={isSelf} photoId={member.photoId} coverId={member.coverId} gallery={gallery} />
         <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Membership")}</h2>
         <div className="flex flex-wrap items-center gap-3 rounded border border-line bg-cream px-4 py-3" data-testid="membership-status">
           <span className="inline-flex items-center rounded-sm border border-forest bg-forest px-3 py-1 text-[14px] font-semibold uppercase tracking-[0.08em] text-paper">

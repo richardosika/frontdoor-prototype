@@ -1,6 +1,7 @@
 import { Shell } from "@/components/shell";
 import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { memberAlertWhere } from "@/lib/member-alerts";
 import { currentLocale } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +22,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         conversation: { OR: [{ userAId: user.id }, { userBId: user.id }] },
       },
     }),
-    prisma.notification.count({ where: { userId: user.id, readAt: null } }),
+    prisma.notification.count({ where: { ...memberAlertWhere(user.id), readAt: null } }),
   ]);
   return (
     <Shell
-      user={{ name: user.name, initials: user.initials, tier: user.tier, isAdmin: user.isAdmin }}
+      user={{ name: user.name, initials: user.initials, photoId: user.photoId, tier: user.tier, isAdmin: user.isAdmin }}
       unread={unread}
       alerts={alerts}
       locale={await currentLocale()}

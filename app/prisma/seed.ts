@@ -9,6 +9,7 @@ import { BRAND } from "../src/lib/brand";
 import { duplicateExampleIds } from "../src/lib/demo-cleanup";
 import { ORPHAN_VERIFICATION_CASE_IDS, verificationCaseIsDeletableOrphan } from "../src/lib/orphan-case";
 import { deleteMemberAccount } from "../src/lib/remove-member";
+import { alertNewMemberMatches } from "../src/lib/member-alerts";
 import { SEEDED_EXTRA_PROJECTS, SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES } from "../src/lib/seed-coherence";
 import { MEMBER_CHECKS, PROJECT_CHECKS, type VerificationStatus } from "../src/lib/verification";
 
@@ -1235,6 +1236,9 @@ async function alignProjectContactDemo() {
       },
     });
   }
+  // Example "new member matches your projects" alerts for the demo accounts (once per member pair).
+  for (const id of ["user_mt", "user_gl", "user_rk", "user_hc", "user_jw"]) await alertNewMemberMatches(id);
+  await prisma.notification.updateMany({ where: { audience: "member", href: { startsWith: "/admin" } }, data: { audience: "admin" } });
   const contacts: { projectId: string; fromId: string; toId: string; category: string; status: "PENDING" | "ACCEPTED" | "DECLINED"; note: string }[] = [
     { projectId: "proj_ironbound", fromId: "user_ls", toId: "user_mh", category: "FINANCING", status: "ACCEPTED", note: "We lend on value-add multifamily in Essex County." },
     { projectId: "proj_ironbound", fromId: "user_tn", toId: "user_mh", category: "EQUITY", status: "PENDING", note: "Interested in the LP piece. What is the hold period?" },

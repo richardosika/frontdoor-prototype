@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["tesseract.js"],
+  serverExternalPackages: ["tesseract.js", "sharp", "heic-convert"],
   poweredByHeader: false,
   devIndicators: false,
   experimental: {

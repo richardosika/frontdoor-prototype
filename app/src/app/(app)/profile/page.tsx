@@ -27,6 +27,7 @@ export default async function ProfilePage({
       <ProfileView
         member={loaded.member}
         projects={loaded.projects}
+        gallery={loaded.gallery}
         isSelf
         connection="NONE"
         intro="NONE"

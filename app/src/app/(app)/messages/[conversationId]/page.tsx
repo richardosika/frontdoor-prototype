@@ -31,8 +31,8 @@ export default async function ThreadPage({
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      userA: { select: { id: true, name: true, initials: true, role: true, location: true, tier: true } },
-      userB: { select: { id: true, name: true, initials: true, role: true, location: true, tier: true } },
+      userA: { select: { id: true, name: true, initials: true, photoId: true, role: true, location: true, tier: true } },
+      userB: { select: { id: true, name: true, initials: true, photoId: true, role: true, location: true, tier: true } },
       messages: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -67,7 +67,7 @@ export default async function ThreadPage({
           <Link href="/messages" className="inline-flex min-h-11 min-w-11 items-center text-sm text-mut lg:hidden">
             ‹
           </Link>
-          <Avatar initials={other.initials} size="sm" />
+          <Avatar initials={other.initials} photoId={other.photoId} size="sm" />
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 font-serif text-lg font-normal">
               {other.name} <TierBadge tier={other.tier} />

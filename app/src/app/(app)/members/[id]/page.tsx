@@ -33,6 +33,7 @@ export default async function MemberPage({
       <ProfileView
         member={loaded.member}
         projects={loaded.projects}
+        gallery={loaded.gallery}
         isSelf={user.id === loaded.member.id}
         connection={loaded.connection}
         intro={loaded.intro}

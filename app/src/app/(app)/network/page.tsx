@@ -149,7 +149,7 @@ export default async function NetworkPage({
           return (
             <article key={member.id} className="rounded border border-line bg-paper p-4">
               <Link href={`/members/${member.id}`} className="flex items-center gap-3">
-                <Avatar initials={member.initials} />
+                <Avatar initials={member.initials} photoId={member.photoId} />
                 <span>
                   <span className="block text-sm font-semibold">{member.name}</span>
                   <span className="block text-[11px] text-mut">

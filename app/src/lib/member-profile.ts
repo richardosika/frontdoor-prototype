@@ -17,6 +17,11 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
         },
         orderBy: { year: "desc" },
       },
+      images: {
+        where: { kind: "GALLERY" },
+        select: { id: true, caption: true, width: true, height: true },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
   if (!member || member.status !== "ACTIVE") return null;
@@ -138,6 +143,8 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       id: member.id,
       name: member.name,
       initials: member.initials,
+      photoId: member.photoId,
+      coverId: member.coverId,
       org: member.org,
       location: member.location,
       role: member.role,
@@ -153,6 +160,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       createdAt: member.createdAt,
     },
     projects,
+    gallery: member.images,
     ownDeals,
     verification,
     connection: state,

@@ -315,7 +315,7 @@ export default async function FeedPage({
               >
                 <div className="flex items-start gap-3">
                   <Link href={`/members/${post.authorId}`}>
-                    <Avatar initials={post.author.initials} />
+                    <Avatar initials={post.author.initials} photoId={post.author.photoId} />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -436,7 +436,7 @@ export default async function FeedPage({
           <ul className="mt-2">
             {suggestions.map((person) => (
               <li key={person.id} className="flex items-center gap-2 border-b border-line py-2 last:border-0">
-                <Avatar initials={person.initials} size="sm" />
+                <Avatar initials={person.initials} photoId={person.photoId} size="sm" />
                 <Link href={`/members/${person.id}`} className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{person.name}</span>
                   <span className="block truncate text-[11px] text-mut">{tx(roleShort(roleLabel(person.role)))}</span>

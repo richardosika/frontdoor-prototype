@@ -252,6 +252,10 @@ model User {
   crmProfile           CrmPerson?           @relation("CrmMember")
   crmNotes             CrmNote[]
   savedFilters         SavedFilter[]
+  /// MemberImage ids for the profile photo and the cover image or company logo. Empty means initials and the green banner.
+  photoId        String           @default("")
+  coverId        String           @default("")
+  images         MemberImage[]
   projectContactsSent     ProjectContact[] @relation("ProjectContactFrom")
   projectContactsReceived ProjectContact[] @relation("ProjectContactTo")
 
@@ -578,6 +582,8 @@ model Notification {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   body      String
+  /// "member" alerts show on the member Alerts page. "admin" notices (applicant grades, queues) stay in Admin.
+  audience  String   @default("member")
   href      String    @default("")
   readAt    DateTime?
   createdAt DateTime  @default(now())
@@ -1002,4 +1008,28 @@ model ProjectDocument {
   updatedAt   DateTime     @updatedAt
 
   @@index([projectId])
+}
+
+enum MemberImageKind {
+  AVATAR
+  COVER
+  GALLERY
+}
+
+/// A member's profile photo, cover image or gallery photo. Always stored re-encoded (JPEG or WebP), resized.
+model MemberImage {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        MemberImageKind
+  caption     String          @default("")
+  position    Int             @default(0)
+  contentType String
+  width       Int
+  height      Int
+  sizeBytes   Int
+  bytes       Bytes
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, kind, position])
 }
