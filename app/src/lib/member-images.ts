@@ -72,20 +72,51 @@ export function centerCrop(width: number, height: number, aspect: number): Crop 
   return { x: 0, y: (1 - h) / 2, w: 1, h };
 }
 
+const HEIC_WORKER = `
+const { parentPort, workerData } = require("node:worker_threads");
+require("heic-decode")({ buffer: Buffer.from(workerData) })
+  .then((r) => parentPort.postMessage({ width: r.width, height: r.height, data: r.data }))
+  .catch((e) => parentPort.postMessage({ error: String(e && e.message || e) }));
+`;
+
+/** HEIC decoding is slow pure JS/wasm; run it on a worker thread so the server keeps answering other requests. */
+async function decodeHeic(input: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }> {
+  const { Worker } = await import("node:worker_threads");
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(HEIC_WORKER, { eval: true, workerData: input, resourceLimits: { maxOldGenerationSizeMb: 192 } });
+    const timer = setTimeout(() => {
+      void worker.terminate();
+      reject(new Error("heic timeout"));
+    }, 180_000);
+    worker.once("message", (message: { width: number; height: number; data: Uint8Array; error?: string }) => {
+      clearTimeout(timer);
+      void worker.terminate();
+      if (message.error) reject(new Error(message.error));
+      else resolve(message);
+    });
+    worker.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
 /**
- * Decode (HEIC/HEIF through heic-convert), honor EXIF rotation, crop, resize and re-encode as WebP.
+ * Decode (HEIC/HEIF through heic-decode on a worker thread), honor EXIF rotation, crop, resize and re-encode as WebP.
  * GIFs keep only their first frame.
  */
 export async function processImage(input: Uint8Array, kind: ImageKind, crop: Crop | null) {
   const format = sniffImage(input);
   if (!format) throw new Error("unsupported");
-  let source = Buffer.from(input);
-  if (format === "heic") {
-    const convert = (await import("heic-convert")).default as (o: { buffer: Buffer; format: "JPEG"; quality: number }) => Promise<ArrayBuffer>;
-    source = Buffer.from(await convert({ buffer: source, format: "JPEG", quality: 0.92 }));
-  }
   const sharp = (await import("sharp")).default;
-  const oriented = await sharp(source, { animated: false, limitInputPixels: 80_000_000 }).rotate().toBuffer({ resolveWithObject: true });
+  sharp.concurrency(1);
+  const oriented =
+    format === "heic"
+      ? await (async () => {
+          const raw = await decodeHeic(input);
+          return sharp(raw.data, { raw: { width: raw.width, height: raw.height, channels: 4 } }).png({ compressionLevel: 0 }).toBuffer({ resolveWithObject: true });
+        })()
+      : await sharp(Buffer.from(input), { animated: false, limitInputPixels: 80_000_000 }).rotate().toBuffer({ resolveWithObject: true });
   const { width, height } = oriented.info;
   const target = IMAGE_TARGET[kind];
   let pipeline = sharp(oriented.data);
