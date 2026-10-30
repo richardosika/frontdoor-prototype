@@ -11,9 +11,9 @@ const section = terms.slice(terms.indexOf("## 7A."), terms.indexOf("## 8."));
 const BANNED = /\b(invite|invited|invite-only|founding member|limited)\b/i;
 
 describe("member risk terms", () => {
-  it("has a 7A section with an anchor the checkbox links to", () => {
+  it("has a 7A section, and the checkbox links to the Terms without an anchor", () => {
     expect(section).toMatch(/\{#member-risk\}/);
-    expect(MEMBER_RISK_HREF).toBe("/legal/terms#member-risk");
+    expect(MEMBER_RISK_HREF).toBe("/legal/terms");
     expect(renderMarkdown(section)).toContain('<h2 id="member-risk"');
     expect(renderMarkdown(section)).not.toContain("{#member-risk}");
   });
@@ -59,5 +59,16 @@ describe("member risk checkbox", () => {
     expect(MEMBER_RISK_LABEL).toBe(
       "I understand that Private Floor's review is not a guarantee of any member, and that Private Floor is not responsible for information members withhold or for any member's performance. I agree to the Member Terms.",
     );
+  });
+});
+
+describe("join form does not name a section", () => {
+  it("links to the Member Terms and never mentions 7A", () => {
+    const form = readFileSync(path.join(ROOT, "src/components/join-application.tsx"), "utf8");
+    const page = readFileSync(path.join(ROOT, "src/app/join/page.tsx"), "utf8");
+    expect(form).toContain("Read the Member Terms");
+    for (const text of [form, page, MEMBER_RISK_LABEL, MEMBER_RISK_ERROR, MEMBER_RISK_HREF]) {
+      expect(text).not.toMatch(/7A|#member-risk/);
+    }
   });
 });

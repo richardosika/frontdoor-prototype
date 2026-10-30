@@ -426,7 +426,7 @@ export function JoinApplication({
             <span>
               {MEMBER_RISK_LABEL}{" "}
               <a href={MEMBER_RISK_HREF} target="_blank" rel="noreferrer" className="font-semibold underline decoration-brass">
-                Read Section 7A of the Member Terms
+                Read the Member Terms
               </a>
             </span>
           </label>
