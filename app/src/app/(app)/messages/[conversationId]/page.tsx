@@ -138,7 +138,7 @@ export default async function ThreadPage({
               </div>
             </>
           )}
-          <ReportDialog userId={other.id} conversationId={conversation.id} label="Report" />
+          <ReportDialog userId={other.id} conversationId={conversation.id} label={tx("Report")} />
         </div>
       </section>
     </div>

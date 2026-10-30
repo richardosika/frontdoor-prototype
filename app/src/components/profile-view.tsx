@@ -85,7 +85,7 @@ export async function ProfileView({
       <div className="cover-forest notch relative z-0 h-[calc(8rem+env(safe-area-inset-top,0px))] overflow-hidden bg-forest md:h-40">
         {backHref ? (
           <Link href={backHref} className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-10 inline-flex min-h-11 items-center font-sans text-sm text-paper md:hidden">
-            ‹ Network
+            ‹ {tx("Network")}
           </Link>
         ) : null}
       </div>
@@ -127,7 +127,7 @@ export async function ProfileView({
             {tx(roleShort(roleLabel(member.role)))}
           </span>
           <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
-            Member since {member.createdAt.getFullYear()}
+            {tx("Member since")} {member.createdAt.getFullYear()}
           </span>
         </div>
         {member.bio ? <p className="mt-4 text-sm leading-relaxed text-ink">{member.bio}</p> : null}
@@ -231,17 +231,17 @@ export async function ProfileView({
                 </button>
               </form>
             </div>
-            <ReportDialog userId={member.id} label="Report" />
+            <ReportDialog userId={member.id} label={tx("Report")} />
           </div>
         )}
         <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
-          <Stat value={String(projectCount)} label="Projects" />
-          <Stat value={String(vouchCount)} label="Vouches" />
+          <Stat value={String(projectCount)} label={tx("Projects")} />
+          <Stat value={String(vouchCount)} label={tx("Vouches")} />
           <Stat value={tx(tierLabel(member.tier))} label={tx("Membership")} />
         </div>
         <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Membership")}</h2>
         <p className="mb-2 text-xs leading-relaxed text-ink">
-          Status is Approved. {VERIFIED_EXPLANATION} The brass badge is separate from membership.
+          {tx("Status is Approved.")} {tx(VERIFIED_EXPLANATION)} {tx("The brass badge is separate from membership.")}
         </p>
         <div className="flex items-center gap-2">
           <TierBadge tier={member.tier} />

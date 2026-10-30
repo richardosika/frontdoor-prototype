@@ -111,8 +111,8 @@ export default async function SettingsPage({
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Delete this account")}</h2>
         <p className="mt-2 text-sm text-ink">
           {user.deletionRequestedAt
-            ? "A Private Floor administrator already has this request."
-            : "This asks a Private Floor administrator to remove the account. It does not delete it immediately."}
+            ? tx("A Private Floor administrator already has this request.")
+            : tx("This asks a Private Floor administrator to remove the account. It does not delete it immediately.")}
         </p>
         <form action={requestAccountDeletion} className="mt-3 grid gap-2">
           <textarea name="note" className={field} rows={2} placeholder={tx("Optional note")} />

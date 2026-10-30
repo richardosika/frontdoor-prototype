@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { btnOutline } from "@/components/ui";
+import { useTx } from "@/components/locale-context";
 
 export function ShareLink({ href }: { href: string }) {
+  const tx = useTx();
   const [label, setLabel] = useState("Copy link");
   return (
     <button
@@ -19,7 +21,7 @@ export function ShareLink({ href }: { href: string }) {
         }
       }}
     >
-      {label}
+      {tx(label)}
     </button>
   );
 }

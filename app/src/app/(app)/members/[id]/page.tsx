@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Banner } from "@/components/banner";
@@ -18,12 +19,13 @@ export default async function MemberPage({
   const user = await requireUser();
   const { id } = await params;
   const query = await searchParams;
+  const tx = await serverTx();
   const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
   if (!loaded) notFound();
   return (
     <div className="mx-auto max-w-3xl md:px-8 md:py-6">
       <Link href="/network" className="mb-3 hidden px-1 text-sm text-mut md:inline-block">
-        ‹ Network
+        ‹ {tx("Network")}
       </Link>
       <div className="md:px-0">
         <Banner error={query.error} notice={query.notice} />

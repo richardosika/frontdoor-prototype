@@ -116,7 +116,7 @@ export async function ProjectFilterBar({
           </select>
         </label>
         <label>
-          <span className={labelCls}>{directory ? "Role" : "Role of poster"}</span>
+          <span className={labelCls}>{tx(directory ? "Role" : "Role of poster")}</span>
           <select className={field} name="role" defaultValue={filters.role || ""}>
             <option value="">{tx("Any")}</option>
             {ROLES.map((item) => (
@@ -159,9 +159,9 @@ export async function ProjectFilterBar({
           <ShareLink href={href} />
         </div>
       </form>
-      <p className="mt-3 break-all text-xs text-mut">Shareable link: {href}</p>
+      <p className="mt-3 break-all text-xs text-mut">{tx("Shareable link:")} {href}</p>
       <details className="mt-3">
-        <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">Saved filters ({saved.length})</summary>
+        <summary className="min-h-11 cursor-pointer text-sm font-semibold text-forest">{tx("Saved filters")} ({saved.length})</summary>
         {query ? (
           <form action={saveFilter} className="mt-2 flex flex-wrap items-end gap-2">
             <input type="hidden" name="surface" value={path.slice(1)} />

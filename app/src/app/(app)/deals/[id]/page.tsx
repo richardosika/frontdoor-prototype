@@ -46,10 +46,10 @@ export default async function DealPage({
 
   return (
     <div>
-      <MobileTitle href="/deals" label="Deals" title={tx("Deal")} />
+      <MobileTitle href="/deals" label={tx("Deals")} title={tx("Deal")} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
       <Link href="/deals" className="hidden text-sm text-mut md:inline">
-        ‹ Deals
+        ‹ {tx("Deals")}
       </Link>
       <Banner error={query.error} notice={query.notice} />
       <div className={`mt-3 p-5 ${dealCard}`}>
@@ -59,12 +59,12 @@ export default async function DealPage({
         </div>
         <h1 className="mt-3 font-serif text-2xl font-normal">{deal.title}</h1>
         <Link href={`/members/${deal.sponsorId}`} className="mt-1 inline-flex items-center gap-2 text-sm text-mut">
-          Sponsor: {deal.sponsor.name} <TierBadge tier={deal.sponsor.tier} />
+          {tx("Sponsor:")} {deal.sponsor.name} <TierBadge tier={deal.sponsor.tier} />
         </Link>
         <div className="mt-4 grid grid-cols-3 overflow-hidden border border-brass-line">
-          <Cell label={deal.kind === "DEAL" ? "Raise" : "Size"} value={deal.raiseLabel} />
-          <Cell label="State" value={deal.market} />
-          <Cell label={deal.kind === "SEEKING" ? "Needed" : "Asset"} value={deal.kind === "SEEKING" ? roleShort(roleLabel(deal.roleNeeded)) : deal.assetClass} />
+          <Cell label={tx(deal.kind === "DEAL" ? "Raise" : "Size")} value={deal.raiseLabel} />
+          <Cell label={tx("State")} value={deal.market} />
+          <Cell label={tx(deal.kind === "SEEKING" ? "Needed" : "Asset")} value={deal.kind === "SEEKING" ? tx(roleShort(roleLabel(deal.roleNeeded))) : tx(deal.assetClass)} />
         </div>
         <p className="mt-4 text-sm leading-relaxed text-ink">{deal.blurb}</p>
         <p className="mt-2 text-xs text-mut">
@@ -78,7 +78,7 @@ export default async function DealPage({
               <span>
                 <b>{project.name}</b>
                 <span className="block text-xs text-mut">
-                  {project.location} · {project.year} · {plural(project.confirmations.filter((item) => item.status === "CONFIRMED").length, "counterparty", "counterparties")} confirmed
+                  {project.location} · {project.year} · {project.confirmations.filter((item) => item.status === "CONFIRMED").length} {tx("counterparties confirmed")}
                 </span>
               </span>
               <span className="font-serif">{project.valueLabel}</span>
@@ -177,7 +177,7 @@ export default async function DealPage({
                     </Link>
                     <span className="block text-xs text-mut">
                       {tx(roleShort(roleLabel(access.requester.role)))} · {access.status === "PENDING" ? tx("Pending — not approved") : tx(access.status)}
-                      {access.ndaAcknowledged ? ` · NDA ${access.ndaVersion || "acknowledged"}` : ""}
+                      {access.ndaAcknowledged ? ` · NDA ${access.ndaVersion || tx("acknowledged")}` : ""}
                     </span>
                   </span>
                   {access.status === "PENDING" ? (

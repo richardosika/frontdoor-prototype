@@ -48,7 +48,7 @@ export default async function DealRoomPage({
 
   return (
     <div>
-      <MobileTitle href={`/deals/${deal.id}`} label="Deal" title={tx("Room")} />
+      <MobileTitle href={`/deals/${deal.id}`} label={tx("Deal")} title={tx("Room")} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <Link href={`/deals/${deal.id}`} className="hidden min-h-11 items-center text-sm text-mut md:inline-flex">
           ‹ {deal.title}
