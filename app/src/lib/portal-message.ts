@@ -5,6 +5,8 @@ import { canMessage, portalMessageEmail, RATE_LIMITS, withinRateLimit, type Mess
 import { notify } from "@/lib/notify";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
+import { COLD_MESSAGE_REASON } from "@/lib/project-contact";
+import { canMessagePair } from "@/lib/project-contact-db";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -33,6 +35,10 @@ export async function deliverPortalMessage(input: {
   const blockedEitherWay = await isBlocked(input.from.id, input.toId);
   const decision = canMessage({ fromId: input.from.id, toId: input.toId, blockedEitherWay });
   if (!decision.ok) return decision;
+  // No cold solicitation: a typed message needs a circle, an accepted introduction, or an accepted project contact.
+  if ((input.kind ?? "TEXT") === "TEXT" && !(await canMessagePair(input.from.id, input.toId))) {
+    return { ok: false, reason: COLD_MESSAGE_REASON };
+  }
 
   const since = new Date(Date.now() - HOUR);
   const recent = await prisma.message.count({ where: { senderId: input.from.id, createdAt: { gte: since } } });

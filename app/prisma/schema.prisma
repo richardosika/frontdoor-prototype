@@ -252,6 +252,8 @@ model User {
   crmProfile           CrmPerson?           @relation("CrmMember")
   crmNotes             CrmNote[]
   savedFilters         SavedFilter[]
+  projectContactsSent     ProjectContact[] @relation("ProjectContactFrom")
+  projectContactsReceived ProjectContact[] @relation("ProjectContactTo")
 
   @@index([paymentStatus])
 }
@@ -351,9 +353,57 @@ model TrackProject {
   year       Int
   valueLabel String
   summary    String         @default("")
+  street     String         @default("")
+  city       String         @default("")
+  state      String         @default("")
+  role       String         @default("")
+  /// Comma-separated contact categories this project is seeking (see src/lib/project-contact.ts).
+  seeking    String         @default("")
+  shareWithCircle Boolean   @default(false)
+  /// Staff review of the listing. Projects that existed before review are APPROVED.
+  reviewStatus ProjectReview @default(APPROVED)
+  reviewNote String         @default("")
+  reviewedAt DateTime?
+  submittedAt DateTime      @default(now())
   createdAt  DateTime       @default(now())
   confirmations Confirmation[]
   verification  VerificationCase?
+  contacts      ProjectContact[]
+
+  @@index([reviewStatus])
+}
+
+enum ProjectReview {
+  PENDING_REVIEW
+  NEEDS_INFO
+  APPROVED
+  DECLINED
+}
+
+enum ProjectContactStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+/// A contact request about one project, between the project owner and a member in a category the project is seeking.
+model ProjectContact {
+  id        String               @id @default(cuid())
+  projectId String
+  project   TrackProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromId    String
+  from      User                 @relation("ProjectContactFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        User                 @relation("ProjectContactTo", fields: [toId], references: [id], onDelete: Cascade)
+  category  String
+  note      String               @default("")
+  status    ProjectContactStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+  decidedAt DateTime?
+
+  @@unique([projectId, fromId, toId])
+  @@index([toId, status])
+  @@index([fromId])
 }
 
 model Confirmation {

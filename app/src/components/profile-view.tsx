@@ -1,16 +1,18 @@
 import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
-import { TierBadge, VerifiedMark } from "@/components/badge";
+import { TierBadge } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
-import { addProject, requestConfirmation } from "@/actions/profile";
-import { blockMember, introduceMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
+import { requestConfirmation } from "@/actions/profile";
+import { contactAboutProject, setProjectSharing } from "@/actions/projects";
+import { ProjectForm, ReviewChip } from "@/components/project-form";
+import { blockMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { tierLabel } from "@/lib/format";
-import { VERIFIED_EXPLANATION } from "@/lib/membership-copy";
+import { canEditProject, parseSeeking, seekLabel } from "@/lib/project-contact";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
 
 type Project = {
@@ -21,6 +23,17 @@ type Project = {
   year: number;
   valueLabel: string;
   summary: string;
+  street: string;
+  city: string;
+  state: string;
+  role: string;
+  seeking: string;
+  shareWithCircle: boolean;
+  reviewStatus: string;
+  reviewNote: string;
+  detailsVisible: boolean;
+  canContact: boolean;
+  contactStatus: string;
   confirmations: {
     id: string;
     status: string;
@@ -116,9 +129,6 @@ export async function ProfileView({
         <h1 className="mt-3 flex flex-wrap items-center gap-2 font-serif text-[26px] font-normal">
           {member.name} <TierBadge tier={member.tier} />
         </h1>
-        <div className="mt-2">
-          <VerifiedMark view={verification} />
-        </div>
         <p className="mt-1 text-sm text-mut">
           {member.org} · {member.location}
         </p>
@@ -215,13 +225,9 @@ export async function ProfileView({
                 </button>
               </form>
             ) : (
-              <form action={introduceMember} className="grid gap-2">
-                <input type="hidden" name="userId" value={member.id} />
-                <textarea name="note" className={field} rows={2} placeholder={tx("A short note. It stays inside Private Floor.")} required />
-                <button className={btn} type="submit">
-                  {tx("Request introduction")}
-                </button>
-              </form>
+              <p className="rounded border border-line bg-cream px-3 py-3 text-[15px] leading-relaxed text-ink" data-testid="contact-rule">
+                {tx("Contact opens through a project that is seeking your category. Private Floor does not allow cold outreach.")}
+              </p>
             )}
             <div className="flex flex-wrap gap-2">
               <form action={blockMember}>
@@ -239,69 +245,124 @@ export async function ProfileView({
           <Stat value={String(vouchCount)} label={tx("Vouches")} />
           <Stat value={tx(tierLabel(member.tier))} label={tx("Membership")} />
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Membership")}</h2>
-        <p className="mb-2 text-xs leading-relaxed text-ink">
-          {tx("Status is Approved.")} {tx(VERIFIED_EXPLANATION)} {tx("The brass badge is separate from membership.")}
-        </p>
-        <div className="flex items-center gap-2">
-          <TierBadge tier={member.tier} />
+        <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Membership")}</h2>
+        <div className="flex flex-wrap items-center gap-3 rounded border border-line bg-cream px-4 py-3" data-testid="membership-status">
+          <span className="inline-flex items-center rounded-sm border border-forest bg-forest px-3 py-1 text-[14px] font-semibold uppercase tracking-[0.08em] text-paper">
+            {tx("Approved")}
+          </span>
+          <span className="text-[16px] leading-relaxed text-ink">{tx("Approved members are in the platform.")}</span>
         </div>
-        <div className="mt-3 rounded border border-line bg-cream px-3 py-2 text-[12px] leading-relaxed text-ink">
-          <b>{tx("How verification works")}</b>
-          <ol className="mt-1 list-decimal pl-4">
-            <li>{tx("Request to join. A referral code from a member is optional.")}</li>
-            <li>{tx("A business card is optional. A Private Floor administrator matches it to public records.")}</li>
-            <li>{tx("A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.")}</li>
-            <li>{tx("A project can request a confirmation only after that project file is Verified. Accepting it does not change membership.")}</li>
-          </ol>
-        </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Track record")}</h2>
-        {projects.length === 0 ? <p className="text-sm text-mut">{tx("No projects listed yet.")}</p> : null}
+        <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Track record")}</h2>
+        {projects.length === 0 ? <p className="text-[16px] text-mut">{tx("No projects listed yet.")}</p> : null}
         <ul>
           {projects.map((project) => {
             const confirmed = project.confirmations.filter((item) => item.reviewStatus === "APPROVED").length;
             const pending = project.confirmations.filter(
               (item) => item.status === "PENDING" || item.reviewStatus === "PENDING_ADMIN",
             ).length;
+            const seeking = parseSeeking(project.seeking);
+            const listed = project.reviewStatus === "APPROVED";
             return (
-              <li key={project.id} className="flex gap-3 border-b border-line py-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest">▦</span>
+              <li key={project.id} id={`project-${project.id}`} className="flex scroll-mt-20 gap-3 border-b border-line py-4" data-testid="track-project">
+                <span className="hidden h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest sm:grid">▦</span>
                 <div className="min-w-0 flex-1">
-                  <b className="text-sm">{project.name}</b>
-                  <div className="mt-1">
-                    <VerifiedMark view={project.verification} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b className="text-[18px] font-semibold">{project.name}</b>
+                    {isSelf ? <ReviewChip status={project.reviewStatus} /> : null}
                   </div>
-                  <div className="text-xs text-mut">
-                    {project.asset} · {project.location} · {project.year}
-                    {confirmed ? ` · ${confirmed} confirmed` : ""}
-                    {pending ? ` · ${pending} pending` : ""}
+                  <div className="mt-1 text-[15px] text-mut">
+                    {tx(project.asset)} · {project.location} · {project.year}
+                    {project.role ? ` · ${tx(project.role)}` : ""}
+                    {confirmed ? ` · ${confirmed} ${tx("confirmed")}` : ""}
+                    {pending ? ` · ${pending} ${tx("pending")}` : ""}
                   </div>
-                  {project.summary ? <p className="mt-1 text-xs text-ink">{project.summary}</p> : null}
-                  {isSelf
+                  {project.detailsVisible ? (
+                    <div className="mt-1 text-[15px] text-ink">
+                      {project.street ? <span className="block">{project.street}</span> : null}
+                      <span className="block">
+                        {tx("Total project value ($)")}: <b className="font-serif font-normal text-forest">{project.valueLabel}</b>
+                      </span>
+                      {project.summary ? <p className="mt-1 leading-relaxed">{project.summary}</p> : null}
+                    </div>
+                  ) : null}
+                  {seeking.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="text-[13px] font-semibold uppercase tracking-wider text-brass">{tx("Seeking")}</span>
+                      {seeking.map((id) => (
+                        <span key={id} className="rounded-sm border border-line px-2 py-0.5 text-[13px] text-ink">
+                          {tx(seekLabel(id))}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {isSelf && project.reviewStatus === "NEEDS_INFO" && project.reviewNote ? (
+                    <p className="mt-2 rounded border border-brass bg-cream px-3 py-2 text-[15px] leading-relaxed text-ink">
+                      <b>{tx("Note from the reviewer:")}</b> {project.reviewNote}
+                    </p>
+                  ) : null}
+                  {isSelf && project.reviewStatus === "DECLINED" && project.reviewNote ? (
+                    <p className="mt-2 text-[15px] text-mut">
+                      {tx("Reason:")} {project.reviewNote}
+                    </p>
+                  ) : null}
+                  {isSelf && project.reviewStatus === "PENDING_REVIEW" ? (
+                    <p className="mt-2 text-[15px] leading-relaxed text-ink">{tx("Pending review. Other members cannot see this project until it is approved.")}</p>
+                  ) : null}
+                  {isSelf && canEditProject(project.reviewStatus) ? (
+                    <details className="mt-2 rounded border border-line bg-paper p-3" open={project.reviewStatus === "NEEDS_INFO"}>
+                      <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit and resubmit")}</summary>
+                      <div className="mt-3">
+                        <ProjectForm back="/profile" project={project} />
+                      </div>
+                    </details>
+                  ) : null}
+                  {isSelf && listed ? (
+                    <form action={setProjectSharing} className="mt-2 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input type="hidden" name="back" value="/profile" />
+                      <input type="hidden" name="share" value={project.shareWithCircle ? "" : "on"} />
+                      <span className="text-[15px] text-ink">
+                        {project.shareWithCircle ? tx("Shared with My Circle") : tx("Not shared with My Circle")}
+                      </span>
+                      <button className={btnOutline} type="submit">
+                        {project.shareWithCircle ? tx("Stop sharing") : tx("Share with My Circle")}
+                      </button>
+                    </form>
+                  ) : null}
+                  {!isSelf && project.contactStatus ? (
+                    <p className="mt-2 text-[15px] text-ink">
+                      {tx("Contact request")}: {tx(contactLabel(project.contactStatus))}
+                    </p>
+                  ) : !isSelf && project.canContact && !messagingClosed ? (
+                    <form action={contactAboutProject} className="mt-2 grid gap-2">
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input type="hidden" name="back" value={`/members/${member.id}`} />
+                      <textarea name="note" className={`${field} text-[16px]`} rows={2} placeholder={tx("A short note. It stays inside Private Floor.")} />
+                      <button className={btn} type="submit">
+                        {tx("Contact about this project")}
+                      </button>
+                    </form>
+                  ) : null}
+                  {isSelf && listed
                     ? project.confirmations.map((item) => (
-                        <div key={item.id} className="mt-2 text-xs text-ink">
+                        <div key={item.id} className="mt-2 text-[15px] text-ink">
                           <span className="font-semibold">{item.counterpartyName}</span>
-                          <span className="text-mut"> · {vouchState(item)}</span>
+                          <span className="text-mut"> · {tx(vouchState(item))}</span>
                           {item.status === "PENDING" && canOpenProjectToCounterparties(project.verification) ? (
                             <CopyLink url={`${linkOrigin}/confirm/${item.token}`} />
                           ) : null}
                         </div>
                       ))
                     : null}
-                  {isSelf && !canOpenProjectToCounterparties(project.verification) ? (
-                    <p className="mt-2 text-xs leading-relaxed text-ink">
-                      {tx("Verification in progress. The vouch form stays hidden until an admin marks this project Verified. Counterparties cannot confirm it before then.")}
-                    </p>
-                  ) : null}
-                  {isSelf && canOpenProjectToCounterparties(project.verification) ? (
+                  {isSelf && listed && canOpenProjectToCounterparties(project.verification) ? (
                     <form action={requestConfirmation} className="mt-2 grid gap-2">
                       <input type="hidden" name="projectId" value={project.id} />
-                      <p className="text-xs leading-relaxed text-mut">
+                      <p className="text-[14px] leading-relaxed text-mut">
                         {tx("If this person is a member, the request goes to their inbox. Otherwise a portal link appears here. Private Floor does not email it.")}
                       </p>
                       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                        <input name="counterpartyName" placeholder={tx("Counterparty name")} className={field} required />
-                        <input name="counterpartyEmail" type="email" placeholder={tx("Counterparty email, used only to match a member")} className={field} required />
+                        <input name="counterpartyName" placeholder={tx("Counterparty name")} className={`${field} text-[16px]`} required />
+                        <input name="counterpartyEmail" type="email" placeholder={tx("Counterparty email, used only to match a member")} className={`${field} text-[16px]`} required />
                         <button className={btnOutline} type="submit">
                           {tx("Request vouch")}
                         </button>
@@ -309,28 +370,25 @@ export async function ProfileView({
                     </form>
                   ) : null}
                 </div>
-                <span className="font-serif text-sm text-forest">{project.valueLabel}</span>
               </li>
             );
           })}
         </ul>
         {isSelf ? (
-          <form action={addProject} className="mt-4 grid gap-2 rounded border border-line p-3 sm:grid-cols-2">
-            <p className={`${labelCls} sm:col-span-2`}>{tx("Add a project")}</p>
-            <input name="name" placeholder={tx("Project name")} className={field} required />
-            <input name="asset" placeholder={tx("Asset class")} className={field} required />
-            <input name="location" placeholder={tx("City, ST")} className={field} required />
-            <input name="year" type="number" placeholder={tx("Year")} className={field} required />
-            <input name="valueLabel" placeholder="$24M" className={field} required />
-            <input name="summary" placeholder={tx("Your role on the project")} className={field} />
-            <button className={`${btn} sm:col-span-2`} type="submit">
-              {tx("Save project")}
-            </button>
-          </form>
+          <section id="add-project" className="mt-6 min-w-0 rounded border border-line bg-cream p-5 sm:p-7">
+            <h2 className="mb-4 font-serif text-2xl text-forest sm:text-[28px]">{tx("Add a project")}</h2>
+            <ProjectForm back="/profile" />
+          </section>
         ) : null}
       </div>
     </article>
   );
+}
+
+function contactLabel(status: string) {
+  if (status === "ACCEPTED") return "Accepted";
+  if (status === "DECLINED") return "Declined";
+  return "Sent";
 }
 
 function vouchState(item: { status: string; reviewStatus: string }) {

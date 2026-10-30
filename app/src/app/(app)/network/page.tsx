@@ -1,13 +1,12 @@
 import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { introduceMember, respondIntroduction } from "@/actions/social";
+import { respondIntroduction } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
-import { VerifiedMark } from "@/components/badge";
 import { PageHeader } from "@/components/page-header";
 import { ProjectFilterBar } from "@/components/project-filters";
-import { btn, btnOutline, chipOff, chipOn, field } from "@/components/ui";
+import { btn, btnOutline, chipOff, chipOn } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { directoryMatch } from "@/lib/member-network";
@@ -98,7 +97,7 @@ export default async function NetworkPage({
   return (
     <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader title={tx("Network")} />
-      <p className="mt-1 text-sm text-ink">{tx("Email and phone stay off this directory. Ask for an introduction. The conversation stays inside Private Floor.")}</p>
+      <p className="mt-1 text-sm text-ink">{tx("Email and phone stay off this directory. Contact opens through a project that is seeking your category. The conversation stays inside Private Floor.")}</p>
       <div className="mt-4">
         <Banner error={error} notice={notice} />
       </div>
@@ -159,9 +158,6 @@ export default async function NetworkPage({
                   <span className="block text-[11px] text-mut">{member.location}</span>
                 </span>
               </Link>
-              <div className="mt-2">
-                <VerifiedMark view={badgeFor(member.id)} />
-              </div>
               {member.lookingFor ? <p className="mt-2 line-clamp-2 text-xs text-ink">{member.lookingFor}</p> : null}
               <div className="mt-3">
                 {intro === "ACCEPTED" ? (
@@ -177,14 +173,9 @@ export default async function NetworkPage({
                     {tx("Respond")}
                   </Link>
                 ) : (
-                  <form action={introduceMember} className="grid gap-2">
-                    <input type="hidden" name="userId" value={member.id} />
-                    <input type="hidden" name="back" value="/network" />
-                    <textarea name="note" className={field} rows={2} placeholder={tx("Short note")} required />
-                    <button className={btn} type="submit">
-                      {tx("Request introduction")}
-                    </button>
-                  </form>
+                  <Link href={`/members/${member.id}`} className={`${btnOutline} w-full`}>
+                    {tx("View projects")}
+                  </Link>
                 )}
               </div>
             </article>

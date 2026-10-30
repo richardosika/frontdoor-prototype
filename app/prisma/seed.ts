@@ -812,6 +812,7 @@ async function main() {
   });
 
   await ensureExtraProjects();
+  await alignProjectContactDemo();
   await seedVerification();
 
   console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
@@ -931,6 +932,7 @@ async function alignSeededDemo() {
   await dedupeDanielReyes();
   await fillDemoProjectFields();
   await ensureExtraProjects();
+  await alignProjectContactDemo();
   await ensureMissingVerificationCases();
   await alignSeedTiers();
   await applySeedCaseMap();
@@ -1149,3 +1151,89 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+/**
+ * Demo data for project review and the contact rule. Seeded projects get a street, city, state, role and the
+ * categories they seek, once (a member's later edits stay). Marcus Hale also has one project pending review and one
+ * sent back for more information, plus contact requests in each state.
+ */
+async function alignProjectContactDemo() {
+  const fields: Record<string, { street: string; city: string; state: string; role: string; seeking: string; share: boolean }> = {
+    proj_ironbound: { street: "88 Ferry Street", city: "Newark", state: "NJ", role: "Developer", seeking: "FINANCING,EQUITY,GENERAL_CONTRACTOR", share: true },
+    proj_halsey: { street: "120 Montgomery Street", city: "Jersey City", state: "NJ", role: "Developer", seeking: "ARCHITECT_ENGINEER,ZONING_ATTORNEY", share: false },
+    proj_nora: { street: "", city: "Newark", state: "NJ", role: "Property Manager", seeking: "", share: false },
+    proj_raritan: { street: "1500 Route 1", city: "Edison", state: "NJ", role: "Developer", seeking: "FINANCING", share: true },
+    proj_waterfront: { street: "", city: "Jersey City", state: "NJ", role: "Architect / Engineer", seeking: "", share: false },
+    proj_exchange: { street: "", city: "Jersey City", state: "NJ", role: "Developer", seeking: "EQUITY,RE_ATTORNEY", share: false },
+    proj_hoboken: { street: "410 Washington Street", city: "Hoboken", state: "NJ", role: "General Contractor", seeking: "ARCHITECT_ENGINEER,FINANCING", share: true },
+    proj_parsippany: { street: "", city: "Parsippany", state: "NJ", role: "Insurance (builder's risk, title, surety / bonding)", seeking: "", share: false },
+  };
+  for (const [id, value] of Object.entries(fields)) {
+    const row = await prisma.trackProject.findUnique({ where: { id }, select: { city: true } });
+    if (!row || row.city) continue;
+    await prisma.trackProject.update({
+      where: { id },
+      data: { street: value.street, city: value.city, state: value.state, role: value.role, seeking: value.seeking, shareWithCircle: value.share, reviewStatus: "APPROVED" },
+    });
+  }
+  const marcus = await prisma.user.findUnique({ where: { id: "user_mh" }, select: { id: true } });
+  if (!marcus) return;
+  await prisma.trackProject.upsert({
+    where: { id: "proj_broad_townhomes" },
+    update: {},
+    create: {
+      id: "proj_broad_townhomes",
+      userId: "user_mh",
+      name: "Broad Street Townhomes",
+      asset: "Single family / townhome",
+      street: "301 Broad Street",
+      city: "Newark",
+      state: "NJ",
+      location: "Newark, NJ",
+      year: 2027,
+      valueLabel: "$14,500,000",
+      role: "Developer",
+      summary: "Eighteen for-sale townhomes. Construction start spring 2027.",
+      seeking: "FINANCING,EQUITY",
+      reviewStatus: "PENDING_REVIEW",
+    },
+  });
+  await prisma.trackProject.upsert({
+    where: { id: "proj_market_mixed" },
+    update: {},
+    create: {
+      id: "proj_market_mixed",
+      userId: "user_mh",
+      name: "Market Street Mixed-Use",
+      asset: "Mixed-use",
+      street: "",
+      city: "Newark",
+      state: "NJ",
+      location: "Newark, NJ",
+      year: 2028,
+      valueLabel: "$32,000,000",
+      role: "Developer",
+      summary: "Ground-floor retail with 60 apartments above.",
+      seeking: "EQUITY",
+      reviewStatus: "NEEDS_INFO",
+      reviewNote: "Please add the street address and confirm your ownership or contract status on the site.",
+      reviewedAt: hoursAgo(5),
+    },
+  });
+  const contacts: { projectId: string; fromId: string; toId: string; category: string; status: "PENDING" | "ACCEPTED" | "DECLINED"; note: string }[] = [
+    { projectId: "proj_ironbound", fromId: "user_ls", toId: "user_mh", category: "FINANCING", status: "ACCEPTED", note: "We lend on value-add multifamily in Essex County." },
+    { projectId: "proj_ironbound", fromId: "user_tn", toId: "user_mh", category: "EQUITY", status: "PENDING", note: "Interested in the LP piece. What is the hold period?" },
+    { projectId: "proj_ironbound", fromId: "user_mh", toId: "user_mt", category: "FINANCING", status: "PENDING", note: "Looking at refinance options for 2026." },
+    { projectId: "proj_halsey", fromId: "user_mh", toId: "user_gl", category: "ARCHITECT_ENGINEER", status: "DECLINED", note: "Facade study for the retail base." },
+  ];
+  for (const item of contacts) {
+    const users = await prisma.user.count({ where: { id: { in: [item.fromId, item.toId] } } });
+    const project = await prisma.trackProject.findUnique({ where: { id: item.projectId }, select: { id: true } });
+    if (users < 2 || !project) continue;
+    await prisma.projectContact.upsert({
+      where: { projectId_fromId_toId: { projectId: item.projectId, fromId: item.fromId, toId: item.toId } },
+      update: {},
+      create: { ...item, decidedAt: item.status === "PENDING" ? null : hoursAgo(20) },
+    });
+  }
+}

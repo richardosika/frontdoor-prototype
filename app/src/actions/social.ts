@@ -14,6 +14,8 @@ import { notify, notifyAdmins } from "@/lib/notify";
 import { sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
+import { COLD_MESSAGE_REASON } from "@/lib/project-contact";
+import { canMessagePair } from "@/lib/project-contact-db";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -27,6 +29,9 @@ export async function requestConnection(formData: FormData) {
   if (!target || !eligibleForDirectory(target)) redirect("/network");
   if (await isBlocked(user.id, toId)) {
     redirect(`/members/${toId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+  }
+  if (!(await canMessagePair(user.id, toId))) {
+    redirect(`/members/${toId}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
   }
 
   const recent = await prisma.connection.count({
@@ -109,6 +114,10 @@ export async function introduceMember(formData: FormData) {
   if (!other || !eligibleForDirectory(other) || other.id === user.id) redirect("/network");
   if (await isBlocked(user.id, otherId)) {
     redirect(`${back}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+  }
+  // Generic introductions to strangers are cold outreach. Contact opens through a project that seeks the member's category.
+  if (!(await canMessagePair(user.id, otherId))) {
+    redirect(`${back}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
   }
   const recent = await prisma.introduction.count({
     where: { fromId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
@@ -225,8 +234,9 @@ export async function openConversation(formData: FormData) {
       select: { id: true },
     }),
   ]);
-  if (!existing && !canMessageAfterIntro({ intro: intro?.status ?? null, connection: connection?.status ?? null })) {
-    redirect(`/members/${otherId}?error=${encodeURIComponent("Request an introduction first. Messaging opens after they accept.")}`);
+  if (existing) redirect(`/messages/${existing.id}`);
+  if (!canMessageAfterIntro({ intro: intro?.status ?? null, connection: connection?.status ?? null }) && !(await canMessagePair(user.id, otherId))) {
+    redirect(`/members/${otherId}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
   }
   const [userAId, userBId] = orderedPair(user.id, otherId);
   const conversation = await prisma.conversation.upsert({

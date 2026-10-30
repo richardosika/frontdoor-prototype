@@ -9,6 +9,8 @@ import { KindTag, TierBadge } from "@/components/badge";
 import { Composer } from "@/components/composer";
 import { ProjectFilterBar } from "@/components/project-filters";
 import { ColleagueInvite } from "@/components/colleague-invite";
+import { LedgerProjects } from "@/components/ledger-projects";
+import { loadLedgerProjects } from "@/lib/ledger-projects";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
@@ -82,6 +84,7 @@ export default async function FeedPage({
     prisma.introduction.count({ where: { OR: [{ fromId: user.id }, { toId: user.id }] } }),
     prisma.savedFilter.findMany({ where: { userId: user.id, surface: "feed" }, orderBy: { createdAt: "desc" }, take: 12 }),
   ]);
+  const ledgerProjects = await loadLedgerProjects(user);
   const checklist = checklistProgress({
     markets: user.markets,
     lookingFor: user.lookingFor,
@@ -196,7 +199,8 @@ export default async function FeedPage({
           <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-brass">{BRAND.name}</p>
           <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">{t("ledger.title")}</h1>
         </header>
-        <Banner error={error} notice={notice} />
+        <Banner error={error ? tx(error) : undefined} notice={notice ? tx(notice) : undefined} />
+        <LedgerProjects data={ledgerProjects} role={user.role} />
         <section className={`${matchPanel} mb-6 p-5 md:p-6`} data-testid="ledger-lead">
           <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-sand">
             {lead.matched ? t("ledger.matchedNote") : hasPrefs(prefs) ? t("ledger.noMatchNote") : t("ledger.noPrefsNote")}

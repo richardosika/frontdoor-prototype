@@ -28,7 +28,7 @@ export default async function MemberPage({
         ‹ {tx("Network")}
       </Link>
       <div className="md:px-0">
-        <Banner error={query.error} notice={query.notice} />
+        <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
       </div>
       <ProfileView
         member={loaded.member}

@@ -110,27 +110,6 @@ export async function requestAccountDeletion(formData: FormData) {
   redirect("/settings?notice=Deletion+request+sent+to+a+Private+Floor+administrator");
 }
 
-export async function addProject(formData: FormData) {
-  const user = await requireUser();
-  const name = String(formData.get("name") || "").trim();
-  const asset = String(formData.get("asset") || "").trim();
-  const location = String(formData.get("location") || "").trim();
-  const year = Number(formData.get("year") || 0);
-  const valueLabel = String(formData.get("valueLabel") || "").trim();
-  const summary = String(formData.get("summary") || "").trim();
-  if (name.length < 2 || !asset || !location || !valueLabel || year < 1980 || year > 2100) {
-    redirect("/profile?error=Add+a+name,+asset,+location,+year,+and+value");
-  }
-  const project = await prisma.trackProject.create({
-    data: { userId: user.id, name, asset, location, year, valueLabel, summary },
-  });
-  await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
-  const { queueProjectVerification } = await import("@/lib/verify/queue");
-  await queueProjectVerification(project.id, name);
-  revalidatePath("/profile");
-  redirect("/profile");
-}
-
 export async function requestConfirmation(formData: FormData) {
   const user = await requireUser();
   const projectId = String(formData.get("projectId") || "");
