@@ -33,7 +33,7 @@ export async function ProfileEditor({
   const dealTypes = selected(member.dealTypes);
   const assets = selected(member.assetClasses);
   return (
-    <form action={saveProfile} className="mt-6 grid gap-5 rounded border border-line bg-cream p-5 sm:p-7">
+    <form action={saveProfile} className="mt-6 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 rounded border border-line bg-cream p-5 sm:p-7">
       <h2 className="font-serif text-2xl text-forest sm:text-[28px]">{t("profile.edit")}</h2>
       <p className="text-[15px] leading-relaxed text-ink">{t("profile.privacy")}</p>
       <label>
