@@ -32,7 +32,6 @@ export function ApplicationStatus({
     !declined &&
     Boolean(application.reviewerNote) &&
     (application.status === "NEEDS_INFO" || application.status === "APPROVED" || application.status === "PAYMENT_DUE");
-  const canSignIn = application.status === "APPROVED" || application.status === "PAYMENT_DUE";
   const membershipLine = statusMembershipLine({
     status: application.status,
     monthlyCents: application.duesCents > 0 ? currentMonthlyCents(application.role, application.duesCents) : 0,
@@ -68,15 +67,9 @@ export function ApplicationStatus({
             </div>
           ) : null}
           {application.status === "NEEDS_INFO" ? <ApplyReply token={application.statusToken} /> : null}
-          {canSignIn ? (
-            <Link href="/login" className={`${btn} mt-4 w-full`}>
-              Sign in
-            </Link>
-          ) : (
-            <Link href={publicSiteUrl()} className={`${btn} mt-4 w-full`}>
-              Back to home
-            </Link>
-          )}
+          <Link href={publicSiteUrl()} className={`${btn} mt-4 w-full`}>
+            Back to home
+          </Link>
         </div>
       </div>
     </main>
