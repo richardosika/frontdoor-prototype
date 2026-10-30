@@ -21,14 +21,16 @@ import { renderMarkdown } from "@/lib/markdown";
 import { checklistProgress, intentsForRole, postIsPublic } from "@/lib/member-network";
 import { filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, settleProjectQuery, sortProjects, stageLabel } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
+import { currentLocale } from "@/lib/i18n/server";
+import { translator, type MessageKey } from "@/lib/i18n/messages";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-const TABS = [
-  { id: "foryou", label: "Matched for you" },
-  { id: "requests", label: "Requests" },
-] as const;
+const TABS: { id: "foryou" | "requests"; label: string; key: MessageKey }[] = [
+  { id: "foryou", label: "Matched for you", key: "ledger.tab.matched" },
+  { id: "requests", label: "Requests", key: "ledger.tab.requests" },
+];
 
 export default async function FeedPage({
   searchParams,
@@ -36,6 +38,7 @@ export default async function FeedPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  const t = translator(await currentLocale());
   const params = await searchParams;
   const settled = settleProjectQuery("/feed", params, "feed");
   if (settled.redirectTo) redirect(settled.redirectTo);
@@ -161,8 +164,8 @@ export default async function FeedPage({
   const circlePosts = posts.filter((post) => post.authorId !== user.id && circle.has(post.authorId) && postIsPublic(post)).slice(0, 4);
   const circlePanel = (
     <div className="rounded border border-line bg-paper p-5">
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">My circle</h2>
-      <p className="mt-1 text-[14px] text-mut">{plural(circle.size - 1, "connection", "connections")}</p>
+      <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{t("ledger.circle")}</h2>
+      <p className="mt-1 text-[14px] text-mut">{circle.size - 1 === 1 ? t("ledger.connection") : t("ledger.connections", { count: circle.size - 1 })}</p>
       {circlePosts.length ? (
         <ul className="mt-2">
           {circlePosts.map((post) => (
@@ -176,10 +179,10 @@ export default async function FeedPage({
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-[14px] leading-relaxed text-ink">Nothing new from your connections yet.</p>
+        <p className="mt-2 text-[14px] leading-relaxed text-ink">{t("ledger.circleEmpty")}</p>
       )}
       <Link href="/network" className="mt-3 inline-block text-[14px] font-semibold text-forest underline decoration-brass">
-        Find members to connect with
+        {t("ledger.findMembers")}
       </Link>
     </div>
   );
@@ -190,21 +193,21 @@ export default async function FeedPage({
         <JoinEntryBanner name={user.name} />
         <header className="mb-6 border-b-[3px] border-double border-brass pb-4">
           <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-brass">{BRAND.name}</p>
-          <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">The Ledger</h1>
+          <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">{t("ledger.title")}</h1>
         </header>
         <Banner error={error} notice={notice} />
         <section className={`${matchPanel} mb-6 p-5 md:p-6`} data-testid="ledger-lead">
           <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-sand">
-            {lead.matched ? "Picked from your markets, deal types and asset classes" : hasPrefs(prefs) ? "Nothing matches your profile yet. Showing the newest deals" : "Showing the newest deals. Add markets on your profile to tailor this"}
+            {lead.matched ? t("ledger.matchedNote") : hasPrefs(prefs) ? t("ledger.noMatchNote") : t("ledger.noPrefsNote")}
           </p>
-          <h2 className="mt-1 font-serif text-[30px] font-normal leading-tight md:text-[36px]">{lead.matched ? "New deals matching you" : "Recent deals"}</h2>
+          <h2 className="mt-1 font-serif text-[30px] font-normal leading-tight md:text-[36px]">{lead.matched ? t("ledger.matchedTitle") : t("ledger.recentTitle")}</h2>
           {lead.items.length ? (
             <ul className="mt-4 grid gap-3">
               {lead.items.map(({ post, reasons }) => (
                 <li key={post.id} className="rounded border border-brass/50 bg-paper/5 p-4">
                   <Link href={`/deals/${post.dealId}`} className="block">
                     <span className="block font-serif text-[22px] leading-snug text-paper md:text-[24px]">
-                      Raising {post.deal?.raiseLabel} — {post.deal?.title}
+                      {t("ledger.raising", { amount: post.deal?.raiseLabel || "", title: post.deal?.title || "" })}
                     </span>
                     <span className="mt-1 block text-[15px] text-sand">
                       {post.deal?.market} · {post.deal?.assetClass} · {post.author.name} · {timeAgo(post.createdAt)}
@@ -223,14 +226,14 @@ export default async function FeedPage({
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-[16px] text-sand">No deals have been posted yet.</p>
+            <p className="mt-3 text-[16px] text-sand">{t("ledger.noDeals")}</p>
           )}
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/deals" className={btnBrass}>
-              All deals
+              {t("ledger.allDeals")}
             </Link>
             <Link href="/profile" className="inline-flex min-h-11 items-center text-[15px] text-sand underline decoration-brass">
-              Update what you look for
+              {t("ledger.updatePrefs")}
             </Link>
           </div>
         </section>
@@ -241,15 +244,15 @@ export default async function FeedPage({
               href={projectQuery("/feed", { ...filters, tab: item.id === "foryou" ? undefined : item.id })}
               className={`inline-flex min-h-11 shrink-0 items-center border-b-2 ${tab === item.id ? "border-brass font-semibold text-forest" : "border-transparent"}`}
             >
-              {item.label}
+              {t(item.key)}
             </Link>
           ))}
         </div>
         <ProjectFilterBar path="/feed" filters={filters} saved={saved} />
         {checklistOpen ? (
           <section className="mt-4 rounded border border-brass bg-paper p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">First week</p>
-            <h2 className="mt-1 font-serif text-2xl font-normal">Getting started</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{t("ledger.firstWeek")}</p>
+            <h2 className="mt-1 font-serif text-2xl font-normal">{t("ledger.gettingStarted")}</h2>
             <ol className="mt-2 space-y-2 text-sm text-ink">
               {checklist.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
@@ -263,7 +266,7 @@ export default async function FeedPage({
                     <form action={markChecklist}>
                       <input type="hidden" name="item" value={item.id} />
                       <button className={btnOutline} type="submit">
-                        Mark done
+                        {t("ledger.markDone")}
                       </button>
                     </form>
                   ) : null}
@@ -272,14 +275,14 @@ export default async function FeedPage({
             </ol>
             {application?.reviewerNote ? (
               <p className="mt-3 rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
-                <b>Note from {BRAND.owner}. </b>
+                <b>{t("ledger.noteFrom", { owner: BRAND.owner })} </b>
                 {application.reviewerNote}
               </p>
             ) : null}
           </section>
         ) : application?.reviewerNote ? (
           <p className="mt-4 rounded border border-line bg-paper px-3 py-2 text-sm text-ink">
-            <b>Note from {BRAND.owner}. </b>
+            <b>{t("ledger.noteFrom", { owner: BRAND.owner })} </b>
             {application.reviewerNote}
           </p>
         ) : null}
@@ -295,7 +298,7 @@ export default async function FeedPage({
         </div>
         <div className="mt-4 space-y-4">
           {visible.length === 0 ? (
-            <p className="py-10 text-center text-[16px] text-mut">{filterSummary(filters) ? "No posts match these filters." : "Nothing here yet."}</p>
+            <p className="py-10 text-center text-[16px] text-mut">{filterSummary(filters) ? t("ledger.noFilterMatch") : t("ledger.empty")}</p>
           ) : null}
           {visible.map((post) => {
             const liked = post.likes.some((like) => like.userId === user.id);
@@ -324,12 +327,12 @@ export default async function FeedPage({
                 </div>
                 {post.deal ? (
                   <h2 className="mt-3 font-serif text-[24px] font-normal leading-snug">
-                    {post.kind === "DEAL" ? `Raising ${post.deal.raiseLabel} — ${post.deal.title}` : post.deal.title}
+                    {post.kind === "DEAL" ? t("ledger.raising", { amount: post.deal.raiseLabel, title: post.deal.title }) : post.deal.title}
                   </h2>
                 ) : null}
                 {!postIsPublic(post) ? (
                   <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-brass">
-                    {post.status === "PENDING_REVIEW" ? "Held for a Private Floor administrator" : post.status === "CLOSED" ? "Closed" : "Not published"}
+                    {post.status === "PENDING_REVIEW" ? t("ledger.held") : post.status === "CLOSED" ? t("ledger.closed") : t("ledger.unpublished")}
                   </p>
                 ) : null}
                 <p className="mt-2 text-[17px] leading-relaxed text-ink">{post.body}</p>
@@ -358,7 +361,7 @@ export default async function FeedPage({
                   <span>💬 {post.comments.length}</span>
                   {post.deal ? (
                     <Link href={`/deals/${post.dealId}`} className="ml-auto font-semibold text-forest">
-                      View deal
+                      {t("ledger.viewDeal")}
                     </Link>
                   ) : null}
                 </div>
@@ -376,17 +379,17 @@ export default async function FeedPage({
                   <div className="mt-3 grid gap-2">
                     <form action={updatePost} className="grid gap-2">
                       <input type="hidden" name="postId" value={post.id} />
-                      <input name="title" defaultValue={post.title} className="min-h-11 rounded-sm border border-line bg-paper px-3 text-sm" placeholder="Title" />
+                      <input name="title" defaultValue={post.title} className="min-h-11 rounded-sm border border-line bg-paper px-3 text-sm" placeholder={t("ledger.titlePlaceholder")} />
                       <textarea name="body" defaultValue={post.body} rows={2} className="rounded-sm border border-line bg-paper px-3 py-2 text-sm" />
                       <button className={btnOutline} type="submit">
-                        Save edit
+                        {t("ledger.saveEdit")}
                       </button>
                     </form>
                     {post.status !== "CLOSED" ? (
                       <form action={closePost}>
                         <input type="hidden" name="postId" value={post.id} />
                         <button className={btnOutline} type="submit">
-                          Close post
+                          {t("ledger.closePost")}
                         </button>
                       </form>
                     ) : null}
@@ -395,17 +398,17 @@ export default async function FeedPage({
                   <form action={reportPost} className="mt-3 flex gap-2">
                     <input type="hidden" name="postId" value={post.id} />
                     <input type="hidden" name="back" value="/feed" />
-                    <input name="reason" placeholder="Report this post" className="min-w-0 flex-1 rounded-sm border border-line bg-paper px-3 py-2 text-sm" />
+                    <input name="reason" placeholder={t("ledger.reportPlaceholder")} className="min-w-0 flex-1 rounded-sm border border-line bg-paper px-3 py-2 text-sm" />
                     <button className={btnOutline} type="submit">
-                      Report
+                      {t("ledger.report")}
                     </button>
                   </form>
                 )}
                 <form action={addComment} className="mt-2 flex gap-2">
                   <input type="hidden" name="postId" value={post.id} />
-                  <input name="body" placeholder="Comment" className="min-w-0 flex-1 rounded-sm border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brass" />
+                  <input name="body" placeholder={t("ledger.comment")} className="min-w-0 flex-1 rounded-sm border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brass" />
                   <button className={btn} type="submit">
-                    Send
+                    {t("ledger.send")}
                   </button>
                 </form>
               </article>
@@ -416,15 +419,15 @@ export default async function FeedPage({
       <aside className="hidden space-y-4 lg:block">
         {circlePanel}
         <div className={matchPanel}>
-          <div className="text-[10px] uppercase tracking-[0.16em] text-sand">Match suggestions</div>
-          <p className="mt-1 font-serif text-2xl">{plural(matchCount, audience.singular, audience.plural)} in your markets</p>
-          <p className="mt-2 text-xs text-sand">Rules match on role, market, and size. This is a directory, not a solicitation.</p>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-sand">{t("ledger.matchSuggestions")}</div>
+          <p className="mt-1 font-serif text-2xl">{t("ledger.inYourMarkets", { who: plural(matchCount, audience.singular, audience.plural) })}</p>
+          <p className="mt-2 text-xs text-sand">{t("ledger.matchRules")}</p>
           <Link href={`/network?role=${audience.role}`} className={`${btnBrass} mt-3`}>
-            Review matches
+            {t("ledger.reviewMatches")}
           </Link>
         </div>
         <div className="rounded border border-line bg-paper p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Suggested connections</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{t("ledger.suggested")}</h2>
           <ul className="mt-2">
             {suggestions.map((person) => (
               <li key={person.id} className="flex items-center gap-2 border-b border-line py-2 last:border-0">

@@ -75,17 +75,42 @@ describe("Ledger", () => {
     expect(page).toContain('label: "Requests"');
     expect(page).not.toMatch(/label: "(Deals|Seeking|For you|My circle)"/);
     expect(page).not.toContain("Membership status");
-    expect(page).toContain("New deals matching you");
+    expect(page).toContain('t("ledger.matchedTitle")');
     expect(settleProjectQuery("/feed", { tab: "seeking" }, "feed").filters.tab).toBe("requests");
   });
   it("sidebar says Ledger and keeps Settings and Sign out inside the member menu", () => {
     const shell = read("components/shell.tsx");
     expect(shell).toContain('label: "Ledger"');
+    expect(shell).toContain("<LanguagePicker");
     expect(shell).toContain('data-testid="member-menu"');
     expect(shell).toContain('data-testid="sidebar-membership"');
     const aside = shell.slice(shell.indexOf("<aside"), shell.indexOf("</aside>"));
     expect(aside.indexOf('data-testid="member-menu"')).toBeLessThan(aside.indexOf("<nav"));
-    expect(aside.match(/Sign out/g)).toHaveLength(1);
+    expect(aside.match(/menu\.signOut/g)).toHaveLength(1);
     expect(aside.match(/href="\/settings"/g)).toHaveLength(1);
+  });
+});
+
+import { LOCALES, isLocale, messagesFor, translate } from "@/lib/i18n/messages";
+describe("member platform languages", () => {
+  it("offers the same four languages as the application", () => {
+    expect(LOCALES.map((item) => item.id)).toEqual(["en", "es", "de", "ja"]);
+    expect(isLocale("ja")).toBe(true);
+    expect(isLocale("fr")).toBe(false);
+  });
+  it("every language has every key, and keeps the wording rules", () => {
+    const keys = Object.keys(messagesFor("en")).sort();
+    for (const { id } of LOCALES) {
+      const dict = messagesFor(id);
+      expect(Object.keys(dict).sort()).toEqual(keys);
+      for (const value of Object.values(dict)) {
+        expect(value.trim().length).toBeGreaterThan(0);
+        expect(value).not.toMatch(/invite|invited|founding member|limited|invitación|einladung|招待|限定/i);
+      }
+    }
+  });
+  it("fills placeholders", () => {
+    expect(translate("es", "ledger.raising", { amount: "$2M", title: "X" })).toBe("Captando $2M — X");
+    expect(translate("ja", "nav.ledger")).toBe("レジャー");
   });
 });

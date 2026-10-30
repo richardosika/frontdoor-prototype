@@ -1,5 +1,7 @@
 import { saveProfile } from "@/actions/profile";
 import { btn } from "@/components/ui";
+import { currentLocale } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n/messages";
 
 const labelCls = "mb-2 block font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-forest";
 const field =
@@ -11,7 +13,7 @@ function selected(csv: string) {
   return new Set(csv.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
-export function ProfileEditor({
+export async function ProfileEditor({
   member,
 }: {
   member: {
@@ -26,27 +28,28 @@ export function ProfileEditor({
     offering: string;
   };
 }) {
+  const t = translator(await currentLocale());
   const markets = selected(member.markets);
   const dealTypes = selected(member.dealTypes);
   const assets = selected(member.assetClasses);
   return (
     <form action={saveProfile} className="mt-6 grid gap-5 rounded border border-line bg-cream p-5 sm:p-7">
-      <h2 className="font-serif text-2xl text-forest sm:text-[28px]">Edit profile</h2>
-      <p className="text-[15px] leading-relaxed text-ink">Other members never see your email or phone. A business card stays with your account.</p>
+      <h2 className="font-serif text-2xl text-forest sm:text-[28px]">{t("profile.edit")}</h2>
+      <p className="text-[15px] leading-relaxed text-ink">{t("profile.privacy")}</p>
       <label>
-        <span className={labelCls}>City and state</span>
+        <span className={labelCls}>{t("profile.location")}</span>
         <input name="location" defaultValue={member.location} className={field} required />
       </label>
       <label>
-        <span className={labelCls}>Website</span>
+        <span className={labelCls}>{t("profile.website")}</span>
         <input name="website" type="text" inputMode="url" autoCapitalize="none" spellCheck={false} defaultValue={member.website} className={field} placeholder="www.example.com" />
       </label>
       <label>
-        <span className={labelCls}>Bio</span>
+        <span className={labelCls}>{t("profile.bio")}</span>
         <textarea name="bio" defaultValue={member.bio} rows={3} className={field} />
       </label>
-      <fieldset>
-        <legend className={labelCls}>Markets</legend>
+      <fieldset className="min-w-0">
+        <legend className={labelCls}>{t("profile.markets")}</legend>
         <div className="grid max-h-72 grid-cols-4 gap-x-2 gap-y-1 overflow-y-auto rounded border border-line bg-paper p-3 text-[16px] sm:grid-cols-6 lg:grid-cols-8">
           {US_STATES.map((state) => (
             <label key={state} className="flex min-h-10 cursor-pointer items-center gap-2">
@@ -56,8 +59,8 @@ export function ProfileEditor({
           ))}
         </div>
       </fieldset>
-      <fieldset>
-        <legend className={labelCls}>Deal types</legend>
+      <fieldset className="min-w-0">
+        <legend className={labelCls}>{t("profile.dealTypes")}</legend>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
           {DEAL_TYPES.map((item) => (
             <label key={item} className="flex min-h-10 cursor-pointer items-center gap-2">
@@ -67,8 +70,8 @@ export function ProfileEditor({
           ))}
         </div>
       </fieldset>
-      <fieldset>
-        <legend className={labelCls}>Asset classes</legend>
+      <fieldset className="min-w-0">
+        <legend className={labelCls}>{t("profile.assetClasses")}</legend>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
           {ASSET_CLASSES.map((item) => (
             <label key={item} className="flex min-h-10 cursor-pointer items-center gap-2">
@@ -79,23 +82,23 @@ export function ProfileEditor({
         </div>
       </fieldset>
       <label>
-        <span className={labelCls}>Check size or deal size</span>
+        <span className={labelCls}>{t("profile.checkSize")}</span>
         <input name="checkSize" defaultValue={member.checkSize} className={field} placeholder="$1–5M" />
       </label>
       <label>
-        <span className={labelCls}>What I am looking for</span>
+        <span className={labelCls}>{t("profile.lookingFor")}</span>
         <textarea name="lookingFor" defaultValue={member.lookingFor} rows={3} className={field} />
       </label>
       <label>
-        <span className={labelCls}>What I offer</span>
+        <span className={labelCls}>{t("profile.offering")}</span>
         <textarea name="offering" defaultValue={member.offering} rows={3} className={field} />
       </label>
       <label>
-        <span className={labelCls}>Business card, optional</span>
+        <span className={labelCls}>{t("profile.card")}</span>
         <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-[15px]" />
       </label>
       <button className={btn} type="submit">
-        Save profile
+        {t("profile.save")}
       </button>
     </form>
   );

@@ -1,6 +1,7 @@
 import { Shell } from "@/components/shell";
 import { requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { currentLocale } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user={{ name: user.name, initials: user.initials, tier: user.tier, isAdmin: user.isAdmin }}
       unread={unread}
       alerts={alerts}
+      locale={await currentLocale()}
     >
       {children}
     </Shell>
