@@ -409,8 +409,8 @@ export function ApplyWizard({ consent }: { consent: ApplyConsentCopy }) {
               <DetailControl id="apply-zip" label="ZIP" value={zip} error={visibleError("apply-zip")} autoComplete="postal-code" inputMode="numeric" placeholder="07663" onBlur={() => reveal("apply-zip")} onChange={(value) => editField("apply-zip", () => setZip(value))} />
             </div>
             <DetailControl id="apply-phone" label="Contact phone" value={phone} error={visibleError("apply-phone")} autoComplete="tel" onBlur={() => reveal("apply-phone")} onChange={(value) => editField("apply-phone", () => setPhone(value))} />
-            <DetailControl id="apply-linkedin" label="LinkedIn URL" value={linkedinUrl} error={visibleError("apply-linkedin")} placeholder="https://" onBlur={() => reveal("apply-linkedin")} onChange={(value) => editField("apply-linkedin", () => setLinkedinUrl(value))} />
-            <DetailControl id="apply-website" label="Website" value={website} error={visibleError("apply-website")} placeholder="https://" onBlur={() => reveal("apply-website")} onChange={(value) => editField("apply-website", () => setWebsite(value))} />
+            <DetailControl id="apply-linkedin" label="LinkedIn URL" inputMode="url" value={linkedinUrl} error={visibleError("apply-linkedin")} placeholder="linkedin.com/in/yourname" onBlur={() => reveal("apply-linkedin")} onChange={(value) => editField("apply-linkedin", () => setLinkedinUrl(value))} />
+            <DetailControl id="apply-website" label="Website" inputMode="url" value={website} error={visibleError("apply-website")} placeholder="www.example.com" onBlur={() => reveal("apply-website")} onChange={(value) => editField("apply-website", () => setWebsite(value))} />
             <DetailControl id="apply-social" label="Other social links (optional)" value={socialLinks} error={visibleError("apply-social")} rows={2} placeholder="One https link per line" onBlur={() => reveal("apply-social")} onChange={(value) => editField("apply-social", () => setSocialLinks(value))} />
             <div>
               <label className={labelCls}>Business card (optional, encouraged)</label>
@@ -596,7 +596,7 @@ function DetailControl({
   onBlur: () => void;
   type?: string;
   autoComplete?: string;
-  inputMode?: "numeric" | "email" | "text" | "tel";
+  inputMode?: "numeric" | "email" | "text" | "tel" | "url";
   hint?: string;
   placeholder?: string;
   maxLength?: number;
@@ -634,6 +634,8 @@ function DetailControl({
           value={value}
           autoComplete={autoComplete}
           inputMode={inputMode}
+          autoCapitalize={inputMode === "url" ? "none" : undefined}
+          spellCheck={inputMode === "url" ? false : undefined}
           placeholder={placeholder}
           maxLength={maxLength}
           aria-invalid={error ? true : undefined}

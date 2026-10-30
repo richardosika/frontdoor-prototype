@@ -9,11 +9,11 @@ import { KindTag, TierBadge } from "@/components/badge";
 import { Composer } from "@/components/composer";
 import { ProjectFilterBar } from "@/components/project-filters";
 import { ColleagueInvite } from "@/components/colleague-invite";
-import { PageHeader } from "@/components/page-header";
 import { btn, btnBrass, btnOutline, dealCard, matchPanel } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
+import { pickLeadDeals, hasPrefs } from "@/lib/ledger-match";
 import { matchAudience, marketToken, matchScore } from "@/lib/domain";
 import { plural, tierLabel, timeAgo } from "@/lib/format";
 import { memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
@@ -26,10 +26,8 @@ import { roleLabel, roleShort } from "@/lib/roles";
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  { id: "foryou", label: "For you" },
-  { id: "deals", label: "Deals" },
-  { id: "seeking", label: "Seeking" },
-  { id: "circle", label: "My circle" },
+  { id: "foryou", label: "Matched for you" },
+  { id: "requests", label: "Requests" },
 ] as const;
 
 export default async function FeedPage({
@@ -140,20 +138,103 @@ export default async function FeedPage({
     .filter((post) => {
       if (!postIsPublic(post) && post.authorId !== user.id && !user.isAdmin) return false;
       if (!order.has(post.id)) return false;
-      if (tab === "deals") return post.kind === "DEAL";
-      if (tab === "seeking") return post.kind === "SEEKING";
-      if (tab === "circle") return circle.has(post.authorId);
+      if (tab === "requests") return post.kind === "SEEKING";
       return true;
     })
     .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 
+  const prefs = { markets: user.markets, dealTypes: user.dealTypes, assetClasses: user.assetClasses };
+  const lead = pickLeadDeals(
+    prefs,
+    posts
+      .filter((post) => post.kind === "DEAL" && post.deal && postIsPublic(post))
+      .map((post) => ({
+        post,
+        createdAt: post.createdAt,
+        deal: {
+          market: post.market || post.deal?.market || "",
+          assetClass: post.assetClass || post.deal?.assetClass || "",
+          text: `${post.deal?.title || ""} ${post.deal?.blurb || ""} ${post.deal?.need || ""} ${post.intent} ${post.need} ${post.title} ${post.body}`,
+        },
+      })),
+  );
+  const circlePosts = posts.filter((post) => post.authorId !== user.id && circle.has(post.authorId) && postIsPublic(post)).slice(0, 4);
+  const circlePanel = (
+    <div className="rounded border border-line bg-paper p-5">
+      <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">My circle</h2>
+      <p className="mt-1 text-[14px] text-mut">{plural(circle.size - 1, "connection", "connections")}</p>
+      {circlePosts.length ? (
+        <ul className="mt-2">
+          {circlePosts.map((post) => (
+            <li key={post.id} className="border-b border-line py-2.5 last:border-0">
+              <Link href={post.dealId ? `/deals/${post.dealId}` : `/members/${post.authorId}`} className="block">
+                <span className="block text-[15px] font-semibold">{post.author.name}</span>
+                <span className="line-clamp-2 block text-[14px] text-ink">{post.deal?.title || post.title || post.body}</span>
+                <span className="block text-[12px] text-mut">{timeAgo(post.createdAt)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-[14px] leading-relaxed text-ink">Nothing new from your connections yet.</p>
+      )}
+      <Link href="/network" className="mt-3 inline-block text-[14px] font-semibold text-forest underline decoration-brass">
+        Find members to connect with
+      </Link>
+    </div>
+  );
+
   return (
-    <div className="mx-auto grid max-w-[1180px] gap-6 px-4 pb-6 pt-3 md:pt-6 lg:grid-cols-[minmax(0,760px)_320px] lg:px-8">
+    <div className="mx-auto grid max-w-[1240px] gap-8 px-4 pb-8 pt-4 md:pt-8 lg:grid-cols-[minmax(0,800px)_340px] lg:px-10">
       <section>
         <JoinEntryBanner name={user.name} />
-        <PageHeader title="The Ledger" ledger />
+        <header className="mb-6 border-b-[3px] border-double border-brass pb-4">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-brass">{BRAND.name}</p>
+          <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">The Ledger</h1>
+        </header>
         <Banner error={error} notice={notice} />
-        <div className="flex gap-5 overflow-x-auto border-b border-line font-serif text-[15px] text-mut">
+        <section className={`${matchPanel} mb-6 p-5 md:p-6`} data-testid="ledger-lead">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-sand">
+            {lead.matched ? "Picked from your markets, deal types and asset classes" : hasPrefs(prefs) ? "Nothing matches your profile yet. Showing the newest deals" : "Showing the newest deals. Add markets on your profile to tailor this"}
+          </p>
+          <h2 className="mt-1 font-serif text-[30px] font-normal leading-tight md:text-[36px]">{lead.matched ? "New deals matching you" : "Recent deals"}</h2>
+          {lead.items.length ? (
+            <ul className="mt-4 grid gap-3">
+              {lead.items.map(({ post, reasons }) => (
+                <li key={post.id} className="rounded border border-brass/50 bg-paper/5 p-4">
+                  <Link href={`/deals/${post.dealId}`} className="block">
+                    <span className="block font-serif text-[22px] leading-snug text-paper md:text-[24px]">
+                      Raising {post.deal?.raiseLabel} — {post.deal?.title}
+                    </span>
+                    <span className="mt-1 block text-[15px] text-sand">
+                      {post.deal?.market} · {post.deal?.assetClass} · {post.author.name} · {timeAgo(post.createdAt)}
+                    </span>
+                    {reasons.length ? (
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        {reasons.map((reason) => (
+                          <span key={reason} className="rounded-sm border border-brass px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wider text-brass">
+                            {reason}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-[16px] text-sand">No deals have been posted yet.</p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/deals" className={btnBrass}>
+              All deals
+            </Link>
+            <Link href="/profile" className="inline-flex min-h-11 items-center text-[15px] text-sand underline decoration-brass">
+              Update what you look for
+            </Link>
+          </div>
+        </section>
+        <div className="flex gap-7 overflow-x-auto border-b border-line font-serif text-[19px] text-mut md:text-[21px]">
           {TABS.map((item) => (
             <Link
               key={item.id}
@@ -165,16 +246,6 @@ export default async function FeedPage({
           ))}
         </div>
         <ProjectFilterBar path="/feed" filters={filters} saved={saved} />
-        <section className="mt-4 rounded border border-brass bg-paper p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</p>
-          <h2 className="mt-1 font-serif text-2xl font-normal">{tierLabel(user.tier)} member</h2>
-          <p className="mt-2 text-sm leading-relaxed text-ink">
-            Your account is active. {BRAND.owner} approved membership. Reviewed membership means every member is personally reviewed. You see “Verified” or “Verification in progress.” Verified means the verification file was completed by Private Floor.
-          </p>
-          <div className="mt-2">
-            <TierBadge tier={user.tier} />
-          </div>
-        </section>
         {checklistOpen ? (
           <section className="mt-4 rounded border border-brass bg-paper p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">First week</p>
@@ -213,6 +284,7 @@ export default async function FeedPage({
           </p>
         ) : null}
         <div className="mt-4 space-y-4 lg:hidden">
+          {circlePanel}
           <ColleagueInvite codes={unusedCodes} />
         </div>
         <div className="mt-4">
@@ -223,7 +295,7 @@ export default async function FeedPage({
         </div>
         <div className="mt-4 space-y-4">
           {visible.length === 0 ? (
-            <p className="py-10 text-center text-sm text-mut">{filterSummary(filters) ? "No posts match these filters." : "Nothing here yet."}</p>
+            <p className="py-10 text-center text-[16px] text-mut">{filterSummary(filters) ? "No posts match these filters." : "Nothing here yet."}</p>
           ) : null}
           {visible.map((post) => {
             const liked = post.likes.some((like) => like.userId === user.id);
@@ -239,19 +311,19 @@ export default async function FeedPage({
                   </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <Link href={`/members/${post.authorId}`} className="text-sm font-semibold">
+                      <Link href={`/members/${post.authorId}`} className="text-[17px] font-semibold">
                         {post.author.name}
                       </Link>
                       <TierBadge tier={post.author.tier} />
                     </div>
-                    <p className="text-[11.5px] text-mut">
+                    <p className="text-[14px] text-mut">
                       {roleShort(roleLabel(post.author.role))} · {post.author.org} · {timeAgo(post.createdAt)}
                     </p>
                   </div>
                   <KindTag kind={post.kind} roleLabel={seeking} />
                 </div>
                 {post.deal ? (
-                  <h2 className="mt-3 font-serif text-lg font-normal">
+                  <h2 className="mt-3 font-serif text-[24px] font-normal leading-snug">
                     {post.kind === "DEAL" ? `Raising ${post.deal.raiseLabel} — ${post.deal.title}` : post.deal.title}
                   </h2>
                 ) : null}
@@ -260,23 +332,23 @@ export default async function FeedPage({
                     {post.status === "PENDING_REVIEW" ? "Held for a Private Floor administrator" : post.status === "CLOSED" ? "Closed" : "Not published"}
                   </p>
                 ) : null}
-                <p className="mt-2 text-sm leading-relaxed text-ink">{post.body}</p>
+                <p className="mt-2 text-[17px] leading-relaxed text-ink">{post.body}</p>
                 {post.deal ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.market}</span>
-                    <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.assetClass}</span>
-                    <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{post.deal.raiseLabel}</span>
+                    <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{post.deal.market}</span>
+                    <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{post.deal.assetClass}</span>
+                    <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{post.deal.raiseLabel}</span>
                     {stageLabel(post.stage || post.deal.stage) ? (
-                      <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">{stageLabel(post.stage || post.deal.stage)}</span>
+                      <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{stageLabel(post.stage || post.deal.stage)}</span>
                     ) : null}
                     {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded })) ? (
-                      <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
+                      <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">
                         {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded }))}
                       </span>
                     ) : null}
                   </div>
                 ) : null}
-                <div className="mt-3 flex items-center gap-4 border-t border-line pt-2 text-xs text-mut">
+                <div className="mt-3 flex items-center gap-4 border-t border-line pt-2 text-[14px] text-mut">
                   <form action={toggleLike}>
                     <input type="hidden" name="postId" value={post.id} />
                     <button type="submit" className={liked ? "font-semibold text-brass" : ""}>
@@ -342,9 +414,10 @@ export default async function FeedPage({
         </div>
       </section>
       <aside className="hidden space-y-4 lg:block">
+        {circlePanel}
         <div className={matchPanel}>
           <div className="text-[10px] uppercase tracking-[0.16em] text-sand">Match suggestions</div>
-          <p className="mt-1 font-serif text-xl">{plural(matchCount, audience.singular, audience.plural)} in your markets</p>
+          <p className="mt-1 font-serif text-2xl">{plural(matchCount, audience.singular, audience.plural)} in your markets</p>
           <p className="mt-2 text-xs text-sand">Rules match on role, market, and size. This is a directory, not a solicitation.</p>
           <Link href={`/network?role=${audience.role}`} className={`${btnBrass} mt-3`}>
             Review matches
@@ -363,15 +436,6 @@ export default async function FeedPage({
               </li>
             ))}
           </ul>
-        </div>
-        <div className="rounded border border-line bg-paper p-4">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership status</h2>
-          <div className="mt-2">
-            <TierBadge tier={user.tier} />
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-ink">
-            Approved member. Account active. {BRAND.owner} approves every member. Members see Verified or Verification in progress. Verified means the verification file was completed by Private Floor.
-          </p>
         </div>
         <ColleagueInvite codes={unusedCodes} />
       </aside>

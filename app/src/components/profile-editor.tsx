@@ -1,5 +1,10 @@
 import { saveProfile } from "@/actions/profile";
-import { btn, field, labelCls } from "@/components/ui";
+import { btn } from "@/components/ui";
+
+const labelCls = "mb-2 block font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-forest";
+const field =
+  "w-full min-h-12 rounded-sm border border-line bg-paper px-3.5 py-3 font-sans text-[17px] text-forest outline-none placeholder:text-mut/70 focus:border-brass";
+const box = "h-5 w-5 shrink-0 accent-[#1F3A2E]";
 import { ASSET_CLASSES, DEAL_TYPES, US_STATES } from "@/lib/member-network";
 
 function selected(csv: string) {
@@ -25,16 +30,16 @@ export function ProfileEditor({
   const dealTypes = selected(member.dealTypes);
   const assets = selected(member.assetClasses);
   return (
-    <form action={saveProfile} className="mt-5 grid gap-3 rounded border border-line bg-cream p-4">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Edit profile</h2>
-      <p className="text-xs text-ink">Other members never see your email or phone. A business card stays with your account.</p>
+    <form action={saveProfile} className="mt-6 grid gap-5 rounded border border-line bg-cream p-5 sm:p-7">
+      <h2 className="font-serif text-2xl text-forest sm:text-[28px]">Edit profile</h2>
+      <p className="text-[15px] leading-relaxed text-ink">Other members never see your email or phone. A business card stays with your account.</p>
       <label>
         <span className={labelCls}>City and state</span>
         <input name="location" defaultValue={member.location} className={field} required />
       </label>
       <label>
         <span className={labelCls}>Website</span>
-        <input name="website" defaultValue={member.website} className={field} placeholder="https://" />
+        <input name="website" type="text" inputMode="url" autoCapitalize="none" spellCheck={false} defaultValue={member.website} className={field} placeholder="www.example.com" />
       </label>
       <label>
         <span className={labelCls}>Bio</span>
@@ -42,10 +47,10 @@ export function ProfileEditor({
       </label>
       <fieldset>
         <legend className={labelCls}>Markets</legend>
-        <div className="grid max-h-40 grid-cols-6 gap-1 overflow-y-auto rounded border border-line bg-paper p-2 text-xs">
+        <div className="grid max-h-72 grid-cols-4 gap-x-2 gap-y-1 overflow-y-auto rounded border border-line bg-paper p-3 text-[16px] sm:grid-cols-6 lg:grid-cols-8">
           {US_STATES.map((state) => (
-            <label key={state} className="flex items-center gap-1">
-              <input type="checkbox" name="markets" value={state} defaultChecked={markets.has(state)} />
+            <label key={state} className="flex min-h-10 cursor-pointer items-center gap-2">
+              <input className={box} type="checkbox" name="markets" value={state} defaultChecked={markets.has(state)} />
               {state}
             </label>
           ))}
@@ -53,10 +58,10 @@ export function ProfileEditor({
       </fieldset>
       <fieldset>
         <legend className={labelCls}>Deal types</legend>
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
           {DEAL_TYPES.map((item) => (
-            <label key={item} className="flex items-center gap-1">
-              <input type="checkbox" name="dealTypes" value={item} defaultChecked={dealTypes.has(item)} />
+            <label key={item} className="flex min-h-10 cursor-pointer items-center gap-2">
+              <input className={box} type="checkbox" name="dealTypes" value={item} defaultChecked={dealTypes.has(item)} />
               {item}
             </label>
           ))}
@@ -64,10 +69,10 @@ export function ProfileEditor({
       </fieldset>
       <fieldset>
         <legend className={labelCls}>Asset classes</legend>
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
           {ASSET_CLASSES.map((item) => (
-            <label key={item} className="flex items-center gap-1">
-              <input type="checkbox" name="assetClasses" value={item} defaultChecked={assets.has(item)} />
+            <label key={item} className="flex min-h-10 cursor-pointer items-center gap-2">
+              <input className={box} type="checkbox" name="assetClasses" value={item} defaultChecked={assets.has(item)} />
               {item}
             </label>
           ))}
@@ -87,7 +92,7 @@ export function ProfileEditor({
       </label>
       <label>
         <span className={labelCls}>Business card, optional</span>
-        <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-sm" />
+        <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-[15px]" />
       </label>
       <button className={btn} type="submit">
         Save profile

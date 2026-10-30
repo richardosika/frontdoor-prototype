@@ -1,4 +1,5 @@
 "use server";
+import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -18,7 +19,7 @@ import { appBaseUrl } from "@/lib/url";
 export async function saveProfile(formData: FormData) {
   const user = await requireUser();
   const bio = String(formData.get("bio") || "").trim().slice(0, 1200);
-  const website = String(formData.get("website") || "").trim().slice(0, 200);
+  const website = normalizeWebUrl(String(formData.get("website") || "")).slice(0, 200);
   const markets = formData.getAll("markets").map((value) => String(value)).filter(Boolean).join(", ");
   const dealTypes = formData.getAll("dealTypes").map((value) => String(value)).filter(Boolean).join(", ");
   const assetClasses = formData.getAll("assetClasses").map((value) => String(value)).filter(Boolean).join(", ");

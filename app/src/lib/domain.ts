@@ -1,3 +1,4 @@
+import { webUrlIssue } from "@/lib/web-url";
 import { BRAND } from "@/lib/brand";
 import { formatAddress, joinName, validateAddress, validatePersonName, validatePhone } from "@/lib/person-fields";
 import { isRoleId, ROLE_IDS, type RoleId } from "@/lib/roles";
@@ -219,9 +220,11 @@ export function validateApplication(input: ApplicationInput): string[] {
   const phoneError = validatePhone(input.phone ?? "");
   if (phoneError) errors.push(phoneError);
   const linkedin = (input.linkedinUrl ?? "").trim();
-  if (linkedin && !/^https?:\/\//i.test(linkedin)) errors.push("LinkedIn URL must start with http.");
+  const linkedinIssue = webUrlIssue("LinkedIn URL", linkedin);
+  if (linkedinIssue) errors.push(linkedinIssue);
   const website = (input.website ?? "").trim();
-  if (website && !/^https?:\/\//i.test(website)) errors.push("Website must start with http.");
+  const websiteIssue = webUrlIssue("Website", website);
+  if (websiteIssue) errors.push(websiteIssue);
   const social = (input.socialLinks ?? "")
     .split(/\s+/)
     .map((item) => item.trim())

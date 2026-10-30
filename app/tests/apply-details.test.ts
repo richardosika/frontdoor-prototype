@@ -48,9 +48,10 @@ describe("apply details gate", () => {
   });
 
   it("treats a filled optional field as required until it is valid", () => {
-    const issues = applyDetailsIssues({ ...READY, linkedinUrl: "linkedin.com/in/ada", website: "northline.example" });
+    const issues = applyDetailsIssues({ ...READY, linkedinUrl: "ada lovelace", website: "northline" });
     expect(stillNeeded(issues)).toBe("Still needed: LinkedIn URL, website");
     expect(applyDetailsIssues(READY)).toEqual([]);
     expect(applyDetailsIssues({ ...READY, linkedinUrl: "https://www.linkedin.com/in/ada" })).toEqual([]);
+    expect(applyDetailsIssues({ ...READY, linkedinUrl: "linkedin.com/in/ada", website: "northline.example" })).toEqual([]);
   });
 });

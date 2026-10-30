@@ -211,7 +211,7 @@ export function cleanProjectQuery(input: ProjectQuery, surface: FilterSurface): 
     if (sort && sort !== "newest") out.sort = sort;
   }
   if (input.need && isNeedId(input.need)) out.need = input.need;
-  if (surface === "feed" && input.tab && ["deals", "seeking", "circle"].includes(input.tab)) out.tab = input.tab;
+  if (surface === "feed" && input.tab && ["requests", "seeking"].includes(input.tab)) out.tab = "requests";
   return out;
 }
 

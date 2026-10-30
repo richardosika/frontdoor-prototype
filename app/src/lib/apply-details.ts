@@ -1,3 +1,4 @@
+import { webUrlIssue } from "@/lib/web-url";
 import { stateIssue, validatePhone, zipIssue } from "@/lib/person-fields";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,9 +32,7 @@ export type ApplyDetailsIssue = {
 };
 
 function httpMessage(label: string, value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed || HTTP.test(trimmed)) return null;
-  return `${label} must start with http.`;
+  return webUrlIssue(label, value);
 }
 
 /** Required details, in form order, plus optional fields that were filled in incorrectly. */

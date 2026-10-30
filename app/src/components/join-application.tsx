@@ -182,7 +182,7 @@ export function JoinApplication({
           <h2 className="mt-6 font-serif text-2xl font-normal">Your company</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label="Company name" required={!companyOptional} optional={companyOptional} value={profile.company} onChange={(value) => patch({ company: value })} />
-            <Field label="Company website" required={!companyOptional} optional={companyOptional} value={profile.website} onChange={(value) => patch({ website: value })} />
+            <Field label="Company website" inputMode="url" required={!companyOptional} optional={companyOptional} value={profile.website} onChange={(value) => patch({ website: value })} />
             <label className="sm:col-span-2">
               <span className={labelCls}>Business street address{RQ}</span>
               <input className={field} value={profile.street} onChange={(event) => patch({ street: event.target.value })} />
@@ -212,7 +212,7 @@ export function JoinApplication({
                 }}>
                   {LINK_KINDS.map((kind) => <option key={kind}>{kind}</option>)}
                 </select>
-                <input className={field} type="url" placeholder="https://" value={link.url} onChange={(event) => {
+                <input className={field} type="text" inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="linkedin.com/in/yourname" value={link.url} onChange={(event) => {
                   const links = profile.links.slice();
                   links[index] = { ...link, url: event.target.value };
                   patch({ links });
@@ -248,7 +248,7 @@ export function JoinApplication({
             <Field label="Former names or companies" optional value={profile.formerNames} onChange={(value) => patch({ formerNames: value })} />
             <label className="sm:col-span-2">
               <span className={labelCls}>Link to your bio or team page (optional)</span>
-              <input className={field} value={profile.bioUrl} onChange={(event) => patch({ bioUrl: event.target.value })} />
+              <input className={field} type="text" inputMode="url" autoCapitalize="none" value={profile.bioUrl} onChange={(event) => patch({ bioUrl: event.target.value })} />
             </label>
           </div>
 
@@ -352,7 +352,7 @@ export function JoinApplication({
                 <ChipSet options={COVERAGE_TYPES} value={profile.coverageTypes} onChange={(coverageTypes) => patch({ coverageTypes })} />
               </div>
             ) : null}
-            {profile.role === "BROKER" ? <Field label="Brokerage profile URL" optional value={profile.brokerageUrl} onChange={(value) => patch({ brokerageUrl: value })} /> : null}
+            {profile.role === "BROKER" ? <Field label="Brokerage profile URL" inputMode="url" optional value={profile.brokerageUrl} onChange={(value) => patch({ brokerageUrl: value })} /> : null}
           </section>
 
           {showsProjects(profile.role) ? (
@@ -373,8 +373,8 @@ export function JoinApplication({
 
           <h2 className="mt-6 font-serif text-2xl font-normal">Press (optional)</h2>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            <input className={field} placeholder="https://" value={profile.press[0]} onChange={(event) => patch({ press: [event.target.value, profile.press[1] || ""] })} />
-            <input className={field} placeholder="https://" value={profile.press[1]} onChange={(event) => patch({ press: [profile.press[0] || "", event.target.value] })} />
+            <input className={field} inputMode="url" placeholder="example.com/article" value={profile.press[0]} onChange={(event) => patch({ press: [event.target.value, profile.press[1] || ""] })} />
+            <input className={field} inputMode="url" placeholder="example.com/article" value={profile.press[1]} onChange={(event) => patch({ press: [profile.press[0] || "", event.target.value] })} />
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">Business card or email signature (optional)</h2>
           <label className="mt-2 block rounded border border-dashed border-line bg-paper p-4 text-center text-sm text-mut">
@@ -423,6 +423,7 @@ function Field({
   required,
   optional,
   type = "text",
+  inputMode,
   onBlur,
 }: {
   label: string;
@@ -431,12 +432,13 @@ function Field({
   required?: boolean;
   optional?: boolean;
   type?: string;
+  inputMode?: "url" | "text";
   onBlur?: (value: string) => void;
 }) {
   return (
     <label className="min-w-0">
       <span className={labelCls}>{label}{required ? RQ : null}{optional ? " (optional)" : ""}</span>
-      <input className={field} type={type} value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onBlur?.(event.target.value)} />
+      <input className={field} type={type} inputMode={inputMode} autoCapitalize={inputMode === "url" ? "none" : undefined} spellCheck={inputMode === "url" ? false : undefined} placeholder={inputMode === "url" ? "example.com" : undefined} value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onBlur?.(event.target.value)} />
     </label>
   );
 }

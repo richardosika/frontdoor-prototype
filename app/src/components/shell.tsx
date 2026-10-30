@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
@@ -11,7 +11,7 @@ import { Logo } from "@/components/logo";
 import { tierLabel } from "@/lib/format";
 
 const TABS = [
-  { href: "/feed", label: "Feed", icon: "⌂", test: "tab-feed" },
+  { href: "/feed", label: "Ledger", icon: "⌂", test: "tab-feed" },
   { href: "/deals", label: "Deals", icon: "◈", test: "tab-deals" },
   { href: "/network", label: "Network", icon: "⚇", test: "tab-network" },
   { href: "/messages", label: "Messages", icon: "✉", test: "tab-messages" },
@@ -41,20 +41,76 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const memberRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!memberOpen) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent) {
+        if (event.key === "Escape") setMemberOpen(false);
+        return;
+      }
+      if (memberRef.current && !memberRef.current.contains(event.target as Node)) setMemberOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [memberOpen]);
+  useEffect(() => setMemberOpen(false), [pathname]);
 
   return (
     <>
     <DecisionDialogHost />
     <div className="min-h-dvh bg-cream text-forest md:grid md:grid-cols-[84px_minmax(0,1fr)] lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="hidden border-r border-brass bg-forest bg-gradient-to-b from-white/[0.02] to-black/10 text-paper md:flex md:flex-col md:gap-1 md:px-3 md:py-6 lg:px-4 lg:py-7">
-        <Link href="/feed" className="mb-8 flex items-center justify-center px-1 lg:justify-start lg:px-2">
+        <Link href="/feed" className="mb-4 flex items-center justify-center px-1 lg:justify-start lg:px-2">
           <span className="lg:hidden">
-            <Logo tone="paper" compact />
+            <Logo tone="paper" compact large />
           </span>
           <span className="hidden lg:inline-flex">
-            <Logo tone="paper" />
+            <Logo tone="paper" large />
           </span>
         </Link>
+        <div className="mb-3 hidden rounded-sm border border-brass/50 bg-paper/5 px-3 py-2.5 lg:block" data-testid="sidebar-membership">
+          <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-brass">Membership</p>
+          <p className="mt-0.5 font-serif text-[16px] text-paper">{tierLabel(user.tier)} member</p>
+          <p className="font-sans text-[12px] text-sand">Account active</p>
+        </div>
+        <div ref={memberRef} className="relative mb-5">
+          <button
+            type="button"
+            data-testid="member-menu"
+            aria-haspopup="menu"
+            aria-expanded={memberOpen}
+            onClick={() => setMemberOpen((open) => !open)}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-sm border border-brass/40 p-2 text-left hover:bg-paper/10 lg:justify-start"
+          >
+            <Avatar initials={user.initials} size="sm" />
+            <span className="hidden min-w-0 flex-1 lg:block">
+              <span className="block truncate font-sans text-[13px] font-semibold">{user.name}</span>
+              <span className="block font-sans text-[11px] text-sand">{tierLabel(user.tier)} member</span>
+            </span>
+            <span aria-hidden className={`hidden text-sand transition lg:inline ${memberOpen ? "rotate-180" : ""}`}>▾</span>
+          </button>
+          {memberOpen ? (
+            <div role="menu" className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-sm border border-brass/50 bg-paper text-forest shadow-lg lg:w-full">
+              <Link href="/profile" role="menuitem" className="flex min-h-11 items-center px-3 font-sans text-sm font-semibold hover:bg-cream">
+                Profile
+              </Link>
+              <Link href="/settings" role="menuitem" className="flex min-h-11 items-center border-t border-line px-3 font-sans text-sm font-semibold hover:bg-cream">
+                Settings
+              </Link>
+              <form action={logoutAction} className="border-t border-line">
+                <button role="menuitem" className="min-h-11 w-full px-3 text-left font-sans text-sm font-semibold hover:bg-cream" type="submit">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          ) : null}
+        </div>
         <nav className="flex flex-1 flex-col gap-1">
           {TABS.map((tab) => {
             const on = active(pathname, tab.href);
@@ -128,23 +184,6 @@ export function Shell({
             </Link>
           ) : null}
         </nav>
-        <div className="mt-4 flex items-center justify-center gap-2 rounded-sm border border-brass/40 p-2 lg:justify-start">
-          <Link href="/profile" className="flex items-center gap-2">
-            <Avatar initials={user.initials} size="sm" />
-            <span className="hidden lg:block">
-              <span className="block font-sans text-[13px] font-semibold">{user.name}</span>
-              <span className="block font-sans text-[11px] text-sand">{tierLabel(user.tier)} member</span>
-            </span>
-          </Link>
-        </div>
-        <Link href="/settings" className="mt-2 hidden min-h-11 items-center rounded-sm px-3 font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper lg:flex">
-          Settings
-        </Link>
-        <form action={logoutAction} className="mt-2">
-          <button className="min-h-11 w-full rounded-sm px-3 py-2 text-left font-sans text-xs tracking-wide text-sand [font-variant:all-small-caps] hover:text-paper" type="submit">
-            Sign out
-          </button>
-        </form>
       </aside>
 
       <div className="min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
@@ -203,7 +242,7 @@ export function Shell({
           <button type="button" className="absolute inset-0 bg-forest/40" aria-label="Close account menu" onClick={() => setMenuOpen(false)} />
           <div className="absolute inset-x-0 bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] rounded-t border border-line bg-paper px-4 pb-4 pt-4">
             <p className="font-serif text-lg">{user.name}</p>
-            <p className="text-xs text-mut">{tierLabel(user.tier)} member</p>
+            <p className="text-xs text-mut">{tierLabel(user.tier)} member · Account active</p>
             <Link href="/settings" className="mt-3 flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               Settings
             </Link>

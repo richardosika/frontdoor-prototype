@@ -1,4 +1,5 @@
 "use server";
+import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -88,7 +89,7 @@ export async function submitJoinApplication(
   const linkedin = profile.links.find((link) => link.kind.startsWith("LinkedIn") && link.url.trim())?.url.trim() || "";
   const socialLinks = profile.links
     .filter((link) => link.url.trim())
-    .map((link) => `${link.kind}: ${link.url.trim()}`)
+    .map((link) => `${link.kind}: ${normalizeWebUrl(link.url)}`)
     .join("\n")
     .slice(0, 1000);
   const stored = { ...profile, password: "" };
@@ -108,9 +109,9 @@ export async function submitJoinApplication(
         credentialValue: card ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
         referenceEmails: [profile.referenceContact].map((item) => item.trim().toLowerCase()).filter((item) => item.includes("@")),
         phone: profile.phone.trim().slice(0, 40),
-        linkedinUrl: linkedin.slice(0, 300),
+        linkedinUrl: normalizeWebUrl(linkedin).slice(0, 300),
         statement: profile.standout.trim().slice(0, 4000),
-        website: profile.website.trim().slice(0, 300),
+        website: normalizeWebUrl(profile.website).slice(0, 300),
         socialLinks,
         joinProfile: stored,
         status: "IN_REVIEW",

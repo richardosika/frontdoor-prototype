@@ -1,4 +1,5 @@
 "use server";
+import { normalizeWebUrl } from "@/lib/web-url";
 
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -190,7 +191,7 @@ export async function submitApplication(
   const statusToken = randomBytes(24).toString("hex");
   const ipHash = await clientIpHash();
   const acceptedAt = new Date();
-  const website = (input.website ?? "").trim().slice(0, 300);
+  const website = normalizeWebUrl(input.website).slice(0, 300);
   const socialLinks = (input.socialLinks ?? "").trim().slice(0, 1000);
 
   const application = await prisma.$transaction(async (tx) => {
@@ -208,7 +209,7 @@ export async function submitApplication(
         credentialValue: card ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
         referenceEmails: references,
         phone: (input.phone ?? "").trim().slice(0, 40),
-        linkedinUrl: (input.linkedinUrl ?? "").trim().slice(0, 300),
+        linkedinUrl: normalizeWebUrl(input.linkedinUrl).slice(0, 300),
         statement: (input.statement ?? "").trim(),
         website,
         socialLinks,

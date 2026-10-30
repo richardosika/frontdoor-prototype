@@ -57,7 +57,7 @@ export function CreateTestApplicantForm() {
       </label>
       <label className="block">
         <span className={labelCls}>Website</span>
-        <input className={field} name="website" placeholder="https://www.related.com" />
+        <input className={field} name="website" type="text" inputMode="url" placeholder="www.related.com" />
       </label>
       <label className="block">
         <span className={labelCls}>Location</span>

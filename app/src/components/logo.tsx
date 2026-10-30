@@ -1,14 +1,14 @@
 import { BRAND } from "@/lib/brand";
 
-export function Logo({ tone = "ink", compact = false }: { tone?: "ink" | "paper"; compact?: boolean }) {
+export function Logo({ tone = "ink", compact = false, large = false }: { tone?: "ink" | "paper"; compact?: boolean; large?: boolean }) {
   if (tone === "paper" && compact) {
     // Brand SVG served as-is. The optimizer does not apply.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src="/brand/pf-mark.svg" alt={BRAND.name} className="h-7 w-7" />;
+    return <img src="/brand/pf-mark.svg" alt={BRAND.name} className={large ? "h-9 w-9" : "h-7 w-7"} />;
   }
   if (tone === "paper") {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src="/brand/lockup-reversed.svg" alt={BRAND.name} className="h-10 w-auto" />;
+    return <img src="/brand/lockup-reversed.svg" alt={BRAND.name} className={large ? "h-[60px] w-auto" : "h-10 w-auto"} />;
   }
   return (
     <span className="inline-flex items-center gap-2.5 text-forest">

@@ -1,4 +1,5 @@
 "use server";
+import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -735,7 +736,7 @@ export async function createCustomTestApplicant(
   const name = String(formData.get("name") || "").trim();
   const org = String(formData.get("org") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const website = String(formData.get("website") || "").trim();
+  const website = normalizeWebUrl(String(formData.get("website") || ""));
   const location = String(formData.get("location") || "").trim() || "Newark, NJ";
   if (name.length < 2 || org.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Name, company, and a valid email are required." };
