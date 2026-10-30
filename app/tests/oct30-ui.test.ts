@@ -114,3 +114,37 @@ describe("member platform languages", () => {
     expect(translate("ja", "nav.ledger")).toBe("レジャー");
   });
 });
+
+import { PHRASES, phrase } from "@/lib/i18n/phrases";
+import { portalMessageEmail } from "@/lib/messaging";
+describe("member platform phrases", () => {
+  it("every phrase has Spanish, German and Japanese text, without banned words", () => {
+    const banned = /invite|invited|invite-only|founding member|limited|invitación|invitado|einladung|eingeladen|招待|限定|limitad|begrenzt/i;
+    for (const [en, values] of Object.entries(PHRASES)) {
+      expect(banned.test(en), en).toBe(false);
+      expect(values).toHaveLength(3);
+      for (const value of values) {
+        expect(value.trim().length, en).toBeGreaterThan(0);
+        expect(banned.test(value), value).toBe(false);
+      }
+    }
+  });
+  it("falls back to English for unknown text and for English", () => {
+    expect(phrase("ja", "Some member wrote this")).toBe("Some member wrote this");
+    expect(phrase("en", "Deals")).toBe("Deals");
+    expect(phrase("de", "Deals")).toBe("Deals");
+    expect(phrase("es", "Settings")).toBe("Ajustes");
+  });
+  it("sends the portal message email in the member's language", () => {
+    expect(portalMessageEmail("https://x/messages", "es").subject).toBe("Tiene un mensaje nuevo en Private Floor");
+    expect(portalMessageEmail("https://x/messages", "ja").text).toContain("メッセージを開く");
+    expect(portalMessageEmail("https://x/messages").subject).toBe("You have a new message on Private Floor");
+  });
+  it("every member page uses the translator, and the language is saved on the account", () => {
+    for (const file of ["deals/page.tsx", "deals/[id]/page.tsx", "deals/[id]/room/page.tsx", "network/page.tsx", "messages/[conversationId]/page.tsx", "alerts/page.tsx", "settings/page.tsx"]) {
+      expect(read(`app/(app)/${file}`), file).toMatch(/serverTx\(\)/);
+    }
+    expect(read("actions/language.ts")).toMatch(/data: \{ locale: value \}/);
+    expect(readFileSync(path.join(ROOT, "..", "prisma", "schema.prisma"), "utf8")).toMatch(/locale\s+String\s+@default\("en"\)/);
+  });
+});

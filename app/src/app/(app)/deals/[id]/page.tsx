@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminReviewAccess, requestAccess, reviewAccess } from "@/actions/deals";
@@ -25,6 +26,7 @@ export default async function DealPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const { id } = await params;
   const query = await searchParams;
@@ -44,7 +46,7 @@ export default async function DealPage({
 
   return (
     <div>
-      <MobileTitle href="/deals" label="Deals" title="Deal" />
+      <MobileTitle href="/deals" label="Deals" title={tx("Deal")} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
       <Link href="/deals" className="hidden text-sm text-mut md:inline">
         ‹ Deals
@@ -52,8 +54,8 @@ export default async function DealPage({
       <Banner error={query.error} notice={query.notice} />
       <div className={`mt-3 p-5 ${dealCard}`}>
         <div className="flex items-start justify-between gap-3">
-          <KindTag kind={deal.kind} roleLabel={roleShort(roleLabel(deal.roleNeeded))} />
-          <span className="text-xs text-mut">{deal.market} · {sizeLabel(deal.sizeBand)} · {deal.assetClass}</span>
+          <KindTag kind={deal.kind} roleLabel={tx(roleShort(roleLabel(deal.roleNeeded)))} />
+          <span className="text-xs text-mut">{deal.market} · {tx(sizeLabel(deal.sizeBand))} · {deal.assetClass}</span>
         </div>
         <h1 className="mt-3 font-serif text-2xl font-normal">{deal.title}</h1>
         <Link href={`/members/${deal.sponsorId}`} className="mt-1 inline-flex items-center gap-2 text-sm text-mut">
@@ -68,8 +70,8 @@ export default async function DealPage({
         <p className="mt-2 text-xs text-mut">
           This page is a member note. {BRAND.name} does not offer securities, accept subscriptions, or process payments.
         </p>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Sponsor track record</h2>
-        {deal.sponsor.projects.length === 0 ? <p className="text-sm text-mut">No projects listed.</p> : null}
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Sponsor track record")}</h2>
+        {deal.sponsor.projects.length === 0 ? <p className="text-sm text-mut">{tx("No projects listed.")}</p> : null}
         <ul>
           {deal.sponsor.projects.map((project) => (
             <li key={project.id} className="flex items-center justify-between border-b border-line py-2 text-sm">
@@ -85,24 +87,24 @@ export default async function DealPage({
         </ul>
         {approved ? (
           <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
-            <b>You can open the deal room.</b>
-            <p className="mt-1 text-ink">Approved members are listed there. Materials stay among those members.</p>
+            <b>{tx("You can open the deal room.")}</b>
+            <p className="mt-1 text-ink">{tx("Approved members are listed there. Materials stay among those members.")}</p>
             <Link href={`/deals/${deal.id}/room`} className={`${btn} mt-3`}>
-              Open deal room
+              {tx("Open deal room")}
             </Link>
           </div>
         ) : mine?.status === "REMOVED" ? (
           <form action={requestAccess} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
             <input type="hidden" name="dealId" value={deal.id} />
-            <p className="mb-2">The sponsor removed you from this room. You can request access again after acknowledging the current NDA.</p>
+            <p className="mb-2">{tx("The sponsor removed you from this room. You can request access again after acknowledging the current NDA.")}</p>
             <NdaCopy html={ndaHtml} />
             <button className={`${btn} mt-3`} type="submit">
-              Request access again
+              {tx("Request access again")}
             </button>
           </form>
         ) : mine?.status === "PENDING" ? (
           <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
-            <b>Pending — not approved</b>
+            <b>{tx("Pending — not approved")}</b>
             <p className="mt-1">
               Your request to {deal.sponsor.name} is waiting on sponsor review. It has not been approved. An admin can decide on {deal.sponsor.name}&apos;s behalf.
             </p>
@@ -112,12 +114,12 @@ export default async function DealPage({
             <input type="hidden" name="dealId" value={deal.id} />
             {mine?.status === "REJECTED" ? (
               <p className="mb-2">
-                <b>Request declined.</b> {deal.sponsor.name} did not approve access. You can send a new request.
+                <b>{tx("Request declined.")}</b> {deal.sponsor.name} did not approve access. You can send a new request.
               </p>
             ) : null}
             <NdaCopy html={ndaHtml} />
             <button className={`${btn} mt-3`} type="submit">
-              Request access
+              {tx("Request access")}
             </button>
           </form>
         )}
@@ -128,13 +130,13 @@ export default async function DealPage({
               <input name="title" defaultValue={post.title || deal.title} className={field} />
               <textarea name="body" defaultValue={post.body} rows={3} className={field} />
               <button className={btnOutline} type="submit">
-                Save post
+                {tx("Save post")}
               </button>
             </form>
             <form action={closePost}>
               <input type="hidden" name="postId" value={post.id} />
               <button className={btnOutline} type="submit">
-                Close post
+                {tx("Close post")}
               </button>
             </form>
           </div>
@@ -143,9 +145,9 @@ export default async function DealPage({
           <form action={reportPost} className="mt-4 flex gap-2">
             <input type="hidden" name="postId" value={post.id} />
             <input type="hidden" name="back" value={`/deals/${deal.id}`} />
-            <input name="reason" className={field} placeholder="Report this post" />
+            <input name="reason" className={field} placeholder={tx("Report this post")} />
             <button className={btnOutline} type="submit">
-              Report
+              {tx("Report")}
             </button>
           </form>
         ) : null}
@@ -154,18 +156,18 @@ export default async function DealPage({
             <form action={openConversation}>
               <input type="hidden" name="userId" value={deal.sponsorId} />
               <button className={btnOutline} type="submit">
-                Message sponsor
+                {tx("Message sponsor")}
               </button>
             </form>
           </div>
         )}
         {isSponsor || user.isAdmin ? (
           <section className="mt-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Access requests</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Access requests")}</h2>
             {user.isAdmin && !isSponsor ? (
               <p className="mt-1 text-xs text-ink">You are acting for {deal.sponsor.name}. The requester is told an admin decided.</p>
             ) : null}
-            {deal.access.length === 0 ? <p className="mt-2 text-sm text-mut">No requests yet.</p> : null}
+            {deal.access.length === 0 ? <p className="mt-2 text-sm text-mut">{tx("No requests yet.")}</p> : null}
             <ul className="mt-2 divide-y divide-line">
               {deal.access.map((access) => (
                 <li key={access.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
@@ -174,7 +176,7 @@ export default async function DealPage({
                       {access.requester.name}
                     </Link>
                     <span className="block text-xs text-mut">
-                      {roleShort(roleLabel(access.requester.role))} · {access.status === "PENDING" ? "Pending — not approved" : access.status}
+                      {tx(roleShort(roleLabel(access.requester.role)))} · {access.status === "PENDING" ? tx("Pending — not approved") : tx(access.status)}
                       {access.ndaAcknowledged ? ` · NDA ${access.ndaVersion || "acknowledged"}` : ""}
                     </span>
                   </span>
@@ -183,13 +185,13 @@ export default async function DealPage({
                       <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
                         <button className={btnOutline} name="decision" value="REJECTED" type="submit">
-                          Decline
+                          {tx("Decline")}
                         </button>
                       </form>
                       <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
                         <button className={btn} name="decision" value="APPROVED" type="submit">
-                          Approve
+                          {tx("Approve")}
                         </button>
                       </form>
                     </span>
@@ -205,14 +207,15 @@ export default async function DealPage({
   );
 }
 
-function NdaCopy({ html }: { html: string }) {
+async function NdaCopy({ html }: { html: string }) {
+  const tx = await serverTx();
   return (
     <>
-      <b>Deal-room NDA</b>
+      <b>{tx("Deal-room NDA")}</b>
       <div className="mt-2 max-h-64 overflow-y-auto rounded border border-line bg-paper p-3" dangerouslySetInnerHTML={{ __html: html }} />
       <label className="mt-3 flex items-start gap-2 text-ink">
         <input type="checkbox" name="nda" required className="mt-1" />
-        <span>I accept this NDA. Private Floor records the version, the time, and a hash of my IP address. It does not show that record to other members.</span>
+        <span>{tx("I accept this NDA. Private Floor records the version, the time, and a hash of my IP address. It does not show that record to other members.")}</span>
       </label>
     </>
   );

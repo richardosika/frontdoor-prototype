@@ -173,6 +173,7 @@ enum CrmStage {
 
 model User {
   id             String           @id @default(cuid())
+  locale         String           @default("en")
   email          String           @unique
   passwordHash   String
   name           String

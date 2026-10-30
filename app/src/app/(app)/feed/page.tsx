@@ -21,7 +21,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import { checklistProgress, intentsForRole, postIsPublic } from "@/lib/member-network";
 import { filterSummary, inferNeed, narrowProjects, needLabel, projectQuery, settleProjectQuery, sortProjects, stageLabel } from "@/lib/project-filter";
 import { prisma } from "@/lib/prisma";
-import { currentLocale } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { translator, type MessageKey } from "@/lib/i18n/messages";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -39,6 +39,7 @@ export default async function FeedPage({
 }) {
   const user = await requireUser();
   const t = translator(await currentLocale());
+  const tx = await serverTx();
   const params = await searchParams;
   const settled = settleProjectQuery("/feed", params, "feed");
   if (settled.redirectTo) redirect(settled.redirectTo);
@@ -302,7 +303,7 @@ export default async function FeedPage({
           ) : null}
           {visible.map((post) => {
             const liked = post.likes.some((like) => like.userId === user.id);
-            const seeking = post.kind === "SEEKING" ? roleShort(roleLabel(post.deal?.roleNeeded)) : undefined;
+            const seeking = post.kind === "SEEKING" ? tx(roleShort(roleLabel(post.deal?.roleNeeded))) : undefined;
             return (
               <article
                 key={post.id}
@@ -320,7 +321,7 @@ export default async function FeedPage({
                       <TierBadge tier={post.author.tier} />
                     </div>
                     <p className="text-[14px] text-mut">
-                      {roleShort(roleLabel(post.author.role))} · {post.author.org} · {timeAgo(post.createdAt)}
+                      {tx(roleShort(roleLabel(post.author.role)))} · {post.author.org} · {timeAgo(post.createdAt)}
                     </p>
                   </div>
                   <KindTag kind={post.kind} roleLabel={seeking} />
@@ -342,11 +343,11 @@ export default async function FeedPage({
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{post.deal.assetClass}</span>
                     <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{post.deal.raiseLabel}</span>
                     {stageLabel(post.stage || post.deal.stage) ? (
-                      <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{stageLabel(post.stage || post.deal.stage)}</span>
+                      <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">{tx(stageLabel(post.stage || post.deal.stage))}</span>
                     ) : null}
                     {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded })) ? (
                       <span className="rounded-sm border border-line px-2.5 py-1 text-[13px] text-mut">
-                        {needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded }))}
+                        {tx(needLabel(inferNeed({ need: post.need || post.deal.need, intent: post.intent, roleNeeded: post.deal.roleNeeded })))}
                       </span>
                     ) : null}
                   </div>
@@ -420,7 +421,7 @@ export default async function FeedPage({
         {circlePanel}
         <div className={matchPanel}>
           <div className="text-[10px] uppercase tracking-[0.16em] text-sand">{t("ledger.matchSuggestions")}</div>
-          <p className="mt-1 font-serif text-2xl">{t("ledger.inYourMarkets", { who: plural(matchCount, audience.singular, audience.plural) })}</p>
+          <p className="mt-1 font-serif text-2xl">{t("ledger.inYourMarkets", { who: `${matchCount} ${tx(matchCount === 1 ? audience.singular : audience.plural)}` })}</p>
           <p className="mt-2 text-xs text-sand">{t("ledger.matchRules")}</p>
           <Link href={`/network?role=${audience.role}`} className={`${btnBrass} mt-3`}>
             {t("ledger.reviewMatches")}
@@ -434,7 +435,7 @@ export default async function FeedPage({
                 <Avatar initials={person.initials} size="sm" />
                 <Link href={`/members/${person.id}`} className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{person.name}</span>
-                  <span className="block truncate text-[11px] text-mut">{roleShort(roleLabel(person.role))}</span>
+                  <span className="block truncate text-[11px] text-mut">{tx(roleShort(roleLabel(person.role)))}</span>
                 </Link>
               </li>
             ))}

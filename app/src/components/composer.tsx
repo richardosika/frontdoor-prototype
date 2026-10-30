@@ -1,4 +1,5 @@
 "use client";
+import { useTx } from "@/components/locale-context";
 
 import { useMemo, useState } from "react";
 import { createPost } from "@/actions/feed";
@@ -18,6 +19,7 @@ export function Composer({
   intents: { id: string; label: string; kind: "DEAL" | "SEEKING" }[];
   rulesHtml: string;
 }) {
+  const tx = useTx();
   const [kind, setKind] = useState<Kind>("NORMAL");
   const choices = useMemo(() => intents.filter((item) => item.kind === kind), [intents, kind]);
   const structured = kind !== "NORMAL";
@@ -46,15 +48,15 @@ export function Composer({
         ))}
       </div>
       {structured && choices.length === 0 ? (
-        <p className="text-sm text-ink">This post type is not available for your role. Choose the other one, or post an update.</p>
+        <p className="text-sm text-ink">{tx("This post type is not available for your role. Choose the other one, or post an update.")}</p>
       ) : null}
       {structured && choices.length > 0 ? (
         <div className="mb-3">
-          <label className={labelCls}>What you are posting</label>
+          <label className={labelCls}>{tx("What you are posting")}</label>
           <select name="intent" className={field} defaultValue={choices[0]?.id} required>
             {choices.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.label}
+                {tx(item.label)}
               </option>
             ))}
           </select>
@@ -77,43 +79,43 @@ export function Composer({
       {structured && choices.length > 0 ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className={labelCls}>Title</label>
-            <input name="title" required className={field} placeholder="Multifamily site, Austin TX" />
+            <label className={labelCls}>{tx("Title")}</label>
+            <input name="title" required className={field} placeholder={tx("Multifamily site, Austin TX")} />
           </div>
           <div>
             <label className={labelCls}>{kind === "DEAL" ? "Amount" : "Size"}</label>
             <input name="raiseLabel" required className={field} placeholder={kind === "DEAL" ? "$2.5M" : "120 units"} />
           </div>
           <div>
-            <label className={labelCls}>Asset class</label>
+            <label className={labelCls}>{tx("Asset class")}</label>
             <select name="assetClass" className={field} defaultValue="Multifamily" required>
               {ASSET_CLASSES.map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>{tx(item)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className={labelCls}>Project stage</label>
+            <label className={labelCls}>{tx("Project stage")}</label>
             <select name="stage" className={field} defaultValue="pre-construction" required>
               {PROJECT_STAGES.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.label}
+                  {tx(item.label)}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className={labelCls}>What is needed</label>
+            <label className={labelCls}>{tx("What is needed")}</label>
             <select key={kind} name="need" className={field} defaultValue={kind === "SEEKING" ? "gc" : "equity"} required>
               {PROJECT_NEEDS.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.label}
+                  {tx(item.label)}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className={labelCls}>State</label>
+            <label className={labelCls}>{tx("State")}</label>
             <select name="market" className={field} defaultValue="NJ" required>
               {US_STATES.map((market) => (
                 <option key={market}>{market}</option>
@@ -125,42 +127,42 @@ export function Composer({
             <select name="sizeBand" className={field} defaultValue="1-5">
               {SIZE_BANDS.map((band) => (
                 <option key={band.id} value={band.id}>
-                  {band.label}
+                  {tx(band.label)}
                 </option>
               ))}
             </select>
           </div>
           {kind === "SEEKING" ? (
             <div className="sm:col-span-2">
-              <label className={labelCls}>Role needed</label>
+              <label className={labelCls}>{tx("Role needed")}</label>
               <select name="roleNeeded" className={field} defaultValue="GENERAL_CONTRACTOR">
                 {ROLES.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {roleShort(role.label)}
+                    {tx(roleShort(role.label))}
                   </option>
                 ))}
               </select>
             </div>
           ) : null}
           <div>
-            <label className={labelCls}>Expires</label>
+            <label className={labelCls}>{tx("Expires")}</label>
             <input name="expiresAt" type="date" className={field} />
           </div>
           {kind === "SEEKING" ? (
             <div>
-              <label className={labelCls}>Timing</label>
-              <input name="deadline" className={field} placeholder="Bids in November" />
+              <label className={labelCls}>{tx("Timing")}</label>
+              <input name="deadline" className={field} placeholder={tx("Bids in November")} />
             </div>
           ) : null}
         </div>
       ) : null}
       {structured && choices.length > 0 ? (
         <div className="mt-3 rounded border border-line bg-cream p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Seeking and Raising rules</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Seeking and Raising rules")}</p>
           <div className="mt-2 max-h-64 overflow-y-auto text-sm" dangerouslySetInnerHTML={{ __html: rulesHtml }} />
           <label className="mt-3 flex items-start gap-2 text-sm text-ink">
             <input type="checkbox" name="rulesAck" value="yes" required className="mt-1" />
-            <span>I have read these rules. This post does not offer securities or promise a return. Membership dues are month to month, and this post does not charge them.</span>
+            <span>{tx("I have read these rules. This post does not offer securities or promise a return. Membership dues are month to month, and this post does not charge them.")}</span>
           </label>
         </div>
       ) : null}

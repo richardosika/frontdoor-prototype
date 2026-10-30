@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { blockMember, sendMessage, unblockMember } from "@/actions/social";
@@ -23,6 +24,7 @@ export default async function ThreadPage({
   params: Promise<{ conversationId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const { conversationId } = await params;
   const query = await searchParams;
@@ -71,7 +73,7 @@ export default async function ThreadPage({
               {other.name} <TierBadge tier={other.tier} />
             </h1>
             <p className="truncate text-xs text-mut">
-              {roleLabel(other.role)} · {other.location}
+              {tx(roleLabel(other.role))} · {other.location}
             </p>
           </div>
           <div className="ml-auto flex gap-2">
@@ -80,7 +82,7 @@ export default async function ThreadPage({
                 <input type="hidden" name="userId" value={other.id} />
                 <input type="hidden" name="conversationId" value={conversation.id} />
                 <button className={btn} type="submit">
-                  Unblock
+                  {tx("Unblock")}
                 </button>
               </form>
             ) : (
@@ -88,7 +90,7 @@ export default async function ThreadPage({
                 <input type="hidden" name="userId" value={other.id} />
                 <input type="hidden" name="conversationId" value={conversation.id} />
                 <button className={btn} type="submit">
-                  Block
+                  {tx("Block")}
                 </button>
               </form>
             )}
@@ -121,14 +123,14 @@ export default async function ThreadPage({
         </div>
         <div className="border-t border-line bg-paper p-3">
           {messagingClosed ? (
-            <p className="mb-3 text-sm text-mut">Messaging is closed between these members.</p>
+            <p className="mb-3 text-sm text-mut">{tx("Messaging is closed between these members.")}</p>
           ) : (
             <>
               <form action={sendMessage} className="mb-3 flex gap-2">
                 <input type="hidden" name="conversationId" value={conversation.id} />
                 <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
                 <button className={btn} type="submit">
-                  Send
+                  {tx("Send")}
                 </button>
               </form>
               <div className="mb-3">

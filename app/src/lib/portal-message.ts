@@ -1,3 +1,4 @@
+import { isLocale } from "@/lib/i18n/messages";
 import { orderedPair } from "@/lib/domain";
 import { sendEmail } from "@/lib/email";
 import { canMessage, portalMessageEmail, RATE_LIMITS, withinRateLimit, type MessageKind } from "@/lib/messaging";
@@ -41,7 +42,7 @@ export async function deliverPortalMessage(input: {
 
   const recipient = await prisma.user.findUnique({
     where: { id: input.toId },
-    select: { id: true, email: true, status: true, notifyMessages: true, notifyIntros: true, notifyDeals: true },
+    select: { id: true, email: true, status: true, locale: true, notifyMessages: true, notifyIntros: true, notifyDeals: true },
   });
   if (!recipient || recipient.status !== "ACTIVE") return { ok: false, reason: "That member is not available." };
 
@@ -72,7 +73,7 @@ export async function deliverPortalMessage(input: {
         ? recipient.notifyDeals
         : recipient.notifyMessages;
   if (emailOn) {
-    const mail = portalMessageEmail(`${await appBaseUrl()}/messages`);
+    const mail = portalMessageEmail(`${await appBaseUrl()}/messages`, isLocale(recipient.locale) ? recipient.locale : "en");
     await sendEmail({ to: recipient.email, subject: mail.subject, text: mail.text });
   }
   return { ok: true, conversationId: conversation.id };
@@ -85,8 +86,8 @@ export async function countRecentKind(senderId: string, kind: MessageKind): Prom
 }
 
 export async function sendPortalNotice(userId: string) {
-  const recipient = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, status: true } });
+  const recipient = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, status: true, locale: true } });
   if (!recipient || recipient.status !== "ACTIVE") return;
-  const mail = portalMessageEmail(`${await appBaseUrl()}/messages`);
+  const mail = portalMessageEmail(`${await appBaseUrl()}/messages`, isLocale(recipient.locale) ? recipient.locale : "en");
   await sendEmail({ to: recipient.email, subject: mail.subject, text: mail.text });
 }

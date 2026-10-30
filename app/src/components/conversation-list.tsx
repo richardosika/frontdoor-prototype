@@ -1,20 +1,22 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import type { listConversations } from "@/lib/conversations";
 
-export function ConversationList({
+export async function ConversationList({
   conversations,
   activeId,
 }: {
   conversations: Awaited<ReturnType<typeof listConversations>>;
   activeId: string | null;
 }) {
+  const tx = await serverTx();
   return (
     <section className="lg:min-h-dvh lg:border-r lg:border-line lg:bg-cream">
       <h1 className="mb-0 hidden border-b-[3px] border-double border-brass px-5 py-6 font-serif text-[26px] font-normal uppercase tracking-[0.14em] lg:block">
-        Messages
+        {tx("Messages")}
       </h1>
       {conversations.length === 0 ? (
-        <p className="px-5 py-8 text-sm text-mut">No messages yet. Introductions, connections, access requests, vouches, and deal questions land here.</p>
+        <p className="px-5 py-8 text-sm text-mut">{tx("No messages yet. Introductions, connections, access requests, vouches, and deal questions land here.")}</p>
       ) : null}
       <ul>
         {conversations.map((conversation) => (

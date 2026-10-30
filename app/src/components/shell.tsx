@@ -8,8 +8,10 @@ import { AdminMark } from "@/components/admin-mark";
 import { Avatar } from "@/components/avatar";
 import { DecisionDialogHost } from "@/components/decision-dialog-host";
 import { Logo } from "@/components/logo";
+import { LocaleProvider } from "@/components/locale-context";
 import { tierLabel } from "@/lib/format";
 import { setLanguage } from "@/actions/language";
+import { phrase } from "@/lib/i18n/phrases";
 import { LOCALES, translator, type Locale, type MessageKey } from "@/lib/i18n/messages";
 
 const TABS: { href: string; label: string; key: MessageKey; icon: string; test: string }[] = [
@@ -68,7 +70,7 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const t = translator(locale);
-  const memberLine = t("membership.member", { tier: tierLabel(user.tier) });
+  const memberLine = t("membership.member", { tier: phrase(locale, tierLabel(user.tier)) });
   const [menuOpen, setMenuOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
   const memberRef = useRef<HTMLDivElement>(null);
@@ -89,6 +91,9 @@ export function Shell({
     };
   }, [memberOpen]);
   useEffect(() => setMemberOpen(false), [pathname]);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <>
@@ -233,7 +238,7 @@ export function Shell({
             </button>
           </header>
         ) : null}
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper px-1 pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom,0px))] md:hidden">

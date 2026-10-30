@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { addDealDocument, postDealQuestion, removeParticipant } from "@/actions/deals";
@@ -21,6 +22,7 @@ export default async function DealRoomPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const { id } = await params;
   const query = await searchParams;
@@ -46,14 +48,14 @@ export default async function DealRoomPage({
 
   return (
     <div>
-      <MobileTitle href={`/deals/${deal.id}`} label="Deal" title="Room" />
+      <MobileTitle href={`/deals/${deal.id}`} label="Deal" title={tx("Room")} />
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <Link href={`/deals/${deal.id}`} className="hidden min-h-11 items-center text-sm text-mut md:inline-flex">
           ‹ {deal.title}
         </Link>
         <Banner error={query.error} notice={query.notice} />
         <div className={`mt-3 p-5 ${card}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Deal room</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Deal room")}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
           <p className="mt-2 text-sm text-ink">
             Approved members and {deal.sponsor.name} can list documents, ask questions, and see what changed. {BRAND.name} stores the file name, type, and size. It does not keep the file and does not process a payment.
@@ -64,7 +66,7 @@ export default async function DealRoomPage({
                 <Link href={`/members/${person.id}`} className="min-h-11">
                   <span className="font-semibold">{person.name}</span>
                   <span className="block text-xs text-mut">
-                    {roleShort(roleLabel(person.role))} · {person.org}
+                    {tx(roleShort(roleLabel(person.role)))} · {person.org}
                     {person.id === deal.sponsorId ? " · Sponsor" : ""}
                   </span>
                 </Link>
@@ -75,7 +77,7 @@ export default async function DealRoomPage({
                       <input type="hidden" name="dealId" value={deal.id} />
                       <input type="hidden" name="requesterId" value={person.id} />
                       <button className={btnOutline} type="submit">
-                        Remove
+                        {tx("Remove")}
                       </button>
                     </form>
                   ) : null}
@@ -86,9 +88,9 @@ export default async function DealRoomPage({
         </div>
 
         <section className={`mt-4 p-5 ${card}`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Documents</h2>
-          <p className="mt-1 text-xs text-mut">PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.</p>
-          {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">No documents listed yet.</p> : null}
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Documents")}</h2>
+          <p className="mt-1 text-xs text-mut">{tx("PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.")}</p>
+          {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">{tx("No documents listed yet.")}</p> : null}
           <ul className="mt-3 divide-y divide-line">
             {deal.documents.map((document) => (
               <li key={document.id} className="py-3">
@@ -103,26 +105,26 @@ export default async function DealRoomPage({
           <form action={addDealDocument} className="mt-3 grid gap-2">
             <input type="hidden" name="dealId" value={deal.id} />
             <div>
-              <label className={labelCls}>Title</label>
-              <input name="title" className={field} placeholder="Site sketch" required />
+              <label className={labelCls}>{tx("Title")}</label>
+              <input name="title" className={field} placeholder={tx("Site sketch")} required />
             </div>
             <div>
-              <label className={labelCls}>File</label>
+              <label className={labelCls}>{tx("File")}</label>
               <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" className="text-sm" required />
             </div>
             <div>
-              <label className={labelCls}>Note</label>
-              <input name="note" className={field} placeholder="What this file is for" />
+              <label className={labelCls}>{tx("Note")}</label>
+              <input name="note" className={field} placeholder={tx("What this file is for")} />
             </div>
             <button className={btnOutline} type="submit">
-              List document
+              {tx("List document")}
             </button>
           </form>
         </section>
 
         <section className={`mt-4 p-5 ${card}`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Questions</h2>
-          {questions.length === 0 ? <p className="mt-3 text-sm text-mut">No questions yet.</p> : null}
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Questions")}</h2>
+          {questions.length === 0 ? <p className="mt-3 text-sm text-mut">{tx("No questions yet.")}</p> : null}
           <ul className="mt-3 space-y-4">
             {questions.map((question) => (
               <li key={question.id} className="rounded border border-line bg-cream px-3 py-3">
@@ -144,9 +146,9 @@ export default async function DealRoomPage({
                 <form action={postDealQuestion} className="mt-2 flex gap-2">
                   <input type="hidden" name="dealId" value={deal.id} />
                   <input type="hidden" name="parentId" value={question.id} />
-                  <input name="body" className={field} placeholder="Reply" required />
+                  <input name="body" className={field} placeholder={tx("Reply")} required />
                   <button className={btn} type="submit">
-                    Reply
+                    {tx("Reply")}
                   </button>
                 </form>
               </li>
@@ -154,18 +156,18 @@ export default async function DealRoomPage({
           </ul>
           <form action={postDealQuestion} className="mt-4 space-y-2">
             <input type="hidden" name="dealId" value={deal.id} />
-            <label className={labelCls}>Ask the room</label>
-            <textarea name="body" className={field} rows={3} placeholder="A question for the sponsor or the other approved members" required />
+            <label className={labelCls}>{tx("Ask the room")}</label>
+            <textarea name="body" className={field} rows={3} placeholder={tx("A question for the sponsor or the other approved members")} required />
             <button className={btn} type="submit">
-              Post question
+              {tx("Post question")}
             </button>
             <ModeratorNotice />
           </form>
         </section>
 
         <section className={`mt-4 p-5 ${card}`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Activity</h2>
-          {deal.events.length === 0 ? <p className="mt-3 text-sm text-mut">Nothing recorded yet.</p> : null}
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Activity")}</h2>
+          {deal.events.length === 0 ? <p className="mt-3 text-sm text-mut">{tx("Nothing recorded yet.")}</p> : null}
           <ul className="mt-3 divide-y divide-line">
             {deal.events.map((event) => (
               <li key={event.id} className="py-2 text-sm text-ink">

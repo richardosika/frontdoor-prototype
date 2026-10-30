@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { introduceMember, respondIntroduction } from "@/actions/social";
@@ -22,6 +23,7 @@ export default async function NetworkPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const params = await searchParams;
   const settled = settleProjectQuery("/network", params, "network");
@@ -95,31 +97,31 @@ export default async function NetworkPage({
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
-      <PageHeader title="Network" />
-      <p className="mt-1 text-sm text-ink">Email and phone stay off this directory. Ask for an introduction. The conversation stays inside Private Floor.</p>
+      <PageHeader title={tx("Network")} />
+      <p className="mt-1 text-sm text-ink">{tx("Email and phone stay off this directory. Ask for an introduction. The conversation stays inside Private Floor.")}</p>
       <div className="mt-4">
         <Banner error={error} notice={notice} />
       </div>
       {incoming.length ? (
         <section className="mb-4 rounded border border-brass bg-brass-soft p-4">
-          <h2 className="text-sm font-semibold">Introduction requests</h2>
+          <h2 className="text-sm font-semibold">{tx("Introduction requests")}</h2>
           <ul className="mt-2 space-y-3">
             {incoming.map((item) => (
               <li key={item.id} className="text-sm">
                 <span className="font-semibold">{item.from.name}</span>
-                <span className="text-mut"> · {roleShort(roleLabel(item.from.role))}</span>
+                <span className="text-mut"> · {tx(roleShort(roleLabel(item.from.role)))}</span>
                 <p className="mt-1 text-ink">{item.note}</p>
                 <span className="mt-2 flex gap-2">
                   <form action={respondIntroduction}>
                     <input type="hidden" name="introductionId" value={item.id} />
                     <button className={btnOutline} name="decision" value="DECLINED" type="submit">
-                      Decline
+                      {tx("Decline")}
                     </button>
                   </form>
                   <form action={respondIntroduction}>
                     <input type="hidden" name="introductionId" value={item.id} />
                     <button className={btn} name="decision" value="ACCEPTED" type="submit">
-                      Accept
+                      {tx("Accept")}
                     </button>
                   </form>
                 </span>
@@ -131,11 +133,11 @@ export default async function NetworkPage({
       <ProjectFilterBar path="/network" filters={filters} saved={saved} />
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         <RoleChip href={projectQuery("/network", { ...filters, role: undefined })} on={!role}>
-          All
+          {tx("All")}
         </RoleChip>
         {ROLES.map((item) => (
           <RoleChip key={item.id} href={projectQuery("/network", { ...filters, role: item.id })} on={role === item.id}>
-            {roleShort(item.label)}
+            {tx(roleShort(item.label))}
           </RoleChip>
         ))}
       </div>
@@ -152,7 +154,7 @@ export default async function NetworkPage({
                 <span>
                   <span className="block text-sm font-semibold">{member.name}</span>
                   <span className="block text-[11px] text-mut">
-                    {roleShort(roleLabel(member.role))} · {member.org}
+                    {tx(roleShort(roleLabel(member.role)))} · {member.org}
                   </span>
                   <span className="block text-[11px] text-mut">{member.location}</span>
                 </span>
@@ -164,23 +166,23 @@ export default async function NetworkPage({
               <div className="mt-3">
                 {intro === "ACCEPTED" ? (
                   <Link href={`/members/${member.id}`} className={`${btnOutline} w-full`}>
-                    Open messages
+                    {tx("Open messages")}
                   </Link>
                 ) : intro === "PENDING" ? (
                   <p className="rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
-                    Introduction requested. It stays inside Private Floor until they accept.
+                    {tx("Introduction requested. It stays inside Private Floor until they accept.")}
                   </p>
                 ) : intro === "INCOMING" ? (
                   <Link href={`/members/${member.id}`} className={`${btn} w-full`}>
-                    Respond
+                    {tx("Respond")}
                   </Link>
                 ) : (
                   <form action={introduceMember} className="grid gap-2">
                     <input type="hidden" name="userId" value={member.id} />
                     <input type="hidden" name="back" value="/network" />
-                    <textarea name="note" className={field} rows={2} placeholder="Short note" required />
+                    <textarea name="note" className={field} rows={2} placeholder={tx("Short note")} required />
                     <button className={btn} type="submit">
-                      Request introduction
+                      {tx("Request introduction")}
                     </button>
                   </form>
                 )}
@@ -189,7 +191,7 @@ export default async function NetworkPage({
           );
         })}
       </div>
-      {members.length === 0 ? <p className="mt-6 text-sm text-mut">No members match those filters.</p> : null}
+      {members.length === 0 ? <p className="mt-6 text-sm text-mut">{tx("No members match those filters.")}</p> : null}
     </div>
   );
 }

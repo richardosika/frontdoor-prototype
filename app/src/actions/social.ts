@@ -1,4 +1,6 @@
 "use server";
+import { phrase } from "@/lib/i18n/phrases";
+import { isLocale } from "@/lib/i18n/messages";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -102,7 +104,7 @@ export async function introduceMember(formData: FormData) {
   if (note.length < 2) redirect(`${back}?error=${encodeURIComponent("Write a short note with the introduction.")}`);
   const other = await prisma.user.findUnique({
     where: { id: otherId },
-    select: { id: true, status: true, paymentStatus: true, email: true, notifyIntros: true, name: true },
+    select: { id: true, status: true, paymentStatus: true, email: true, notifyIntros: true, name: true, locale: true },
   });
   if (!other || !eligibleForDirectory(other) || other.id === user.id) redirect("/network");
   if (await isBlocked(user.id, otherId)) {
@@ -133,10 +135,11 @@ export async function introduceMember(formData: FormData) {
   });
   if (other.notifyIntros) {
     const base = await appBaseUrl();
+    const locale = isLocale(other.locale) ? other.locale : "en";
     await sendEmail({
       to: other.email,
-      subject: "You have a new message on Private Floor",
-      text: `You have an introduction request on Private Floor.\n\nOpen messages\n${base}/network\n`,
+      subject: phrase(locale, "You have a new message on Private Floor"),
+      text: `${phrase(locale, "You have an introduction request on Private Floor.")}\n\n${phrase(locale, "Open messages")}\n${base}/network\n`,
     });
   }
   revalidatePath("/network");

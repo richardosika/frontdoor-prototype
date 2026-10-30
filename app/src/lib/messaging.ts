@@ -1,3 +1,5 @@
+import { phrase } from "@/lib/i18n/phrases";
+import type { Locale } from "@/lib/i18n/messages";
 export const MESSAGE_KINDS = ["TEXT", "INTRO", "CONNECTION", "ACCESS", "VOUCH", "DEAL"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -88,10 +90,10 @@ export function vouchDelivery(input: { counterpartyIsMember: boolean }): { chann
   return { channel: "guest-link", sendsEmail: false };
 }
 
-export function portalMessageEmail(inboxUrl: string): { subject: string; text: string } {
+export function portalMessageEmail(inboxUrl: string, locale: Locale = "en"): { subject: string; text: string } {
   return {
-    subject: PORTAL_MESSAGE_SUBJECT,
-    text: `You have a new message on Private Floor.\n\nOpen messages\n${inboxUrl}\n`,
+    subject: phrase(locale, PORTAL_MESSAGE_SUBJECT),
+    text: `${phrase(locale, "You have a new message on Private Floor.")}\n\n${phrase(locale, "Open messages")}\n${inboxUrl}\n`,
   };
 }
 

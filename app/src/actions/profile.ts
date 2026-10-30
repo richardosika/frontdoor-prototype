@@ -1,4 +1,6 @@
 "use server";
+import { phrase } from "@/lib/i18n/phrases";
+import { isLocale } from "@/lib/i18n/messages";
 import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
@@ -101,8 +103,8 @@ export async function requestAccountDeletion(formData: FormData) {
   const { sendEmail } = await import("@/lib/email");
   await sendEmail({
     to: user.email,
-    subject: "Account deletion requested",
-    text: "A Private Floor administrator will review this deletion request. No contact details were sent to other members.",
+    subject: phrase(isLocale(user.locale) ? user.locale : "en", "Account deletion requested"),
+    text: phrase(isLocale(user.locale) ? user.locale : "en", "A Private Floor administrator will review this deletion request. No contact details were sent to other members."),
   });
   revalidatePath("/settings");
   redirect("/settings?notice=Deletion+request+sent+to+a+Private+Floor+administrator");

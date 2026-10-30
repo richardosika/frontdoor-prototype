@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Banner } from "@/components/banner";
@@ -28,6 +29,7 @@ export default async function DealsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const params = await searchParams;
   const settled = settleProjectQuery("/deals", params, "deals");
@@ -75,10 +77,10 @@ export default async function DealsPage({
   return (
     <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
       <PageHeader
-        title="Deals"
+        title={tx("Deals")}
         action={
           <Link href="/feed" className="text-sm font-semibold text-brass">
-            Post a deal
+            {tx("Post a deal")}
           </Link>
         }
       />
@@ -86,11 +88,11 @@ export default async function DealsPage({
       <ProjectFilterBar path="/deals" filters={filters} saved={saved} />
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         <FilterChip href={projectQuery("/deals", { ...filters, role: undefined })} on={!filters.role}>
-          All roles
+          {tx("All roles")}
         </FilterChip>
         {ROLES.map((item) => (
           <FilterChip key={item.id} href={projectQuery("/deals", { ...filters, role: item.id })} on={filters.role === item.id}>
-            {roleShort(item.label)}
+            {tx(roleShort(item.label))}
           </FilterChip>
         ))}
       </div>
@@ -100,10 +102,10 @@ export default async function DealsPage({
       </p>
       {filtered.length === 0 ? (
         <div className="py-10 text-center text-sm text-mut">
-          No deals match these filters.
+          {tx("No deals match these filters.")}
           <div>
             <Link href="/deals" className="mt-3 inline-block font-semibold text-forest">
-              Clear filters
+              {tx("Clear filters")}
             </Link>
           </div>
         </div>
@@ -115,7 +117,7 @@ export default async function DealsPage({
             return (
               <Link key={deal.id} href={`/deals/${deal.id}`} className={`flex flex-col p-4 transition hover:-translate-y-0.5 hover:shadow-card ${dealCard}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <KindTag kind={deal.kind} roleLabel={roleShort(roleLabel(deal.roleNeeded))} />
+                  <KindTag kind={deal.kind} roleLabel={tx(roleShort(roleLabel(deal.roleNeeded)))} />
                   <span className="text-xs font-semibold text-brass">{deal.match}% match</span>
                 </div>
                 <h2 className="mt-2 font-serif text-[17px] font-normal leading-snug">{deal.title}</h2>

@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { cancelMembership, openBillingPortal } from "@/actions/payments";
 import { changePassword, requestAccountDeletion, saveNotificationPrefs } from "@/actions/profile";
@@ -17,105 +18,106 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
+  const tx = await serverTx();
   const user = await requireUser();
   const params = await searchParams;
   return (
     <div className="mx-auto max-w-3xl px-4 pb-6 pt-3 md:pt-6 lg:px-8">
-      <PageHeader title="Settings" />
+      <PageHeader title={tx("Settings")} />
       <div className="mt-3">
         <Banner error={params.error} notice={params.notice} />
       </div>
       <section className={`${card} mt-4 p-4 text-sm`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Billing</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Billing")}</h2>
         {user.paymentStatus === "NOT_REQUIRED" ? null : (
           <div className="mt-2 space-y-1 text-ink">
             <Receipt user={user} />
             {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}
             {user.refundNote ? <p>Refund note: {user.refundNote}</p> : null}
-            <p>No card on file. Private Floor does not store a card number.</p>
+            <p>{tx("No card on file. Private Floor does not store a card number.")}</p>
             <DuesLanguages />
             {user.cancelRequestedAt ? (
               <p>Cancellation recorded {formatAuditTime(user.cancelRequestedAt)}. No further charge is scheduled.</p>
             ) : (
               <form action={cancelMembership} className="pt-2">
                 <button className={btnOutline} type="submit">
-                  Cancel anytime
+                  {tx("Cancel anytime")}
                 </button>
-                <p className="mt-2 text-ink">Month to month. No long-term contract. Cancellation stops the next charge.</p>
+                <p className="mt-2 text-ink">{tx("Month to month. No long-term contract. Cancellation stops the next charge.")}</p>
               </form>
             )}
           </div>
         )}
         <p className="mt-3">
           <Link href="/legal/membership-dues" className="underline decoration-brass">
-            Membership Dues and Refund Terms
+            {tx("Membership Dues and Refund Terms")}
           </Link>
         </p>
         {user.stripeCustomerId && process.env.STRIPE_SECRET_KEY ? (
           <form action={openBillingPortal} className="mt-3">
             <button className={btnOutline} type="submit">
-              Open billing portal
+              {tx("Open billing portal")}
             </button>
           </form>
         ) : (
-          <p className="mt-3 text-mut">A Stripe billing portal link appears after a Stripe test checkout. This test does not store a card.</p>
+          <p className="mt-3 text-mut">{tx("A Stripe billing portal link appears after a Stripe test checkout. This test does not store a card.")}</p>
         )}
       </section>
       <section className={`${card} mt-4 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Notifications</h2>
-        <p className="mt-1 text-sm text-ink">The bell always records an alert. Email copies go only to the test recipient, and only when the box is on.</p>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Notifications")}</h2>
+        <p className="mt-1 text-sm text-ink">{tx("The bell always records an alert. Email copies go only to the test recipient, and only when the box is on.")}</p>
         <form action={saveNotificationPrefs} className="mt-3 space-y-2 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" name="notifyMessages" defaultChecked={user.notifyMessages} />
-            Messages
+            {tx("Messages")}
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="notifyIntros" defaultChecked={user.notifyIntros} />
-            Introductions
+            {tx("Introductions")}
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="notifyDeals" defaultChecked={user.notifyDeals} />
-            Deals and deal rooms
+            {tx("Deals and deal rooms")}
           </label>
           <button className={btn} type="submit">
-            Save notification settings
+            {tx("Save notification settings")}
           </button>
         </form>
       </section>
       <section className={`${card} mt-4 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Password</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Password")}</h2>
         <form action={changePassword} className="mt-3 grid gap-2">
           <label>
-            <span className={labelCls}>Current password</span>
+            <span className={labelCls}>{tx("Current password")}</span>
             <input name="current" type="password" className={field} required autoComplete="current-password" />
           </label>
           <label>
-            <span className={labelCls}>New password</span>
+            <span className={labelCls}>{tx("New password")}</span>
             <input name="next" type="password" className={field} required minLength={8} maxLength={72} autoComplete="new-password" />
           </label>
           <button className={btn} type="submit">
-            Change password
+            {tx("Change password")}
           </button>
         </form>
       </section>
       <section className={`${card} mt-4 p-4 text-sm`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Your data</h2>
-        <p className="mt-2 text-ink">The export is your profile, posts, and messages you sent. It does not include another member’s email or phone.</p>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Your data")}</h2>
+        <p className="mt-2 text-ink">{tx("The export is your profile, posts, and messages you sent. It does not include another member’s email or phone.")}</p>
         <Link href="/api/me/export" className={`${btnOutline} mt-3`}>
-          Export my data
+          {tx("Export my data")}
         </Link>
       </section>
       <section className={`${card} mt-4 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Delete this account</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Delete this account")}</h2>
         <p className="mt-2 text-sm text-ink">
           {user.deletionRequestedAt
             ? "A Private Floor administrator already has this request."
             : "This asks a Private Floor administrator to remove the account. It does not delete it immediately."}
         </p>
         <form action={requestAccountDeletion} className="mt-3 grid gap-2">
-          <textarea name="note" className={field} rows={2} placeholder="Optional note" />
+          <textarea name="note" className={field} rows={2} placeholder={tx("Optional note")} />
           <button className={btnOutline} type="submit">
-            Request account deletion
+            {tx("Request account deletion")}
           </button>
         </form>
       </section>
@@ -123,7 +125,7 @@ export default async function SettingsPage({
   );
 }
 
-function Receipt({
+async function Receipt({
   user,
 }: {
   user: {
@@ -135,13 +137,14 @@ function Receipt({
     renewalAt: Date | null;
   };
 }) {
+  const tx = await serverTx();
   const monthly = currentMonthlyCents(user.role, user.duesCents);
   const first = formatMoney(firstMonthCents(monthly));
   const full = formatMoney(monthly);
   return (
     <>
       <p>
-        <b>Membership dues.</b> {paymentStatusLabel(user.paymentStatus)}. First month {first}. Full price {full} per month. {DUES_BILLING_NOTE}
+        <b>{tx("Membership dues.")}</b> {paymentStatusLabel(user.paymentStatus)}. First month {first}. Full price {full} per month. {DUES_BILLING_NOTE}
       </p>
       <p>{receiptLine(user.paymentMode)}</p>
       <p>Paid {user.paidAt ? formatAuditTime(user.paidAt) : "—"}.</p>

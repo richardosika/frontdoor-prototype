@@ -1,3 +1,4 @@
+import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { TierBadge, VerifiedMark } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
@@ -30,7 +31,7 @@ type Project = {
   verification: PublicVerification;
 };
 
-export function ProfileView({
+export async function ProfileView({
   member,
   projects,
   isSelf,
@@ -76,6 +77,7 @@ export function ProfileView({
   blockedByViewer: boolean;
   blockedByThem: boolean;
 }) {
+  const tx = await serverTx();
   const messagingClosed = blockedByViewer || blockedByThem;
 
   return (
@@ -98,14 +100,14 @@ export function ProfileView({
             <form action={openConversation}>
               <input type="hidden" name="userId" value={member.id} />
               <button className={btn} type="submit">
-                Open messages
+                {tx("Open messages")}
               </button>
             </form>
           ) : intro === "PENDING" ? (
-            <span className={`${btn} pointer-events-none bg-mut`}>Introduction requested</span>
+            <span className={`${btn} pointer-events-none bg-mut`}>{tx("Introduction requested")}</span>
           ) : intro === "INCOMING" ? (
             <Link href="/network" className={btn}>
-              Respond
+              {tx("Respond")}
             </Link>
           ) : null}
         </div>
@@ -122,7 +124,7 @@ export function ProfileView({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-sm bg-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-paper">
-            {roleShort(roleLabel(member.role))}
+            {tx(roleShort(roleLabel(member.role)))}
           </span>
           <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
             Member since {member.createdAt.getFullYear()}
@@ -132,43 +134,43 @@ export function ProfileView({
         <dl className="mt-3 grid gap-2 text-sm text-ink">
           {member.markets ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Markets</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Markets")}</dt>
               <dd>{member.markets}</dd>
             </div>
           ) : null}
           {member.dealTypes ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Deal types</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Deal types")}</dt>
               <dd>{member.dealTypes}</dd>
             </div>
           ) : null}
           {member.assetClasses ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Asset classes</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Asset classes")}</dt>
               <dd>{member.assetClasses}</dd>
             </div>
           ) : null}
           {member.checkSize ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Check or deal size</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Check or deal size")}</dt>
               <dd>{member.checkSize}</dd>
             </div>
           ) : null}
           {member.lookingFor ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Looking for</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Looking for")}</dt>
               <dd>{member.lookingFor}</dd>
             </div>
           ) : null}
           {member.offering ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Offering</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Offering")}</dt>
               <dd>{member.offering}</dd>
             </div>
           ) : null}
           {member.website ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">Website</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Website")}</dt>
               <dd>{member.website}</dd>
             </div>
           ) : null}
@@ -176,12 +178,12 @@ export function ProfileView({
         {isSelf ? <ProfileEditor member={member} /> : null}
         {isSelf ? null : messagingClosed ? (
           <div className="mt-4 rounded border border-line bg-cream px-3 py-3 text-sm text-ink">
-            Messaging is closed between these members.
+            {tx("Messaging is closed between these members.")}
             {blockedByViewer ? (
               <form action={unblockMember} className="mt-2">
                 <input type="hidden" name="userId" value={member.id} />
                 <button className={btnOutline} type="submit">
-                  Unblock
+                  {tx("Unblock")}
                 </button>
               </form>
             ) : null}
@@ -193,31 +195,31 @@ export function ProfileView({
                 <form action={respondIntroduction}>
                   <input type="hidden" name="introductionId" value={introductionId} />
                   <button className={btnOutline} name="decision" value="DECLINED" type="submit">
-                    Decline introduction
+                    {tx("Decline introduction")}
                   </button>
                 </form>
                 <form action={respondIntroduction}>
                   <input type="hidden" name="introductionId" value={introductionId} />
                   <button className={btn} name="decision" value="ACCEPTED" type="submit">
-                    Accept introduction
+                    {tx("Accept introduction")}
                   </button>
                 </form>
               </div>
             ) : intro === "PENDING" ? (
-              <p className="text-sm text-ink">Your introduction is waiting. Messaging opens after they accept.</p>
+              <p className="text-sm text-ink">{tx("Your introduction is waiting. Messaging opens after they accept.")}</p>
             ) : intro === "ACCEPTED" || connection === "ACCEPTED" ? (
               <form action={openConversation}>
                 <input type="hidden" name="userId" value={member.id} />
                 <button className={btn} type="submit">
-                  Open messages
+                  {tx("Open messages")}
                 </button>
               </form>
             ) : (
               <form action={introduceMember} className="grid gap-2">
                 <input type="hidden" name="userId" value={member.id} />
-                <textarea name="note" className={field} rows={2} placeholder="A short note. It stays inside Private Floor." required />
+                <textarea name="note" className={field} rows={2} placeholder={tx("A short note. It stays inside Private Floor.")} required />
                 <button className={btn} type="submit">
-                  Request introduction
+                  {tx("Request introduction")}
                 </button>
               </form>
             )}
@@ -225,7 +227,7 @@ export function ProfileView({
               <form action={blockMember}>
                 <input type="hidden" name="userId" value={member.id} />
                 <button className={btnOutline} type="submit">
-                  Block
+                  {tx("Block")}
                 </button>
               </form>
             </div>
@@ -235,9 +237,9 @@ export function ProfileView({
         <div className="mt-4 grid grid-cols-3 overflow-hidden border-y border-brass-line">
           <Stat value={String(projectCount)} label="Projects" />
           <Stat value={String(vouchCount)} label="Vouches" />
-          <Stat value={tierLabel(member.tier)} label="Membership" />
+          <Stat value={tx(tierLabel(member.tier))} label={tx("Membership")} />
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Membership</h2>
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Membership")}</h2>
         <p className="mb-2 text-xs leading-relaxed text-ink">
           Status is Approved. {VERIFIED_EXPLANATION} The brass badge is separate from membership.
         </p>
@@ -245,16 +247,16 @@ export function ProfileView({
           <TierBadge tier={member.tier} />
         </div>
         <div className="mt-3 rounded border border-line bg-cream px-3 py-2 text-[12px] leading-relaxed text-ink">
-          <b>How verification works</b>
+          <b>{tx("How verification works")}</b>
           <ol className="mt-1 list-decimal pl-4">
-            <li>Request to join. A referral code from a member is optional.</li>
-            <li>A business card is optional. A Private Floor administrator matches it to public records.</li>
-            <li>A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.</li>
-            <li>A project can request a confirmation only after that project file is Verified. Accepting it does not change membership.</li>
+            <li>{tx("Request to join. A referral code from a member is optional.")}</li>
+            <li>{tx("A business card is optional. A Private Floor administrator matches it to public records.")}</li>
+            <li>{tx("A Private Floor administrator verifies the file. Naming someone who can speak for you is optional.")}</li>
+            <li>{tx("A project can request a confirmation only after that project file is Verified. Accepting it does not change membership.")}</li>
           </ol>
         </div>
-        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Track record</h2>
-        {projects.length === 0 ? <p className="text-sm text-mut">No projects listed yet.</p> : null}
+        <h2 className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Track record")}</h2>
+        {projects.length === 0 ? <p className="text-sm text-mut">{tx("No projects listed yet.")}</p> : null}
         <ul>
           {projects.map((project) => {
             const confirmed = project.confirmations.filter((item) => item.reviewStatus === "APPROVED").length;
@@ -288,20 +290,20 @@ export function ProfileView({
                     : null}
                   {isSelf && !canOpenProjectToCounterparties(project.verification) ? (
                     <p className="mt-2 text-xs leading-relaxed text-ink">
-                      Verification in progress. The vouch form stays hidden until an admin marks this project Verified. Counterparties cannot confirm it before then.
+                      {tx("Verification in progress. The vouch form stays hidden until an admin marks this project Verified. Counterparties cannot confirm it before then.")}
                     </p>
                   ) : null}
                   {isSelf && canOpenProjectToCounterparties(project.verification) ? (
                     <form action={requestConfirmation} className="mt-2 grid gap-2">
                       <input type="hidden" name="projectId" value={project.id} />
                       <p className="text-xs leading-relaxed text-mut">
-                        If this person is a member, the request goes to their inbox. Otherwise a portal link appears here. Private Floor does not email it.
+                        {tx("If this person is a member, the request goes to their inbox. Otherwise a portal link appears here. Private Floor does not email it.")}
                       </p>
                       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                        <input name="counterpartyName" placeholder="Counterparty name" className={field} required />
-                        <input name="counterpartyEmail" type="email" placeholder="Counterparty email, used only to match a member" className={field} required />
+                        <input name="counterpartyName" placeholder={tx("Counterparty name")} className={field} required />
+                        <input name="counterpartyEmail" type="email" placeholder={tx("Counterparty email, used only to match a member")} className={field} required />
                         <button className={btnOutline} type="submit">
-                          Request vouch
+                          {tx("Request vouch")}
                         </button>
                       </div>
                     </form>
@@ -314,15 +316,15 @@ export function ProfileView({
         </ul>
         {isSelf ? (
           <form action={addProject} className="mt-4 grid gap-2 rounded border border-line p-3 sm:grid-cols-2">
-            <p className={`${labelCls} sm:col-span-2`}>Add a project</p>
-            <input name="name" placeholder="Project name" className={field} required />
-            <input name="asset" placeholder="Asset class" className={field} required />
-            <input name="location" placeholder="City, ST" className={field} required />
-            <input name="year" type="number" placeholder="Year" className={field} required />
+            <p className={`${labelCls} sm:col-span-2`}>{tx("Add a project")}</p>
+            <input name="name" placeholder={tx("Project name")} className={field} required />
+            <input name="asset" placeholder={tx("Asset class")} className={field} required />
+            <input name="location" placeholder={tx("City, ST")} className={field} required />
+            <input name="year" type="number" placeholder={tx("Year")} className={field} required />
             <input name="valueLabel" placeholder="$24M" className={field} required />
-            <input name="summary" placeholder="Your role on the project" className={field} />
+            <input name="summary" placeholder={tx("Your role on the project")} className={field} />
             <button className={`${btn} sm:col-span-2`} type="submit">
-              Save project
+              {tx("Save project")}
             </button>
           </form>
         ) : null}
