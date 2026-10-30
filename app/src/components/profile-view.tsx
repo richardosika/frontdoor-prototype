@@ -7,6 +7,7 @@ import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { requestConfirmation } from "@/actions/profile";
 import { contactAboutProject, setProjectSharing } from "@/actions/projects";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
+import { ProjectDocuments } from "@/components/project-documents";
 import { blockMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
@@ -34,6 +35,9 @@ type Project = {
   detailsVisible: boolean;
   canContact: boolean;
   contactStatus: string;
+  documents: { id: string; title: string; fileName: string; sizeBytes: number; version: number; updatedAt: Date }[];
+  documentsVisible: boolean;
+  linkedDealId: string;
   confirmations: {
     id: string;
     status: string;
@@ -58,7 +62,9 @@ export async function ProfileView({
   verification,
   blockedByViewer,
   blockedByThem,
+  ownDeals = [],
 }: {
+  ownDeals?: { id: string; title: string }[];
   member: {
     id: string;
     name: string;
@@ -328,6 +334,16 @@ export async function ProfileView({
                         {project.shareWithCircle ? tx("Stop sharing") : tx("Share with My Circle")}
                       </button>
                     </form>
+                  ) : null}
+                  {project.documentsVisible ? (
+                    <ProjectDocuments
+                      projectId={project.id}
+                      documents={project.documents}
+                      isOwner={isSelf}
+                      approved={listed}
+                      deals={isSelf ? ownDeals : undefined}
+                      linkedDealId={project.linkedDealId}
+                    />
                   ) : null}
                   {!isSelf && project.contactStatus ? (
                     <p className="mt-2 text-[15px] text-ink">

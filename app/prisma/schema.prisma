@@ -369,6 +369,8 @@ model TrackProject {
   confirmations Confirmation[]
   verification  VerificationCase?
   contacts      ProjectContact[]
+  documents     ProjectDocument[]
+  deals         Deal[]
 
   @@index([reviewStatus])
 }
@@ -488,6 +490,9 @@ model Deal {
   equityMultiple String      @default("")
   roleNeeded     MemberRole?
   deadline       String      @default("")
+  /// Optional project this deal room belongs to. Its approved deal-room members hear about project document updates.
+  projectId      String?
+  project        TrackProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt      DateTime    @default(now())
   posts          Post[]
   access         DealAccess[]
@@ -980,4 +985,21 @@ model DealEvent {
   createdAt DateTime @default(now())
 
   @@index([dealId, createdAt])
+}
+
+/// A document on a project. Owners can add, replace or remove documents on an approved project without a new review.
+model ProjectDocument {
+  id          String       @id @default(cuid())
+  projectId   String
+  project     TrackProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  bytes       Bytes
+  version     Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId])
 }

@@ -247,3 +247,121 @@ export async function addContactToCircle(formData: FormData) {
   revalidatePath("/network");
   go("/feed", "notice", "Added to My Circle.");
 }
+
+const DOC_MAX = 5 * 1024 * 1024;
+const DOC_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
+
+async function readDocument(formData: FormData, back: string) {
+  const upload = formData.get("file");
+  const file = upload instanceof File && upload.size > 0 ? upload : null;
+  if (!file) go(back, "error", "Choose a PDF, JPG, or PNG up to 5 MB.");
+  const contentType = file.type || "application/octet-stream";
+  if (!DOC_TYPES.has(contentType) || file.size > DOC_MAX) go(back, "error", "Choose a PDF, JPG, or PNG up to 5 MB.");
+  return {
+    fileName: file.name.replace(/[^\w .()-]/g, "_").slice(0, 180) || "document",
+    contentType,
+    sizeBytes: file.size,
+    bytes: Buffer.from(new Uint8Array(await file.arrayBuffer())),
+  };
+}
+
+async function ownProject(formData: FormData, userId: string, back: string) {
+  const projectId = String(formData.get("projectId") || "");
+  const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
+  if (!project || project.userId !== userId) go(back, "error", "Project not found.");
+  return project;
+}
+
+/** Tell everyone involved in the project, in their language. The project's review status never changes here. */
+async function announceDocumentChange(
+  project: { id: string; name: string; userId: string; reviewStatus: string },
+  owner: { name: string },
+  change: "added" | "replaced" | "removed",
+  documentTitle: string,
+) {
+  if (project.reviewStatus !== "APPROVED") return 0;
+  const { projectAudience } = await import("@/lib/project-contact-db");
+  const { projectDocumentEmail } = await import("@/lib/project-review-email");
+  const ids = await projectAudience(project.id);
+  if (!ids.length) return 0;
+  const people = await prisma.user.findMany({ where: { id: { in: ids }, status: "ACTIVE" }, select: { id: true, email: true, locale: true } });
+  const link = `${await appBaseUrl()}/members/${project.userId}#project-${project.id}`;
+  for (const person of people) {
+    const mail = projectDocumentEmail({
+      locale: isLocale(person.locale) ? person.locale : "en",
+      change,
+      ownerName: owner.name,
+      projectName: project.name,
+      documentTitle,
+      link,
+    });
+    await notify(person.id, { title: mail.subject, body: `${owner.name}: ${documentTitle}`, href: `/members/${project.userId}#project-${project.id}` });
+    await sendEmail({ to: person.email, subject: mail.subject, text: mail.text });
+  }
+  return people.length;
+}
+
+function sentNotice(count: number) {
+  return count ? "Document saved. Everyone involved in this project was notified." : "Document saved.";
+}
+
+/** Add a document. Allowed on an approved project without sending it back to review. */
+export async function addProjectDocument(formData: FormData) {
+  const user = await requireUser();
+  const back = backPath(formData);
+  const project = await ownProject(formData, user.id, back);
+  const title = String(formData.get("title") || "").trim().slice(0, 120);
+  if (title.length < 2) go(back, "error", "Add a document title.");
+  const file = await readDocument(formData, back);
+  await prisma.projectDocument.create({ data: { projectId: project.id, title, ...file } });
+  const count = await announceDocumentChange(project, user, "added", title);
+  refresh();
+  revalidatePath(`/members/${user.id}`);
+  go(back, "notice", sentNotice(count));
+}
+
+/** Replace a document's file. The project's other fields and review status stay as they are. */
+export async function replaceProjectDocument(formData: FormData) {
+  const user = await requireUser();
+  const back = backPath(formData);
+  const project = await ownProject(formData, user.id, back);
+  const documentId = String(formData.get("documentId") || "");
+  const existing = await prisma.projectDocument.findUnique({ where: { id: documentId } });
+  if (!existing || existing.projectId !== project.id) go(back, "error", "Document not found.");
+  const file = await readDocument(formData, back);
+  await prisma.projectDocument.update({ where: { id: existing.id }, data: { ...file, version: existing.version + 1 } });
+  const count = await announceDocumentChange(project, user, "replaced", existing.title);
+  refresh();
+  revalidatePath(`/members/${user.id}`);
+  go(back, "notice", sentNotice(count));
+}
+
+export async function removeProjectDocument(formData: FormData) {
+  const user = await requireUser();
+  const back = backPath(formData);
+  const project = await ownProject(formData, user.id, back);
+  const documentId = String(formData.get("documentId") || "");
+  const existing = await prisma.projectDocument.findUnique({ where: { id: documentId }, select: { id: true, projectId: true, title: true } });
+  if (!existing || existing.projectId !== project.id) go(back, "error", "Document not found.");
+  await prisma.projectDocument.delete({ where: { id: existing.id } });
+  const count = await announceDocumentChange(project, user, "removed", existing.title);
+  refresh();
+  revalidatePath(`/members/${user.id}`);
+  go(back, "notice", count ? "Document removed. Everyone involved in this project was notified." : "Document removed.");
+}
+
+/** Link one of your deal rooms to the project, so its approved members hear about document updates. */
+export async function linkProjectDeal(formData: FormData) {
+  const user = await requireUser();
+  const back = backPath(formData);
+  const project = await ownProject(formData, user.id, back);
+  const dealId = String(formData.get("dealId") || "");
+  await prisma.deal.updateMany({ where: { sponsorId: user.id, projectId: project.id }, data: { projectId: null } });
+  if (dealId) {
+    const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { sponsorId: true } });
+    if (!deal || deal.sponsorId !== user.id) go(back, "error", "Deal not found.");
+    await prisma.deal.update({ where: { id: dealId }, data: { projectId: project.id } });
+  }
+  refresh();
+  go(back, "notice", "Deal room link saved.");
+}

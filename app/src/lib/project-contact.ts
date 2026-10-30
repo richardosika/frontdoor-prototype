@@ -247,3 +247,57 @@ export function formatProjectValue(value: string): string {
   }
   return clean;
 }
+
+/** Which categories a Ledger need answers. */
+const NEED_CATEGORIES: Record<string, string[]> = {
+  equity: ["EQUITY"],
+  debt: ["FINANCING"],
+  gc: ["GENERAL_CONTRACTOR"],
+  broker: ["BROKER", "FINANCING"],
+  advisory: ["RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "INSURANCE", "ACCOUNTANT", "APPRAISER", "PROPERTY_MANAGER", "EXCHANGE_1031"],
+};
+
+/**
+ * The categories a deal room is seeking: the linked project's list when there is one, plus the role the deal asked
+ * for, plus its need (equity, debt, GC, broker, advisory).
+ */
+export function dealSeekingCategories(input: { need: string; roleNeeded: string | null; projectSeeking?: string | null }): string[] {
+  const ids = new Set<string>(parseSeeking(input.projectSeeking ?? ""));
+  const fromRole = categoryForRole(input.roleNeeded);
+  if (fromRole) ids.add(fromRole);
+  for (const id of NEED_CATEGORIES[input.need] ?? []) ids.add(id);
+  return parseSeeking([...ids]);
+}
+
+export const DEAL_ROOM_REASON =
+  "This deal room is not seeking your category. Access requests are open to members in the categories it seeks, and to the sponsor's circle and accepted contacts.";
+
+/** Deal-room access follows the contact rule: a sought category, or an existing relationship (circle, accepted contact or introduction, administrator). */
+export function canRequestDealRoom(input: { categories: string[]; requesterRole: string; related: boolean }): { ok: true } | { ok: false; reason: string } {
+  if (input.related) return { ok: true };
+  const category = categoryForRole(input.requesterRole);
+  if (category && input.categories.includes(category)) return { ok: true };
+  return { ok: false, reason: DEAL_ROOM_REASON };
+}
+
+/**
+ * Everyone involved in a project, for document updates: the other side of each accepted project contact, circle
+ * members when the project is shared with My Circle, and approved members of deal rooms linked to the project.
+ * Never the owner; each person once.
+ */
+export function projectAudienceIds(input: {
+  ownerId: string;
+  acceptedContacts: { fromId: string; toId: string }[];
+  shareWithCircle: boolean;
+  circle: string[];
+  dealMembers: string[];
+}): string[] {
+  const ids = new Set<string>();
+  for (const row of input.acceptedContacts) ids.add(row.fromId === input.ownerId ? row.toId : row.fromId);
+  if (input.shareWithCircle) for (const id of input.circle) ids.add(id);
+  for (const id of input.dealMembers) ids.add(id);
+  ids.delete(input.ownerId);
+  return [...ids].sort();
+}
+
+export type DocumentChange = "added" | "replaced" | "removed";

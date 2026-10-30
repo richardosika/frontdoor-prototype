@@ -1,4 +1,5 @@
 "use server";
+import { dealRoomRule } from "@/lib/deal-room-rule";
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -38,6 +39,9 @@ export async function requestAccess(formData: FormData) {
   if (await isBlocked(user.id, deal.sponsorId)) {
     redirect(`/deals/${dealId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
+  // Same contact rule as projects: a sought category, or the sponsor's circle, accepted contacts, or an administrator.
+  const room = await dealRoomRule(deal, user);
+  if (!room.ok) redirect(`/deals/${dealId}?error=${encodeURIComponent(room.reason)}`);
   const recentAccess = await prisma.dealAccess.count({
     where: { requesterId: user.id, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
   });
@@ -271,3 +275,4 @@ export async function removeParticipant(formData: FormData) {
   revalidatePath(`/deals/${dealId}/room`);
   redirect(`/deals/${dealId}/room?notice=Participant+removed`);
 }
+

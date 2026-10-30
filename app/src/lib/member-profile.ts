@@ -1,5 +1,6 @@
 import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { projectAudience } from "@/lib/project-contact-db";
 import { canContactAboutProject, projectDetailsVisible, projectVisibleTo } from "@/lib/project-contact";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
@@ -11,6 +12,8 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
         include: {
           confirmations: true,
           contacts: { where: { OR: [{ fromId: viewerId }, { toId: viewerId }] }, select: { status: true } },
+          documents: { select: { id: true, title: true, fileName: true, sizeBytes: true, version: true, updatedAt: true }, orderBy: { createdAt: "asc" } },
+          deals: { select: { id: true } },
         },
         orderBy: { year: "desc" },
       },
@@ -87,7 +90,14 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       : null,
   );
   const inOwnerCircle = connection?.status === "ACCEPTED";
-  const projects = member.projects.filter((project) => projectVisibleTo(project, viewer)).map((project) => {
+  const visibleProjects = member.projects.filter((project) => projectVisibleTo(project, viewer));
+  const audiences = new Map(
+    await Promise.all(
+      visibleProjects.map(async (project) => [project.id, viewer.id === project.userId || viewer.isAdmin ? [] : await projectAudience(project.id)] as const),
+    ),
+  );
+  const ownDeals = viewerId === memberId ? await prisma.deal.findMany({ where: { sponsorId: memberId }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }) : [];
+  const projects = visibleProjects.map((project) => {
     const record = cases.find((item) => item.projectId === project.id);
     return {
       id: project.id,
@@ -110,6 +120,9 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
         viewer.id !== project.userId &&
         canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role }, to: { id: member.id, role: member.role } }).ok,
       contactStatus: project.contacts[0]?.status ?? "",
+      documents: project.documents,
+      documentsVisible: viewer.id === project.userId || viewer.isAdmin || (audiences.get(project.id) ?? []).includes(viewer.id),
+      linkedDealId: project.deals[0]?.id ?? "",
       confirmations: project.confirmations.map((item) => ({
         id: item.id,
         status: item.status,
@@ -140,6 +153,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       createdAt: member.createdAt,
     },
     projects,
+    ownDeals,
     verification,
     connection: state,
     intro,

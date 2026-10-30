@@ -1,4 +1,5 @@
 import { serverTx } from "@/lib/i18n/server";
+import { dealRoomRule } from "@/lib/deal-room-rule";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminReviewAccess, requestAccess, reviewAccess } from "@/actions/deals";
@@ -43,6 +44,7 @@ export default async function DealPage({
   const mine = deal.access.find((item) => item.requesterId === user.id);
   const isSponsor = deal.sponsorId === user.id;
   const approved = mine?.status === "APPROVED" || isSponsor;
+  const roomRule = approved ? { ok: true as const } : await dealRoomRule(deal, user);
 
   return (
     <div>
@@ -51,7 +53,7 @@ export default async function DealPage({
       <Link href="/deals" className="hidden text-sm text-mut md:inline">
         ‹ {tx("Deals")}
       </Link>
-      <Banner error={query.error} notice={query.notice} />
+      <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
       <div className={`mt-3 p-5 ${dealCard}`}>
         <div className="flex items-start justify-between gap-3">
           <KindTag kind={deal.kind} roleLabel={tx(roleShort(roleLabel(deal.roleNeeded)))} />
@@ -92,6 +94,10 @@ export default async function DealPage({
             <Link href={`/deals/${deal.id}/room`} className={`${btn} mt-3`}>
               {tx("Open deal room")}
             </Link>
+          </div>
+        ) : !roomRule.ok && mine?.status !== "PENDING" ? (
+          <div className="mt-4 rounded border border-line bg-cream p-3 text-[15px] leading-relaxed text-ink" data-testid="deal-room-rule">
+            {tx(roomRule.reason)}
           </div>
         ) : mine?.status === "REMOVED" ? (
           <form action={requestAccess} className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">

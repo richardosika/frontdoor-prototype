@@ -37,6 +37,7 @@ export default async function ProfilePage({
         verification={loaded.verification}
         blockedByViewer={false}
         blockedByThem={false}
+        ownDeals={loaded.ownDeals}
       />
     </div>
   );

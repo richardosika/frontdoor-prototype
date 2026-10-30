@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { canDirectMessage } from "@/lib/project-contact";
+import { canDirectMessage, projectAudienceIds } from "@/lib/project-contact";
 
 /** Member ids in the user's circle (accepted connections), not including the user. */
 export async function circleIds(userId: string): Promise<Set<string>> {
@@ -37,4 +37,35 @@ export async function pairRelation(a: string, b: string) {
 /** Server-side check for direct messages and circle requests. */
 export async function canMessagePair(a: string, b: string): Promise<boolean> {
   return canDirectMessage(await pairRelation(a, b));
+}
+
+/** Member ids involved in a project (see projectAudienceIds). */
+export async function projectAudience(projectId: string): Promise<string[]> {
+  const project = await prisma.trackProject.findUnique({
+    where: { id: projectId },
+    select: {
+      userId: true,
+      shareWithCircle: true,
+      contacts: { where: { status: "ACCEPTED" }, select: { fromId: true, toId: true } },
+      deals: { select: { access: { where: { status: "APPROVED" }, select: { requesterId: true } } } },
+    },
+  });
+  if (!project) return [];
+  const circle = project.shareWithCircle ? [...(await circleIds(project.userId))] : [];
+  return projectAudienceIds({
+    ownerId: project.userId,
+    acceptedContacts: project.contacts,
+    shareWithCircle: project.shareWithCircle,
+    circle,
+    dealMembers: project.deals.flatMap((deal) => deal.access.map((row) => row.requesterId)),
+  });
+}
+
+/** Whether a viewer may open a project's documents. */
+export async function canViewProjectDocuments(projectId: string, viewer: { id: string; isAdmin: boolean }): Promise<boolean> {
+  const project = await prisma.trackProject.findUnique({ where: { id: projectId }, select: { userId: true, reviewStatus: true } });
+  if (!project) return false;
+  if (viewer.isAdmin || project.userId === viewer.id) return true;
+  if (project.reviewStatus !== "APPROVED") return false;
+  return (await projectAudience(projectId)).includes(viewer.id);
 }

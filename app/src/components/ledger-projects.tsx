@@ -238,6 +238,9 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
               {project.location} · {project.year}
             </p>
             {project.summary ? <p className="mt-1 text-[15px] text-ink">{project.summary}</p> : null}
+            <Link href={`/members/${project.user.id}#project-${project.id}`} className="mt-1 inline-block text-[15px] font-semibold text-forest underline decoration-brass">
+              {tx("Open the project")}
+            </Link>
           </li>
         ))}
       </ul>

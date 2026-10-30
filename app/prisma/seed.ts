@@ -1220,6 +1220,21 @@ async function alignProjectContactDemo() {
       reviewedAt: hoursAgo(5),
     },
   });
+  await prisma.deal.updateMany({ where: { id: "deal_newark", projectId: null, sponsorId: "user_mh" }, data: { projectId: "proj_ironbound" } });
+  const docs = await prisma.projectDocument.count({ where: { projectId: "proj_ironbound" } });
+  const ironbound = await prisma.trackProject.findUnique({ where: { id: "proj_ironbound" }, select: { id: true } });
+  if (!docs && ironbound) {
+    await prisma.projectDocument.create({
+      data: {
+        projectId: "proj_ironbound",
+        title: "Ironbound Lofts rent roll (demo)",
+        fileName: "ironbound-rent-roll-demo.pdf",
+        contentType: "application/pdf",
+        bytes: Buffer.from(DEMO_PDF),
+        sizeBytes: Buffer.byteLength(DEMO_PDF),
+      },
+    });
+  }
   const contacts: { projectId: string; fromId: string; toId: string; category: string; status: "PENDING" | "ACCEPTED" | "DECLINED"; note: string }[] = [
     { projectId: "proj_ironbound", fromId: "user_ls", toId: "user_mh", category: "FINANCING", status: "ACCEPTED", note: "We lend on value-add multifamily in Essex County." },
     { projectId: "proj_ironbound", fromId: "user_tn", toId: "user_mh", category: "EQUITY", status: "PENDING", note: "Interested in the LP piece. What is the hold period?" },
@@ -1237,3 +1252,5 @@ async function alignProjectContactDemo() {
     });
   }
 }
+
+const DEMO_PDF = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 62>>stream\nBT /F1 18 Tf 72 720 Td (Ironbound Lofts rent roll - demo only) Tj ET\nendstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";

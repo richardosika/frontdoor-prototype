@@ -55,3 +55,26 @@ export function projectContactEmail(locale: Locale, link: string): { subject: st
     text: `${p("A member contacted you about a project on Private Floor. Accept or decline on your Ledger.")}\n\n${p("Open your Ledger")}\n${link}`,
   };
 }
+
+/** The alert and email everyone involved in a project gets when its owner changes a document. */
+export function projectDocumentEmail(input: {
+  locale: Locale;
+  change: "added" | "replaced" | "removed";
+  ownerName: string;
+  projectName: string;
+  documentTitle: string;
+  link: string;
+}): { subject: string; text: string } {
+  const p = (text: string) => phrase(input.locale, text);
+  const what =
+    input.change === "added" ? p("added a document") : input.change === "replaced" ? p("replaced a document") : p("removed a document");
+  return {
+    subject: `${p("Project update")}: ${input.projectName}`,
+    text: [
+      `${input.ownerName} ${what}: “${input.documentTitle}”.`,
+      `${p("Project")}: ${input.projectName}`,
+      p("You are getting this because you are involved in this project on Private Floor."),
+      `${p("Open the project")}\n${input.link}`,
+    ].join("\n\n"),
+  };
+}
