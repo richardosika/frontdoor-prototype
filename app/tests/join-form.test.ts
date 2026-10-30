@@ -25,6 +25,7 @@ function ready(role: string) {
   profile.acceptTerms = true;
   profile.acceptVerification = true;
   profile.acceptMemberRisk = true;
+  profile.acceptMemberNda = true;
   profile.states = [{ state: "NJ", licensed: true, looking: true, licenseNumber: "" }];
   profile.specialties = ["Tax"];
   profile.loanTypes = ["Bridge"];

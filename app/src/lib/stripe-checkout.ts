@@ -104,3 +104,60 @@ export function sessionPaid(session: Record<string, unknown>): boolean {
     payment_status: String(session.payment_status || ""),
   });
 }
+
+async function stripeGet(secret: string, path: string): Promise<StripeResult<Record<string, unknown>>> {
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${secret}` } });
+  const payload = (await response.json()) as { error?: { message?: string } } & Record<string, unknown>;
+  if (!response.ok) return { ok: false, error: payload.error?.message || "Stripe request failed." };
+  return { ok: true, value: payload };
+}
+
+/** A Stripe customer for the member (test mode only). */
+export async function ensureStripeCustomer(secret: string, input: { customerId: string; email: string; name: string; userId: string }): Promise<StripeResult<string>> {
+  if (!secret.startsWith("sk_test")) return { ok: false, error: "Stripe stays in test mode." };
+  if (input.customerId) return { ok: true, value: input.customerId };
+  const body = new URLSearchParams({ email: input.email, name: input.name, "metadata[userId]": input.userId });
+  const created = await stripeForm(secret, "customers", body);
+  return created.ok ? { ok: true, value: String(created.value.id || "") } : created;
+}
+
+/** A SetupIntent for the Payment Element: cards plus Apple Pay / Google Pay wallets. No charge is made. */
+export async function createSetupIntent(secret: string, customerId: string, userId: string): Promise<StripeResult<{ id: string; clientSecret: string }>> {
+  if (!secret.startsWith("sk_test")) return { ok: false, error: "Stripe stays in test mode." };
+  const body = new URLSearchParams({ customer: customerId, usage: "off_session", "automatic_payment_methods[enabled]": "true", "metadata[userId]": userId });
+  const created = await stripeForm(secret, "setup_intents", body);
+  if (!created.ok) return created;
+  return { ok: true, value: { id: String(created.value.id || ""), clientSecret: String(created.value.client_secret || "") } };
+}
+
+export async function retrieveSetupIntent(secret: string, id: string): Promise<StripeResult<Record<string, unknown>>> {
+  return stripeGet(secret, `setup_intents/${encodeURIComponent(id)}?expand[]=payment_method`);
+}
+
+export async function setDefaultPaymentMethod(secret: string, customerId: string, paymentMethodId: string, subscriptionId = ""): Promise<boolean> {
+  const body = new URLSearchParams({ "invoice_settings[default_payment_method]": paymentMethodId });
+  const updated = await stripeForm(secret, `customers/${encodeURIComponent(customerId)}`, body);
+  if (subscriptionId) await stripeForm(secret, `subscriptions/${encodeURIComponent(subscriptionId)}`, new URLSearchParams({ default_payment_method: paymentMethodId }));
+  return updated.ok;
+}
+
+export async function detachPaymentMethod(secret: string, paymentMethodId: string): Promise<boolean> {
+  return (await stripeForm(secret, `payment_methods/${encodeURIComponent(paymentMethodId)}/detach`, new URLSearchParams())).ok;
+}
+
+/** Pause collection until `resumesAt` (invoices in between are voided), or clear the pause. */
+export async function setSubscriptionPause(secret: string, subscriptionId: string, resumesAt: Date | null): Promise<boolean> {
+  if (!secret.startsWith("sk_test") || !subscriptionId) return false;
+  const body = new URLSearchParams();
+  if (resumesAt) {
+    body.set("pause_collection[behavior]", "void");
+    body.set("pause_collection[resumes_at]", String(Math.floor(resumesAt.getTime() / 1000)));
+  } else body.set("pause_collection", "");
+  return (await stripeForm(secret, `subscriptions/${encodeURIComponent(subscriptionId)}`, body)).ok;
+}
+
+/** Retry an unpaid invoice on another card (the backup). */
+export async function payInvoiceWith(secret: string, invoiceId: string, paymentMethodId: string): Promise<boolean> {
+  if (!secret.startsWith("sk_test") || !invoiceId || !paymentMethodId) return false;
+  return (await stripeForm(secret, `invoices/${encodeURIComponent(invoiceId)}/pay`, new URLSearchParams({ payment_method: paymentMethodId }))).ok;
+}

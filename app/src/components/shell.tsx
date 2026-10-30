@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/actions/auth";
 import { AdminMark } from "@/components/admin-mark";
 import { Avatar } from "@/components/avatar";
+import { MembershipCard } from "@/components/membership-card";
 import { DecisionDialogHost } from "@/components/decision-dialog-host";
 import { Logo } from "@/components/logo";
 import { LocaleProvider } from "@/components/locale-context";
@@ -62,7 +63,7 @@ export function Shell({
   locale = "en",
   children,
 }: {
-  user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean };
+  user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean; memberSince?: number };
   unread: number;
   alerts: number;
   locale?: Locale;
@@ -71,6 +72,7 @@ export function Shell({
   const pathname = usePathname();
   const t = translator(locale);
   const memberLine = t("membership.member", { tier: phrase(locale, tierLabel(user.tier)) });
+  const sinceLabel = `${phrase(locale, "Member since")} ${user.memberSince ?? new Date().getFullYear()}`;
   const [menuOpen, setMenuOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
   const memberRef = useRef<HTMLDivElement>(null);
@@ -108,10 +110,8 @@ export function Shell({
             <Logo tone="paper" large />
           </span>
         </Link>
-        <div className="mb-3 hidden rounded-sm border border-brass/50 bg-paper/5 px-3 py-2.5 lg:block" data-testid="sidebar-membership">
-          <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-brass">{t("membership.title")}</p>
-          <p className="mt-0.5 font-serif text-[16px] text-paper">{memberLine}</p>
-          <p className="font-sans text-[12px] text-sand">{t("membership.active")}</p>
+        <div className="mb-4 hidden lg:block" data-testid="sidebar-membership">
+          <MembershipCard name={user.name} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
         </div>
         <div ref={memberRef} className="relative mb-5">
           <button
@@ -276,8 +276,7 @@ export function Shell({
         <div className="fixed inset-0 z-40 md:hidden">
           <button type="button" className="absolute inset-0 bg-forest/40" aria-label={t("menu.close")} onClick={() => setMenuOpen(false)} />
           <div className="absolute inset-x-0 bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] rounded-t border border-line bg-paper px-4 pb-4 pt-4">
-            <p className="font-serif text-lg">{user.name}</p>
-            <p className="text-xs text-mut">{memberLine} · {t("membership.active")}</p>
+            <MembershipCard name={user.name} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
             <Link href="/settings" className="mt-3 flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {t("menu.settings")}
             </Link>

@@ -1,5 +1,6 @@
 "use server";
 import { MEMBER_RISK_VERSION } from "@/lib/member-risk";
+import { MEMBER_NDA_SLUG, memberNdaVersion } from "@/lib/member-nda";
 import { normalizeWebUrl } from "@/lib/web-url";
 
 import { randomBytes } from "node:crypto";
@@ -142,6 +143,9 @@ export async function submitJoinApplication(
         acceptedAt,
         ipHash,
       })),
+    });
+    await tx.legalAcceptance.create({
+      data: { applicationId: created.id, email, document: MEMBER_NDA_SLUG, version: memberNdaVersion(), acceptedAt, ipHash },
     });
     if (invite) await tx.inviteCode.update({ where: { id: invite.id }, data: { uses: { increment: 1 } } });
     return created;

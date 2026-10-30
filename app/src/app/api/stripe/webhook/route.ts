@@ -1,6 +1,9 @@
 import { activatePaidMembership, claimPaymentEvent, markPaymentFailed } from "@/lib/payment-record";
 import { renewalInOneMonth, verifyStripeSignature } from "@/lib/payments";
 import { NextResponse } from "next/server";
+import { fallbackMethod } from "@/lib/billing";
+import { prisma } from "@/lib/prisma";
+import { payInvoiceWith } from "@/lib/stripe-checkout";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +59,14 @@ export async function POST(request: Request) {
     });
   }
   if (event.type === "invoice.payment_failed" && userId) {
-    await markPaymentFailed(userId);
+    // The primary card failed: try the backup card once before marking the payment failed.
+    const methods = await prisma.paymentMethod.findMany({ where: { userId, mode: "stripe" } });
+    const charge = object.payment_intent as { last_payment_error?: { payment_method?: { id?: string } } } | string | undefined;
+    const failedId = typeof charge === "object" ? charge?.last_payment_error?.payment_method?.id || "" : "";
+    const primaryId = methods.find((method) => method.role === "PRIMARY")?.stripePaymentMethodId || "";
+    const backup = fallbackMethod(methods, failedId || primaryId);
+    const retried = backup && backup.role === "BACKUP" ? await payInvoiceWith(process.env.STRIPE_SECRET_KEY || "", String(object.id || ""), backup.stripePaymentMethodId) : false;
+    if (!retried) await markPaymentFailed(userId);
   }
   return NextResponse.json({ received: true });
 }

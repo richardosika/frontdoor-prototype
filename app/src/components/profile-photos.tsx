@@ -28,6 +28,7 @@ export async function ProfilePhotos({
     zoom: tx("Zoom"),
     drag: tx("Drag the image to position it."),
     noPreview: tx("Preview is not available for this file in your browser. It will be centered and cropped when saved."),
+    saving: tx("Saving. HEIC photos can take a minute to convert."),
   };
   return (
     <section id="photos" className="scroll-mt-20" data-testid="profile-photos">

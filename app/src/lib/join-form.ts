@@ -1,3 +1,4 @@
+import { MEMBER_NDA_ERROR } from "@/lib/member-nda-copy";
 import { MEMBER_RISK_ERROR } from "@/lib/member-risk";
 import { isRoleId, type RoleId } from "@/lib/roles";
 import { US_STATES } from "@/lib/member-network";
@@ -222,6 +223,7 @@ export type JoinProfile = {
   acceptTerms: boolean;
   acceptVerification: boolean;
   acceptMemberRisk: boolean;
+  acceptMemberNda: boolean;
   title: string;
   legalName: string;
   formationState: string;
@@ -289,6 +291,7 @@ export function emptyProfile(role = "DEVELOPER", code = ""): JoinProfile {
     acceptTerms: false,
     acceptVerification: false,
     acceptMemberRisk: false,
+    acceptMemberNda: false,
     title: "",
     legalName: "",
     formationState: "",
@@ -357,6 +360,7 @@ export function pageTwoErrors(profile: JoinProfile): string[] {
   if (profile.password.trim().length < 8) errors.push("Create a password of at least 8 characters.");
   if (!profile.acceptTerms || !profile.acceptVerification) errors.push("Check both agreement boxes.");
   if (profile.acceptMemberRisk !== true) errors.push(MEMBER_RISK_ERROR);
+  if (profile.acceptMemberNda !== true) errors.push(MEMBER_NDA_ERROR);
   const kind = pageKind(profile.role);
   if (showsProjects(profile.role)) {
     const needed = projectsRequired(profile.role);

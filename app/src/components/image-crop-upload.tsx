@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 
-export type CropLabels = { choose: string; zoom: string; drag: string; noPreview: string; save: string; caption?: string };
+export type CropLabels = { choose: string; zoom: string; drag: string; noPreview: string; save: string; saving: string; caption?: string };
+
+function SaveButton({ label, saving }: { label: string; saving: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      disabled={pending}
+      aria-busy={pending}
+      className="inline-flex min-h-11 items-center justify-center rounded-sm bg-forest px-4 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-paper [font-variant:all-small-caps] disabled:opacity-70"
+      type="submit"
+    >
+      {pending ? saving : label}
+    </button>
+  );
+}
 
 /**
  * File picker with a simple crop step: drag to position, slider to zoom. Sends the original file plus the crop as
@@ -117,12 +132,7 @@ export function ImageCropUpload({
       {labels.caption ? (
         <input name="caption" maxLength={200} placeholder={labels.caption} className="min-h-11 w-full rounded-sm border border-line bg-paper px-3 text-[16px]" />
       ) : null}
-      <button
-        className="inline-flex min-h-11 items-center justify-center rounded-sm bg-forest px-4 py-[11px] font-sans text-[14px] font-semibold tracking-[0.08em] text-paper [font-variant:all-small-caps]"
-        type="submit"
-      >
-        {labels.save}
-      </button>
+      <SaveButton label={labels.save} saving={labels.saving} />
     </form>
   );
 }

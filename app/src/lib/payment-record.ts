@@ -192,9 +192,10 @@ export async function sendRenewalReminder(userId: string) {
 export async function maybeSendFullPriceReminder(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { paymentStatus: true, renewalAt: true, lastRenewalReminderAt: true, cancelRequestedAt: true },
+    select: { paymentStatus: true, renewalAt: true, lastRenewalReminderAt: true, cancelRequestedAt: true, pausedUntil: true },
   });
   if (!user || user.paymentStatus !== "PAID" || user.cancelRequestedAt) return false;
+  if (user.pausedUntil && user.pausedUntil > new Date()) return false;
   if (!renewalReminderDue({ renewalAt: user.renewalAt, lastSentAt: user.lastRenewalReminderAt })) return false;
   return sendRenewalReminder(userId);
 }

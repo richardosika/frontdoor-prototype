@@ -11,7 +11,9 @@ function ConfirmModal({
   confirmLabel,
   onConfirm,
   onCancel,
+  cancelLabel = "Cancel",
 }: {
+  cancelLabel?: string;
   title: string;
   body: string;
   confirmLabel: string;
@@ -35,7 +37,7 @@ function ConfirmModal({
             {confirmLabel}
           </button>
           <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" onClick={onCancel}>
-            Cancel
+            {cancelLabel}
           </button>
         </div>
       </div>
@@ -48,7 +50,11 @@ export function ConfirmSubmitButton({
   message,
   className,
   children,
+  keepLabel,
+  cancelledText,
 }: {
+  keepLabel?: string;
+  cancelledText?: string;
   form: string;
   message: string;
   className: string;
@@ -80,6 +86,7 @@ export function ConfirmSubmitButton({
           title={label}
           body={message}
           confirmLabel={label}
+          cancelLabel={keepLabel}
           onConfirm={() => {
             setOpen(false);
             const target = document.getElementById(form);
@@ -87,7 +94,7 @@ export function ConfirmSubmitButton({
           }}
           onCancel={() => {
             setOpen(false);
-            setResult(CANCELLED_RESULT);
+            setResult(cancelledText ?? CANCELLED_RESULT);
           }}
         />
       ) : null}

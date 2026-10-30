@@ -53,6 +53,11 @@ export default async function AdminMemberPage({
             {member.deletionRequestedAt ? " · deletion requested" : ""}
           </p>
           <p>{member.email}</p>
+          <p className="pt-1">
+            <a href={`/api/admin/members/${member.id}/export`} className={btnOutline} data-testid="admin-member-export" download>
+              Export member data
+            </a>
+          </p>
           {member.isAdmin ? null : (
             <div className="flex flex-wrap gap-2 pt-2">
               {member.status === "ACTIVE" ? (

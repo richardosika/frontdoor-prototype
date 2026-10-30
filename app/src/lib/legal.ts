@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { DUES_SCHEDULE_SENTENCE } from "@/lib/dues";
 import { renderMarkdown } from "@/lib/markdown";
@@ -14,6 +14,7 @@ export const LEGAL_DOCS = [
   { slug: "seeking-raising", title: "Seeking and Raising Post Rules", file: "seeking-raising.md" },
   { slug: "deal-room-nda", title: "Deal Room NDA Acknowledgement", file: "deal-room-nda.md" },
   { slug: "membership-dues", title: "Membership Dues and Refund Terms", file: "membership-dues.md" },
+  { slug: "member-nda", title: "Member NDA", file: "member-nda.md" },
 ] as const;
 
 /** Documents recorded when both signup boxes are checked. */
@@ -32,8 +33,13 @@ export function legalDoc(slug: string) {
   return LEGAL_DOCS.find((doc) => doc.slug === slug) ?? null;
 }
 
-export function readLegalMarkdown(file: string): string {
-  return readFileSync(path.join(process.cwd(), "src/content/legal", file), "utf8");
+export function readLegalMarkdown(file: string, locale = "en"): string {
+  const dir = path.join(process.cwd(), "src/content/legal");
+  if (locale !== "en") {
+    const localized = path.join(dir, file.replace(/\.md$/, `.${locale}.md`));
+    if (existsSync(localized)) return readFileSync(localized, "utf8");
+  }
+  return readFileSync(path.join(dir, file), "utf8");
 }
 
 /** The first line of each draft is `Version: <id>`. That id is what acceptance stores. */

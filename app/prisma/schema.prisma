@@ -214,7 +214,13 @@ model User {
   refundNote     String           @default("")
   lastRenewalReminderAt DateTime?
   cancelRequestedAt DateTime?
+  pausedAt       DateTime?
+  pausedUntil    DateTime?
+  pauseReminderSentAt DateTime?
+  ndaAcceptedAt  DateTime?
+  ndaVersion     String           @default("")
   createdAt      DateTime         @default(now())
+  paymentMethods PaymentMethod[]
 
   posts                Post[]
   comments             Comment[]
@@ -1032,4 +1038,27 @@ model MemberImage {
   createdAt   DateTime        @default(now())
 
   @@index([userId, kind, position])
+}
+
+enum PaymentMethodRole {
+  PRIMARY
+  BACKUP
+}
+
+/// Card details stay at Stripe. Only the Stripe id, brand, last four digits, expiry and wallet name are kept.
+model PaymentMethod {
+  id                    String            @id @default(cuid())
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role                  PaymentMethodRole
+  stripePaymentMethodId String            @default("")
+  brand                 String            @default("")
+  last4                 String            @default("")
+  expMonth              Int               @default(0)
+  expYear               Int               @default(0)
+  wallet                String            @default("")
+  mode                  String            @default("stripe")
+  createdAt             DateTime          @default(now())
+
+  @@unique([userId, role])
 }

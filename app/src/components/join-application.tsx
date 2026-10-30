@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkJoinEmail, submitJoinApplication } from "@/actions/join";
 import { MEMBER_RISK_ERROR, MEMBER_RISK_HREF, MEMBER_RISK_LABEL } from "@/lib/member-risk";
+import { MEMBER_NDA_ERROR, MEMBER_NDA_HREF, MEMBER_NDA_LABEL } from "@/lib/member-nda-copy";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import {
   ATTORNEY_SPECIALTIES,
@@ -89,6 +90,7 @@ export function JoinApplication({
   const [alert, setAlert] = useState<{ title: string; detail: string } | null>(null);
   const [pending, setPending] = useState(false);
   const [riskError, setRiskError] = useState(false);
+  const [ndaError, setNdaError] = useState(false);
   const [cardName, setCardName] = useState("");
 
   function patch(partial: Partial<JoinProfile>) {
@@ -116,6 +118,7 @@ export function JoinApplication({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRiskError(profile.acceptMemberRisk !== true);
+    setNdaError(profile.acceptMemberNda !== true);
     const issues = pageTwoErrors(profile);
     if (issues.length) {
       setError(issues[0]);
@@ -433,6 +436,32 @@ export function JoinApplication({
           {riskError ? (
             <p id="member-risk-error" role="alert" className="mt-1 text-sm font-semibold text-[#9b2c22]">
               {MEMBER_RISK_ERROR}
+            </p>
+          ) : null}
+          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${ndaError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-nda">
+            <input
+              type="checkbox"
+              name="acceptMemberNda"
+              className="mt-1 h-5 w-5 shrink-0"
+              aria-required="true"
+              aria-invalid={ndaError ? true : undefined}
+              aria-describedby={ndaError ? "member-nda-error" : undefined}
+              checked={profile.acceptMemberNda === true}
+              onChange={(event) => {
+                patch({ acceptMemberNda: event.target.checked });
+                if (event.target.checked) setNdaError(false);
+              }}
+            />
+            <span>
+              {MEMBER_NDA_LABEL}{" "}
+              <a href={MEMBER_NDA_HREF} target="_blank" rel="noreferrer" className="font-semibold underline decoration-brass">
+                Read the Member NDA
+              </a>
+            </span>
+          </label>
+          {ndaError ? (
+            <p id="member-nda-error" role="alert" className="mt-1 text-sm font-semibold text-[#9b2c22]">
+              {MEMBER_NDA_ERROR}
             </p>
           ) : null}
           <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-between">

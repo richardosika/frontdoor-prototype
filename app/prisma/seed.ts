@@ -1159,6 +1159,11 @@ main()
  * sent back for more information, plus contact requests in each state.
  */
 async function alignProjectContactDemo() {
+  // Billing demo: Elena Voss (general contractor, a paid role) shows a paid TEST membership so Settings > Billing has data.
+  await prisma.user.updateMany({
+    where: { id: "user_ev", paymentStatus: "NOT_REQUIRED" },
+    data: { paymentStatus: "PAID", paymentMode: "simulated", duesCents: 19_900, paidAt: new Date(), renewalAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+  });
   const fields: Record<string, { street: string; city: string; state: string; role: string; seeking: string; share: boolean }> = {
     proj_ironbound: { street: "88 Ferry Street", city: "Newark", state: "NJ", role: "Developer", seeking: "FINANCING,EQUITY,GENERAL_CONTRACTOR", share: true },
     proj_halsey: { street: "120 Montgomery Street", city: "Jersey City", state: "NJ", role: "Developer", seeking: "ARCHITECT_ENGINEER,ZONING_ATTORNEY", share: false },
