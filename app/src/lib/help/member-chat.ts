@@ -53,17 +53,28 @@ const T = {
 } satisfies Record<string, L4>;
 
 // Pre-filter extras in the other languages (EN is covered by classifyQuestion).
-const ADVICE_I18N = /asesor(í|i)a (legal|fiscal)|consejo de inversi|¿?debo invertir|rechtsberatung|steuerberatung|anlageberatung|soll ich investieren|法律相談|税務|投資助言|投資すべき/i;
+const ADVICE_I18N = new RegExp([
+  // ES
+  "asesor(í|i)a (legal|fiscal|jur(í|i)dica)", "consejo (legal|fiscal|de inversi)", "¿?deber(í|i)a (invertir|ofertar|pujar|licitar|firmar|aceptar|presentar)", "¿?debo (invertir|ofertar|pujar|licitar|firmar|aceptar)",
+  "vale la pena (invertir|ofertar)", "es (un )?buen (negocio|proyecto|trato|acuerdo)", "cu(á|a)nto deber(í|i)a (cobrar|ofertar|prestar)", "abogad", "demandar", "impuesto", "(es|ser(á|a)) (legal|v(á|a)lid)", "cl(á|a)usula",
+  // DE
+  "rechtsberatung", "steuerberatung", "anlageberatung", "soll(te)? ich\\b.{0,60}\\b(investieren|bieten|ein angebot|unterschreiben|annehmen|zusagen)", "lohnt sich", "ist (das|es) ein gutes? (gesch(ä|a)ft|projekt|deal|investment)",
+  "wie viel soll(te)? ich (verlangen|bieten|berechnen)", "anwalt", "verklagen", "steuer(frage|lich|recht|n zahlen)", "rechtlich", "vertragspr(ü|u)fung", "klausel",
+  // JA
+  "法律相談", "法的", "税務", "税金", "投資助言", "投資すべき", "入札すべき", "入札したほうが", "応札すべき", "署名すべき", "契約すべき", "引き受けるべき", "いくら(請求|入札)", "良い案件", "弁護士", "訴え", "条項",
+].join("|"), "i");
 const ADVICE_EN = /\b(should i (invest|take|accept|sign|bid)|is (this|it) a good (deal|project|investment)|how much should i (charge|bid|lend)|what should i charge|legal|lawyer|sue|contract review|tax)\b/i;
-const APPROVAL_I18N = /me aprobar(á|a)n|werde ich (zugelassen|freigegeben)|承認されますか/i;
+const APPROVAL_I18N = /me aprobar(á|a)n|ser(é|e) aprobad|me van a aprobar|aprobar(á|a)n mi|garantiz|werde ich (zugelassen|freigegeben|angenommen|aufgenommen)|wird (mein|meine) \S+ (freigegeben|genehmigt)|garantier|承認されますか|承認され(る|ます)|承認を保証|審査に通(る|り)|合格(する|します)/i;
+const SCORE_I18N = /puntuaci(ó|o)n|puntaje|calificaci(ó|o)n de verificaci|fuentes de verificaci|notas internas|punktzahl|pr(ü|u)fwert|score|bewertung meiner|interne notizen|スコア|点数|内部メモ|審査の情報源/i;
+const INJECTION_I18N = /ignora (las|tus|todas)|olvida (las|tus) (reglas|instrucciones)|cambia (las|tus) reglas|nuevas instrucciones|ignoriere|vergiss (die|deine|alle)|(ä|a)ndere (die|deine) regeln|neue anweisungen|systemprompt|指示を無視|ルールを(変更|無視|変え)|システムプロンプト|制限を解除/i;
 const BANNED = /\b(invite|invited|invites|invitation|founding member|limited)\b|invitar|invitaci|einlad|招待/i;
 const FORBIDDEN = /\b(ofac|courtlistener|edgar|duckduckgo|wikidata|gdelt|sdn|watchlists?|sanctions lists?|internal score|verification score)\b/i;
 export const ALLOWED_LINKS = ["/feed", "/profile", "/refer", "/viewers", "/messages", "/deals", "/network", "/member-nda", "/settings", "/alerts"];
 
 export function prefilter(question: string): keyof typeof T | null {
   const kind = classifyQuestion(question);
-  if (kind === "injection") return "meta";
-  if (kind === "score") return "score";
+  if (kind === "injection" || INJECTION_I18N.test(question)) return "meta";
+  if (kind === "score" || SCORE_I18N.test(question)) return "score";
   if (kind === "advice" || ADVICE_I18N.test(question) || ADVICE_EN.test(question)) return "advice";
   if (kind === "approval" || APPROVAL_I18N.test(question)) return "approval";
   return null;
