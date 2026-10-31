@@ -1,4 +1,10 @@
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
+import type { MemberRole } from "@prisma/client";
+import { DealChecklist } from "@/components/deal-checklist";
+import { ensureStarterChecklist } from "@/lib/deal-checklist-db";
+import { readChecklistFilter } from "@/lib/deal-checklist";
+import { rolesForCategory } from "@/lib/project-contact";
+import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { addDealDocument, postDealQuestion, removeParticipant } from "@/actions/deals";
@@ -20,7 +26,7 @@ export default async function DealRoomPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; f?: string }>;
 }) {
   const tx = await serverTx();
   const user = await requireUser();
@@ -33,11 +39,11 @@ export default async function DealRoomPage({
       access: { where: { status: "APPROVED" }, include: { requester: true } },
       documents: { orderBy: { createdAt: "desc" }, include: { author: true } },
       messages: { orderBy: { createdAt: "asc" }, include: { author: true, replies: { include: { author: true }, orderBy: { createdAt: "asc" } } } },
-      events: { orderBy: { createdAt: "desc" }, take: 20 },
+      events: { orderBy: { createdAt: "desc" }, take: 15 },
     },
   });
   if (!deal) notFound();
-  const allowed = deal.sponsorId === user.id || deal.access.some((item) => item.requesterId === user.id);
+  const allowed = deal.sponsorId === user.id || deal.access.some((item) => item.requesterId === user.id) || user.isAdmin;
   if (!allowed) redirect(`/deals/${deal.id}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
 
   const members = [
@@ -45,11 +51,43 @@ export default async function DealRoomPage({
     ...deal.access.map((item) => item.requester).filter((person) => person.id !== deal.sponsorId),
   ];
   const questions = deal.messages.filter((message) => !message.parentId);
+  // #41 checklist: starter list on first open by the sponsor or staff.
+  const manage = deal.sponsorId === user.id || user.isAdmin;
+  if (manage) await ensureStarterChecklist(deal.id);
+  const [items, project] = await Promise.all([
+    prisma.dealChecklistItem.findMany({
+      where: { dealId: deal.id },
+      orderBy: { position: "asc" },
+      select: {
+        id: true, section: true, title: true, category: true, status: true, assigneeId: true, dueDate: true, fileName: true, sizeBytes: true, fileAt: true,
+        comments: { orderBy: { createdAt: "asc" }, select: { id: true, body: true, createdAt: true, author: { select: { name: true } } } },
+      },
+    }),
+    deal.projectId ? prisma.trackProject.findUnique({ where: { id: deal.projectId }, select: { id: true, name: true, reviewStatus: true } }) : null,
+  ]);
+  const memberIds = new Set(members.map((person) => person.id));
+  const wantedCategories = [...new Set(items.filter((item) => item.category && item.status !== "DONE").map((item) => item.category))];
+  const candidates: Record<string, { id: string; name: string; initials: string; photoId: string; role: string; org: string; location: string; status: string }[]> = {};
+  if (deal.sponsorId === user.id && project?.reviewStatus === "APPROVED" && wantedCategories.length) {
+    const contacts = await prisma.projectContact.findMany({ where: { projectId: project.id }, select: { fromId: true, toId: true, status: true } });
+    const people = await prisma.user.findMany({
+      where: { status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: wantedCategories.flatMap((id) => rolesForCategory(id)) as MemberRole[] } },
+      orderBy: { name: "asc" },
+      take: 200,
+    });
+    for (const category of wantedCategories) {
+      const roles = rolesForCategory(category) as string[];
+      candidates[category] = people
+        .filter((person) => roles.includes(person.role) && !memberIds.has(person.id))
+        .slice(0, 6)
+        .map((person) => ({ id: person.id, name: person.name, initials: person.initials, photoId: person.photoId, role: person.role, org: person.org, location: person.location, status: contacts.find((c) => c.fromId === person.id || c.toId === person.id)?.status ?? "" }));
+    }
+  }
 
   return (
     <div>
       <MobileTitle href={`/deals/${deal.id}`} label={tx("Deal")} title={tx("Room")} />
-      <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-4 md:py-6 lg:px-8">
         <Link href={`/deals/${deal.id}`} className="hidden min-h-11 items-center text-sm text-mut md:inline-flex">
           ‹ {deal.title}
         </Link>
@@ -87,6 +125,22 @@ export default async function DealRoomPage({
           </ul>
         </div>
 
+        <div className="mt-4">
+          <DealChecklist
+            dealId={deal.id}
+            userId={user.id}
+            manage={manage}
+            members={members}
+            items={items}
+            filter={readChecklistFilter(query.f)}
+            project={project ? { id: project.id, name: project.name, approved: project.reviewStatus === "APPROVED" } : null}
+            candidates={candidates}
+            events={deal.events}
+            locale={await currentLocale()}
+          />
+        </div>
+
+        <div className="max-w-3xl">
         <section className={`mt-4 p-5 ${card}`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Documents")}</h2>
           <p className="mt-1 text-xs text-mut">{tx("PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.")}</p>
@@ -165,18 +219,7 @@ export default async function DealRoomPage({
           </form>
         </section>
 
-        <section className={`mt-4 p-5 ${card}`}>
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Activity")}</h2>
-          {deal.events.length === 0 ? <p className="mt-3 text-sm text-mut">{tx("Nothing recorded yet.")}</p> : null}
-          <ul className="mt-3 divide-y divide-line">
-            {deal.events.map((event) => (
-              <li key={event.id} className="py-2 text-sm text-ink">
-                {event.summary}
-                <span className="block text-xs text-mut">{timeAgo(event.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        </div>
       </div>
     </div>
   );

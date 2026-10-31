@@ -57,6 +57,15 @@ export const JOIN_ROLES: { id: RoleId; label: string }[] = [
   { id: "PROPERTY_MANAGER", label: "Property Manager" },
   { id: "ACCOUNTANT", label: "Accountant / Cost Seg" },
   { id: "EXCHANGE_1031", label: "1031 Exchange Intermediary" },
+  { id: "SURVEYOR", label: "Surveyor" },
+  { id: "TITLE_COMPANY", label: "Title Company" },
+  { id: "ENVIRONMENTAL_CONSULTANT", label: "Environmental Consultant" },
+  { id: "GEOTECH_ENGINEER", label: "Geotechnical Engineer" },
+  { id: "CIVIL_ENGINEER", label: "Civil Engineer" },
+  { id: "STRUCTURAL_ENGINEER", label: "Structural Engineer" },
+  { id: "PERMIT_EXPEDITER", label: "Permit Expediter" },
+  { id: "MEP_ENGINEER", label: "MEP Engineer" },
+  { id: "SURETY_BONDING", label: "Surety / Bonding" },
 ];
 
 export function joinRoleLabel(id: string): string {
@@ -65,7 +74,7 @@ export function joinRoleLabel(id: string): string {
 
 export type PageKind = "developer" | "gc" | "licensed" | "attorney" | "lender" | "investor" | "family" | "specialty";
 
-const LICENSED = new Set(["BROKER", "INSURANCE", "MORTGAGE_BROKER", "ARCHITECT_ENGINEER", "APPRAISER"]);
+const LICENSED = new Set(["BROKER", "INSURANCE", "MORTGAGE_BROKER", "ARCHITECT_ENGINEER", "APPRAISER", "SURVEYOR", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "SURETY_BONDING", "TITLE_COMPANY"]);
 
 export function pageKind(role: string): PageKind {
   if (role === "DEVELOPER") return "developer";

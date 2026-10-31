@@ -878,6 +878,8 @@ async function seedVerification() {
   await alignSeedTiers();
   await applySeedCaseMap();
   await ensureDemoAccessAndNotices();
+  await ensureCategoryDemoMembers();
+  await ensureMapleCourtDealRoom();
 }
 
 const DEMO_PROJECT_FIELDS: Record<string, { stage: string; need: string }> = {
@@ -1358,4 +1360,110 @@ function samplePdf(title: string): string {
   out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return out;
+}
+
+/** #41 one fictional demo member per new category, so "Find a [category]" has someone to show. Idempotent. */
+const CATEGORY_DEMO: Person[] = [
+  { id: "user_sv", email: "sam.verga@vergasurvey.example", name: "Sam Verga", initials: "SV", role: "SURVEYOR", org: "Verga Land Surveying", location: "Morristown, NJ", tier: "INVITED", credentialNote: "NJ Professional Land Surveyor (demo)", bio: "ALTA, boundary, and topographic surveys. Fictional." },
+  { id: "user_tc", email: "tanya.cole@gardentitle.example", name: "Tanya Cole", initials: "TC", role: "TITLE_COMPANY", org: "Garden State Title Agency", location: "Newark, NJ", tier: "INVITED", credentialNote: "NJ title producer license (demo)", bio: "Commercial title and closings. Fictional." },
+  { id: "user_ec", email: "erin.chu@chuenviro.example", name: "Erin Chu", initials: "EC", role: "ENVIRONMENTAL_CONSULTANT", org: "Chu Environmental", location: "Edison, NJ", tier: "INVITED", credentialNote: "NJ LSRP (demo)", bio: "Phase I / II and remediation. Fictional." },
+  { id: "user_gb", email: "gabe.byrne@byrnegeo.example", name: "Gabe Byrne", initials: "GB", role: "GEOTECH_ENGINEER", org: "Byrne Geotechnical", location: "Paramus, NJ", tier: "INVITED", credentialNote: "NJ PE (demo)", bio: "Borings and foundation reports. Fictional." },
+  { id: "user_cn", email: "carla.nunez@nunezcivil.example", name: "Carla Nunez", initials: "CN", role: "CIVIL_ENGINEER", org: "Nunez Civil Engineering", location: "Clifton, NJ", tier: "INVITED", credentialNote: "NJ PE (demo)", bio: "Site plans, grading, and utilities. Fictional." },
+  { id: "user_sk", email: "sid.kapoor@kapoorstructural.example", name: "Sid Kapoor", initials: "SK", role: "STRUCTURAL_ENGINEER", org: "Kapoor Structural", location: "Jersey City, NJ", tier: "INVITED", credentialNote: "NJ PE (demo)", bio: "Mid-rise wood and podium structures. Fictional." },
+  { id: "user_pe", email: "paula.estes@estespermits.example", name: "Paula Estes", initials: "PE", role: "PERMIT_EXPEDITER", org: "Estes Permit Services", location: "Montclair, NJ", tier: "INVITED", credentialNote: "Business card matched to public records", bio: "Building permits across Essex County. Fictional." },
+  { id: "user_mr", email: "max.romero@romeromep.example", name: "Max Romero", initials: "MR", role: "MEP_ENGINEER", org: "Romero MEP", location: "Hackensack, NJ", tier: "INVITED", credentialNote: "NJ PE (demo)", bio: "Mechanical, electrical, and plumbing design. Fictional." },
+  { id: "user_bh", email: "beth.hale@keystonebond.example", name: "Beth Haley", initials: "BH", role: "SURETY_BONDING", org: "Keystone Surety", location: "Parsippany, NJ", tier: "INVITED", credentialNote: "NJ surety producer (demo)", bio: "Performance and payment bonds. Fictional." },
+];
+
+async function ensureCategoryDemoMembers() {
+  for (const [index, person] of CATEGORY_DEMO.entries()) {
+    const exists = await prisma.user.findUnique({ where: { id: person.id }, select: { id: true } });
+    if (exists) continue;
+    const taken = await prisma.user.findUnique({ where: { email: person.email }, select: { id: true } });
+    if (taken) continue;
+    await prisma.user.create({ data: { ...person, passwordHash, isAdmin: false, status: "ACTIVE", phone: `201-555-${String(2000 + index)}`, seenWelcome: true } });
+  }
+}
+
+const daysFromNow = (days: number) => {
+  const date = new Date(Date.now() + days * 86_400_000);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12));
+};
+
+/** #41 Maple Court deal room with a filled-in due-diligence checklist. Idempotent: built once. */
+async function ensureMapleCourtDealRoom() {
+  const project = await prisma.trackProject.findUnique({ where: { id: "proj_maple_court" }, select: { id: true } });
+  if (!project) return;
+  const id = "deal_maple_court";
+  const existing = await prisma.deal.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) {
+    await prisma.deal.create({
+      data: {
+        id,
+        sponsorId: "user_mh",
+        kind: "SEEKING",
+        title: "Sample: Maple Court Townhomes",
+        blurb: "24 for-sale townhomes on 3.1 acres in Montclair. Site plan approval in hand.",
+        market: "NJ",
+        sizeBand: "$5M – $25M",
+        assetClass: "Single family / townhome",
+        raiseLabel: "",
+        stage: "pre-construction",
+        need: "gc",
+        projectId: project.id,
+      },
+    });
+  }
+  for (const requesterId of ["user_ev", "user_gl", "user_ls"]) {
+    const person = await prisma.user.findUnique({ where: { id: requesterId }, select: { id: true } });
+    if (!person) continue;
+    await prisma.dealAccess.upsert({
+      where: { dealId_requesterId: { dealId: id, requesterId } },
+      update: {},
+      create: { dealId: id, requesterId, status: "APPROVED", ndaAcknowledged: true, ndaAcknowledgedAt: hoursAgo(72), reviewedAt: hoursAgo(70) },
+    });
+  }
+  if ((await prisma.dealChecklistItem.count({ where: { dealId: id } })) > 0) return;
+  type Row = [string, string, string, string, string | null, number | null, string, number];
+  // section, title, category, status, assignee, due (days from now), file name, comments
+  const rows: Row[] = [
+    ["Site & Title", "Boundary and topographic survey", "SURVEYOR", "DONE", "user_mh", -21, "Maple-Court-survey.pdf", 2],
+    ["Site & Title", "Title report and commitment", "TITLE_COMPANY", "DONE", "user_mh", -18, "Title-commitment-2026-1187.pdf", 1],
+    ["Site & Title", "Phase I environmental site assessment", "ENVIRONMENTAL_CONSULTANT", "DONE", "user_mh", -15, "Phase-I-ESA-final.pdf", 1],
+    ["Site & Title", "Geotechnical report", "GEOTECH_ENGINEER", "NEEDED", null, 7, "", 0],
+    ["Approvals & Permits", "Zoning approval", "ZONING_ATTORNEY", "DONE", "user_mh", -28, "Montclair-ZBA-resolution.pdf", 0],
+    ["Approvals & Permits", "Structural drawings", "STRUCTURAL_ENGINEER", "NEEDED", null, 14, "", 0],
+    ["Approvals & Permits", "Building permit", "PERMIT_EXPEDITER", "IN_PROGRESS", "user_ev", -4, "", 2],
+    ["Approvals & Permits", "Utility will-serve letters", "CIVIL_ENGINEER", "IN_PROGRESS", "user_mh", 9, "", 1],
+    ["Budget & Financing", "GC budget", "GENERAL_CONTRACTOR", "DONE", "user_ev", -6, "GC-budget-v2.xlsx", 2],
+    ["Budget & Financing", "Lender term sheet", "FINANCING", "DONE", "user_ls", -10, "Term-sheet-signed.pdf", 1],
+    ["Budget & Financing", "Appraisal", "APPRAISER", "IN_PROGRESS", "user_ls", 13, "", 0],
+    ["Insurance", "Builder's risk policy", "INSURANCE", "NEEDED", "user_mh", 16, "", 0],
+    ["Insurance", "GC certificate of insurance", "GENERAL_CONTRACTOR", "DONE", "user_ev", -8, "Voss-Reed-COI-2026.pdf", 0],
+    ["Insurance", "Performance and payment bonds", "SURETY_BONDING", "NEEDED", null, 21, "", 0],
+    ["Contracts", "GC agreement", "RE_ATTORNEY", "IN_PROGRESS", "user_ev", 11, "", 3],
+    ["Contracts", "Architect agreement", "ARCHITECT_ENGINEER", "DONE", "user_gl", -30, "Architect-B101-executed.pdf", 1],
+  ];
+  const remarks = ["Uploaded the final version.", "Looks good to me.", "Resubmitting the fire separation sheets Monday."];
+  const pdf = Buffer.from(DEMO_PDF);
+  for (const [position, [section, title, category, status, assigneeId, due, fileName, comments]] of rows.entries()) {
+    const item = await prisma.dealChecklistItem.create({
+      data: {
+        dealId: id, section, title, category, status, assigneeId, position,
+        dueDate: due === null ? null : daysFromNow(due),
+        ...(fileName ? { fileName, contentType: fileName.endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf", sizeBytes: pdf.byteLength, bytes: pdf, fileAt: hoursAgo(24 * (position + 1)) } : {}),
+      },
+    });
+    for (let index = 0; index < comments; index += 1) {
+      await prisma.dealChecklistComment.create({ data: { itemId: item.id, authorId: index % 2 ? "user_mh" : assigneeId ?? "user_mh", body: remarks[index % remarks.length], createdAt: hoursAgo(30 - index) } });
+    }
+  }
+  const events: [string, string, number][] = [
+    ["user_ev", "Elena Voss uploaded GC-budget-v2.xlsx to GC budget", 2],
+    ["user_ls", "Leo Sandoval marked Lender term sheet done", 5],
+    ["user_mh", "Marcus Hale commented on Building permit: “Resubmitting the fire separation sheets Monday.”", 26],
+    ["user_ev", "Elena Voss uploaded Voss-Reed-COI-2026.pdf to GC certificate of insurance", 48],
+    ["user_gl", "Grace Liu marked Architect agreement done", 70],
+  ];
+  for (const [actorId, summary, hours] of events) await prisma.dealEvent.create({ data: { dealId: id, actorId, summary, createdAt: hoursAgo(hours) } });
 }

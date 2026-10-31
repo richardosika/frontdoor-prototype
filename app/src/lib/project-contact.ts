@@ -21,12 +21,21 @@ export const SEEK_CATEGORIES: SeekCategory[] = [
   { id: "RE_ATTORNEY", label: "Real estate attorney", roles: ["RE_ATTORNEY"] },
   { id: "SECURITIES_ATTORNEY", label: "Securities attorney", roles: ["SECURITIES_ATTORNEY"] },
   { id: "ZONING_ATTORNEY", label: "Zoning / land use attorney", roles: ["ZONING_ATTORNEY"] },
-  { id: "INSURANCE", label: "Insurance / Surety", roles: ["INSURANCE"] },
+  { id: "INSURANCE", label: "Insurance", roles: ["INSURANCE"] },
+  { id: "SURETY_BONDING", label: "Surety / bonding", roles: ["SURETY_BONDING"] },
   { id: "BROKER", label: "Broker", roles: ["BROKER"] },
   { id: "APPRAISER", label: "Appraiser", roles: ["APPRAISER"] },
   { id: "PROPERTY_MANAGER", label: "Property manager", roles: ["PROPERTY_MANAGER"] },
   { id: "ACCOUNTANT", label: "Accountant / Cost seg", roles: ["ACCOUNTANT"] },
   { id: "EXCHANGE_1031", label: "1031 exchange", roles: ["EXCHANGE_1031"] },
+  { id: "SURVEYOR", label: "Surveyor", roles: ["SURVEYOR"] },
+  { id: "TITLE_COMPANY", label: "Title company", roles: ["TITLE_COMPANY"] },
+  { id: "ENVIRONMENTAL_CONSULTANT", label: "Environmental consultant", roles: ["ENVIRONMENTAL_CONSULTANT"] },
+  { id: "GEOTECH_ENGINEER", label: "Geotechnical engineer", roles: ["GEOTECH_ENGINEER"] },
+  { id: "CIVIL_ENGINEER", label: "Civil engineer", roles: ["CIVIL_ENGINEER"] },
+  { id: "STRUCTURAL_ENGINEER", label: "Structural engineer", roles: ["STRUCTURAL_ENGINEER"] },
+  { id: "PERMIT_EXPEDITER", label: "Permit expediter", roles: ["PERMIT_EXPEDITER"] },
+  { id: "MEP_ENGINEER", label: "MEP engineer", roles: ["MEP_ENGINEER"] },
 ];
 
 const BY_ID = new Map(SEEK_CATEGORIES.map((item) => [item.id, item]));
@@ -262,7 +271,7 @@ const NEED_CATEGORIES: Record<string, string[]> = {
   debt: ["FINANCING"],
   gc: ["GENERAL_CONTRACTOR"],
   broker: ["BROKER", "FINANCING"],
-  advisory: ["RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "INSURANCE", "ACCOUNTANT", "APPRAISER", "PROPERTY_MANAGER", "EXCHANGE_1031"],
+  advisory: ["RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "INSURANCE", "ACCOUNTANT", "APPRAISER", "PROPERTY_MANAGER", "EXCHANGE_1031", "SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING"],
 };
 
 /**

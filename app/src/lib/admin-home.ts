@@ -116,6 +116,15 @@ const DUES_ROWS: { role: string; label: string }[] = [
   { role: "PROPERTY_MANAGER", label: "Property Manager" },
   { role: "ACCOUNTANT", label: "Accountant / Cost Seg" },
   { role: "EXCHANGE_1031", label: "1031 Exchange Intermediary" },
+  { role: "SURVEYOR", label: "Surveyor" },
+  { role: "TITLE_COMPANY", label: "Title Company" },
+  { role: "ENVIRONMENTAL_CONSULTANT", label: "Environmental Consultant" },
+  { role: "GEOTECH_ENGINEER", label: "Geotechnical Engineer" },
+  { role: "CIVIL_ENGINEER", label: "Civil Engineer" },
+  { role: "STRUCTURAL_ENGINEER", label: "Structural Engineer" },
+  { role: "PERMIT_EXPEDITER", label: "Permit Expediter" },
+  { role: "MEP_ENGINEER", label: "MEP Engineer" },
+  { role: "SURETY_BONDING", label: "Surety / Bonding" },
 ];
 
 export function duesSchedule(): { role: string; label: string; cents: number; text: string }[] {

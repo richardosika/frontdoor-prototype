@@ -58,10 +58,11 @@ describe("brand", () => {
 });
 
 describe("roles", () => {
-  it("lists the 16 deal-team roles from the brief", () => {
-    expect(ROLES).toHaveLength(16);
-    expect(ROLE_IDS).toHaveLength(16);
-    expect(ROLES.map((role) => role.label)).toEqual(BRIEF_LABELS);
+  it("lists the 25 deal-team roles (16 from the brief plus 9 from #41)", () => {
+    expect(ROLES).toHaveLength(25);
+    expect(ROLE_IDS).toHaveLength(25);
+    expect(ROLES.slice(0, 16).map((role) => role.label)).toEqual(BRIEF_LABELS.map((label) => (label.startsWith("Insurance") ? "Insurance (builder's risk, liability)" : label)));
+    expect(ROLES.slice(16).map((role) => role.id)).toEqual(["SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING"]);
     expect(new Set(ROLES.map((role) => role.group)).size).toBeGreaterThan(1);
   });
 });
