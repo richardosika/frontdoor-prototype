@@ -80,6 +80,7 @@ describe("#51 bids and comparison", () => {
     ]);
     expect(best.total).toEqual(["b"]);
     expect(best.duration).toEqual(["c"]);
+    expect(bestPerRow(fields, [{ id: "a", values: { feePct: "4" } }, { id: "b", values: { feePct: "4" } }]).feePct).toBeUndefined();
   });
   it("normalizes per unit and per SF", () => {
     expect(perUnit(38400000, 120)).toBe(320000);

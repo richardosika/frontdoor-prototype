@@ -74,6 +74,7 @@ export function bestPerRow(fields: BidField[], bids: { id: string; values: Recor
     if (!fl.best) continue;
     const nums = bids.map((b) => ({ id: b.id, n: numeric(b.values[fl.key]) })).filter((x): x is { id: string; n: number } => x.n != null);
     if (nums.length < 2) continue;
+    if (nums.every((x) => x.n === nums[0].n)) continue;
     const target = fl.best === "high" ? Math.max(...nums.map((x) => x.n)) : Math.min(...nums.map((x) => x.n));
     out[fl.key] = nums.filter((x) => x.n === target).map((x) => x.id);
   }
