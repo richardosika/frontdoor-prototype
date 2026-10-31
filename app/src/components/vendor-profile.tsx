@@ -6,6 +6,7 @@ import { ReachOut, StatusPill, type ReachProject } from "@/components/reach-out"
 import { btnOutline } from "@/components/ui";
 import { blockMember, openConversation, unblockMember } from "@/actions/social";
 import { serverTx } from "@/lib/i18n/server";
+import { roleProfile } from "@/lib/role-profile";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { fixRoleTypos, formatProjectValue, projectLocation } from "@/lib/project-contact";
 
@@ -28,6 +29,7 @@ type Member = {
   typicalJobSize?: string;
   licenses?: string;
   insuranceInfo?: string;
+  specialties?: string;
 };
 type PastProject = { id: string; name: string; asset: string; location: string; city: string; state: string; year: number; valueLabel: string; role: string; detailsVisible: boolean; reviewStatus: string };
 
@@ -56,12 +58,14 @@ export async function VendorProfile({
   const tx = await serverTx();
   const closed = blockedByViewer || blockedByThem;
   const type = tx(roleShort(roleLabel(member.role)));
+  const rp = roleProfile(member.role);
   const facts = [
+    [rp.specialties, member.specialties ?? ""],
     ["Markets", member.markets],
     ["Asset classes", member.assetClasses],
     ["Years in business", member.yearsInBusiness ?? ""],
-    ["Typical job size", member.typicalJobSize || member.checkSize],
-    ["Licenses", member.licenses ?? ""],
+    [rp.size, member.typicalJobSize || member.checkSize],
+    [rp.credential, member.licenses ?? ""],
     ["Insurance", member.insuranceInfo ?? ""],
   ].filter(([, value]) => value);
   const contacted = reach.filter((project) => project.status);

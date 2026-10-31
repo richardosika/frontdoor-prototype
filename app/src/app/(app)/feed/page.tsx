@@ -55,6 +55,7 @@ export default async function FeedPage({
     projectPending: mine.some((project) => project.reviewStatus === "PENDING_REVIEW" || project.reviewStatus === "NEEDS_INFO"),
     outreachSent,
     hasPhoto: Boolean(user.photoId),
+    hasCredential: Boolean(user.licenses?.trim()),
   });
   const unusedCodes = ownedCodes.filter((code) => code.uses < code.maxUses).map((code) => ({ code: code.code, note: code.note }));
 

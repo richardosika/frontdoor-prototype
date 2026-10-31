@@ -93,7 +93,7 @@ describe("#24 getting started", () => {
     expect(all.every((i) => i.done)).toBe(true);
   });
   it("other members get their own list, and the box hides when all done", () => {
-    expect(gettingStarted({ role: "INSURANCE", ...base }).map((i) => i.id)).toEqual(["nda", "profile", "photo", "work", "reach"]);
+    expect(gettingStarted({ role: "INSURANCE", ...base }).map((i) => i.id)).toEqual(["nda", "profile", "work", "photo", "reach"]);
     expect(read("src/components/getting-started.tsx")).toContain("if (items.every((item) => item.done)) return null;");
     expect(read("src/app/(app)/feed/page.tsx")).not.toContain("markChecklist");
   });

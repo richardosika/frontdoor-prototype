@@ -1,3 +1,4 @@
+import { roleProfile } from "@/lib/role-profile";
 /**
  * Who sees which projects and people (#25, #27, #28).
  *
@@ -106,6 +107,8 @@ export function gettingStarted(input: {
   projectPending?: boolean;
   outreachSent: number;
   hasPhoto: boolean;
+  /** Overnight: licenses / NMLS / bar / producer license entered on the profile. */
+  hasCredential?: boolean;
 }): StartItem[] {
   if (isDeveloperRole(input.role)) {
     return sequential([
@@ -118,11 +121,15 @@ export function gettingStarted(input: {
       { id: "reach", label: "Reach out to a member on your team", href: "/deals", done: input.outreachSent > 0 },
     ]);
   }
+  // Overnight: role order is NDA, profile with credentials, past work, photos, first outreach.
+  const rp = roleProfile(input.role);
   return sequential([
     { id: "nda", label: "Accept the Member NDA", href: "/member-nda", done: input.ndaAccepted },
-    { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
+    rp.credentialRequired
+      ? { id: "profile", label: `Complete your profile with your ${rp.credential.toLowerCase()}`, href: "/profile#profile-credential", done: input.profileDone && Boolean(input.hasCredential) }
+      : { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
+    { id: "work", label: rp.portfolio, href: "/feed#ledger-add-project", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
-    { id: "work", label: "Add a past project to show your work", href: "/feed#ledger-add-project", done: input.projectCount > 0 },
     { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
   ]);
 }

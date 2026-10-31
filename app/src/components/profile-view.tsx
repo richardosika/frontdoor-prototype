@@ -29,6 +29,7 @@ type Project = {
   role: string;
   seeking: string;
   shareWithCircle: boolean;
+  roleFacts?: string;
   reviewStatus: string;
   reviewNote: string;
   detailsVisible: boolean;
@@ -88,6 +89,8 @@ export async function ProfileView({
     typicalJobSize?: string;
     licenses?: string;
     insuranceInfo?: string;
+    specialties?: string;
+    privateTerms?: string;
     createdAt: Date;
   };
   projects: Project[];

@@ -31,9 +31,9 @@ export async function saveProfile(formData: FormData) {
   // #30: "What I am looking for" is gone and developers have no services field; keep whatever is saved.
   const offering = formData.has("offering") ? String(formData.get("offering") || "").trim().slice(0, 800) : undefined;
   const vendor = Object.fromEntries(
-    (["yearsInBusiness", "typicalJobSize", "licenses", "insuranceInfo"] as const)
+    (["yearsInBusiness", "typicalJobSize", "licenses", "insuranceInfo", "specialties", "privateTerms"] as const)
       .filter((key) => formData.has(key))
-      .map((key) => [key, String(formData.get(key) || "").trim().slice(0, key === "yearsInBusiness" ? 40 : key === "typicalJobSize" ? 80 : 400)]),
+      .map((key) => [key, String(formData.get(key) || "").trim().slice(0, key === "yearsInBusiness" ? 40 : key === "typicalJobSize" ? 80 : key === "specialties" ? 300 : 400)]),
   );
   const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
   await prisma.user.update({

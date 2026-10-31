@@ -3,6 +3,7 @@ import { btn } from "@/components/ui";
 import { currentLocale } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n/messages";
 import { phrase } from "@/lib/i18n/phrases";
+import { roleProfile } from "@/lib/role-profile";
 
 const labelCls = "mb-2 block font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-forest";
 const field =
@@ -31,10 +32,13 @@ export async function ProfileEditor({
     typicalJobSize?: string;
     licenses?: string;
     insuranceInfo?: string;
+    specialties?: string;
+    privateTerms?: string;
     role?: string;
   };
 }) {
   const locale = await currentLocale();
+  const rp = roleProfile(member.role);
   const t = translator(locale);
   const markets = selected(member.markets);
   const dealTypes = selected(member.dealTypes);
@@ -107,18 +111,30 @@ export async function ProfileEditor({
             <input name="yearsInBusiness" defaultValue={member.yearsInBusiness ?? ""} maxLength={40} className={field} inputMode="numeric" />
           </label>
           <label>
-            <span className={labelCls}>{phrase(locale, "Typical job size")}</span>
-            <input name="typicalJobSize" defaultValue={member.typicalJobSize ?? ""} maxLength={80} className={field} placeholder="$2M to $20M" />
+            <span className={labelCls}>{phrase(locale, rp.size)}</span>
+            <input name="typicalJobSize" defaultValue={member.typicalJobSize ?? ""} maxLength={80} className={field} placeholder={phrase(locale, rp.sizeHint)} />
           </label>
           <label className="sm:col-span-2">
-            <span className={labelCls}>{phrase(locale, "Licenses")}</span>
-            <textarea name="licenses" defaultValue={member.licenses ?? ""} rows={2} maxLength={400} className={field} />
+            <span className={labelCls}>{phrase(locale, rp.specialties)}</span>
+            <input name="specialties" defaultValue={member.specialties ?? ""} maxLength={300} className={field} placeholder={rp.specialtiesHint ? phrase(locale, rp.specialtiesHint) : undefined} />
+          </label>
+          <label className="sm:col-span-2" data-testid="profile-credential">
+            <span className={labelCls}>{phrase(locale, rp.credential)}{rp.credentialRequired ? " *" : ""}</span>
+            <textarea name="licenses" defaultValue={member.licenses ?? ""} rows={2} maxLength={400} className={field} placeholder={rp.credentialHint ? phrase(locale, rp.credentialHint) : undefined} />
+            {rp.credentialRequired ? <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Needed to finish Getting started. Staff check it against public records.")}</span> : null}
           </label>
           <label className="sm:col-span-2">
             <span className={labelCls}>{phrase(locale, "Insurance")}</span>
             <textarea name="insuranceInfo" defaultValue={member.insuranceInfo ?? ""} rows={2} maxLength={400} className={field} />
             <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Optional. Shown on your profile to developers.")}</span>
           </label>
+          {rp.privateTerms ? (
+            <label className="sm:col-span-2" data-testid="profile-private-terms">
+              <span className={labelCls}>{phrase(locale, "Rates and terms (private)")}</span>
+              <textarea name="privateTerms" defaultValue={member.privateTerms ?? ""} rows={2} maxLength={400} className={field} />
+              <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Only you see this. Rates and terms are never shown on your profile; discuss them in messages.")}</span>
+            </label>
+          ) : null}
         </div>
       ) : null}
       <label>

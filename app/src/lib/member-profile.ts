@@ -130,6 +130,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       role: project.role,
       seeking: project.seeking,
       shareWithCircle: project.shareWithCircle,
+      roleFacts: project.roleFacts,
       reviewStatus: project.reviewStatus,
       reviewNote: viewer.id === project.userId || viewer.isAdmin ? project.reviewNote : "",
       detailsVisible: projectDetailsVisible(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle }),
@@ -173,6 +174,9 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       typicalJobSize: member.typicalJobSize,
       licenses: member.licenses,
       insuranceInfo: member.insuranceInfo,
+      specialties: member.specialties,
+      // Private rates and terms only ever go back to the member themself.
+      privateTerms: viewerId === memberId ? member.privateTerms : "",
       createdAt: member.createdAt,
     },
     projects,
