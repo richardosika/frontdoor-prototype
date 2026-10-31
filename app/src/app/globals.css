@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+}
+
+html {
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
+  scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Phone chrome. Desktop cards sit inside the wash and keep their own padding. */
+@media (max-width: 767px) {
+  .safe-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  /* Keep the status-bar band filled after the in-flow header scrolls away.
+     The band is only the notch inset, so it does not cover the first card. */
+  .safe-top::before,
+  .notch::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: inherit;
+    z-index: 40;
+    pointer-events: none;
+  }
+}
+
+body {
+  background: #f4efe4;
+  color: #1f3a2e;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #e0d6c2 transparent;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif), "EB Garamond", serif;
+  }
+}
+
+@layer utilities {
+  .wash {
+    background: radial-gradient(circle at 80% 10%, #2e5242, transparent 55%), #1f3a2e;
+  }
+
+  .cover-forest {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 38px, rgba(255, 255, 255, 0.08) 38px 39px),
+      radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.18), transparent 60%),
+      linear-gradient(135deg, #2a4a3b, #1f3a2e);
+  }
+}

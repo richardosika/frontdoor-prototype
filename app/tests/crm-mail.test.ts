@@ -1,0 +1,165 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { STAGE_OVERRIDE_OPTIONS, crmStage, csvCell, followUpDue, isDecisionStage, stageOverride } from "@/lib/crm-stage";
+import {
+  SIGN_OFF,
+  TEMPLATE_DEFS,
+  TEMPLATE_VARIABLES,
+  TEMPLATE_PREVIOUS_BODIES,
+  deliveryTarget,
+  firstName,
+  renderTemplate,
+  replacementTemplateBody,
+  sampleTemplateVars,
+  shouldSuppressSend,
+  templateDef,
+} from "@/lib/email-templates";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+describe("email templates", () => {
+  it("fills variables once and keeps the founder sign-off", () => {
+    const body = renderTemplate("Hello {first_name},\n\nCode {invite_code}.\n\nRichard Osika, Founder", {
+      first_name: "Alex",
+      invite_code: "PF-1",
+    });
+    expect(body).toBe("Hello Alex,\n\nCode PF-1.\n\nRichard Osika, Founder");
+    expect(body.match(/Richard Osika, Founder/g)).toHaveLength(1);
+    expect(renderTemplate("Hello {first_name}.", { first_name: "Alex" })).toContain(SIGN_OFF);
+    expect(renderTemplate("Hello {unknown_token}.", {})).toContain("{unknown_token}");
+    expect(renderTemplate("Code {referral_code}.", { invite_code: "PF-2" }, { signOff: false })).toBe("Code PF-2.");
+    expect(renderTemplate("Code {invite_code}.", { referral_code: "PF-3" }, { signOff: false })).toBe("Code PF-3.");
+    expect(firstName("Alex Rivera")).toBe("Alex");
+    expect(firstName("QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
+  });
+
+  it("keeps the declined letter free of a reason variable", () => {
+    const declined = templateDef("declined");
+    expect(declined?.body).not.toContain("{note}");
+    expect(declined?.body).toContain("don't share the reasons");
+    expect(declined?.body).toContain("Private Floor administrator");
+    expect(declined?.body).toContain(SIGN_OFF);
+  });
+
+  it("ships the letters in a warm administrator voice", () => {
+    expect(TEMPLATE_DEFS.map((item) => item.key)).toEqual([
+      "info",
+      "invite_received",
+      "application_code",
+      "application_thanks",
+      "welcome",
+      "needs_info",
+      "approved",
+      "declined",
+      "payment_due",
+      "dues_reminder",
+      "renewal",
+    ]);
+    const joined = TEMPLATE_DEFS.map((item) => `${item.subject}\n${item.body}`).join("\n");
+    expect(joined).toContain("Private Floor administrator");
+    expect(joined.toLowerCase()).not.toContain("sent from my");
+    expect(joined).not.toContain("299 Market Street");
+    expect(TEMPLATE_DEFS.every((item) => item.body.includes(SIGN_OFF))).toBe(true);
+    const received = templateDef("invite_received");
+    const rendered = renderTemplate(received?.body || "", {
+      first_name: "Ada",
+      status_link: "https://cornicio-mvp.onrender.com/invite-status/preview",
+    });
+    expect(rendered).toContain("Thank you, Ada. We've got your request to join.");
+    expect(rendered).toContain("A private network where every member is personally reviewed");
+    expect(rendered.toLowerCase()).not.toContain("we've got your application");
+    expect(rendered).toContain("Check your status");
+    expect(rendered).toContain("https://cornicio-mvp.onrender.com/invite-status/preview");
+    expect(rendered).toContain("Richard Osika, Founder, Private Floor Club");
+    expect(rendered.match(/Richard Osika, Founder/g)).toHaveLength(1);
+    expect(templateDef("application_code")?.body).toContain("{code}");
+    const info = renderTemplate(templateDef("info")?.body || "", { ...sampleTemplateVars(), referral_code: "", invite_code: "" });
+    expect(templateDef("info")?.subject).toBe("About Private Floor");
+    expect(templateDef("info")?.body).toContain("{referral_code}");
+    expect(templateDef("info")?.body).not.toContain("{invite_code}");
+    expect(TEMPLATE_VARIABLES).toContain("referral_code");
+    expect(TEMPLATE_VARIABLES).not.toContain("invite_code");
+    expect(templateDef("approved")?.subject).toBe("You're approved to Private Floor");
+    expect(info).toContain("Request to join");
+    expect(info).toContain("reviews every request to join");
+    expect(info).not.toMatch(/\$|dues|charged|fee/i);
+    expect(info).toContain("A private network where every member is personally reviewed");
+    expect(info.toLowerCase()).not.toContain("invited");
+    expect(info).not.toContain("Code:");
+    expect(renderTemplate(templateDef("info")?.body || "", sampleTemplateVars())).toContain("PF-PREVIEW");
+    const previousInfo = TEMPLATE_PREVIOUS_BODIES.info;
+    const storedInfo = Array.isArray(previousInfo) ? previousInfo[1] : previousInfo;
+    const replaced = replacementTemplateBody("info", storedInfo || "") || "";
+    expect(replaced).toContain("Request to join");
+    expect(replaced.toLowerCase()).not.toContain("you're invited");
+  });
+
+  it("sends approval and dues mail from the decision, not the stage menu", () => {
+    const crm = readFileSync(path.resolve(__dirname, "../src/actions/crm.ts"), "utf8");
+    const decision = readFileSync(path.resolve(__dirname, "../src/actions/admin.ts"), "utf8");
+    expect(crm).not.toMatch(/key:\s*"approved"/);
+    expect(crm).not.toMatch(/key:\s*"payment_due"/);
+    expect(decision).toMatch(/key:\s*"payment_due"/);
+    expect(decision).toMatch(/key:\s*"welcome"/);
+    expect(decision).not.toMatch(/key:\s*"approved"/);
+  });
+
+  it("keeps live mode on the test outbox", () => {
+    expect(deliveryTarget("outbox", "rich@privatefloorclub.com")).toEqual({
+      to: "rich@privatefloorclub.com",
+      via: "outbox",
+      mode: "outbox",
+    });
+    expect(deliveryTarget("live", "rich@privatefloorclub.com").via).toBe("outbox");
+    expect(deliveryTarget("live", "rich@privatefloorclub.com").to).toBe("rich@privatefloorclub.com");
+    expect(shouldSuppressSend({ doNotContact: true })).toBe(true);
+    expect(shouldSuppressSend({ doNotContact: false })).toBe(false);
+    expect(shouldSuppressSend(null)).toBe(false);
+  });
+});
+
+describe("crm stage", () => {
+  it("follows invite, application, payment, and membership", () => {
+    expect(crmStage({})).toBe("INVITED");
+    expect(crmStage({ inviteStatus: "DECLINED" })).toBe("DECLINED");
+    expect(crmStage({ applicationStatus: "SUBMITTED" })).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "NEEDS_INFO" })).toBe("IN_REVIEW");
+    expect(crmStage({ applicationStatus: "PAYMENT_DUE" })).toBe("APPROVED");
+    expect(crmStage({ applicationStatus: "APPROVED" })).toBe("ACTIVE");
+    expect(crmStage({ applicationStatus: "DECLINED" })).toBe("DECLINED");
+    expect(crmStage({ memberActive: true, paymentStatus: "NOT_REQUIRED" })).toBe("ACTIVE");
+    expect(crmStage({ memberActive: true, paymentStatus: "DUE" })).toBe("APPROVED");
+    expect(crmStage({ memberActive: true, paymentStatus: "PAID" })).toBe("ACTIVE");
+    expect(crmStage({ applicationStatus: "DECLINED", manualStage: "INVITED" })).toBe("INVITED");
+  });
+
+  it("does not let a stage override approve, activate, or decline", () => {
+    expect(STAGE_OVERRIDE_OPTIONS).toEqual(["INVITED", "APPLIED", "IN_REVIEW"]);
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("APPROVED");
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("ACTIVE");
+    expect(STAGE_OVERRIDE_OPTIONS).not.toContain("DECLINED");
+    expect(isDecisionStage("APPROVED")).toBe(true);
+    expect(isDecisionStage("ACTIVE")).toBe(true);
+    expect(isDecisionStage("DECLINED")).toBe(true);
+    expect(isDecisionStage("IN_REVIEW")).toBe(false);
+    expect(stageOverride("APPROVED")).toBeNull();
+    expect(stageOverride("ACTIVE")).toBeNull();
+    expect(stageOverride("DECLINED")).toBeNull();
+    expect(stageOverride("APPLIED")).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "APPROVED" })).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "ACTIVE" })).toBe("APPLIED");
+    expect(crmStage({ applicationStatus: "SUBMITTED", manualStage: "DECLINED" })).toBe("APPLIED");
+    expect(crmStage({ manualStage: "ACTIVE" })).toBe("INVITED");
+    expect(crmStage({ applicationStatus: "PAYMENT_DUE", manualStage: "APPROVED" })).toBe("APPROVED");
+  });
+
+  it("marks a follow-up due and escapes csv cells", () => {
+    const now = new Date("2026-10-24T12:00:00Z");
+    expect(followUpDue(null, now)).toBe(false);
+    expect(followUpDue(new Date(now.getTime() - DAY), now)).toBe(true);
+    expect(followUpDue(new Date(now.getTime() + DAY), now)).toBe(false);
+    expect(csvCell("plain")).toBe("plain");
+    expect(csvCell('say "hi", friend')).toBe('"say ""hi"", friend"');
+  });
+});

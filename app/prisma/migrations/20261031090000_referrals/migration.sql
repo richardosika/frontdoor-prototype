@@ -1,0 +1,3 @@
+ALTER TABLE "InviteCode" ADD COLUMN "referredName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "InviteCode" ADD COLUMN "referredEmail" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "InviteCode" ADD COLUMN "sentAt" TIMESTAMP(3);

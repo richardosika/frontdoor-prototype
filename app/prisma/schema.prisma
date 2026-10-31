@@ -1,0 +1,1154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  DEVELOPER
+  INVESTOR_PE
+  FAMILY_OFFICE
+  LENDER
+  MORTGAGE_BROKER
+  GENERAL_CONTRACTOR
+  ARCHITECT_ENGINEER
+  RE_ATTORNEY
+  SECURITIES_ATTORNEY
+  ZONING_ATTORNEY
+  INSURANCE
+  BROKER
+  APPRAISER
+  PROPERTY_MANAGER
+  ACCOUNTANT
+  EXCHANGE_1031
+  SURVEYOR
+  TITLE_COMPANY
+  ENVIRONMENTAL_CONSULTANT
+  GEOTECH_ENGINEER
+  CIVIL_ENGINEER
+  STRUCTURAL_ENGINEER
+  PERMIT_EXPEDITER
+  MEP_ENGINEER
+  SURETY_BONDING
+}
+
+enum VerificationTier {
+  INVITED
+  VERIFIED
+  CONFIRMED
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  SUBMITTED
+  IN_REVIEW
+  NEEDS_INFO
+  APPROVED
+  PAYMENT_DUE
+  REJECTED
+  DECLINED
+}
+
+enum PaymentStatus {
+  NOT_REQUIRED
+  DUE
+  PAID
+  WAIVED
+  FAILED
+  REFUNDED
+}
+
+enum Verdict {
+  LEGIT
+  NOT_LEGIT
+  NEEDS_OWNER_DECISION
+}
+
+enum EvidenceStatus {
+  PASS
+  FAIL
+  INCONCLUSIVE
+  NOT_RUN
+  UNAVAILABLE
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum RunSubject {
+  APPLICATION
+  COMPANY
+  PROJECT
+}
+
+enum PostKind {
+  NORMAL
+  DEAL
+  SEEKING
+}
+
+enum DealKind {
+  DEAL
+  SEEKING
+}
+
+enum AccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum PostStatus {
+  PUBLISHED
+  PENDING_REVIEW
+  CLOSED
+  REJECTED
+}
+
+enum IntroductionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum VouchReview {
+  OPEN
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+}
+
+enum VerificationSubject {
+  MEMBER
+  PROJECT
+}
+
+enum VerificationCaseStatus {
+  NOT_STARTED
+  IN_REVIEW
+  NEEDS_INFO
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum VerificationCheckResult {
+  PENDING
+  PASS
+  FAIL
+  NEEDS_INFO
+  NOT_PROVIDED
+}
+
+enum InviteRequestStatus {
+  PENDING
+  ISSUED
+  DECLINED
+}
+
+enum CrmStage {
+  INVITED
+  APPLIED
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  DECLINED
+}
+
+model User {
+  id             String           @id @default(cuid())
+  locale         String           @default("en")
+  email          String           @unique
+  passwordHash   String
+  name           String
+  initials       String
+  role           MemberRole
+  /// #42: more seek categories this member also answers, comma list of SEEK_CATEGORIES ids (primary comes from role).
+  extraCategories String         @default("")
+  /// #42 review: extra categories the member asked for, waiting for staff review. They count nowhere until approved.
+  pendingCategories String       @default("")
+  org            String
+  location       String
+  bio            String           @default("")
+  credentialNote String           @default("")
+  phone          String           @default("")
+  linkedinUrl    String           @default("")
+  website        String           @default("")
+  markets        String           @default("")
+  dealTypes      String           @default("")
+  assetClasses   String           @default("")
+  checkSize      String           @default("")
+  lookingFor     String           @default("")
+  offering       String           @default("")
+  /// #38 vendor profile basics (optional).
+  yearsInBusiness String          @default("")
+  typicalJobSize  String          @default("")
+  licenses        String          @default("")
+  insuranceInfo   String          @default("")
+  insuranceCoverage Json         @default("[]")
+  /// Overnight: role-specific list (loan types, practice areas, coverage lines, services).
+  specialties     String          @default("")
+  /// Overnight: rates and terms note, never shown to other members.
+  privateTerms    String          @default("")
+  checklistDone  String           @default("")
+  notifyMessages Boolean          @default(true)
+  notifyIntros   Boolean          @default(true)
+  notifyDeals    Boolean          @default(true)
+  /// #29 alert emails: new matching members, staff project decisions, document updates, deal room activity.
+  notifyMatches          Boolean  @default(true)
+  notifyProjectDecisions Boolean  @default(true)
+  notifyDocuments        Boolean  @default(true)
+  notifyDealRoom         Boolean  @default(true)
+  /// "INSTANT" or "DAILY".
+  alertDigest            String   @default("INSTANT")
+  deletionRequestedAt DateTime?
+  tier           VerificationTier @default(INVITED)
+  isAdmin        Boolean          @default(false)
+  status         AccountStatus    @default(ACTIVE)
+  seenWelcome    Boolean          @default(false)
+  isTest         Boolean          @default(false)
+  paymentStatus  PaymentStatus    @default(NOT_REQUIRED)
+  duesCents      Int              @default(0)
+  paymentToken   String?          @unique
+  paidAt         DateTime?
+  renewalAt      DateTime?
+  stripeCustomerId String         @default("")
+  stripeSubscriptionId String     @default("")
+  paymentMode    String           @default("")
+  waiverReason   String           @default("")
+  refundNote     String           @default("")
+  lastRenewalReminderAt DateTime?
+  cancelRequestedAt DateTime?
+  pausedAt       DateTime?
+  pausedUntil    DateTime?
+  pauseReminderSentAt DateTime?
+  ndaAcceptedAt  DateTime?
+  ndaVersion     String           @default("")
+  createdAt      DateTime         @default(now())
+  paymentMethods PaymentMethod[]
+
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  deals                Deal[]           @relation("SponsorDeals")
+  accessRequests       DealAccess[]
+  projects             TrackProject[]
+  messages             Message[]
+  conversationsA       Conversation[]   @relation("ConvA")
+  conversationsB       Conversation[]   @relation("ConvB")
+  connectionsFrom      Connection[]     @relation("ConnFrom")
+  connectionsTo        Connection[]     @relation("ConnTo")
+  invitesCreated       InviteCode[]
+  applicationsReviewed Application[]    @relation("Reviewer")
+  ownedApplication     Application?     @relation("ApplicantUser")
+  notifications        Notification[]
+  dealDocuments        DealDocument[]
+  dealMessages         DealMessage[]
+  dealEvents           DealEvent[]
+  checklistAssigned    DealChecklistItem[]    @relation("ChecklistAssignee")
+  checklistComments    DealChecklistComment[]
+  memberVerification   VerificationCase?  @relation("MemberVerification")
+  checksReviewed       VerificationCheck[] @relation("CheckReviewer")
+  verificationEvents   VerificationEvent[] @relation("VerificationActor")
+  blocksMade           Block[]             @relation("BlocksMade")
+  blocksReceived       Block[]             @relation("BlocksReceived")
+  introsSent           Introduction[]      @relation("IntroFrom")
+  introsReceived       Introduction[]      @relation("IntroTo")
+  reportsMade          Report[]            @relation("ReportsMade")
+  reportsReceived      Report[]            @relation("ReportsReceived")
+  moderationEvents     ModerationEvent[]
+  businessCard         BusinessCard?
+  legalAcceptances     LegalAcceptance[]
+  applicationDecisions ApplicationDecision[] @relation("DecisionActor")
+  paymentEvents        PaymentEvent[]
+  crmOwned             CrmPerson[]          @relation("CrmOwner")
+  crmProfile           CrmPerson?           @relation("CrmMember")
+  crmNotes             CrmNote[]
+  savedFilters         SavedFilter[]
+  /// MemberImage ids for the profile photo and the cover image or company logo. Empty means initials and the green banner.
+  photoId        String           @default("")
+  coverId        String           @default("")
+  images         MemberImage[]
+  projectContactsSent     ProjectContact[] @relation("ProjectContactFrom")
+  projectContactsReceived ProjectContact[] @relation("ProjectContactTo")
+
+  @@index([paymentStatus])
+}
+
+model InviteCode {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  maxUses      Int           @default(1)
+  uses         Int           @default(0)
+  note         String        @default("")
+  expiresAt    DateTime?
+  /// #43: who a member referred with this code, and when the email went out. Empty means not sent yet.
+  referredName  String       @default("")
+  referredEmail String       @default("")
+  sentAt        DateTime?
+  createdAt    DateTime      @default(now())
+  createdById  String?
+  createdBy    User?         @relation(fields: [createdById], references: [id])
+  applications Application[]
+  inviteRequests InviteRequest[]
+}
+
+model InviteRequest {
+  id           String              @id @default(cuid())
+  name         String
+  givenName    String              @default("")
+  email        String
+  role         MemberRole
+  org          String
+  location     String
+  note         String              @default("")
+  status       InviteRequestStatus @default(PENDING)
+  statusToken  String              @unique
+  inviteCodeId String?
+  inviteCode   InviteCode?         @relation(fields: [inviteCodeId], references: [id])
+  createdAt    DateTime            @default(now())
+  crmPeople    CrmPerson[]
+  verificationCase VerificationCase?
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  inviteCodeId    String?
+  inviteCode      InviteCode?       @relation(fields: [inviteCodeId], references: [id])
+  email           String
+  name            String
+  givenName       String            @default("")
+  passwordHash    String
+  role            MemberRole
+  org             String
+  location        String
+  credentialValue String
+  referenceEmails String[]
+  phone           String            @default("")
+  linkedinUrl     String            @default("")
+  statement       String            @default("")
+  website         String            @default("")
+  socialLinks     String            @default("")
+  memberRiskAcceptedAt   DateTime?
+  memberRiskTermsVersion String    @default("")
+  joinProfile     Json?
+  statusToken     String            @unique
+  status          ApplicationStatus @default(PENDING)
+  reviewerNote    String            @default("")
+  internalNote    String            @default("")
+  reviewedAt      DateTime?
+  reviewerId      String?
+  reviewer        User?             @relation("Reviewer", fields: [reviewerId], references: [id])
+  userId          String?           @unique
+  user            User?             @relation("ApplicantUser", fields: [userId], references: [id])
+  emailVerifiedAt DateTime?
+  duesCents       Int               @default(0)
+  duesWaived      Boolean           @default(true)
+  isTest          Boolean           @default(false)
+  testProfile     String            @default("")
+  reviewProgress  Json?
+  businessCard    BusinessCard?
+  runs            VerificationRun[]
+  decisions       ApplicationDecision[]
+  notices         OutboxNotice[]
+  legalAcceptances LegalAcceptance[]
+  crmPeople       CrmPerson[]
+  verificationCase VerificationCase?
+  createdAt       DateTime          @default(now())
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([isTest])
+}
+
+model TrackProject {
+  /// Overnight: optional role-relevant details as JSON (see src/lib/project-facts.ts).
+  roleFacts      String   @default("{}")
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  asset      String
+  location   String
+  year       Int
+  valueLabel String
+  summary    String         @default("")
+  street     String         @default("")
+  city       String         @default("")
+  state      String         @default("")
+  role       String         @default("")
+  /// Comma-separated contact categories this project is seeking (see src/lib/project-contact.ts).
+  seeking    String         @default("")
+  shareWithCircle Boolean   @default(false)
+  /// Staff review of the listing. Projects that existed before review are APPROVED.
+  reviewStatus ProjectReview @default(APPROVED)
+  reviewNote String         @default("")
+  reviewedAt DateTime?
+  submittedAt DateTime      @default(now())
+  createdAt  DateTime       @default(now())
+  confirmations Confirmation[]
+  verification  VerificationCase?
+  contacts      ProjectContact[]
+  documents     ProjectDocument[]
+  deals         Deal[]
+
+  @@index([reviewStatus])
+}
+
+enum ProjectReview {
+  PENDING_REVIEW
+  NEEDS_INFO
+  APPROVED
+  DECLINED
+}
+
+enum ProjectContactStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+/// A contact request about one project, between the project owner and a member in a category the project is seeking.
+model ProjectContact {
+  id        String               @id @default(cuid())
+  projectId String
+  project   TrackProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromId    String
+  from      User                 @relation("ProjectContactFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        User                 @relation("ProjectContactTo", fields: [toId], references: [id], onDelete: Cascade)
+  category  String
+  note      String               @default("")
+  status    ProjectContactStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+  decidedAt DateTime?
+
+  @@unique([projectId, fromId, toId])
+  @@index([toId, status])
+  @@index([fromId])
+}
+
+model Confirmation {
+  id                String             @id @default(cuid())
+  projectId         String
+  project           TrackProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  counterpartyName  String
+  counterpartyEmail String
+  token             String             @unique
+  status            ConfirmationStatus @default(PENDING)
+  reviewStatus      VouchReview        @default(OPEN)
+  note              String             @default("")
+  respondedAt       DateTime?
+  createdAt         DateTime           @default(now())
+}
+
+model Post {
+  id           String     @id @default(cuid())
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind         PostKind
+  status       PostStatus @default(PUBLISHED)
+  title        String     @default("")
+  intent       String     @default("")
+  body         String     @default("")
+  market       String     @default("")
+  assetClass   String     @default("")
+  sizeRange    String     @default("")
+  stage        String     @default("")
+  need         String     @default("")
+  rulesVersion String     @default("")
+  rulesAckAt   DateTime?
+  flagReason   String     @default("")
+  expiresAt    DateTime?
+  closedAt     DateTime?
+  isTest       Boolean    @default(false)
+  dealId       String?
+  deal         Deal?      @relation(fields: [dealId], references: [id])
+  createdAt    DateTime   @default(now())
+  likes        Like[]
+  comments     Comment[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model Like {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model Deal {
+  id             String      @id @default(cuid())
+  sponsorId      String
+  sponsor        User        @relation("SponsorDeals", fields: [sponsorId], references: [id])
+  kind           DealKind
+  title          String
+  blurb          String
+  market         String
+  sizeBand       String
+  assetClass     String
+  raiseLabel     String
+  stage          String      @default("")
+  need           String      @default("")
+  targetIrr      String      @default("")
+  minCheck       String      @default("")
+  equityMultiple String      @default("")
+  roleNeeded     MemberRole?
+  deadline       String      @default("")
+  /// Optional project this deal room belongs to. Its approved deal-room members hear about project document updates.
+  projectId      String?
+  project        TrackProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt      DateTime    @default(now())
+  posts          Post[]
+  access         DealAccess[]
+  documents      DealDocument[]
+  messages       DealMessage[]
+  events         DealEvent[]
+  checklist      DealChecklistItem[]
+
+  @@index([market, sizeBand, kind])
+}
+
+model SavedFilter {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  surface   String
+  query     String
+  createdAt DateTime @default(now())
+
+  @@index([userId, surface])
+}
+
+model DealAccess {
+  id                String       @id @default(cuid())
+  dealId            String
+  deal              Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  requesterId       String
+  requester         User         @relation(fields: [requesterId], references: [id])
+  status            AccessStatus @default(PENDING)
+  ndaAcknowledged   Boolean      @default(false)
+  ndaAcknowledgedAt DateTime?
+  ndaVersion        String       @default("")
+  ndaIpHash         String       @default("")
+  createdAt         DateTime     @default(now())
+  reviewedAt        DateTime?
+
+  @@unique([dealId, requesterId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userAId   String
+  userBId   String
+  userA     User      @relation("ConvA", fields: [userAId], references: [id])
+  userB     User      @relation("ConvB", fields: [userBId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String
+  kind           String       @default("TEXT")
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+model Connection {
+  id        String           @id @default(cuid())
+  fromId    String
+  toId      String
+  from      User             @relation("ConnFrom", fields: [fromId], references: [id])
+  to        User             @relation("ConnTo", fields: [toId], references: [id])
+  status    ConnectionStatus @default(PENDING)
+  note      String           @default("")
+  createdAt DateTime         @default(now())
+
+  @@unique([fromId, toId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  /// "member" alerts show on the member Alerts page. "admin" notices (applicant grades, queues) stay in Admin.
+  audience  String   @default("member")
+  href      String    @default("")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DealDocument {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  title       String
+  url         String
+  note        String   @default("")
+  fileName    String   @default("")
+  contentType String   @default("")
+  sizeBytes   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model DealMessage {
+  id        String        @id @default(cuid())
+  dealId    String
+  deal      Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  parentId  String?
+  parent    DealMessage?  @relation("DealThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   DealMessage[] @relation("DealThread")
+  createdAt DateTime      @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model VerificationCase {
+  id           String                 @id @default(cuid())
+  subject      VerificationSubject
+  status       VerificationCaseStatus @default(NOT_STARTED)
+  userId       String?                @unique
+  user         User?                  @relation("MemberVerification", fields: [userId], references: [id], onDelete: Cascade)
+  projectId    String?                @unique
+  project      TrackProject?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  internalNote     String                 @default("")
+  applicationId    String?                @unique
+  application      Application?           @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  inviteRequestId  String?                @unique
+  inviteRequest    InviteRequest?         @relation(fields: [inviteRequestId], references: [id], onDelete: SetNull)
+  gradeSnapshot    Json?
+  sourceSnapshot   Json?
+  reviewProgress   Json?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  checks           VerificationCheck[]
+  events           VerificationEvent[]
+
+  @@index([status, subject])
+}
+
+model VerificationCheck {
+  id          String                  @id @default(cuid())
+  caseId      String
+  case        VerificationCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  result      VerificationCheckResult @default(PENDING)
+  note        String                  @default("")
+  evidenceUrl   String                  @default("")
+  autoSuggested Boolean                 @default(false)
+  reviewerId    String?
+  reviewer    User?                   @relation("CheckReviewer", fields: [reviewerId], references: [id])
+  reviewedAt  DateTime?
+
+  @@unique([caseId, key])
+}
+
+model VerificationEvent {
+  id         String                  @id @default(cuid())
+  caseId     String
+  case       VerificationCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?                   @relation("VerificationActor", fields: [actorId], references: [id])
+  fromStatus VerificationCaseStatus?
+  toStatus   VerificationCaseStatus
+  summary    String
+  createdAt  DateTime                @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reporterId     String
+  reporter       User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId   String
+  target         User     @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  conversationId String   @default("")
+  postId         String   @default("")
+  reason         String
+  status         String   @default("OPEN")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ModerationEvent {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id])
+  action         String
+  summary        String
+  conversationId String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Introduction {
+  id        String             @id @default(cuid())
+  fromId    String
+  toId      String
+  from      User               @relation("IntroFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User               @relation("IntroTo", fields: [toId], references: [id], onDelete: Cascade)
+  note      String
+  status    IntroductionStatus @default(PENDING)
+  isTest    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  decidedAt DateTime?
+
+  @@index([toId, status])
+  @@index([fromId, createdAt])
+}
+
+model PaymentEvent {
+  id        String   @id
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model BusinessCard {
+  id            String       @id @default(cuid())
+  applicationId String?      @unique
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userId        String?      @unique
+  user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  contentType   String
+  sizeBytes     Int
+  bytes         Bytes
+  uploadedAt    DateTime     @default(now())
+  deletedAt     DateTime?
+  deletedById   String?
+}
+
+model EmailChallenge {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model LegalAcceptance {
+  id            String       @id @default(cuid())
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email         String
+  document      String
+  version       String
+  acceptedAt    DateTime     @default(now())
+  ipHash        String       @default("")
+
+  @@index([applicationId])
+  @@index([userId])
+}
+
+model OutboxNotice {
+  id               String       @id @default(cuid())
+  intendedTo       String
+  deliveredTo      String
+  subject          String
+  body             String
+  applicationId    String?
+  application      Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  templateKey      String       @default("")
+  suppressed       Boolean      @default(false)
+  suppressedReason String       @default("")
+  sendStatus       String       @default("")
+  sendError        String       @default("")
+  createdAt        DateTime     @default(now())
+
+  @@index([createdAt])
+}
+
+model MailSettings {
+  id        String   @id @default("default")
+  delivery  String   @default("outbox")
+  updatedAt DateTime @updatedAt
+}
+
+model EmailTemplate {
+  id        String                   @id @default(cuid())
+  key       String                   @unique
+  name      String
+  subject   String
+  body      String
+  updatedAt DateTime                 @updatedAt
+  versions  EmailTemplateVersion[]
+}
+
+model EmailTemplateVersion {
+  id         String        @id @default(cuid())
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version    Int
+  subject    String
+  body       String
+  savedById  String        @default("")
+  createdAt  DateTime      @default(now())
+
+  @@unique([templateId, version])
+}
+
+model CrmPerson {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  role               String    @default("")
+  org                String    @default("")
+  location           String    @default("")
+  stage              CrmStage  @default(INVITED)
+  manualStage        CrmStage?
+  tags               String    @default("")
+  doNotContact       Boolean   @default(false)
+  doNotContactReason String    @default("")
+  ownerId            String?
+  owner              User?     @relation("CrmOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  followUpAt         DateTime?
+  followUpNote       String    @default("")
+  inviteCode         String    @default("")
+  inviteRequestId    String?   @unique
+  inviteRequest      InviteRequest? @relation(fields: [inviteRequestId], references: [id], onDelete: SetNull)
+  applicationId      String?   @unique
+  application        Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  userId             String?   @unique
+  user               User?     @relation("CrmMember", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  notes              CrmNote[]
+  events             CrmEvent[]
+
+  @@index([stage])
+  @@index([followUpAt])
+}
+
+model CrmNote {
+  id        String    @id @default(cuid())
+  personId  String
+  person    CrmPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime  @default(now())
+
+  @@index([personId, createdAt])
+}
+
+model CrmEvent {
+  id        String    @id @default(cuid())
+  personId  String
+  person    CrmPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  kind      String
+  summary   String
+  sourceKey String?   @unique
+  createdAt DateTime  @default(now())
+
+  @@index([personId, createdAt])
+}
+
+model ApplicationDecision {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?       @relation("DecisionActor", fields: [actorId], references: [id])
+  decision       String
+  reason         String   @default("")
+  gradeLetter    String   @default("")
+  gradeScore     Int?
+  recommendation String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+model VerificationRun {
+  id            String        @id @default(cuid())
+  subject       RunSubject
+  status        RunStatus     @default(PENDING)
+  applicationId String?
+  application   Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  projectId     String?
+  companyName   String        @default("")
+  score            Int?
+  verdict          Verdict?
+  summary          String        @default("")
+  gradeLetter      String        @default("")
+  gradeScore       Int?
+  gradeConfidence  String        @default("")
+  recommendation   String        @default("")
+  gradeSnapshot    Json?
+  error            String        @default("")
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  evidence      VerificationEvidence[]
+
+  @@index([applicationId, createdAt])
+  @@index([status])
+}
+
+model VerificationEvidence {
+  id       String         @id @default(cuid())
+  runId    String
+  run      VerificationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  checkKey String
+  status   EvidenceStatus
+  weight   Int            @default(0)
+  finding      String
+  source       String
+  url          String         @default("")
+  ranAt        DateTime       @default(now())
+  hardFlag     Boolean        @default(false)
+  reviewFlag   Boolean        @default(false)
+  corroborates Boolean        @default(false)
+
+  @@index([runId])
+}
+
+model SourceCache {
+  key       String   @id
+  fetchedAt DateTime @default(now())
+  body      String
+}
+
+model HelpArticle {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  body      String
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HelpTurn {
+  id         String   @id @default(cuid())
+  sessionKey String
+  question   String
+  answer     String
+  confidence String
+  unanswered Boolean  @default(false)
+  provider   String
+  feedback   String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([sessionKey, createdAt])
+  @@index([unanswered, createdAt])
+  @@index([createdAt])
+}
+
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+/// A document on a project. Owners can add, replace or remove documents on an approved project without a new review.
+model ProjectDocument {
+  id          String       @id @default(cuid())
+  projectId   String
+  project     TrackProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  bytes       Bytes
+  version     Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId])
+}
+
+enum MemberImageKind {
+  AVATAR
+  COVER
+  GALLERY
+}
+
+/// A member's profile photo, cover image or gallery photo. Always stored re-encoded (JPEG or WebP), resized.
+model MemberImage {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        MemberImageKind
+  caption     String          @default("")
+  position    Int             @default(0)
+  contentType String
+  width       Int
+  height      Int
+  sizeBytes   Int
+  bytes       Bytes
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, kind, position])
+}
+
+enum PaymentMethodRole {
+  PRIMARY
+  BACKUP
+}
+
+/// Card details stay at Stripe. Only the Stripe id, brand, last four digits, expiry and wallet name are kept.
+model PaymentMethod {
+  id                    String            @id @default(cuid())
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role                  PaymentMethodRole
+  stripePaymentMethodId String            @default("")
+  brand                 String            @default("")
+  last4                 String            @default("")
+  expMonth              Int               @default(0)
+  expYear               Int               @default(0)
+  wallet                String            @default("")
+  mode                  String            @default("stripe")
+  createdAt             DateTime          @default(now())
+
+  @@unique([userId, role])
+}
+
+/// #41 due-diligence checklist inside a deal room. Visible to the sponsor, approved room members and staff only.
+model DealChecklistItem {
+  id          String                 @id @default(cuid())
+  dealId      String
+  deal        Deal                   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  section     String
+  title       String
+  /// A seek category (project-contact SEEK_CATEGORIES) the item usually needs, or "".
+  category    String                 @default("")
+  /// NEEDED, IN_PROGRESS or DONE.
+  status      String                 @default("NEEDED")
+  assigneeId  String?
+  assignee    User?                  @relation("ChecklistAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  dueDate     DateTime?
+  position    Int                    @default(0)
+  fileName    String                 @default("")
+  contentType String                 @default("")
+  sizeBytes   Int                    @default(0)
+  bytes       Bytes?
+  fileAt      DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  comments    DealChecklistComment[]
+
+  @@index([dealId, position])
+}
+
+model DealChecklistComment {
+  id        String            @id @default(cuid())
+  itemId    String
+  item      DealChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime          @default(now())
+
+  @@index([itemId, createdAt])
+}
+
+/// #44: a developer opened a member's profile (one row per viewer, member and day), for "developers viewed your profile".
+model ProfileView {
+  id        String   @id @default(cuid())
+  memberId  String
+  viewerId  String
+  day       String
+  createdAt DateTime @default(now())
+
+  @@unique([memberId, viewerId, day])
+  @@index([memberId, createdAt])
+}

@@ -1,0 +1,54 @@
+# Private Floor MVP Blueprint.
+# This file lives at app/render.yaml so it does not replace the static prototype
+# site configured from the repository root. In the Render Dashboard, set the
+# Blueprint path to app/render.yaml. rootDir is relative to the repository root.
+databases:
+  - name: private-floor-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: private-floor
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: app
+    buildCommand: npm ci && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy && npm run db:seed
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: private-floor-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      - key: APP_URL
+        sync: false
+      - key: AUTH_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_GC
+        sync: false
+      - key: STRIPE_PRICE_BROKER
+        sync: false
+      - key: STRIPE_PRICE_ADVISOR
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: HELP_PROVIDER
+        sync: false
+      - key: HELP_MODEL
+        sync: false

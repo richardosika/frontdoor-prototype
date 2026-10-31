@@ -1,0 +1,312 @@
+"use server";
+
+import { randomBytes } from "node:crypto";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { currentUser, requireAccount, requireAdmin } from "@/lib/current-user";
+import { formatLongEtDate } from "@/lib/format";
+import { mailDuesAmounts } from "@/lib/dues";
+import { firstName } from "@/lib/email-templates";
+import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
+import { monthlyDuesCents } from "@/lib/dues";
+import { blocksMembership, checkoutModeForRole, duesEmailStillNeeded, isStripeTestSecret, paymentRenewalLabel, paymentRequired, renewalInOneMonth } from "@/lib/payments";
+import { prisma } from "@/lib/prisma";
+import { cancelStripeAtPeriodEnd, createBillingPortal, createDuesCheckout, createIntroCoupon, retrieveCheckoutSession, sessionPaid, sessionUserId } from "@/lib/stripe-checkout";
+import { buildMailVars, sendTemplate } from "@/lib/mail";
+import { sendNotice } from "@/lib/notices";
+import { roleLabel } from "@/lib/roles";
+import { appBaseUrl } from "@/lib/url";
+
+async function payerByToken(token: string) {
+  if (!token) return null;
+  return prisma.user.findUnique({ where: { paymentToken: token } });
+}
+
+function adminReturn(formData: FormData, fallback: string) {
+  const back = String(formData.get("back") || "");
+  if (back.startsWith("/admin/") && !back.includes("://") && !back.includes("\\") && !back.includes("..")) return back;
+  return fallback;
+}
+
+function withQuery(path: string, key: string, value: string) {
+  const joiner = path.includes("?") ? "&" : "?";
+  return `${path}${joiner}${key}=${encodeURIComponent(value)}`;
+}
+
+export async function simulatePayment(formData: FormData) {
+  const token = String(formData.get("token") || "");
+  const account = token ? await payerByToken(token) : await requireAccount();
+  if (!account) redirect("/login");
+  if (account.status !== "ACTIVE") redirect("/suspended");
+  if (checkoutModeForRole(account.role) === "stripe") redirect(`/pay/${account.paymentToken || ""}?error=Use+Stripe+test+checkout`);
+  if (!blocksMembership(account.paymentStatus) && account.paymentStatus !== "NOT_REQUIRED") {
+    redirect("/feed");
+  }
+  if (!paymentRequired(account.role) && account.paymentStatus === "NOT_REQUIRED") redirect("/feed");
+  await activatePaidMembership({
+    userId: account.id,
+    mode: "simulated",
+    renewalAt: renewalInOneMonth(),
+    welcome: true,
+  });
+  revalidatePath("/pay");
+  revalidatePath("/feed");
+  revalidatePath("/admin");
+  const viewer = await currentUser();
+  const base = await appBaseUrl();
+  if (viewer?.id === account.id) redirect(`${base}/feed?notice=Test+payment+recorded.+No+card+was+charged`);
+  redirect(`${base}/pay/${encodeURIComponent(token)}?notice=Test+payment+recorded.+Sign+in+to+open+the+floor`);
+}
+
+export async function simulateFailedPayment(formData: FormData) {
+  const token = String(formData.get("token") || "");
+  const account = token ? await payerByToken(token) : await requireAccount();
+  if (!account) redirect("/login");
+  if (checkoutModeForRole(account.role) === "stripe") redirect("/pay?error=Stripe+reports+failed+payments+by+webhook");
+  await markPaymentFailed(account.id);
+  revalidatePath("/pay");
+  const base = await appBaseUrl();
+  redirect(token ? `${base}/pay/${encodeURIComponent(token)}?notice=Test+failure+recorded` : `${base}/pay?notice=Test+failure+recorded`);
+}
+
+export async function startStripeCheckout(formData: FormData) {
+  const token = String(formData.get("token") || "");
+  const account = token ? await payerByToken(token) : await requireAccount();
+  if (!account) redirect("/login");
+  const secret = process.env.STRIPE_SECRET_KEY || "";
+  if (checkoutModeForRole(account.role) !== "stripe") {
+    redirect(`/pay/${account.paymentToken || ""}?error=Stripe+test+keys+are+not+set`);
+  }
+  const base = await appBaseUrl();
+  const couponId = await createIntroCoupon(secret);
+  const created = await createDuesCheckout({
+    secret,
+    unitAmount: monthlyDuesCents(account.role),
+    userId: account.id,
+    email: account.email,
+    customerId: account.stripeCustomerId,
+    successUrl: `${base}/pay?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${base}/pay/${account.paymentToken || ""}`,
+    couponId: couponId || undefined,
+  });
+  if (!created.ok) redirect(`/pay/${account.paymentToken || ""}?error=${encodeURIComponent(created.error)}`);
+  redirect(created.value.url);
+}
+
+export async function confirmStripeReturn(sessionId: string) {
+  const secret = process.env.STRIPE_SECRET_KEY || "";
+  if (!secret || !sessionId.startsWith("cs_")) return;
+  const session = await retrieveCheckoutSession(secret, sessionId);
+  if (!session.ok || !sessionPaid(session.value)) return;
+  const userId = sessionUserId(session.value);
+  if (!userId) return;
+  const { claimPaymentEvent } = await import("@/lib/payment-record");
+  const claimed = await claimPaymentEvent(sessionId, userId, "checkout.session.completed");
+  if (!claimed) return;
+  const customer = String(session.value.customer || "");
+  const subscription = String(session.value.subscription || "");
+  await activatePaidMembership({
+    userId,
+    mode: "stripe",
+    stripeCustomerId: customer,
+    stripeSubscriptionId: subscription,
+    welcome: true,
+  });
+}
+
+export async function resendPaymentLink(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member) redirect("/admin/applications");
+  if (!duesEmailStillNeeded(member.paymentStatus)) redirect(`/admin/members/${member.id}?notice=${encodeURIComponent("Dues are already recorded, so no payment link was sent.")}`);
+  const token = member.paymentToken || randomBytes(24).toString("hex");
+  if (!member.paymentToken) {
+    await prisma.user.update({ where: { id: member.id }, data: { paymentToken: token } });
+  }
+  const base = await appBaseUrl();
+  const amounts = mailDuesAmounts(member.role, member.duesCents);
+  await sendTemplate({
+    key: "payment_due",
+    to: member.email,
+    vars: buildMailVars({
+      name: member.name,
+      role: roleLabel(member.role),
+      org: member.org,
+      duesAmount: amounts.duesAmount,
+      introAmount: amounts.introAmount,
+      renewalDate: paymentRenewalLabel(member.renewalAt),
+      paymentLink: `${base}/pay/${token}`,
+      loginLink: `${base}/login`,
+    }),
+    person: { name: member.name, role: member.role, org: member.org, location: member.location },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "RESEND_PAYMENT_LINK",
+      summary: `${admin.name} resent the dues link for ${member.name}.`,
+    },
+  });
+  revalidatePath("/admin/outbox");
+  redirect(withQuery(adminReturn(formData, "/admin/applications"), "notice", "Payment link resent to the Outbox"));
+}
+
+export async function markPaidManually(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member || member.isAdmin) redirect("/admin/applications?error=That+member+cannot+be+marked+paid");
+  await activatePaidMembership({ userId: member.id, mode: "manual", renewalAt: renewalInOneMonth(), welcome: true });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "MARK_PAID",
+      summary: `${admin.name} marked ${member.name} paid. Amount ${mailDuesAmounts(member.role, member.duesCents).introAmount} for the first month, then ${mailDuesAmounts(member.role, member.duesCents).duesAmount}. No card stored.`,
+    },
+  });
+  revalidatePath("/admin");
+  redirect(withQuery(adminReturn(formData, `/admin/members/${member.id}`), "notice", "Marked paid"));
+}
+
+export async function waiveDues(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  const reason = String(formData.get("reason") || "").trim().slice(0, 500);
+  if (reason.length < 3) redirect(withQuery(adminReturn(formData, `/admin/members/${userId}`), "error", "Write why dues are waived"));
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member || member.isAdmin) redirect("/admin/members");
+  await prisma.user.update({
+    where: { id: member.id },
+    data: { paymentStatus: "WAIVED", paymentMode: "waived", waiverReason: reason, renewalAt: null },
+  });
+  await prisma.application.updateMany({
+    where: { userId: member.id },
+    data: { status: "APPROVED", duesWaived: true },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "WAIVE_DUES",
+      summary: `${admin.name} waived dues for ${member.name}. ${reason}`,
+    },
+  });
+  const base = await appBaseUrl();
+  await sendTemplate({
+    key: "welcome",
+    to: member.email,
+    vars: buildMailVars({
+      name: member.name,
+      role: roleLabel(member.role),
+      org: member.org,
+      loginLink: `${base}/login`,
+      note: reason,
+    }),
+    person: { name: member.name, role: member.role, org: member.org, location: member.location },
+  });
+  revalidatePath("/admin");
+  redirect(withQuery(adminReturn(formData, `/admin/members/${member.id}`), "notice", "Dues waived"));
+}
+
+export async function recordRefund(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+  if (note.length < 3) redirect(withQuery(adminReturn(formData, `/admin/members/${userId}`), "error", "Write the refund note"));
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member || member.isAdmin) redirect("/admin/members");
+  await prisma.user.update({
+    where: { id: member.id },
+    data: { paymentStatus: "REFUNDED", refundNote: note },
+  });
+  await prisma.application.updateMany({
+    where: { userId: member.id, status: "APPROVED" },
+    data: { status: "PAYMENT_DUE" },
+  });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "REFUND_NOTE",
+      summary: `${admin.name} recorded a refund note for ${member.name}. ${note}`,
+    },
+  });
+  await sendNotice({
+    intendedTo: member.email,
+    subject: "Private Floor refund noted",
+    text: `Hello ${member.name},\n\nA Private Floor administrator recorded a refund note. No card number is stored. The floor stays closed until dues are paid again.\n`,
+  });
+  revalidatePath("/admin");
+  redirect(withQuery(adminReturn(formData, `/admin/members/${member.id}`), "notice", "Refund note saved"));
+}
+
+export async function sendRenewalReminderAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  const sent = await sendRenewalReminder(userId);
+  if (!sent) redirect(withQuery(adminReturn(formData, `/admin/members/${userId}`), "error", "Set a renewal date before sending a reminder"));
+  const member = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "RENEWAL_REMINDER",
+      summary: `${admin.name} sent a renewal reminder for ${member?.name || userId}.`,
+    },
+  });
+  redirect(withQuery(adminReturn(formData, `/admin/members/${userId}`), "notice", "Renewal reminder is in the Outbox"));
+}
+
+export async function sendFailedPaymentNotice(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") || "");
+  await markPaymentFailed(userId);
+  const member = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  await prisma.moderationEvent.create({
+    data: {
+      actorId: admin.id,
+      action: "FAILED_PAYMENT_NOTICE",
+      summary: `${admin.name} recorded a failed dues payment for ${member?.name || userId}.`,
+    },
+  });
+  redirect(withQuery(adminReturn(formData, `/admin/members/${userId}`), "notice", "Failed-payment notice is in the Outbox"));
+}
+
+export async function cancelMembership(formData: FormData) {
+  const token = String(formData.get("token") || "");
+  const account = token ? await payerByToken(token) : await requireAccount();
+  if (!account) redirect("/login");
+  const back = token ? `/pay/${token}` : "/settings";
+  if (account.paymentStatus === "NOT_REQUIRED") redirect(`${back}?notice=This+role+has+no+monthly+dues`);
+  if (account.cancelRequestedAt) redirect(`${back}?notice=Cancellation+is+already+recorded`);
+  await prisma.user.update({
+    where: { id: account.id },
+    data: { cancelRequestedAt: new Date() },
+  });
+  const secret = process.env.STRIPE_SECRET_KEY || "";
+  if (isStripeTestSecret(secret) && account.stripeSubscriptionId) {
+    await cancelStripeAtPeriodEnd(secret, account.stripeSubscriptionId);
+  }
+  const through =
+    account.paymentStatus === "PAID" && account.renewalAt
+      ? `Access continues through ${formatLongEtDate(account.renewalAt)}. No further charge is scheduled after that date.`
+      : "Nothing further will be charged.";
+  await sendNotice({
+    intendedTo: account.email,
+    subject: "Private Floor membership cancellation",
+    text: `Hello ${firstName(account.name)},\n\nYour cancellation is recorded. Membership is month to month. There is no long-term contract. ${through} No card number is stored.\n`,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/pay");
+  revalidatePath("/admin/outbox");
+  redirect(`${back}?notice=Cancellation+recorded.+No+further+charge+is+scheduled`);
+}
+
+export async function openBillingPortal() {
+  const user = await requireAccount();
+  if (blocksMembership(user.paymentStatus)) redirect("/pay");
+  const secret = process.env.STRIPE_SECRET_KEY || "";
+  if (!isStripeTestSecret(secret) || !user.stripeCustomerId) redirect("/settings?error=No+Stripe+test+customer+is+on+this+account");
+  const base = await appBaseUrl();
+  const portal = await createBillingPortal({ secret, customerId: user.stripeCustomerId, returnUrl: `${base}/settings` });
+  if (!portal.ok) redirect(`/settings?error=${encodeURIComponent(portal.error)}`);
+  redirect(portal.value.url);
+}
