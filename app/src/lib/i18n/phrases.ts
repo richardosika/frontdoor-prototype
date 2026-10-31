@@ -2,6 +2,13 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "Who viewed you": ["Quién vio su perfil", "Wer Sie angesehen hat", "プロフィールを見た人"],
+  "developer viewed your profile this week": ["desarrollador vio su perfil esta semana", "Entwickler hat diese Woche Ihr Profil angesehen", "人のデベロッパーが今週プロフィールを閲覧"],
+  "developers viewed your profile this week": ["desarrolladores vieron su perfil esta semana", "Entwickler haben diese Woche Ihr Profil angesehen", "人のデベロッパーが今週プロフィールを閲覧"],
+  "Upcoming": ["Próximamente", "Demnächst", "今後の予定"],
+  "Nothing scheduled on your active projects.": ["No hay nada programado en sus proyectos activos.", "Für Ihre aktiven Projekte ist nichts geplant.", "進行中のプロジェクトに予定はありません。"],
+  "Unread messages": ["Mensajes no leídos", "Ungelesene Nachrichten", "未読メッセージ"],
+  "You are all caught up.": ["Está al día.", "Sie sind auf dem neuesten Stand.", "すべて確認済みです。"],
   "project needs a {category} right now": ["proyecto necesita {category} ahora mismo", "Projekt braucht gerade {category}", "件のプロジェクトが今 {category} を必要としています"],
   "projects need a {category} right now": ["proyectos necesitan {category} ahora mismo", "Projekte brauchen gerade {category}", "件のプロジェクトが今 {category} を必要としています"],
   "total project value": ["de valor total de proyectos", "Gesamtprojektwert", "のプロジェクト総額"],

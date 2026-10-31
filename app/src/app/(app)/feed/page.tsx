@@ -5,7 +5,7 @@ import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
-import { loadMyWork, loadResults } from "@/lib/my-work";
+import { loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { gettingStarted, isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
@@ -57,6 +57,55 @@ export default async function FeedPage({
     hasCredential: Boolean(user.licenses?.trim()),
   });
 
+  const myWork = isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou);
+  const side = myWork ? await loadSidePanels(user, myWork.active) : null;
+  const dayFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
+  const panel = "rounded border border-line bg-paper p-5";
+  const panelH = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brass";
+  // #45: under My Circle for everyone but developers.
+  const sidePanels = side ? (
+    <>
+      <div className={panel} data-testid="ledger-viewed-you">
+        <h2 className={panelH}>{tx("Who viewed you")}</h2>
+        <p className="mt-1 text-[14px] text-ink">
+          {side.viewers.length} {tx(side.viewers.length === 1 ? "developer viewed your profile this week" : "developers viewed your profile this week")}
+        </p>
+        <ul className="mt-2">
+          {side.viewers.slice(0, 5).map((v) => (
+            <li key={v.id} className="border-t border-line py-2 first:border-t-0">
+              <Link href={`/members/${v.id}`} className="text-[15px] font-semibold text-forest underline decoration-line [overflow-wrap:anywhere]">{v.name}</Link>
+              {v.org ? <span className="block text-[13px] text-mut [overflow-wrap:anywhere]">{v.org}</span> : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className={panel} data-testid="ledger-upcoming">
+        <h2 className={panelH}>{tx("Upcoming")}</h2>
+        {side.upcoming.length === 0 ? <p className="mt-1 text-[14px] text-mut">{tx("Nothing scheduled on your active projects.")}</p> : null}
+        <ul className="mt-1">
+          {side.upcoming.map((u) => (
+            <li key={`${u.projectId}-${u.title}`} className="border-t border-line py-2 first:border-t-0">
+              <Link href={u.roomId ? `/deals/${u.roomId}/room` : `/projects/${u.projectId}`} className="text-[15px] font-semibold text-forest underline decoration-line [overflow-wrap:anywhere]">{u.title}</Link>
+              <span className="block text-[13px] text-mut [overflow-wrap:anywhere]">{u.projectName}{u.dueDate ? ` · ${dayFmt.format(u.dueDate)}` : ""}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className={panel} data-testid="ledger-unread">
+        <h2 className={panelH}>{tx("Unread messages")}</h2>
+        {side.unread.length === 0 ? <p className="mt-1 text-[14px] text-mut">{tx("You are all caught up.")}</p> : null}
+        <ul className="mt-1">
+          {side.unread.map((m) => (
+            <li key={m.id} className="border-t border-line py-2 first:border-t-0">
+              <p className="text-[15px] font-semibold text-forest [overflow-wrap:anywhere]">{m.sender.name}</p>
+              <p className="line-clamp-2 text-[14px] text-ink [overflow-wrap:anywhere]">{m.body}</p>
+              <Link href={`/messages/${m.conversationId}`} className="inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">{tx("Reply")} ›</Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
+  ) : null;
   const circlePanel = (
     <div className="rounded border border-line bg-paper p-5" data-testid="ledger-circle">
       <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("My Circle")}</h2>
@@ -103,7 +152,7 @@ export default async function FeedPage({
         {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
         <GettingStarted items={checklist} />
         {note}
-        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou)}
+        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
           results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
         />
         {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
@@ -111,10 +160,12 @@ export default async function FeedPage({
         ) : null}
         <div className="mt-4 space-y-4 lg:hidden">
           {circlePanel}
+          {sidePanels}
         </div>
       </section>
       <aside className="hidden space-y-4 lg:block">
         {circlePanel}
+        {sidePanels}
       </aside>
     </div>
   );

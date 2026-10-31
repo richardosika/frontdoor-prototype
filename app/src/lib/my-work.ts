@@ -98,3 +98,28 @@ export async function loadResults(user: { id: string }, allSeeking: { at: Date }
   ]);
   return { shown: allSeeking.filter((p) => p.at >= since).length, views: views.length, won };
 }
+
+/** #45: right column for non-developers: who viewed you this week, upcoming milestones, unread messages. */
+export async function loadSidePanels(user: { id: string }, active: { id: string; name: string; next: { title: string; dueDate: Date | null } | null; room: { id: string } | null }[], now = new Date()) {
+  const weekAgo = new Date(now.getTime() - 7 * DAY);
+  const [views, unread] = await Promise.all([
+    prisma.profileView.findMany({ where: { memberId: user.id, createdAt: { gte: weekAgo } }, orderBy: { createdAt: "desc" }, select: { viewerId: true, createdAt: true } }),
+    prisma.message.findMany({
+      where: { readAt: null, senderId: { not: user.id }, conversation: { OR: [{ userAId: user.id }, { userBId: user.id }] } },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: { id: true, body: true, createdAt: true, conversationId: true, sender: { select: { id: true, name: true, org: true } } },
+    }),
+  ]);
+  const viewerIds = [...new Set(views.map((v) => v.viewerId))];
+  const viewers = viewerIds.length
+    ? await prisma.user.findMany({ where: { id: { in: viewerIds }, status: "ACTIVE" }, select: { id: true, name: true, org: true } })
+    : [];
+  const order = new Map(viewerIds.map((id, i) => [id, i]));
+  const upcoming = active
+    .filter((item) => item.next)
+    .map((item) => ({ projectId: item.id, projectName: item.name, title: item.next!.title, dueDate: item.next!.dueDate, roomId: item.room?.id ?? null }))
+    .sort((a, b) => (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity))
+    .slice(0, 4);
+  return { viewers: viewers.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)), upcoming, unread };
+}
