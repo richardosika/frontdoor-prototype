@@ -97,16 +97,15 @@ describe("membership card", () => {
 });
 
 describe("member NDA", () => {
-  it("exists as a draft in four languages for Private Floor Club LLC", () => {
+  it("is published in four languages for Private Floor Club LLC", () => {
     expect(legalDoc("member-nda")).not.toBeNull();
     const en = readLegalMarkdown("member-nda.md");
-    expect(en).toMatch(/New Jersey attorney/);
-    expect(en).toContain("Private Floor Club LLC");
+        expect(en).toContain("Private Floor Club LLC");
     for (const topic of [/deal information/, /documents/, /deal rooms/, /messages/, /member details/, /outside the platform/, /Non-circumvention/, /survive after you leave/]) expect(en).toMatch(topic);
     for (const locale of ["en", "es", "de", "ja"]) {
       const text = readLegalMarkdown("member-nda.md", locale);
       expect(text).toMatch(/^Version: /);
-      expect(text).toMatch(/DRAFT/);
+      expect(text).not.toMatch(/DRAFT|\[DATE\]/);
       expect(text).toContain("Private Floor Club LLC");
       expect(text).not.toMatch(BANNED);
     }

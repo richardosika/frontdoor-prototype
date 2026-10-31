@@ -22,8 +22,8 @@ export default async function MemberNdaGate({ searchParams }: { searchParams: Pr
         <Logo />
         <h1 className="mt-6 font-serif text-[30px] leading-tight">{tx("Before you continue: the Member NDA")}</h1>
         <p className="mt-2 text-[16px] text-ink">{tx("Every member now agrees to one confidentiality agreement that covers deal information, documents, deal rooms, messages, and member details. Please read it and agree to continue.")}</p>
-        <p className="mt-3 rounded border border-brass bg-brass-soft px-3 py-2 text-sm">
-          {tx("Draft - pending attorney review.")} {tx("Version")} {version}.
+        <p className="mt-3 text-sm text-mut">
+          {tx("Version")} {version}.
         </p>
         <div className="mt-4 max-h-[55vh] overflow-y-auto rounded border border-line bg-cream/40 px-4 py-2 text-[15px]" dangerouslySetInnerHTML={{ __html: html }} />
         <form action={acceptMemberNda} className="mt-5 grid gap-3">

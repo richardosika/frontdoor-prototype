@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Member Non-Disclosure and Non-Circumvention Agreement
 
-DRAFT - pending review by a New Jersey attorney. Not legal advice. This draft is not final.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 This agreement is between you and Private Floor Club LLC ("Private Floor"), and it protects every other member. It applies to everyone who uses the Private Floor Club as a member.
 

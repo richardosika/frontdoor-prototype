@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Acuerdo de confidencialidad y no elusión para miembros
 
-DRAFT - pendiente de revisión por un abogado de Nueva Jersey. No es asesoramiento legal. Este borrador no es definitivo.
 
-**Última actualización:** [DATE]
+**Última actualización:** October 31, 2026
 
 Este acuerdo es entre usted y Private Floor Club LLC ("Private Floor") y protege a todos los demás miembros. Se aplica a todas las personas que usan Private Floor Club como miembros.
 

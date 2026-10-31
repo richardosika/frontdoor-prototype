@@ -1,10 +1,9 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Deal Room NDA Acknowledgement
 
-DRAFT - for attorney review, not legal advice. This is the click-through acknowledgement required before a member enters a deal room. It restates Section 6 of the Terms of Use. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 A deal room opens to a member only after the member who created it approves access and this acknowledgement is complete. Private Floor records the date, time, account, and version.
 

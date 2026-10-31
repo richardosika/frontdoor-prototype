@@ -1,10 +1,9 @@
-Version: 2026-10-26-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Verification Policy
 
-DRAFT - for attorney review, not legal advice. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 This policy explains, in plain English, how Private Floor checks applicants and projects, what "Verified" means, and what it does not mean. It is part of our Terms of Use. The English version governs over any translation.
 
@@ -53,7 +52,7 @@ If a privacy law gives you a right to access personal information we hold about 
 
 ## 6. What you can choose to give us
 
-- **Business card image (optional):** helps us match your name, role, and company. Stored privately, seen only by administrators, never shown to members, and deleted within [30] days after the decision.
+- **Business card image (optional):** helps us match your name, role, and company. Stored privately, seen only by administrators, never shown to members, and deleted within 30 days after the decision.
 - **References (optional):** we may email a reference once (plus one reminder) only to confirm that they know you and that you are who you say you are. You must have their permission first. They receive our Reference-giver Notice.
 - **What we do not ask for:** government-issued ID (such as a driver's license or passport), Social Security numbers, dates of birth, professional license documents, or license numbers. Please do not send them.
 
@@ -96,7 +95,7 @@ A member or project without a Verified status may simply not have finished revie
 
 ## 14. Re-checks and removal
 
-We may re-run checks at any time, for example after a report, a change in profile, or periodically [every [12] months]. An administrator may remove Verified status, restrict an account, or remove a member if information appears inaccurate or for any reason in our Terms. A person makes every such decision.
+We may re-run checks at any time, for example after a report, a change in profile, or periodically (every 12 months). An administrator may remove Verified status, restrict an account, or remove a member if information appears inaccurate or for any reason in our Terms. A person makes every such decision.
 
 ## 15. How we protect review records
 
@@ -104,7 +103,7 @@ Internal reports, notes, and audit logs are visible only to authorized administr
 
 ## 16. Contact
 
-Private Floor Club LLC, a New Jersey limited liability company [to be formed]  
+Private Floor Club LLC, a New Jersey limited liability company  
 299 Market Street, Saddle Brook, NJ 07663  
 Email: connect@privatefloorclub.com  
 Phone: 800-399-3745

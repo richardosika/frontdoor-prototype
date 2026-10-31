@@ -1,11 +1,10 @@
-Version: 2026-10-26-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Privacy Policy
 
-DRAFT - for attorney review, not legal advice. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]  
-**Effective date:** [DATE]
+**Last updated:** October 31, 2026  
+**Effective date:** October 31, 2026
 
 **Summary at the top (plain English; the full policy below controls)**
 - **What we collect:** requests to join from our website, your application details (name, email, company, city, role), admin-only contact details (phone and LinkedIn), an optional business card image, optional references, what you post and send on the Platform, consent records, and basic usage and security logs. We do not ask for government ID, license documents, or license numbers.
@@ -15,7 +14,7 @@ DRAFT - for attorney review, not legal advice. Bracketed items are placeholders 
 - **We do not sell your personal information** or use it for targeted advertising.
 - **Your choices:** you can ask to access, correct, download, or delete your information, and ask us to take another look at a verification decision. Email connect@privatefloorclub.com with the subject line "Privacy Request."
 
-This Privacy Policy explains how Private Floor Club LLC, a New Jersey limited liability company [to be formed] ("Private Floor," "we," "us," or "our") collects, uses, shares, and protects personal information through Private Floor Club, privatefloorclub.com, and related services (the "Platform"). Private Floor is a separate company from Captiva Development, BuildPro, and other businesses affiliated with our owners; we do not share your personal information with those companies except as described in this policy.
+This Privacy Policy explains how Private Floor Club LLC, a New Jersey limited liability company ("Private Floor," "we," "us," or "our") collects, uses, shares, and protects personal information through Private Floor Club, privatefloorclub.com, and related services (the "Platform"). Private Floor is a separate company from Captiva Development, BuildPro, and other businesses affiliated with our owners; we do not share your personal information with those companies except as described in this policy.
 
 The Platform is designed for real estate professionals acting in a business capacity. This policy covers applicants, members, people who request to join on our website, people named as references, and visitors to our website. Our website is available in English, Spanish, German, and Japanese; **the English version of this policy governs** if a translation differs.
 
@@ -35,7 +34,7 @@ Request to join. A referral code is optional and is never required. Solicita uni
 - **Member Content:** project information, "seeking" notes, messages to other members, deal-room documents and activity, reports, and blocks.
 - **Deal Room NDA acknowledgements:** the deal room, the version of the acknowledgement text, and the date, time, and account that accepted it.
 - **Communications with us:** support requests, requests to reconsider a decision, feedback, and survey responses.
-- **Billing information (paid categories only, not during testing):** [PLACEHOLDER — billing is not yet built and nothing is charged during testing. Dues will be processed by a third-party payment processor [e.g., Stripe], which stores card details; we will receive only limited information such as card type, last four digits, expiration date, billing ZIP code, and payment status.]
+- **Billing information (paid categories only, not during testing):** Dues are processed by our third-party payment processor, Stripe, which stores card details; we receive only limited information such as card brand, last four digits, and payment status.
 
 **What we do not ask for:** government-issued ID (such as a driver's license or passport), Social Security numbers, dates of birth, professional license documents, or license numbers. Please do not upload them; if you do, we may delete them.
 
@@ -115,7 +114,7 @@ We use personal information to:
 
 ## 4. People named as references
 
-If an applicant names you as a reference, we receive your name, company, role, email address, and how you know the applicant. We may send you one email (and, if needed, one reminder) asking only to confirm that you know the applicant and that they are who they say they are. We do not use your details for marketing, we do not add you to any list, and we do not show your details to other members. We delete reference details within [90] days after the decision on the application, keeping only a short note that a reference was or was not confirmed. You can ask us to delete your details at any time. Our Reference-giver Notice explains this in more detail.
+If an applicant names you as a reference, we receive your name, company, role, email address, and how you know the applicant. We may send you one email (and, if needed, one reminder) asking only to confirm that you know the applicant and that they are who they say they are. We do not use your details for marketing, we do not add you to any list, and we do not show your details to other members. We delete reference details within 90 days after the decision on the application, keeping only a short note that a reference was or was not confirmed. You can ask us to delete your details at any time. Our Reference-giver Notice explains this in more detail.
 
 ## 5. Moderator and administrator access to messages and content
 
@@ -142,7 +141,7 @@ Access is limited to people who need it for these purposes, and every access is 
 We share personal information only as follows:
 
 - **With other members**, as described in Section 6.
-- **With service providers** who process information for us under contracts that limit their use of it, such as cloud hosting, database, file storage, email delivery, text extraction (OCR), security, analytics, and (later) payment processing. [PLACEHOLDER — list categories or names once chosen.] When our automated checks query a public source (for example, a sanctions list search or a court-records search), the search terms we send, such as a name or company name, are received by that source.
+- **With service providers** who process information for us under contracts that limit their use of it, such as cloud hosting, database, file storage, email delivery, text extraction (OCR), security, analytics, and (later) payment processing. When our automated checks query a public source (for example, a sanctions list search or a court-records search), the search terms we send, such as a name or company name, are received by that source.
 - **With professional advisers**, such as lawyers, accountants, and insurers, under confidentiality obligations.
 - **For legal reasons**, if we believe in good faith that disclosure is required by law, subpoena, court order, or government request, or is needed to protect the rights, property, or safety of members, us, or others, or to investigate fraud or security issues.
 - **In a business transfer**, such as a merger, acquisition, financing, reorganization, or sale of assets, subject to confidentiality protections.
@@ -152,24 +151,24 @@ We may share aggregated or de-identified information that cannot reasonably be u
 
 ## 8. Retention
 
-We keep personal information only as long as needed for the purposes in this policy. Proposed periods [all to be confirmed]:
+We keep personal information only as long as needed for the purposes in this policy. Retention periods:
 
-- **Account and profile data:** while your account is active and up to [24] months after it closes.
-- **Messages and Member Content:** while your account is active; after closure, deleted or de-identified within [90] days, except messages you sent may remain visible to recipients.
-- **Internal verification reports (scores, summaries, recommendations, sources):** for approved members, while the membership is active and up to [24] months after; for declined applicants, up to [24] months after the decision, to handle re-applications and requests to reconsider.
-- **Sanctions-list and fraud-pattern matches, records of removals, and audit logs:** up to [7] years, to prevent fraud and defend legal claims.
-- **Consent records and NDA acknowledgements:** for as long as the account exists and up to [7] years after.
-- **Business card images:** deleted within [30] days after the decision on your application; extracted text kept with the verification report.
-- **Reference details:** deleted within [90] days after the decision, except a short note that a reference was or was not confirmed.
-- **Requests to join that do not lead to membership:** up to [24] months.
-- **Billing records (paid categories):** [7] years for tax and accounting.
-- **Backups:** deleted on the normal backup cycle of up to [35] days.
+- **Account and profile data:** while your account is active and up to 24 months after it closes.
+- **Messages and Member Content:** while your account is active; after closure, deleted or de-identified within 90 days, except messages you sent may remain visible to recipients.
+- **Internal verification reports (scores, summaries, recommendations, sources):** for approved members, while the membership is active and up to 24 months after; for declined applicants, up to 24 months after the decision, to handle re-applications and requests to reconsider.
+- **Sanctions-list and fraud-pattern matches, records of removals, and audit logs:** up to 7 years, to prevent fraud and defend legal claims.
+- **Consent records and NDA acknowledgements:** for as long as the account exists and up to 7 years after.
+- **Business card images:** deleted within 30 days after the decision on your application; extracted text kept with the verification report.
+- **Reference details:** deleted within 90 days after the decision, except a short note that a reference was or was not confirmed.
+- **Requests to join that do not lead to membership:** up to 24 months.
+- **Billing records (paid categories):** 7 years for tax and accounting.
+- **Backups:** deleted on the normal backup cycle of up to 35 days.
 
 We may keep information longer when required by law or to resolve disputes and enforce our agreements.
 
 ## 9. Cookies and analytics
 
-We use cookies and similar technologies that are needed to log you in, keep your session secure, and remember your preferences. Our public website's language switcher uses plain links and does not set cookies. [PLACEHOLDER — analytics: we [use / do not currently use] analytics tools such as [TOOL NAME]; list each tool, its purpose, and how to opt out.] We do not use advertising cookies. [Where required, we will honor Global Privacy Control and other recognized opt-out signals.] See our Cookie Notice.
+We use cookies and similar technologies that are needed to log you in, keep your session secure, and remember your preferences. Our public website's language switcher uses plain links and does not set cookies. We do not currently use third-party analytics tools. We do not use advertising cookies. Where required, we will honor Global Privacy Control and other recognized opt-out signals. See our Cookie Notice.
 
 ## 10. Your rights and choices
 
@@ -183,15 +182,15 @@ Residents of New Jersey, California, and other states with comprehensive privacy
 
 ### 10.3 Visitors from the EU, UK, Japan, and other countries
 
-Our website is available in Spanish, German, and Japanese, so visitors from outside the United States may view it. If laws such as the EU or UK General Data Protection Regulation or Japan's Act on the Protection of Personal Information apply to our processing of your information (to be confirmed by counsel), you may have rights to access, correct, delete, restrict, or object to processing, to data portability, to withdraw consent, not to be subject to a decision based solely on automated processing, and to complain to your local data protection authority. Because a person makes every membership decision, we do not make decisions based solely on automated processing.
+Our website is available in Spanish, German, and Japanese, so visitors from outside the United States may view it. If laws such as the EU or UK General Data Protection Regulation or Japan's Act on the Protection of Personal Information apply to our processing of your information, you may have rights to access, correct, delete, restrict, or object to processing, to data portability, to withdraw consent, not to be subject to a decision based solely on automated processing, and to complain to your local data protection authority. Because a person makes every membership decision, we do not make decisions based solely on automated processing.
 
 ### 10.4 How to make a request
 
-Email connect@privatefloorclub.com with the subject line "Privacy Request" (or "Verification Review" to ask for a re-review), or write to Private Floor Club LLC, Attn: Privacy, 299 Market Street, Saddle Brook, NJ 07663. Tell us what you are asking for. We will verify your identity, usually by confirming control of the email address on your account or application. An authorized agent may make a request with your written permission. We aim to respond within [30] days and will always respond within the time the law requires. If we decline your request, you may appeal by emailing the same address with the subject line "Privacy Appeal." We will not discriminate against you for exercising your rights.
+Email connect@privatefloorclub.com with the subject line "Privacy Request" (or "Verification Review" to ask for a re-review), or write to Private Floor Club LLC, Attn: Privacy, 299 Market Street, Saddle Brook, NJ 07663. Tell us what you are asking for. We will verify your identity, usually by confirming control of the email address on your account or application. An authorized agent may make a request with your written permission. We aim to respond within 30 days and will always respond within the time the law requires. If we decline your request, you may appeal by emailing the same address with the subject line "Privacy Appeal." We will not discriminate against you for exercising your rights.
 
 ## 11. Security
 
-We use reasonable administrative, technical, and physical safeguards designed to protect personal information, including [encryption in transit (TLS), encryption at rest, hashed passwords, role-based access, audit logging, and [multi-factor authentication for administrators]]. [PLACEHOLDER — list only safeguards actually implemented.] No system is completely secure. If a security breach affects your personal information, we will notify you and regulators as required by law.
+We use reasonable administrative, technical, and physical safeguards designed to protect personal information, including encryption in transit (TLS), hashed passwords, role-based access, and audit logging. No system is completely secure. If a security breach affects your personal information, we will notify you and regulators as required by law.
 
 ## 12. Emails during testing
 
@@ -203,7 +202,7 @@ The Platform is for business professionals 18 and older. We do not knowingly col
 
 ## 14. Where information is processed
 
-We are based in New Jersey, United States, and we store and process information in the United States [confirm hosting regions]. If you access the website from another country, your information will be transferred to and processed in the United States, where data protection laws may differ from those in your country.
+We are based in New Jersey, United States, and we store and process information in the United States. If you access the website from another country, your information will be transferred to and processed in the United States, where data protection laws may differ from those in your country.
 
 ## 15. Changes to this policy
 
@@ -211,7 +210,7 @@ We may update this policy. We will post the updated version with a new version n
 
 ## 16. Contact us
 
-Private Floor Club LLC, a New Jersey limited liability company [to be formed]  
+Private Floor Club LLC, a New Jersey limited liability company  
 Attn: Privacy  
 299 Market Street, Saddle Brook, NJ 07663  
 Email: connect@privatefloorclub.com (subject line "Privacy Request")  

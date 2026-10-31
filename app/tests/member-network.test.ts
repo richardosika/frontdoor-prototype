@@ -26,8 +26,8 @@ describe("seeking and raising rules", () => {
     expect(postNeedsRulesAck("DEAL")).toBe(true);
     expect(postNeedsRulesAck("SEEKING")).toBe(true);
     expect(postNeedsRulesAck("NORMAL")).toBe(false);
-    expect(documentVersion(readLegalMarkdown("seeking-raising.md"))).toMatch(/draft/);
-    expect(documentVersion(readLegalMarkdown("deal-room-nda.md"))).toMatch(/draft/);
+    expect(documentVersion(readLegalMarkdown("seeking-raising.md"))).toBe("2026-10-31");
+    expect(documentVersion(readLegalMarkdown("deal-room-nda.md"))).toBe("2026-10-31");
   });
 
   it("matches a post to the author's role", () => {

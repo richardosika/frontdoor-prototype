@@ -9,7 +9,7 @@ describe("legal drafts", () => {
   it("uses the uploaded consent sentences and records each document version", () => {
     const copy = signupConsentCopy();
     expect(copy.termsLabel).toBe(
-      "I agree to the Terms of Use, Privacy Policy, and Important Disclosures (version 2026-10-26-draft-1), and I confirm I am 18 or older and applying for business purposes.",
+      "I agree to the Terms of Use, Privacy Policy, and Important Disclosures (version 2026-10-31), and I confirm I am 18 or older and applying for business purposes.",
     );
     expect(copy.verificationLabel).toBe(
       "I consent to Private Floor running the automated public-data checks described above and in the Verification Policy, and to an administrator reviewing the results to decide my application.",
@@ -27,6 +27,6 @@ describe("legal drafts", () => {
       "applicant-consent",
       "verification-policy",
     ]);
-    expect(versions.every((item) => item.version === "2026-10-26-draft-1")).toBe(true);
+    expect(versions.every((item) => item.version === "2026-10-31")).toBe(true);
   });
 });

@@ -1,10 +1,9 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Seeking and Raising Post Rules
 
-DRAFT - for attorney review, not legal advice. This page is the click-through rule text for Seeking and Raising posts. It restates the Community Guidelines and the Important Disclosures. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 ## What you may post
 

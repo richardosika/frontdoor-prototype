@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-2
+Version: 2026-10-31
 
 # Private Floor Club - Membership Dues and Refund Terms
 
-DRAFT - for attorney review, not legal advice. This page restates Section 8 of the Terms of Use. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 ## Monthly dues
 

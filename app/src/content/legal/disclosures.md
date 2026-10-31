@@ -1,12 +1,11 @@
-Version: 2026-10-26-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Important Disclosures
 
-DRAFT - for attorney review, not legal advice. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
-Please read these disclosures before using Private Floor Club (the "Platform"), operated by Private Floor Club LLC, a New Jersey limited liability company [to be formed] ("Private Floor," "we," or "us"). They apply to everyone who uses the Platform and are part of our Terms of Use and Membership Agreement. The English version governs over any translation.
+Please read these disclosures before using Private Floor Club (the "Platform"), operated by Private Floor Club LLC, a New Jersey limited liability company ("Private Floor," "we," or "us"). They apply to everyone who uses the Platform and are part of our Terms of Use and Membership Agreement. The English version governs over any translation.
 
 ## Not an offer of securities
 
@@ -41,7 +40,7 @@ Private Floor is not a consumer reporting agency. Verification is used only for 
 
 Members who are raising capital are solely responsible for complying with securities laws. In particular:
 
-- Many private real estate offerings rely on Rule 506(b) of Regulation D (to be confirmed by counsel), which **prohibits general solicitation or general advertising**. Posting offering terms, return targets, or calls for investors to a broad audience, even inside a private network, may be treated as general solicitation and could cause the offering to lose that exemption.
+- Many private real estate offerings rely on Rule 506(b) of Regulation D, which **prohibits general solicitation or general advertising**. Posting offering terms, return targets, or calls for investors to a broad audience, even inside a private network, may be treated as general solicitation and could cause the offering to lose that exemption.
 - Offerings under Rule 506(c) may use general solicitation, but every purchaser must be an accredited investor and the issuer must take reasonable steps to verify that status.
 - State securities ("blue sky") laws in each state where an offering is made or where investors live may impose their own requirements, such as notice filings and anti-fraud rules. Because members are located across the United States, more than one state's laws may apply to a single raise.
 
@@ -61,7 +60,7 @@ Real estate investments and loans involve significant risk, including the possib
 
 ## Flat dues only
 
-General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
+Paid memberships are $199 per month, and the first month is $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
 
 ## Your responsibility
 
@@ -71,7 +70,7 @@ You are solely responsible for your own independent investigation, due diligence
 
 Questions about these disclosures: connect@privatefloorclub.com
 
-Private Floor Club LLC, a New Jersey limited liability company [to be formed]  
+Private Floor Club LLC, a New Jersey limited liability company  
 299 Market Street, Saddle Brook, NJ 07663  
 Email: connect@privatefloorclub.com  
 Phone: 800-399-3745

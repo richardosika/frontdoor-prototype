@@ -22,7 +22,7 @@ export default async function AdminLegalPage() {
       <div className="mx-auto max-w-3xl px-4 py-4 md:py-6 lg:px-8">
         <PageHeader title="Legal versions" />
         <p className="mt-1 text-sm text-ink">
-          Drafts members and applicants can open. The version is the first line of each file. Signup records the five acceptance documents.
+          Legal documents members and applicants can open. The version is the first line of each file. Signup records the five acceptance documents.
         </p>
         <ul className="mt-4 space-y-3">
           {docs.map((doc) => (

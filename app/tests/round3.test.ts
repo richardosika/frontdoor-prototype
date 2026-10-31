@@ -72,14 +72,26 @@ describe("round 3 copy", () => {
     }
     expect(privacy).not.toContain("billing is not yet built");
     expect(privacy).not.toContain("categories ;");
-    expect(privacy).toContain("[to be formed]");
-    expect(terms).toContain("[to be formed]");
-    expect(terms).toContain("[confirm with counsel]");
-    expect(terms).toContain("[membership is currently limited to professionals doing business in the United States]");
+    for (const shown of [privacy, terms, consent]) {
+      expect(shown).not.toMatch(/\[[^\]]*\]/);
+      expect(shown).not.toMatch(/\bDRAFT\b|attorney review|to be confirmed/i);
+    }
+    expect(terms).toContain("membership is currently limited to professionals doing business in the United States");
     expect(consent).toContain("You can withdraw consent");
     expect(consent).not.toContain("[ Submit application ]");
     const html = renderMarkdown(terms);
-    expect(html).toContain("border-brass");
-    expect(html).toContain("[to be formed]");
+    expect(html).not.toContain("border-brass");
+  });
+});
+
+describe("published legal set", () => {
+  it("has no draft markers or bracket placeholders in any language", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const dir = `${process.cwd()}/src/content/legal`;
+    for (const file of readdirSync(dir)) {
+      const text = readFileSync(`${dir}/${file}`, "utf8");
+      expect(text, file).not.toMatch(/\bDRAFT\b|draft-\d|\[DATE\]|PLACEHOLDER|to be formed|confirm with counsel/i);
+      expect(text, file).not.toMatch(/Flat, never based on the deal/i);
+    }
   });
 });

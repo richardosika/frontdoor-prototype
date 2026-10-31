@@ -6,7 +6,7 @@ export const BRAND = {
   /** Two-line text wordmark. */
   mark: ["Private", "Floor"],
   legalName: "Private Floor Club LLC",
-  formation: "a New Jersey limited liability company [to be formed]",
+  formation: "a New Jersey limited liability company",
   address: "299 Market Street, Saddle Brook, NJ 07663",
   contactEmail: "connect@privatefloorclub.com",
   contactPhone: "800-399-3745",

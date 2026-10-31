@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - メンバー秘密保持および非回避契約
 
-DRAFT - ニュージャージー州の弁護士による確認待ちの草案です。法的助言ではありません。最終版ではありません。
 
-**最終更新日:** [DATE]
+**最終更新日:** October 31, 2026
 
 本契約は、あなたとPrivate Floor Club LLC(以下「Private Floor」)との間の契約であり、他のすべてのメンバーを保護します。メンバーとしてPrivate Floor Clubを利用するすべての方に適用されます。
 

@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-2
+Version: 2026-10-31
 
 # Private Floor Club - 会費および返金条件
 
-DRAFT - 弁護士による確認待ちの草案です。法的助言ではありません。
 
-**最終更新日:** [DATE]
+**最終更新日:** October 31, 2026
 
 ## 月会費
 

@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-2
+Version: 2026-10-31
 
 # Private Floor Club - Cuotas de membresía y condiciones de reembolso
 
-DRAFT - borrador para revisión de un abogado; no es asesoramiento legal.
 
-**Última actualización:** [DATE]
+**Última actualización:** October 31, 2026
 
 ## Cuotas mensuales
 

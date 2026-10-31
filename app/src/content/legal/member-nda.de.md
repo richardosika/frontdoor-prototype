@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Vertraulichkeits- und Umgehungsschutzvereinbarung für Mitglieder
 
-DRAFT - Prüfung durch einen Anwalt in New Jersey ausstehend. Keine Rechtsberatung. Dieser Entwurf ist nicht endgültig.
 
-**Zuletzt aktualisiert:** [DATE]
+**Zuletzt aktualisiert:** October 31, 2026
 
 Diese Vereinbarung besteht zwischen Ihnen und der Private Floor Club LLC („Private Floor“) und schützt alle anderen Mitglieder. Sie gilt für alle, die den Private Floor Club als Mitglied nutzen.
 

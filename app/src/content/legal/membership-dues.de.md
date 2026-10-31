@@ -1,10 +1,9 @@
-Version: 2026-10-30-draft-2
+Version: 2026-10-31
 
 # Private Floor Club - Mitgliedsbeiträge und Erstattungsbedingungen
 
-DRAFT - Entwurf zur anwaltlichen Prüfung, keine Rechtsberatung.
 
-**Zuletzt aktualisiert:** [DATE]
+**Zuletzt aktualisiert:** October 31, 2026
 
 ## Monatliche Beiträge
 

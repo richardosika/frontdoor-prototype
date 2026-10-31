@@ -1,10 +1,9 @@
-Version: 2026-10-24-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Community Guidelines and Code of Conduct
 
-DRAFT - for attorney review, not legal advice. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]
+**Last updated:** October 31, 2026
 
 Private Floor is a vetted community of real estate professionals across the United States. Members are here to meet serious counterparties and do good work together. These guidelines describe how we expect members to behave. They are part of our Terms of Use, alongside our Acceptable Use and Abuse Reporting Policy. Breaking them can lead to removal of content, loss of a Verified badge, suspension, or permanent removal.
 
@@ -59,7 +58,7 @@ Private Floor is a vetted community of real estate professionals across the Unit
 - Use the **Block** button to stop a member from contacting you.
 - Our moderators and administrators can read messages and content on the Platform to review reports, verify members, and keep the community safe. Every access is logged. See our Privacy Policy.
 - We decide in our discretion what action to take, which may include a warning, content removal, restricted features, loss of Verified badge, suspension, or permanent removal. We may act without advance notice where needed to protect members.
-- A person, not an automated system, decides every enforcement action. If you believe we made a mistake, email connect@privatefloorclub.com with the subject line "Moderation Review" within [30] days. We will consider your request, but our decision is final.
+- A person, not an automated system, decides every enforcement action. If you believe we made a mistake, email connect@privatefloorclub.com with the subject line "Moderation Review" within 30 days. We will consider your request, but our decision is final.
 
 ## 8. Off-platform conduct
 

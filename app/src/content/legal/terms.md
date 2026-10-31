@@ -1,26 +1,25 @@
-Version: 2026-10-26-draft-1
+Version: 2026-10-31
 
 # Private Floor Club - Terms of Use and Membership Agreement
 
-DRAFT - for attorney review, not legal advice. Bracketed items are placeholders still to be confirmed.
 
-**Last updated:** [DATE]  
-**Effective date:** [DATE]
+**Last updated:** October 31, 2026  
+**Effective date:** October 31, 2026
 
 **The key points (plain-English summary, not a substitute for the full Terms)**
 - Private Floor is a private network where every member is personally reviewed. It is not an investment platform, broker, adviser, or lender, and it is never a party to your deals.
-- General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
+- Paid memberships are $199 per month, and the first month is $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
 - A Verified badge is a limited, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
 - All member-to-member communication happens inside the Platform. Other members never see your email, phone, LinkedIn, or business card. Our administrators can read messages for moderation, verification, and safety, and that access is logged.
 - Deal-room materials are confidential. You must accept a short NDA acknowledgement before entering a deal room, and the member who shared the materials can enforce it.
 - You are responsible for what you post and for following securities and licensing laws. Do not advertise investments outside the rules.
-- We can remove members or content. Our liability is limited, and disputes go to individual arbitration in New Jersey [confirm with counsel], not court.
+- We can remove members or content. Our liability is limited, and disputes go to individual arbitration in New Jersey, not court.
 - The site is offered in English, Spanish, German, and Japanese. The English version of these Terms and every legal document governs.
 - Questions, privacy requests, and legal notices: connect@privatefloorclub.com. See the Contact and Legal Notices page.
 
-These Terms of Use and Membership Agreement (the "Terms") are a binding agreement between you and Private Floor Club LLC, a New Jersey limited liability company [to be formed] ("Private Floor," "we," "us," or "our"), which operates Private Floor Club, the website at privatefloorclub.com, and related services (together, the "Platform"). Private Floor is a separate company from Captiva Development, BuildPro, and any other business affiliated with our owners, and those companies are not parties to these Terms.
+These Terms of Use and Membership Agreement (the "Terms") are a binding agreement between you and Private Floor Club LLC, a New Jersey limited liability company ("Private Floor," "we," "us," or "our"), which operates Private Floor Club, the website at privatefloorclub.com, and related services (together, the "Platform"). Private Floor is a separate company from Captiva Development, BuildPro, and any other business affiliated with our owners, and those companies are not parties to these Terms.
 
 **Please read these Terms carefully. Section 17 contains an agreement to resolve disputes by individual binding arbitration and a waiver of class actions and jury trials. By agreeing to arbitration, you are giving up your right to have a dispute decided by a judge or jury in court.**
 
@@ -48,7 +47,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 2.2 If you apply or use the Platform on behalf of a company or other organization, you represent that you are authorized to bind that organization to these Terms, and "you" includes that organization.
 
-2.3 **Where we operate.** Membership is offered to real estate professionals for real estate work in the United States. We may limit where membership, or any feature or membership category, is offered, including in any state where we are advised that offering it raises licensing, securities, or other legal issues. Our public website is also available in Spanish, German, and Japanese for convenience, and visitors may view it from outside the United States, but [membership is currently limited to professionals doing business in the United States].
+2.3 **Where we operate.** Membership is offered to real estate professionals for real estate work in the United States. We may limit where membership, or any feature or membership category, is offered, including in any state where we are advised that offering it raises licensing, securities, or other legal issues. Our public website is also available in Spanish, German, and Japanese for convenience, and visitors may view it from outside the United States, but membership is currently limited to professionals doing business in the United States.
 
 2.4
 
@@ -134,7 +133,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 7.2 **Your dealings are at your own risk.** Any communication, relationship, agreement, or transaction between you and another member, whether started on or off the Platform, is solely between you and that member. We are not a party to it, do not supervise it, and are not responsible for anyone's performance, conduct, statements, or compliance with law.
 
-7.3 **Release.** To the fullest extent permitted by law, you release Private Floor and its owners, managers, officers, employees, and agents from claims, demands, and damages of every kind, known or unknown, arising out of or connected with any dispute between you and another member or any third party. [If you are a California resident, you waive California Civil Code Section 1542 (citation and text to be confirmed by counsel), which says: "A general release does not extend to claims that the creditor or releasing party does not know or suspect to exist in his or her favor at the time of executing the release and that, if known by him or her, would have materially affected his or her settlement with the debtor or released party."]
+7.3 **Release.** To the fullest extent permitted by law, you release Private Floor and its owners, managers, officers, employees, and agents from claims, demands, and damages of every kind, known or unknown, arising out of or connected with any dispute between you and another member or any third party. If you are a California resident, you waive California Civil Code Section 1542, which says: "A general release does not extend to claims that the creditor or releasing party does not know or suspect to exist in his or her favor at the time of executing the release and that, if known by him or her, would have materially affected his or her settlement with the debtor or released party."
 
 ## 7A. Our review is not a guarantee; members carry the risk of dealing with each other {#member-risk}
 
@@ -154,11 +153,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 8.0 **Dues terms.** Our Membership Dues and Refund Terms give more detail and are part of these Terms. Checkout is Stripe test mode or a labelled simulated payment. No live card is charged. We will tell you before any live charge begins.
 
-8.1 **Monthly dues.** Members approved in these categories pay the monthly price below. It is due only after approval:
-
-- General contractors: $199 per month. The first month is $99.50.
-- Brokers: $199 per month. The first month is $99.50.
-- Attorneys and advisors: $199 per month. The first month is $99.50.
+8.1 **Monthly dues.** Paid memberships are $199 per month, and the first month is $99.50. The paid categories are general contractors, brokers, attorneys and advisors, insurance professionals, mortgage brokers, architects and engineers, appraisers, property managers, accountants and cost segregation professionals, and 1031 exchange intermediaries. Dues are due only after approval.
 
 We decide which category applies based on the professional role you are approved under. The first charge is half the monthly price. Every charge after that is the full monthly price. We send a reminder before the first full-price charge.
 
@@ -186,7 +181,7 @@ The Platform, including its software, design, text, graphics, logos, and the nam
 
 10.2 **Designated agent:** Copyright Agent, Private Floor Club LLC, 299 Market Street, Saddle Brook, NJ 07663; email connect@privatefloorclub.com with the subject line "Copyright Notice."
 
-10.3 **Counter-notice.** If your content was removed and you believe it was a mistake or misidentification, you may send a counter-notice containing the information required by the U.S. Digital Millennium Copyright Act (to be confirmed by counsel), as summarized in our Copyright Policy. We may restore the content in 10 to 14 business days unless the complaining party tells us it has filed a court action.
+10.3 **Counter-notice.** If your content was removed and you believe it was a mistake or misidentification, you may send a counter-notice containing the information required by the U.S. Digital Millennium Copyright Act, as summarized in our Copyright Policy. We may restore the content in 10 to 14 business days unless the complaining party tells us it has filed a court action.
 
 10.4 **Repeat infringers.** We will terminate the accounts of members who are repeat infringers in appropriate circumstances.
 
@@ -206,7 +201,7 @@ The Platform may link to or integrate third-party websites and services. We do n
 
 13.1 **TO THE FULLEST EXTENT PERMITTED BY LAW, PRIVATE FLOOR AND ITS OWNERS, MANAGERS, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, INVESTMENTS, REVENUE, DATA, OR BUSINESS OPPORTUNITY, ARISING OUT OF OR RELATED TO THE PLATFORM, MEMBER CONTENT, VERIFICATION, OR DEALINGS BETWEEN MEMBERS, EVEN IF ADVISED OF THE POSSIBILITY.**
 
-13.2 **OUR TOTAL LIABILITY FOR ALL CLAIMS RELATED TO THE PLATFORM OR THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM, OR (B) US $[100].**
+13.2 **OUR TOTAL LIABILITY FOR ALL CLAIMS RELATED TO THE PLATFORM OR THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM, OR (B) US $100.**
 
 13.2A **WITHOUT RESTRICTING SECTIONS 13.1 AND 13.2, PRIVATE FLOOR AND ITS OWNERS, MANAGERS, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR ANY LOSS OR DAMAGE ARISING OUT OF OR RELATED TO (A) ANY MEMBER'S ACTS, OMISSIONS, STATEMENTS, PERFORMANCE, OR NON-PERFORMANCE; (B) ANY INFORMATION A MEMBER HID, WITHHELD, OMITTED, OR MISREPRESENTED; (C) ANYTHING OUR REVIEW OR VERIFICATION DID OR DID NOT SURFACE; OR (D) ANY DEAL, LOAN, CONTRACT, OR PAYMENT BETWEEN MEMBERS, WHETHER THE CLAIM IS BASED ON CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER THEORY. THESE EXCLUSIONS AND THE CAP IN SECTION 13.2 APPLY EVEN IF A REMEDY FAILS OF ITS ESSENTIAL PURPOSE.**
 
@@ -222,17 +217,17 @@ You will defend, indemnify, and hold harmless Private Floor and its owners, mana
 
 15.2 **By us.** Membership is a privilege, not a right. As with applications, a person (not an automated system) makes every decision to suspend or remove a member. We may suspend, restrict, remove a Verified badge from, or terminate any account, or remove any content, at any time and for any lawful reason, including if we believe you have broken these Terms, given us false information, created legal or reputational risk, or no longer meet our membership criteria. We will try to notify you, but we are not required to give advance notice or a reason, and we may act immediately where we believe it is needed to protect members, the Platform, or ourselves.
 
-15.3 **Effect.** When your membership ends, your right to use the Platform ends. Sections 5.3, 6 (for the confidentiality period), 7, 8.6 and 8.8, any unpaid dues, 9, 12, 13, 14, 15.3, 17, and 18 survive. We may keep certain information as described in our Privacy Policy. [Dues are not refunded if we terminate your membership for breach of these Terms.]
+15.3 **Effect.** When your membership ends, your right to use the Platform ends. Sections 5.3, 6 (for the confidentiality period), 7, 8.6 and 8.8, any unpaid dues, 9, 12, 13, 14, 15.3, 17, and 18 survive. We may keep certain information as described in our Privacy Policy. Dues are not refunded if we terminate your membership for breach of these Terms.
 
 ## 16. Changes to the Platform or these Terms
 
-We may change the Platform at any time. We may update these Terms by posting the updated version and changing the "Last updated" date. For material changes, we will give notice by email or in the Platform at least [15] days before they take effect, unless a change is required by law or addresses a safety or security issue. Your continued use after the effective date means you accept the updated Terms. Changes will not apply retroactively to disputes we already know about.
+We may change the Platform at any time. We may update these Terms by posting the updated version and changing the "Last updated" date. For material changes, we will give notice by email or in the Platform at least 15 days before they take effect, unless a change is required by law or addresses a safety or security issue. Your continued use after the effective date means you accept the updated Terms. Changes will not apply retroactively to disputes we already know about.
 
 ## 17. Dispute resolution, arbitration, and governing law
 
 17.1 **Informal resolution first.** Before starting any arbitration or court case, you and we agree to try to resolve the dispute informally by sending a written notice describing the dispute to the other party (to us by email to connect@privatefloorclub.com with the subject line "Legal Notice" and by mail to 299 Market Street, Saddle Brook, NJ 07663) and negotiating in good faith for at least 30 days.
 
-17.2 **Agreement to arbitrate.** If the dispute is not resolved, you and we agree that any dispute, claim, or controversy arising out of or relating to these Terms or the Platform will be resolved by final and binding individual arbitration administered by [the American Arbitration Association under its Commercial Arbitration Rules / JAMS under its Comprehensive Arbitration Rules], before a single arbitrator. The arbitration will take place in Bergen County, New Jersey [confirm with counsel], or by video conference. The Federal Arbitration Act governs this Section 17.
+17.2 **Agreement to arbitrate.** If the dispute is not resolved, you and we agree that any dispute, claim, or controversy arising out of or relating to these Terms or the Platform will be resolved by final and binding individual arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules, before a single arbitrator. The arbitration will take place in Bergen County, New Jersey, or by video conference. The Federal Arbitration Act governs this Section 17.
 
 17.3 **Waiver of court and jury.** **YOU AND WE UNDERSTAND AND AGREE THAT, BY AGREEING TO ARBITRATION, EACH OF US IS GIVING UP THE RIGHT TO SUE IN COURT AND THE RIGHT TO HAVE A JUDGE OR JURY DECIDE THE DISPUTE.** An arbitrator, not a court, will decide the dispute, and the arbitrator's decision is final, subject to limited court review.
 
@@ -242,7 +237,7 @@ We may change the Platform at any time. We may update these Terms by posting the
 
 17.6 **Opt-out.**
 
-17.7 **Governing law and venue.** These Terms are governed by the laws of the State of New Jersey [confirm with counsel], without regard to conflict-of-laws rules, wherever in the United States you live. For any matter not subject to arbitration, you and we consent to the exclusive jurisdiction of the state courts located in Bergen County, New Jersey, and the United States District Court for the District of New Jersey [confirm with counsel].
+17.7 **Governing law and venue.** These Terms are governed by the laws of the State of New Jersey, without regard to conflict-of-laws rules, wherever in the United States you live. For any matter not subject to arbitration, you and we consent to the exclusive jurisdiction of the state courts located in Bergen County, New Jersey, and the United States District Court for the District of New Jersey.
 
 17.8
 
@@ -264,7 +259,7 @@ We may change the Platform at any time. We may update these Terms by posting the
 
 ## 19. Contact
 
-Private Floor Club LLC, a New Jersey limited liability company [to be formed]  
+Private Floor Club LLC, a New Jersey limited liability company  
 299 Market Street, Saddle Brook, NJ 07663  
 Email: connect@privatefloorclub.com  
 Phone: 800-399-3745
