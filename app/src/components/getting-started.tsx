@@ -3,7 +3,7 @@ import { serverTx } from "@/lib/i18n/server";
 import type { StartItem } from "@/lib/member-reach";
 
 /** #24: a clean first-week checklist. Items tick themselves off; the box disappears once everything is done. */
-export async function GettingStarted({ items }: { items: StartItem[] }) {
+export async function GettingStarted({ items, category = "" }: { items: StartItem[]; category?: string }) {
   if (items.every((item) => item.done)) return null;
   const tx = await serverTx();
   const done = items.filter((item) => item.done).length;
@@ -58,7 +58,10 @@ export async function GettingStarted({ items }: { items: StartItem[] }) {
           return (
             <li key={item.id} data-state={item.state} aria-disabled={item.state === "locked" ? "true" : undefined} className="flex min-h-12 items-center gap-3 py-2 text-[16px]">
               {mark}
-              <span className={`flex-1 ${item.state === "done" ? "text-mut line-through decoration-line" : "text-mut opacity-60"}`}>{tx(item.label)}</span>
+              <span className="flex-1">
+                <span className={`block ${item.state === "done" ? "text-mut line-through decoration-line" : "text-mut opacity-60"}`}>{tx(item.label)}</span>
+                {item.note ? <span className="block text-[14px] text-forest" data-testid={`start-note-${item.id}`}>{tx(item.note).replace("{category}", category).replace(/\bneed a ([AEIOU])/, "need an $1")}</span> : null}
+              </span>
               <span className="sr-only">{item.state === "done" ? tx("Done") : tx("Locked until the earlier steps are done")}</span>
             </li>
           );

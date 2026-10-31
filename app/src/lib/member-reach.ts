@@ -80,10 +80,10 @@ export function matchesSlimFilters(project: { asset: string; state: string; loca
   return true;
 }
 
-export type StartItem = { id: string; label: string; href: string; done: boolean; state: "done" | "current" | "waiting" | "locked" };
+export type StartItem = { id: string; label: string; href: string; done: boolean; note?: string; state: "done" | "current" | "waiting" | "locked" };
 
 /** Setup runs strictly in order: a step counts as done only once every earlier step is done. */
-export function sequential(items: { id: string; label: string; href: string; done: boolean; waiting?: boolean }[]): StartItem[] {
+export function sequential(items: { id: string; label: string; href: string; done: boolean; waiting?: boolean; note?: string }[]): StartItem[] {
   let open = true;
   return items.map(({ waiting, ...item }) => {
     if (open && item.done) return { ...item, done: true, state: "done" as const };
@@ -109,6 +109,8 @@ export function gettingStarted(input: {
   hasPhoto: boolean;
   /** Overnight: licenses / NMLS / bar / producer license entered on the profile. */
   hasCredential?: boolean;
+  /** #48: no approved project seeks this member's categories yet; the outreach step completes itself. */
+  noMatches?: boolean;
 }): StartItem[] {
   if (isDeveloperRole(input.role)) {
     return sequential([
@@ -130,6 +132,8 @@ export function gettingStarted(input: {
       : { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
     { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
-    { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
+    input.outreachSent === 0 && input.noMatches
+      ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: "No projects need a {category} yet. We'll alert you the moment one does." }
+      : { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
   ]);
 }

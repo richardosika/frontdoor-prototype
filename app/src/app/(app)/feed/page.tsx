@@ -11,7 +11,7 @@ import { loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { gettingStarted, isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
-import { parseSeeking } from "@/lib/project-contact";
+import { parseSeeking, seekLabel } from "@/lib/project-contact";
 import { prisma } from "@/lib/prisma";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n/messages";
@@ -58,6 +58,7 @@ export default async function FeedPage({
     outreachSent,
     hasPhoto: Boolean(user.photoId),
     hasCredential: Boolean(user.licenses?.trim()),
+    noMatches: !isDeveloperRole(user.role) && ledgerProjects.allSeeking.length === 0,
   });
 
   const myWork = isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou);
@@ -193,13 +194,15 @@ export default async function FeedPage({
           </section>
         ) : null}
         {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
-        <GettingStarted items={checklist} />
+        <GettingStarted items={checklist} category={ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")} />
         {note}
         <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
           results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
         />
         {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
-          <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")}</p>
+          <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")} ({checklist.length} / {checklist.length})
+            {checklist.find((item) => item.note) ? <span className="block text-forest" data-testid="start-note-reach">{tx(checklist.find((item) => item.note)!.note!).replace("{category}", ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")).replace(/\bneed a ([AEIOU])/, "need an $1")}</span> : null}
+          </p>
         ) : null}
         <div className="mt-4 space-y-4 lg:hidden">
           {circlePanel}

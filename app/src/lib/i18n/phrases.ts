@@ -331,6 +331,7 @@ const P: Record<string, readonly [string, string, string]> = {
   "You're all set. New projects seeking a {category} will show up here first.": ["Todo listo. Los nuevos proyectos que buscan {category} aparecerán aquí primero.", "Alles bereit. Neue Projekte, die {category} suchen, erscheinen hier zuerst.", "準備は完了です。{category} を求める新しいプロジェクトは、まずここに表示されます。"],
   "{n} project approved across the network this month": ["{n} proyecto aprobado en la red este mes", "{n} Projekt diesen Monat im Netzwerk freigegeben", "今月ネットワーク全体で {n} 件のプロジェクトが承認されました"],
   "{n} projects approved across the network this month": ["{n} proyectos aprobados en la red este mes", "{n} Projekte diesen Monat im Netzwerk freigegeben", "今月ネットワーク全体で {n} 件のプロジェクトが承認されました"],
+  "No projects need a {category} yet. We'll alert you the moment one does.": ["Ningún proyecto necesita {category} todavía. Le avisaremos en cuanto uno lo necesite.", "Noch kein Projekt sucht {category}. Wir benachrichtigen Sie, sobald eines das tut.", "{category} を必要とするプロジェクトはまだありません。出てきたらすぐにお知らせします。"],
   "Insurance": ["Seguros", "Versicherung", "保険"],
   "Insurance (builder's risk, title, surety / bonding)": ["Seguros (obra, título, fianzas)", "Versicherung (Bauleistung, Titel, Bürgschaften)", "保険（工事保険・権原保険・保証）"],
   "Introduction accepted": ["Presentación aceptada", "Vorstellung angenommen", "紹介が承諾されました"],
