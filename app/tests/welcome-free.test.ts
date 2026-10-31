@@ -17,7 +17,7 @@ describe("free-role welcome and the unpaid pay page", () => {
     expect(welcome?.body).toContain("Sign in");
     expect(welcome?.body || "").not.toMatch(BANNED);
     const decision = readFileSync(path.join(ROOT, "actions/admin.ts"), "utf8");
-    const branch = decision.slice(decision.indexOf("if (paying && paymentToken)"));
+    const branch = decision.slice(decision.indexOf("if (paying && paymentToken"));
     expect(branch).toContain('key: "payment_due"');
     expect(branch).toContain('key: "welcome"');
     expect(branch).not.toContain('key: "approved"');

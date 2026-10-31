@@ -9,7 +9,7 @@ import { mailDuesAmounts } from "@/lib/dues";
 import { firstName } from "@/lib/email-templates";
 import { activatePaidMembership, markPaymentFailed, sendRenewalReminder } from "@/lib/payment-record";
 import { monthlyDuesCents } from "@/lib/dues";
-import { blocksMembership, checkoutModeForRole, isStripeTestSecret, paymentRenewalLabel, paymentRequired, renewalInOneMonth } from "@/lib/payments";
+import { blocksMembership, checkoutModeForRole, duesEmailStillNeeded, isStripeTestSecret, paymentRenewalLabel, paymentRequired, renewalInOneMonth } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { cancelStripeAtPeriodEnd, createBillingPortal, createDuesCheckout, createIntroCoupon, retrieveCheckoutSession, sessionPaid, sessionUserId } from "@/lib/stripe-checkout";
 import { buildMailVars, sendTemplate } from "@/lib/mail";
@@ -119,6 +119,7 @@ export async function resendPaymentLink(formData: FormData) {
   const userId = String(formData.get("userId") || "");
   const member = await prisma.user.findUnique({ where: { id: userId } });
   if (!member) redirect("/admin/applications");
+  if (!duesEmailStillNeeded(member.paymentStatus)) redirect(`/admin/members/${member.id}?notice=${encodeURIComponent("Dues are already recorded, so no payment link was sent.")}`);
   const token = member.paymentToken || randomBytes(24).toString("hex");
   if (!member.paymentToken) {
     await prisma.user.update({ where: { id: member.id }, data: { paymentToken: token } });

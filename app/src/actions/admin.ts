@@ -29,6 +29,8 @@ import { roleLabel } from "@/lib/roles";
 import { rememberAdminNotice } from "@/lib/admin-notice";
 import { publicStatusPath } from "@/lib/public-status";
 import { appBaseUrl } from "@/lib/url";
+import { applicationLinkLine } from "@/lib/admin-links";
+import { duesEmailStillNeeded } from "@/lib/payments";
 
 function storedInternalNote(existing: string, addition: string): string {
   return [existing.trim(), addition.trim()].filter(Boolean).join("\n\n").slice(0, 2000);
@@ -141,7 +143,7 @@ export async function reviewApplication(formData: FormData) {
       recommendation: grade?.recommendation || latestGradeRun?.recommendation || "",
     },
   });
-  await tellRichard(application, normalized, grade);
+  await tellRichard(application, normalized, grade, base);
 
   if (normalized === "DECLINED") {
     await prisma.application.update({
@@ -281,7 +283,9 @@ export async function reviewApplication(formData: FormData) {
   });
 
   const person = { name: application.name, role: application.role, org: application.org, location: application.location };
-  if (paying && paymentToken) {
+  // The member can sign in and pay while this action is still finishing, so read the status again before the dues email.
+  const current = paying ? await prisma.user.findUnique({ where: { id: user.id }, select: { paymentStatus: true } }) : null;
+  if (paying && paymentToken && duesEmailStillNeeded(current?.paymentStatus)) {
     const amounts = mailDuesAmounts(application.role, duesCents);
     await sendTemplate({
       key: "payment_due",
@@ -302,7 +306,7 @@ export async function reviewApplication(formData: FormData) {
       }),
       person,
     });
-  } else {
+  } else if (!paying) {
     await sendTemplate({
       key: "welcome",
       to: application.email,
@@ -332,8 +336,9 @@ async function tellRichard(
   application: { id: string; name: string; role?: string },
   decision: string,
   grade: GradeReport | null,
+  base: string,
 ) {
-  const text = reviewCopy(decisionNoticeText({ name: application.name, decision, grade }), application.role);
+  const text = `${reviewCopy(decisionNoticeText({ name: application.name, decision, grade }), application.role)}\n\n${applicationLinkLine(base, application.id)}`;
   await notifyAdmins({
     title: `${application.name}: ${decision} · grade ${grade?.letter || "ungraded"}`,
     body: text.slice(0, 600),

@@ -19,6 +19,11 @@ export function blocksMembership(status: string): boolean {
   return status === "DUE" || status === "FAILED" || status === "REFUNDED";
 }
 
+/** A pay-dues email goes out only while dues are still owed. A member who already paid (or was waived) never gets one. */
+export function duesEmailStillNeeded(status: string | null | undefined): boolean {
+  return blocksMembership(String(status || ""));
+}
+
 /** Payment states that may appear in the directory and receive introductions. */
 export const LISTED_PAYMENT_STATUSES = ["NOT_REQUIRED", "PAID", "WAIVED"] as const;
 
