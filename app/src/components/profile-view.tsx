@@ -180,15 +180,9 @@ export async function ProfileView({
               <dd>{member.checkSize}</dd>
             </div>
           ) : null}
-          {member.lookingFor ? (
+          {member.offering && member.role !== "DEVELOPER" ? (
             <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Looking for")}</dt>
-              <dd>{member.lookingFor}</dd>
-            </div>
-          ) : null}
-          {member.offering ? (
-            <div>
-              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("Offering")}</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-mut">{tx("About my services")}</dt>
               <dd>{member.offering}</dd>
             </div>
           ) : null}

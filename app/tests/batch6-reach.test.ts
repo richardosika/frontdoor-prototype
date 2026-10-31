@@ -150,3 +150,16 @@ describe("copy", () => {
     }
   });
 });
+
+describe("#30 profile fields", () => {
+  it("drops What I am looking for, hides services for developers, keeps saved data", () => {
+    const editor = read("src/components/profile-editor.tsx");
+    expect(editor).not.toContain('name="lookingFor"');
+    expect(editor).toContain('member.role !== "DEVELOPER"');
+    expect(editor).toContain('"About my services"');
+    const action = read("src/actions/profile.ts");
+    expect(action).not.toMatch(/lookingFor[,:]/);
+    expect(action).toContain('formData.has("offering")');
+    for (const key of ["About my services", "A short bio shown on your card when developers look for their team."]) expect(PHRASES[key]).toHaveLength(3);
+  });
+});

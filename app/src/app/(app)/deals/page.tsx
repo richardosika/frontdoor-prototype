@@ -155,7 +155,12 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
                         </span>
                       </span>
                     </Link>
-                    {member.bio || member.offering ? <p className="mt-2 line-clamp-2 text-[14px] text-ink">{member.offering || member.bio}</p> : null}
+                    {member.offering || member.bio ? (
+                      <>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{tx("About my services")}</p>
+                        <p className="line-clamp-3 text-[14px] text-ink">{member.offering || member.bio}</p>
+                      </>
+                    ) : null}
                     <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{tx("Past work")}</p>
                     {member.projects.length ? (
                       <ul className="text-[14px] text-ink">

@@ -28,12 +28,12 @@ export async function saveProfile(formData: FormData) {
   const dealTypes = formData.getAll("dealTypes").map((value) => String(value)).filter(Boolean).join(", ");
   const assetClasses = formData.getAll("assetClasses").map((value) => String(value)).filter(Boolean).join(", ");
   const checkSize = String(formData.get("checkSize") || "").trim().slice(0, 80);
-  const lookingFor = String(formData.get("lookingFor") || "").trim().slice(0, 800);
-  const offering = String(formData.get("offering") || "").trim().slice(0, 800);
+  // #30: "What I am looking for" is gone and developers have no services field; keep whatever is saved.
+  const offering = formData.has("offering") ? String(formData.get("offering") || "").trim().slice(0, 800) : undefined;
   const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
   await prisma.user.update({
     where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, lookingFor, offering, location },
+    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), location },
   });
   const upload = formData.get("card");
   if (upload instanceof File && upload.size > 0) {

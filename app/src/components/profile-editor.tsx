@@ -2,6 +2,7 @@ import { saveProfile } from "@/actions/profile";
 import { btn } from "@/components/ui";
 import { currentLocale } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n/messages";
+import { phrase } from "@/lib/i18n/phrases";
 
 const labelCls = "mb-2 block font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-forest";
 const field =
@@ -26,9 +27,11 @@ export async function ProfileEditor({
     checkSize: string;
     lookingFor: string;
     offering: string;
+    role?: string;
   };
 }) {
-  const t = translator(await currentLocale());
+  const locale = await currentLocale();
+  const t = translator(locale);
   const markets = selected(member.markets);
   const dealTypes = selected(member.dealTypes);
   const assets = selected(member.assetClasses);
@@ -85,14 +88,14 @@ export async function ProfileEditor({
         <span className={labelCls}>{t("profile.checkSize")}</span>
         <input name="checkSize" defaultValue={member.checkSize} className={field} placeholder="$1–5M" />
       </label>
-      <label>
-        <span className={labelCls}>{t("profile.lookingFor")}</span>
-        <textarea name="lookingFor" defaultValue={member.lookingFor} rows={3} className={field} />
-      </label>
-      <label>
-        <span className={labelCls}>{t("profile.offering")}</span>
-        <textarea name="offering" defaultValue={member.offering} rows={3} className={field} />
-      </label>
+      {/* #30: no "What I am looking for" for anyone; developers have no services blurb. Saved data stays in the database. */}
+      {member.role !== "DEVELOPER" ? (
+        <label data-testid="profile-services">
+          <span className={labelCls}>{phrase(locale, "About my services")}</span>
+          <textarea name="offering" defaultValue={member.offering} rows={3} maxLength={800} className={field} />
+          <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "A short bio shown on your card when developers look for their team.")}</span>
+        </label>
+      ) : null}
       <label>
         <span className={labelCls}>{t("profile.card")}</span>
         <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-[15px]" />

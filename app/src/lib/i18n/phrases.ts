@@ -663,6 +663,8 @@ const P: Record<string, readonly [string, string, string]> = {
   "Locked until the earlier steps are done": ["Bloqueado hasta completar los pasos anteriores", "Gesperrt, bis die vorherigen Schritte erledigt sind", "前のステップが完了するまでロックされています"],
   "Complete each step in order. The next step opens when the one before it is done.": ["Complete cada paso en orden. El siguiente paso se abre cuando el anterior está hecho.", "Erledigen Sie die Schritte der Reihe nach. Der nächste Schritt öffnet sich, sobald der vorherige erledigt ist.", "各ステップを順番に進めてください。前のステップが完了すると次のステップが開きます。"],
   "Submit and get approved by staff": ["Envíe y obtenga la aprobación del equipo", "Einreichen und genehmigen lassen", "提出して承認を受ける"],
+  "About my services": ["Sobre mis servicios", "Über meine Leistungen", "サービスについて"],
+  "A short bio shown on your card when developers look for their team.": ["Una breve biografía que aparece en su tarjeta cuando los promotores buscan su equipo.", "Eine kurze Beschreibung auf Ihrer Karte, wenn Entwickler ihr Team suchen.", "デベロッパーがチームを探すときに、あなたのカードに表示される短い紹介文です。"],
 };
 
 export const PHRASES = P;
