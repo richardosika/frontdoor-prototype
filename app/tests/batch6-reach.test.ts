@@ -175,3 +175,17 @@ describe("#31 photo hints", () => {
     for (const k of ["avatar", "cover", "gallery"]) expect(src).toContain(`<PlacementHint kind="${k}"`);
   });
 });
+
+describe("#32 track record", () => {
+  it("renames the section per role, shows compact linked rows, fixes Devloper", async () => {
+    const { fixRoleTypos } = await import("@/lib/project-contact");
+    expect(fixRoleTypos("Devloper")).toBe("Developer");
+    expect(fixRoleTypos("Lead devloper")).toBe("Lead developer");
+    const view = read("src/components/profile-view.tsx");
+    expect(view).toContain('tx("My Projects") : tx("Past Projects")');
+    expect(view).not.toContain("<ProjectDocuments");
+    expect(view).not.toContain("setProjectSharing");
+    expect(view).toContain('data-testid="track-project-row"');
+    for (const k of ["My Projects", "Past Projects"]) expect(PHRASES[k]).toHaveLength(3);
+  });
+});

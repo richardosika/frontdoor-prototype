@@ -10,7 +10,7 @@ import { requireUser } from "@/lib/current-user";
 import { serverTx } from "@/lib/i18n/server";
 import { loadFindTeam, loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
 import { isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
-import { seekLabel } from "@/lib/project-contact";
+import { formatProjectValue, seekLabel } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +74,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
               <p className="mt-1 text-[15px] text-mut">
                 {project.user.name} · {tx(project.asset)} · {project.location} · {project.year}
               </p>
-              {project.valueLabel ? <p className="mt-1 font-serif text-[17px] text-forest">{project.valueLabel}</p> : null}
+              {project.valueLabel ? <p className="mt-1 text-[16px] font-semibold text-forest">{formatProjectValue(project.valueLabel)}</p> : null}
               {project.why === "seeking" ? (
                 project.status ? (
                   <p className="mt-3 text-[14px] text-mut">

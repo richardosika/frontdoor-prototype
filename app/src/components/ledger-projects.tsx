@@ -6,7 +6,7 @@ import { serverTx } from "@/lib/i18n/server";
 import { SlimFilterBar } from "@/components/slim-filters";
 import { isDeveloperRole, type SlimFilters } from "@/lib/member-reach";
 import type { loadLedgerProjects } from "@/lib/ledger-projects";
-import { seekLabel } from "@/lib/project-contact";
+import { formatProjectValue, seekLabel } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 type Data = Awaited<ReturnType<typeof loadLedgerProjects>>;
@@ -240,7 +240,7 @@ export async function LedgerProjects({ data, role, filters }: { data: Data; role
         {data.circleShared.map((project) => (
           <li key={project.id} className="border-b border-line py-3 last:border-0">
             <p className="text-[16px] font-semibold">
-              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link> <span className="font-serif font-normal text-forest">{project.valueLabel}</span>
+              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link> <span className="font-normal text-forest">{formatProjectValue(project.valueLabel)}</span>
             </p>
             <p className="text-[15px] text-mut">
               {project.user.name} · {tx(project.asset)} · {project.street ? `${project.street}, ` : ""}

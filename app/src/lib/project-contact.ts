@@ -301,3 +301,8 @@ export function projectAudienceIds(input: {
 }
 
 export type DocumentChange = "added" | "replaced" | "removed";
+
+/** Fix known misspellings in stored project roles (for example "Devloper"). Data is also corrected by migration. */
+export function fixRoleTypos(role: string): string {
+  return role.replace(/\bdevloper\b/gi, (m) => (m[0] === "d" ? "developer" : "Developer"));
+}

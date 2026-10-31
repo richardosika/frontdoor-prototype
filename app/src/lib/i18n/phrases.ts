@@ -669,6 +669,8 @@ const P: Record<string, readonly [string, string, string]> = {
   "Upload a headshot. It shows as a small circle next to your name on your profile, in messages, and on your member card.": ["Suba una foto de rostro. Aparece como un pequeño círculo junto a su nombre en su perfil, en los mensajes y en su tarjeta de miembro.", "Laden Sie ein Porträtfoto hoch. Es erscheint als kleiner Kreis neben Ihrem Namen im Profil, in Nachrichten und auf Ihrer Mitgliedskarte.", "顔写真をアップロードしてください。プロフィール、メッセージ、メンバーカードで名前の横に小さな円で表示されます。"],
   "Upload your company logo or a signature project. It shows as the wide banner across the top of your profile.": ["Suba el logotipo de su empresa o un proyecto emblemático. Aparece como el banner ancho en la parte superior de su perfil.", "Laden Sie Ihr Firmenlogo oder ein Referenzprojekt hoch. Es erscheint als breites Banner oben in Ihrem Profil.", "会社のロゴや代表的なプロジェクトの画像をアップロードしてください。プロフィール上部の横長のバナーとして表示されます。"],
   "Upload finished work, job sites, or your team. Photos show in the gallery on your profile, which approved members who open your profile can see.": ["Suba trabajos terminados, obras o su equipo. Las fotos aparecen en la galería de su perfil, que pueden ver los miembros aprobados que abran su perfil.", "Laden Sie fertige Arbeiten, Baustellen oder Ihr Team hoch. Die Fotos erscheinen in der Galerie Ihres Profils, die zugelassene Mitglieder sehen, wenn sie Ihr Profil öffnen.", "完成した仕事、現場、チームの写真をアップロードしてください。写真はプロフィールのギャラリーに表示され、あなたのプロフィールを開いた承認済みメンバーが見られます。"],
+  "My Projects": ["Mis proyectos", "Meine Projekte", "マイプロジェクト"],
+  "Past Projects": ["Proyectos anteriores", "Bisherige Projekte", "過去のプロジェクト"],
 };
 
 export const PHRASES = P;

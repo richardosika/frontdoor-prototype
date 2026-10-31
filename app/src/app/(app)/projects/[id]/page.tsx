@@ -11,7 +11,7 @@ import { eligibleForDirectory } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { projectPageView } from "@/lib/project-page";
-import { SEEK_CATEGORIES, canContactAboutProject, categoryForRole, formatProjectValue, parseSeeking, projectLocation, rolesForCategory, seekLabel } from "@/lib/project-contact";
+import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryForRole, formatProjectValue, parseSeeking, projectLocation, rolesForCategory, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +100,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <Fact label={tx("Asset class")} value={tx(project.asset)} />
           <Fact label={tx("Year")} value={String(project.year)} />
           <Fact label={tx("Value")} value={full ? formatProjectValue(project.valueLabel) : tx("Shared after contact")} />
-          <Fact label={tx("Owner's role")} value={tx(project.role) || "—"} />
+          <Fact label={tx("Owner's role")} value={tx(fixRoleTypos(project.role)) || "—"} />
         </dl>
         {full && project.summary ? (
           <div className="mt-4">

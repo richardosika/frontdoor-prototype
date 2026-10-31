@@ -116,7 +116,7 @@ describe("contact rule", () => {
   it("the profile and Network no longer offer a generic introduction to strangers", () => {
     expect(read("components/profile-view.tsx")).not.toContain("introduceMember");
     expect(read("app/(app)/network/page.tsx")).not.toContain("introduceMember");
-    expect(read("components/profile-view.tsx")).toContain("contactAboutProject");
+    expect(read("app/(app)/projects/[id]/page.tsx")).toContain("contactAboutProject");
   });
 
   it("stores seeking as a clean list", () => {

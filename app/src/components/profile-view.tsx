@@ -6,15 +6,13 @@ import { ProfilePhotos } from "@/components/profile-photos";
 import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { requestConfirmation } from "@/actions/profile";
-import { contactAboutProject, setProjectSharing } from "@/actions/projects";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
-import { ProjectDocuments } from "@/components/project-documents";
 import { blockMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { tierLabel } from "@/lib/format";
-import { canEditProject, parseSeeking, seekLabel } from "@/lib/project-contact";
+import { canEditProject, parseSeeking, seekLabel, projectLocation, formatProjectValue, fixRoleTypos } from "@/lib/project-contact";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
 
 type Project = {
@@ -261,7 +259,9 @@ export async function ProfileView({
           </span>
           <span className="text-[16px] leading-relaxed text-ink">{tx("Approved members are in the platform.")}</span>
         </div>
-        <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Track record")}</h2>
+        <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass" data-testid="track-record-title">
+          {member.role === "DEVELOPER" ? tx("My Projects") : tx("Past Projects")}
+        </h2>
         {projects.length === 0 ? <p className="text-[16px] text-mut">{tx("No projects listed yet.")}</p> : null}
         <ul>
           {projects.map((project) => {
@@ -272,108 +272,47 @@ export async function ProfileView({
             const seeking = parseSeeking(project.seeking);
             const listed = project.reviewStatus === "APPROVED";
             return (
-              <li key={project.id} id={`project-${project.id}`} className="flex scroll-mt-20 gap-3 border-b border-line py-4" data-testid="track-project">
-                <span className="hidden h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest sm:grid">▦</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest"><b className="text-[18px] font-semibold">{project.name}</b></Link>
-                    {isSelf ? <ReviewChip status={project.reviewStatus} /> : null}
-                  </div>
-                  <div className="mt-1 text-[15px] text-mut">
-                    {tx(project.asset)} · {project.location} · {project.year}
-                    {project.role ? ` · ${tx(project.role)}` : ""}
-                    {confirmed ? ` · ${confirmed} ${tx("confirmed")}` : ""}
-                    {pending ? ` · ${pending} ${tx("pending")}` : ""}
-                  </div>
-                  {project.detailsVisible ? (
-                    <div className="mt-1 text-[15px] text-ink">
-                      {project.street ? <span className="block">{project.street}</span> : null}
-                      <span className="block">
-                        {tx("Total project value ($)")}: <b className="font-serif font-normal text-forest">{project.valueLabel}</b>
-                      </span>
-                      {project.summary ? <p className="mt-1 leading-relaxed">{project.summary}</p> : null}
+              <li key={project.id} id={`project-${project.id}`} className="scroll-mt-20 border-b border-line py-3" data-testid="track-project">
+                <Link href={`/projects/${project.id}`} className="group flex min-h-12 items-center gap-3 rounded px-1 hover:bg-cream" data-testid="track-project-row">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[17px] font-semibold text-forest underline decoration-brass underline-offset-2">{project.name}</span>
+                      {isSelf || listed ? <ReviewChip status={project.reviewStatus} /> : null}
                     </div>
-                  ) : null}
-                  {seeking.length ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="text-[13px] font-semibold uppercase tracking-wider text-brass">{tx("Seeking")}</span>
-                      {seeking.map((id) => (
-                        <span key={id} className="rounded-sm border border-line px-2 py-0.5 text-[13px] text-ink">
-                          {tx(seekLabel(id))}
-                        </span>
-                      ))}
+                    <p className="mt-0.5 text-[15px] text-mut">
+                      {[tx(project.asset), projectLocation(project) || project.location, String(project.year), project.detailsVisible && project.valueLabel ? formatProjectValue(project.valueLabel) : ""]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {project.role ? ` · ${tx(fixRoleTypos(project.role))}` : ""}
+                      {confirmed ? ` · ${confirmed} ${tx("confirmed")}` : ""}
+                      {pending ? ` · ${pending} ${tx("pending")}` : ""}
+                    </p>
+                  </div>
+                  <span aria-hidden className="shrink-0 text-xl text-brass">›</span>
+                </Link>
+                {isSelf && project.reviewStatus === "NEEDS_INFO" && project.reviewNote ? (
+                  <p className="mt-2 rounded border border-brass bg-cream px-3 py-2 text-[15px] leading-relaxed text-ink">
+                    <b>{tx("Note from the reviewer:")}</b> {project.reviewNote}
+                  </p>
+                ) : null}
+                {isSelf && canEditProject(project.reviewStatus) ? (
+                  <details className="mt-2 rounded border border-line bg-paper p-3" open={project.reviewStatus === "NEEDS_INFO"}>
+                    <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit and resubmit")}</summary>
+                    <div className="mt-3">
+                      <ProjectForm back="/profile" project={project} />
                     </div>
-                  ) : null}
-                  {isSelf && project.reviewStatus === "NEEDS_INFO" && project.reviewNote ? (
-                    <p className="mt-2 rounded border border-brass bg-cream px-3 py-2 text-[15px] leading-relaxed text-ink">
-                      <b>{tx("Note from the reviewer:")}</b> {project.reviewNote}
-                    </p>
-                  ) : null}
-                  {isSelf && project.reviewStatus === "DECLINED" && project.reviewNote ? (
-                    <p className="mt-2 text-[15px] text-mut">
-                      {tx("Reason:")} {project.reviewNote}
-                    </p>
-                  ) : null}
-                  {isSelf && project.reviewStatus === "PENDING_REVIEW" ? (
-                    <p className="mt-2 text-[15px] leading-relaxed text-ink">{tx("Pending review. Other members cannot see this project until it is approved.")}</p>
-                  ) : null}
-                  {isSelf && canEditProject(project.reviewStatus) ? (
-                    <details className="mt-2 rounded border border-line bg-paper p-3" open={project.reviewStatus === "NEEDS_INFO"}>
-                      <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit and resubmit")}</summary>
-                      <div className="mt-3">
-                        <ProjectForm back="/profile" project={project} />
+                  </details>
+                ) : null}
+                {isSelf && listed && canOpenProjectToCounterparties(project.verification) ? (
+                  <details className="mt-2 rounded border border-line bg-paper p-3">
+                    <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Request vouch")}</summary>
+                    {project.confirmations.map((item) => (
+                      <div key={item.id} className="mt-2 text-[15px] text-ink">
+                        <span className="font-semibold">{item.counterpartyName}</span>
+                        <span className="text-mut"> · {tx(vouchState(item))}</span>
+                        {item.status === "PENDING" ? <CopyLink url={`${linkOrigin}/confirm/${item.token}`} /> : null}
                       </div>
-                    </details>
-                  ) : null}
-                  {isSelf && listed ? (
-                    <form action={setProjectSharing} className="mt-2 flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="back" value="/profile" />
-                      <input type="hidden" name="share" value={project.shareWithCircle ? "" : "on"} />
-                      <span className="text-[15px] text-ink">
-                        {project.shareWithCircle ? tx("Shared with My Circle") : tx("Not shared with My Circle")}
-                      </span>
-                      <button className={btnOutline} type="submit">
-                        {project.shareWithCircle ? tx("Stop sharing") : tx("Share with My Circle")}
-                      </button>
-                    </form>
-                  ) : null}
-                  {project.documentsVisible ? (
-                    <ProjectDocuments
-                      projectId={project.id}
-                      documents={project.documents}
-                      isOwner={isSelf}
-                      approved={listed}
-                      deals={isSelf ? ownDeals : undefined}
-                      linkedDealId={project.linkedDealId}
-                    />
-                  ) : null}
-                  {!isSelf && project.contactStatus ? (
-                    <p className="mt-2 text-[15px] text-ink">
-                      {tx("Contact request")}: {tx(contactLabel(project.contactStatus))}
-                    </p>
-                  ) : !isSelf && project.canContact && !messagingClosed ? (
-                    <form action={contactAboutProject} className="mt-2 grid gap-2">
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="back" value={`/members/${member.id}`} />
-                      <textarea name="note" className={`${field} text-[16px]`} rows={2} placeholder={tx("A short note. It stays inside Private Floor.")} />
-                      <button className={btn} type="submit">
-                        {tx("Contact about this project")}
-                      </button>
-                    </form>
-                  ) : null}
-                  {isSelf && listed
-                    ? project.confirmations.map((item) => (
-                        <div key={item.id} className="mt-2 text-[15px] text-ink">
-                          <span className="font-semibold">{item.counterpartyName}</span>
-                          <span className="text-mut"> · {tx(vouchState(item))}</span>
-                          {item.status === "PENDING" && canOpenProjectToCounterparties(project.verification) ? (
-                            <CopyLink url={`${linkOrigin}/confirm/${item.token}`} />
-                          ) : null}
-                        </div>
-                      ))
-                    : null}
-                  {isSelf && listed && canOpenProjectToCounterparties(project.verification) ? (
+                    ))}
                     <form action={requestConfirmation} className="mt-2 grid gap-2">
                       <input type="hidden" name="projectId" value={project.id} />
                       <p className="text-[14px] leading-relaxed text-mut">
@@ -387,8 +326,8 @@ export async function ProfileView({
                         </button>
                       </div>
                     </form>
-                  ) : null}
-                </div>
+                  </details>
+                ) : null}
               </li>
             );
           })}
