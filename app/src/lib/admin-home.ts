@@ -70,6 +70,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
       { href: "/admin/moderation", label: "Moderation queue" },
       { href: "/admin/projects", label: "Project review" },
       { href: "/admin/bid-templates", label: "Bid templates" },
+      { href: "/admin/bids", label: "Bids (read-only)" },
       { href: "/admin/messages", label: "Messages" },
     ],
   },

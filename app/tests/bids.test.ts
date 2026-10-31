@@ -105,3 +105,11 @@ describe("#51 bids and comparison", () => {
     expect(isPdf(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d]))).toBe(false);
   });
 });
+
+describe("#51 cleanup keeps the Bids demo", () => {
+  it("sample GCs and Maple Court survive CLEAN_TEST_DATA", async () => {
+    const { keptUser, BIDS_DEMO_USER_IDS, BIDS_DEMO_PROJECT_IDS } = await import("@/lib/clean-test-data");
+    for (const id of BIDS_DEMO_USER_IDS) expect(keptUser({ id })).toBe(true);
+    expect(BIDS_DEMO_PROJECT_IDS).toContain("proj_maple_court");
+  });
+});

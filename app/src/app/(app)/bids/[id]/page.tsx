@@ -43,17 +43,20 @@ export default async function BidRequestPage({ params, searchParams }: { params:
   if (!req) return <NotAvailable tx={tx} />;
   const isRequester = req.requesterId === user.id;
   const isRecipient = req.recipients.some((r) => r.memberId === user.id);
-  if (!isRequester && !isRecipient) return <NotAvailable tx={tx} />;
+  // Staff: read-only view of the comparison and PDFs. No actions on behalf of members.
+  const isStaff = !isRequester && !isRecipient && user.isAdmin;
+  if (!isRequester && !isRecipient && !isStaff) return <NotAvailable tx={tx} />;
   const fields = parseFields(req.template.fields);
   const questions = parseQuestions(req.questions);
   const due = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(req.dueAt);
   const head = (
     <>
-      <Link href={isRequester ? `/projects/${req.project.id}` : "/bids"} className="inline-flex min-h-11 items-center text-[15px] text-forest underline decoration-brass">‹ {isRequester ? req.project.name : tx("Bids")}</Link>
+      <Link href={isStaff ? "/admin/bids" : isRequester ? `/projects/${req.project.id}` : "/bids"} className="inline-flex min-h-11 items-center text-[15px] text-forest underline decoration-brass">‹ {isStaff ? "Admin · Bids" : isRequester ? req.project.name : tx("Bids")}</Link>
+      {isStaff ? <p className="mt-2 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]" data-testid="staff-readonly">Staff view · read-only. Requested by {req.requester.name} ({req.requester.org}). Members cannot see each other&apos;s bids; staff cannot act for them here.</p> : null}
       {q.error || q.notice ? <div className="mt-2"><Banner error={q.error ? tx(q.error) : undefined} notice={q.notice ? tx(q.notice) : undefined} /></div> : null}
     </>
   );
-  if (isRequester) return <Compare req={req} fields={fields} questions={questions} tx={tx} locale={locale} due={due} head={head} />;
+  if (isRequester || isStaff) return <Compare readOnly={isStaff} req={req} fields={fields} questions={questions} tx={tx} locale={locale} due={due} head={head} />;
   return <BidForm req={req} fields={fields} questions={questions} userId={user.id} tx={tx} locale={locale} due={due} head={head} />;
 }
 
@@ -62,7 +65,7 @@ async function loadReq(id: string) {
   return prisma.bidRequest.findUnique({ where: { id }, include: { project: { select: { id: true, name: true, location: true } }, requester: { select: { id: true, name: true, org: true } }, template: true, recipients: { select: { memberId: true } } } });
 }
 
-async function Compare({ req, fields, questions, tx, locale, due, head }: { req: Req; fields: BidField[]; questions: string[]; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
+async function Compare({ readOnly = false, req, fields, questions, tx, locale, due, head }: { readOnly?: boolean; req: Req; fields: BidField[]; questions: string[]; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
   const rows = await prisma.bid.findMany({
     where: { requestId: req.id, status: { not: "DRAFT" } },
     include: { bidder: { select: { id: true, name: true, org: true, insuranceCoverage: true, insuranceInfo: true, credentialNote: true } } },
@@ -94,7 +97,7 @@ async function Compare({ req, fields, questions, tx, locale, due, head }: { req:
   const Actions = ({ b }: { b: (typeof bids)[number] }) => (
     <div className="flex flex-wrap justify-end gap-1.5">
       {(["SHORTLISTED", "DECLINED", "AWARDED"] as const).map((d) =>
-        canDecide(b.status, req.status, d) ? (
+        !readOnly && canDecide(b.status, req.status, d) ? (
           <form key={d} action={decideBid}>
             <input type="hidden" name="bidId" value={b.id} />
             <input type="hidden" name="decision" value={d} />
