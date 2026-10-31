@@ -11,11 +11,11 @@ Version: 2026-10-31
 - Paid memberships are $199 per month, and the first month is $99.50. Dues are month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval.
 - When you apply, our platform runs automated checks using free, public information (for example, your email domain, your company's website, government sanctions lists, SEC EDGAR, public court records, and public web and news results) and prepares an internal summary and recommendation. **A person (our administrator) makes every membership decision.** No decision is made solely by automated means. You consent to these checks when you apply.
 - We are not a consumer reporting agency, and verification is used only to decide membership in Private Floor, never for credit, employment, housing, or insurance decisions.
-- A Verified badge is a limited, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
+- A Verified badge is a narrow, good-faith check, not a guarantee, endorsement, or due diligence. Do your own diligence.
 - All member-to-member communication happens inside the Platform. Other members never see your email, phone, LinkedIn, or business card. Our administrators can read messages for moderation, verification, and safety, and that access is logged.
 - Deal-room materials are confidential. You must accept a short NDA acknowledgement before entering a deal room, and the member who shared the materials can enforce it.
 - You are responsible for what you post and for following securities and licensing laws. Do not advertise investments outside the rules.
-- We can remove members or content. Our liability is limited, and disputes go to individual arbitration in New Jersey, not court.
+- We can remove members or content. Our liability is capped, and disputes go to individual arbitration in New Jersey, not court.
 - The site is offered in English, Spanish, German, and Japanese. The English version of these Terms and every legal document governs.
 - Questions, privacy requests, and legal notices: connect@privatefloorclub.com. See the Contact and Legal Notices page.
 
@@ -27,7 +27,7 @@ By applying for membership, creating an account, clicking "I agree," or using th
 
 ## 1. What the Platform is — and what it is not
 
-1.1 **What it is.** Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. It is for professionals who work on real estate projects across the United States, including developers, general contractors, investors and limited partners, family offices, lenders, brokers, attorneys, appraisers, property managers, accountants, and qualified intermediaries. The Platform lets approved members create profiles, post project information and "seeking" notes, message other members inside the Platform, and, when the member who runs a deal room approves access, view materials in that deal room. In these Terms, a deal room's "sponsor" means the developer or other member who created that deal room and approves who may enter it.
+1.1 **What it is.** Private Floor is a private network where every member is personally reviewed. Anyone can request to join, and every request is personally reviewed. It is for professionals who work on real estate projects across the United States, including developers, general contractors, investors and LPs, family offices, lenders, brokers, attorneys, appraisers, property managers, accountants, and qualified intermediaries. The Platform lets approved members create profiles, post project information and "seeking" notes, message other members inside the Platform, and, when the member who runs a deal room approves access, view materials in that deal room. In these Terms, a deal room's "sponsor" means the developer or other member who created that deal room and approves who may enter it.
 
 1.2 **What it is not.** Private Floor:
 
@@ -47,7 +47,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 2.2 If you apply or use the Platform on behalf of a company or other organization, you represent that you are authorized to bind that organization to these Terms, and "you" includes that organization.
 
-2.3 **Where we operate.** Membership is offered to real estate professionals for real estate work in the United States. We may limit where membership, or any feature or membership category, is offered, including in any state where we are advised that offering it raises licensing, securities, or other legal issues. Our public website is also available in Spanish, German, and Japanese for convenience, and visitors may view it from outside the United States, but membership is currently limited to professionals doing business in the United States.
+2.3 **Where we operate.** Membership is offered to real estate professionals for real estate work in the United States. We may limit where membership, or any feature or membership category, is offered, including in any state where we are advised that offering it raises licensing, securities, or other legal issues. Our public website is also available in Spanish, German, and Japanese for convenience, and visitors may view it from outside the United States, but membership is currently open to professionals doing business in the United States.
 
 2.4
 
@@ -76,7 +76,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 3.3D **Not a consumer report.** Private Floor is not a consumer reporting agency. We do not obtain consumer reports from consumer reporting agencies for verification, and we do not furnish reports about anyone to anyone. Verification is used only for our own decision about membership in Private Floor and is never used, and may not be used by any member, to decide anyone's eligibility for credit, employment, housing or tenancy, insurance, or any other purpose.
 
-3.4 **Verification.** We may also review projects and re-review members as described in our Verification Policy. A "Verified" status appears only after an administrator has reviewed and approved the applicant. **Verification is a limited, good-faith review of information provided to us and of free public sources at a point in time. It is not a guarantee, endorsement, recommendation, or due diligence, and it does not mean we vouch for any member, project, or offering.** Automated checks rely on public sources that may be incomplete, out of date, or wrong, and may miss information or match the wrong person or company.
+3.4 **Verification.** We may also review projects and re-review members as described in our Verification Policy. A "Verified" status appears only after an administrator has reviewed and approved the applicant. **Verification is a narrow, good-faith review of information provided to us and of free public sources at a point in time. It is not a guarantee, endorsement, recommendation, or due diligence, and it does not mean we vouch for any member, project, or offering.** Automated checks rely on public sources that may be incomplete, out of date, or wrong, and may miss information or match the wrong person or company.
 
 3.5 **Account security.** You are responsible for keeping your login credentials confidential and for all activity under your account. Accounts are personal and may not be shared, sold, or transferred. Tell us right away at connect@privatefloorclub.com if you suspect unauthorized use.
 
@@ -123,7 +123,7 @@ Any statement elsewhere on the Platform should be read consistently with this Se
 
 6.4 **Who enforces it.** The confidentiality obligations in this Section 6 run in favor of the member who shared the Confidential Information and may be enforced by that member directly. We may also enforce them, but we are not responsible for any member's breach. A sponsor may require a separate, more detailed NDA; if so, that separate agreement controls between those parties for its subject matter.
 
-6.5 **Our limited role.** Deal-room materials are provided by members, not by us. We do not review them for accuracy, completeness, or legal compliance, and we make no representations about them.
+6.5 **Our narrow role.** Deal-room materials are provided by members, not by us. We do not review them for accuracy, completeness, or legal compliance, and we make no representations about them.
 
 6.6
 
@@ -171,7 +171,7 @@ We decide which category applies based on the professional role you are approved
 
 ## 9. Intellectual property
 
-The Platform, including its software, design, text, graphics, logos, and the names "Private Floor" and "Private Floor Club," is owned by us or our licensors and is protected by intellectual property laws. We grant you a limited, revocable, non-exclusive, non-transferable license to use the Platform for its intended business purpose under these Terms. You may not copy, modify, reverse engineer, frame, or create derivative works of the Platform. If you send us feedback or suggestions, we may use them without obligation to you.
+The Platform, including its software, design, text, graphics, logos, and the names "Private Floor" and "Private Floor Club," is owned by us or our licensors and is protected by intellectual property laws. We grant you a revocable, non-exclusive, non-transferable license to use the Platform for its intended business purpose under these Terms. You may not copy, modify, reverse engineer, frame, or create derivative works of the Platform. If you send us feedback or suggestions, we may use them without obligation to you.
 
 ## 10. Copyright complaints (DMCA-style takedown)
 
@@ -205,7 +205,7 @@ The Platform may link to or integrate third-party websites and services. We do n
 
 13.2A **WITHOUT RESTRICTING SECTIONS 13.1 AND 13.2, PRIVATE FLOOR AND ITS OWNERS, MANAGERS, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR ANY LOSS OR DAMAGE ARISING OUT OF OR RELATED TO (A) ANY MEMBER'S ACTS, OMISSIONS, STATEMENTS, PERFORMANCE, OR NON-PERFORMANCE; (B) ANY INFORMATION A MEMBER HID, WITHHELD, OMITTED, OR MISREPRESENTED; (C) ANYTHING OUR REVIEW OR VERIFICATION DID OR DID NOT SURFACE; OR (D) ANY DEAL, LOAN, CONTRACT, OR PAYMENT BETWEEN MEMBERS, WHETHER THE CLAIM IS BASED ON CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER THEORY. THESE EXCLUSIONS AND THE CAP IN SECTION 13.2 APPLY EVEN IF A REMEDY FAILS OF ITS ESSENTIAL PURPOSE.**
 
-13.3 Some jurisdictions do not allow certain exclusions or limitations, so some of the above may not apply to you. These limits do not limit liability that cannot be limited by law.
+13.3 Some jurisdictions do not allow certain exclusions or limitations, so some of the above may not apply to you. These limits do not limit liability that cannot be capped by law.
 
 ## 14. Indemnity
 

@@ -78,7 +78,7 @@ When a member posts a project, an administrator may check whether the member app
 
 ## 12. What verification does NOT mean
 
-Verification is a limited, good-faith review. It is **not**:
+Verification is a narrow, good-faith review. It is **not**:
 
 - a guarantee of identity, honesty, competence, licensing, solvency, or ability to perform;
 - an endorsement or recommendation of any member, project, or investment;

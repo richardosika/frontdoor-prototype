@@ -25,10 +25,11 @@ export async function ensureHelpArticles() {
       if (
         (article.slug === "dues" || article.slug === "gc-dues") &&
         (existing.body.includes("$2,400") ||
+          existing.body.includes("General contractors, brokers, and attorneys and advisors: $199") ||
           existing.body.includes("per year") ||
           existing.body.includes("founding") ||
           /based on a deal|never based on/i.test(existing.body) ||
-          /pay no monthly dues|lenders are free|are free\./i.test(existing.body))
+          /pay no monthly dues|lenders are free/i.test(existing.body))
       ) {
         next = article.body;
       }

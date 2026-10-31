@@ -8,7 +8,7 @@ Private Floor is a private network where every member is personally reviewed. An
 
 ## Verification
 
-A Private Floor administrator reviews every application. Automation can only recommend. It does not approve anyone. Members and applicants see Verified or Verification in progress. They do not see a score, a source list, or an internal checklist. A Verified badge is a limited review. It is not a guarantee, an endorsement, or due diligence. A declined application does not include the reasons. If you think something is wrong, email connect@privatefloorclub.com with the subject line Verification Review.
+A Private Floor administrator reviews every application. Automation can only recommend. It does not approve anyone. Members and applicants see Verified or Verification in progress. They do not see a score, a source list, or an internal checklist. A Verified badge is a narrow review. It is not a guarantee, an endorsement, or due diligence. A declined application does not include the reasons. If you think something is wrong, email connect@privatefloorclub.com with the subject line Verification Review.
 
 ## Posts
 
@@ -24,7 +24,7 @@ Only members added to the deal team can open a deal room. Before entering, a mem
 
 ## Dues
 
-General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues for a person. A waiver is not automatic.
+Paid memberships are $199 per month, and the first month is $99.50. Developer, Lender, Family office and Investor/LP memberships are free; every other role pays. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues for a person. A waiver is not automatic.
 
 ## Getting a person
 

@@ -76,7 +76,7 @@ describe("round 3 copy", () => {
       expect(shown).not.toMatch(/\[[^\]]*\]/);
       expect(shown).not.toMatch(/\bDRAFT\b|attorney review|to be confirmed/i);
     }
-    expect(terms).toContain("membership is currently limited to professionals doing business in the United States");
+    expect(terms).toContain("membership is currently open to professionals doing business in the United States");
     expect(consent).toContain("You can withdraw consent");
     expect(consent).not.toContain("[ Submit application ]");
     const html = renderMarkdown(terms);

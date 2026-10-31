@@ -34,7 +34,7 @@ Request to join. A referral code is optional and is never required. Solicita uni
 - **Member Content:** project information, "seeking" notes, messages to other members, deal-room documents and activity, reports, and blocks.
 - **Deal Room NDA acknowledgements:** the deal room, the version of the acknowledgement text, and the date, time, and account that accepted it.
 - **Communications with us:** support requests, requests to reconsider a decision, feedback, and survey responses.
-- **Billing information (paid categories only, not during testing):** Dues are processed by our third-party payment processor, Stripe, which stores card details; we receive only limited information such as card brand, last four digits, and payment status.
+- **Billing information (paid categories only, not during testing):** Dues are processed by our third-party payment processor, Stripe, which stores card details; we receive only basic information such as card brand, last four digits, and payment status.
 
 **What we do not ask for:** government-issued ID (such as a driver's license or passport), Social Security numbers, dates of birth, professional license documents, or license numbers. Please do not upload them; if you do, we may delete them.
 
@@ -126,7 +126,7 @@ If an applicant names you as a reference, we receive your name, company, role, e
 - legal compliance and responding to lawful requests; and
 - technical support when you ask for help.
 
-Access is limited to people who need it for these purposes, and every access is recorded in an audit log showing who accessed what and when. We do not read messages to sell advertising or to pursue our own business deals.
+Access is restricted to people who need it for these purposes, and every access is recorded in an audit log showing who accessed what and when. We do not read messages to sell advertising or to pursue our own business deals.
 
 ## 6. What other members can see
 

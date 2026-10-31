@@ -34,12 +34,12 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "verification",
     title: "What you see about verification",
-    body: "A Private Floor administrator reviews every application. Automation only recommends and does not approve anyone. You see Verified or Verification in progress. You do not see a score, a source list, or an internal checklist. Verified is a limited review, not a guarantee or an endorsement. A decline does not include reasons. Email connect@privatefloorclub.com with the subject Verification Review if you think something is wrong.",
+    body: "A Private Floor administrator reviews every application. Automation only recommends and does not approve anyone. You see Verified or Verification in progress. You do not see a score, a source list, or an internal checklist. Verified is a narrow review, not a guarantee or an endorsement. A decline does not include reasons. Email connect@privatefloorclub.com with the subject Verification Review if you think something is wrong.",
   },
   {
     slug: "dues",
     title: "Monthly dues and cancellation",
-    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues. A waiver is not automatic. Cancel on the payment page or in Settings. A reminder goes out before the first full-price charge.",
+    body: "Paid memberships are $199 per month, and the first month is $99.50. Developer, Lender, Family office and Investor/LP memberships are free; every other role pays. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after approval. Checkout is Stripe test mode or a labelled simulated payment. No card number is stored. No live card is charged. An administrator can waive dues. A waiver is not automatic. Cancel on the payment page or in Settings. A reminder goes out before the first full-price charge.",
   },
   {
     slug: "posts",
@@ -69,7 +69,7 @@ export const DEFAULT_FAQ: FaqArticle[] = [
   {
     slug: "gc-dues",
     title: "What a general contractor pays for membership",
-    body: "General contractors, brokers, and attorneys and advisors: $199 per month, first month $99.50. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after a Private Floor administrator approves the application.",
+    body: "Paid memberships are $199 per month, and the first month is $99.50. Developer, Lender, Family office and Investor/LP memberships are free; every other role pays. Membership is month to month, with no long-term contract, and you can cancel anytime. The first month is 50% off, then the full monthly price. Dues are due only after a Private Floor administrator approves the application.",
   },
   {
     slug: "post-held",
