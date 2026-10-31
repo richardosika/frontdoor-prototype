@@ -1,14 +1,15 @@
+import { ORDINARY_WORDS } from "@/lib/verify/ordinary-words";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 
 const NICKNAMES: Record<string, string[]> = {
-  richard: ["richard", "rich"],
+  richard: ["richard", "rich", "rick", "ricky", "dick"],
   robert: ["robert", "bob", "rob"],
   william: ["william", "bill", "will", "willy"],
   willy: ["willy", "william", "bill", "will"],
   will: ["will", "william", "bill", "willy"],
   james: ["james", "jim"],
   michael: ["michael", "mike"],
-  christopher: ["christopher", "chris"],
+  christopher: ["christopher", "chris", "kip"],
   anthony: ["anthony", "tony"],
   joseph: ["joseph", "joe"],
   thomas: ["thomas", "tom"],
@@ -17,6 +18,53 @@ const NICKNAMES: Record<string, string[]> = {
   stephen: ["stephen", "steve"],
   steven: ["steven", "steve"],
   jeffrey: ["jeffrey", "jeff"],
+  matthew: ["matthew", "matt"],
+  andrew: ["andrew", "andy", "drew"],
+  douglas: ["douglas", "doug"],
+  kenneth: ["kenneth", "ken"],
+  timothy: ["timothy", "tim"],
+  leslie: ["leslie", "les"],
+  edward: ["edward", "ed", "ned"],
+  gregory: ["gregory", "greg"],
+  nicholas: ["nicholas", "nick"],
+  benjamin: ["benjamin", "ben"],
+  jonathan: ["jonathan", "jon"],
+  alexander: ["alexander", "alex"],
+  peter: ["peter", "pete"],
+  charles: ["charles", "chuck", "charlie", "chip"],
+  lawrence: ["lawrence", "larry"],
+  ronald: ["ronald", "ron"],
+  donald: ["donald", "don"],
+  gerald: ["gerald", "jerry"],
+  joshua: ["joshua", "josh"],
+  jacob: ["jacob", "jake"],
+  bradley: ["bradley", "brad"],
+  patrick: ["patrick", "pat"],
+  samuel: ["samuel", "sam"],
+  frederick: ["frederick", "fred"],
+  raymond: ["raymond", "ray"],
+  philip: ["philip", "phil"],
+  phillip: ["phillip", "phil"],
+  kathleen: ["kathleen", "kathy", "kate"],
+  katherine: ["katherine", "kate", "kathy"],
+  elizabeth: ["elizabeth", "liz", "beth", "bess", "betsy", "betty"],
+  jennifer: ["jennifer", "jen"],
+  susan: ["susan", "sue"],
+  patricia: ["patricia", "pat", "trish"],
+  margaret: ["margaret", "peggy", "maggie"],
+  rebecca: ["rebecca", "becky"],
+  deborah: ["deborah", "deb"],
+  albert: ["albert", "al"],
+  theodore: ["theodore", "ted"],
+  francis: ["francis", "frank"],
+  frank: ["frank", "francis"],
+  harold: ["harold", "hal"],
+  henry: ["henry", "hank"],
+  john: ["john", "jack"],
+  stuart: ["stuart", "stu"],
+  clifford: ["clifford", "cliff"],
+  terrence: ["terrence", "terry"],
+  sandra: ["sandra", "sandy"],
 };
 
 const LEGAL = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pllc", "pc"]);
@@ -86,11 +134,25 @@ const GENERIC = new Set([
   "usa",
 ]);
 
+/** "M&T", "L & L", "L AND L", and "AT&T" become one token. "Robins & Morton" stays two words. */
+export function collapseAmpersandInitials(value: string): string {
+  const spaced = value.replace(
+    /(?<![A-Za-z])([A-Za-z](?:\s*(?:&|and)\s*[A-Za-z])+)(?![A-Za-z])/gi,
+    (match) => match.replace(/[^A-Za-z]/g, ""),
+  );
+  return spaced.replace(/(?<![A-Za-z])([A-Z]{1,4}(?:&[A-Z]{1,4})+)(?![A-Za-z])/g, (match) => match.replace(/&/g, ""));
+}
+
+export function foldMarks(value: string): string {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function tokens(value: string): string[] {
-  return value
+  return collapseAmpersandInitials(value)
     .toLowerCase()
     .replace(/&amp;/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[\u2018\u2019\u02BB\u02BC]/g, "'")
+    .replace(/[^a-z0-9'\s]/g, " ")
     .split(/\s+/)
     .filter((token) => token.length >= 2);
 }
@@ -133,11 +195,11 @@ function surnameFromParts(parts: string[]): { given: string[]; surname: string }
 }
 
 export function parsePersonName(name: string): ParsedPersonName | null {
-  const parts = name
+  const parts = foldMarks(name)
     .replace(/\b[A-Za-z]\.\s*/g, " ")
     .split(/\s+/)
-    .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
-    .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 2);
+    .map((part) => part.replace(/^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu, ""))
+    .filter((part) => part.replace(/[^\p{L}\p{N}]/gu, "").length >= 2);
   if (!parts.length) return null;
   let suffix: string | null = null;
   const tail = normalizeGenerationalSuffix(parts[parts.length - 1]);
@@ -150,6 +212,37 @@ export function parsePersonName(name: string): ParsedPersonName | null {
   return { given, surname, suffix };
 }
 
+function accentedPerson(name: string): string {
+  const parts = name
+    .normalize("NFC")
+    .replace(/\b\p{L}\.\s*/gu, " ")
+    .split(/\s+/)
+    .map((part) => part.replace(/^[^\p{L}\p{N}-]+|[^\p{L}\p{N}-]+$/gu, ""))
+    .filter((part) => part.replace(/[^\p{L}\p{N}]/gu, "").length >= 2);
+  if (parts.length && normalizeGenerationalSuffix(foldMarks(parts[parts.length - 1]))) parts.pop();
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** Letters-only label for a company site guess. "Madison Realty Capital" is madisonrealtycapital. The email domain is never used. */
+export function orgLettersLabel(org: string): string {
+  const stripped = stripQaOrg(org).replace(/\b(llc|l\.l\.c|inc|incorporated|corp|corporation|ltd|limited|lp|l\.p|llp|plc|pllc|pc)\b\.?/gi, " ");
+  return stripped.replace(/[^A-Za-z]/g, "").toLowerCase();
+}
+
+/** The host label is the firm's own letters, such as berkadia.com. A mail host does not qualify. */
+export function hostMatchesOrgLetters(host: string, org: string): boolean {
+  const label = host.trim().toLowerCase().replace(/^www\./, "").split(".")[0]?.replace(/[^a-z0-9]/g, "") || "";
+  const letters = orgLettersLabel(org);
+  return letters.length >= 4 && letters.length <= 48 && label === letters;
+}
+
+/** Folded spelling, plus the original when it still has an accent. "René Jones" and "Rene Jones". */
+export function personSearchSpellings(name: string): string[] {
+  const folded = personWithoutSuffix(name);
+  const accented = accentedPerson(name);
+  return [...new Set([accented, folded].map((item) => item.replace(/\s+/g, " ").trim()).filter(Boolean))];
+}
+
 /** Name used in a search query. The suffix token is removed. The surname stays. */
 export function personWithoutSuffix(name: string): string {
   const parsed = parsePersonName(name);
@@ -160,6 +253,29 @@ export function personWithoutSuffix(name: string): string {
 /** Surname for a query or a sitemap path. A suffix is never returned in place of the surname. */
 export function surnameForSearch(name: string): string {
   return parsePersonName(name)?.surname || "";
+}
+
+function capitalizeName(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+}
+
+/** Every formal name for a short form. "Pat" is both Patrick and Patricia, at most two. */
+export function formalGivenNames(name: string): string[] {
+  const given = parsePersonName(name)?.given[0]?.toLowerCase();
+  if (!given || NICKNAMES[given]) return [];
+  const raw = Object.entries(NICKNAMES)
+    .filter(([key, nicks]) => key !== given && nicks.includes(given))
+    .map(([key]) => key);
+  const longest = raw.reduce((best, key) => (key.length > best.length ? key : best), "");
+  const formals = raw
+    .filter((key) => key === longest || !(NICKNAMES[longest] || []).includes(key))
+    .sort((left, right) => left.length - right.length || left.localeCompare(right));
+  return [...new Set(formals)].slice(0, 2).map(capitalizeName);
+}
+
+/** "Bill" is William. "Rob" is Robert. An ambiguous short form uses the shorter formal name first. */
+export function formalGivenName(name: string): string | null {
+  return formalGivenNames(name)[0] || null;
 }
 
 export type PersonHit = "match" | "suffix-mismatch" | "none";
@@ -238,6 +354,77 @@ export function isStandaloneGenericQueryToken(token: string): boolean {
   return STANDALONE_QUERY_GENERIC.has(token);
 }
 
+/**
+ * Generic leftovers for the search query only. Matching still uses GENERIC.
+ * "organization" is not a brand by itself, so "Brodsky Organization" must not search as "organization".
+ */
+const SEARCH_TERM_GENERIC = new Set([
+  "organization",
+  "group",
+  "company",
+  "companies",
+  "holdings",
+  "partners",
+  "properties",
+  "realty",
+  "development",
+  "management",
+  "associates",
+  "enterprises",
+  "services",
+  "service",
+]);
+
+export function isSearchTermGeneric(token: string): boolean {
+  return SEARCH_TERM_GENERIC.has(token) || isStandaloneGenericQueryToken(token) || isGenericFirmToken(token);
+}
+
+/** A place or dictionary word. "plaza" alone is not Plaza Construction. Matching still uses the full name. */
+const COMMON_QUERY_STEM = new Set([
+  "plaza",
+  "park",
+  "summit",
+  "capital",
+  "square",
+  "tower",
+  "place",
+  "court",
+  "center",
+  "centre",
+  "point",
+  "house",
+  "hall",
+  "bridge",
+  "garden",
+  "gardens",
+  "heights",
+  "hill",
+  "hills",
+  "green",
+  "metro",
+  "commons",
+  "crossing",
+  "landing",
+  "station",
+  "yard",
+  "yards",
+]);
+
+const INDUSTRY_QUERY_WORD = new Set(["construction", "development", "contracting", "contractor", "builders", "building"]);
+
+export function isCommonQueryStem(token: string): boolean {
+  return COMMON_QUERY_STEM.has(token);
+}
+
+/** An ordinary dictionary word, not a coined brand. "ocean" is one. "rockrose" is not. */
+export function isOrdinaryDictionaryWord(token: string): boolean {
+  return ORDINARY_WORDS.has(token);
+}
+
+export function isIndustryQueryWord(token: string): boolean {
+  return INDUSTRY_QUERY_WORD.has(token);
+}
+
 export function distinctiveCompanyTokens(org: string): string[] {
   const kept = tokens(org).filter((token) => !LEGAL.has(token));
   const distinctive = kept.filter((token) => isDistinctiveCompanyToken(token));
@@ -254,6 +441,8 @@ export function companySearchTerm(org: string, person = ""): string {
   org = stripQaOrg(org);
   const phrase = companyPhraseTokens(org);
   if (!phrase.length) return "";
+  const spoken = tokens(org).filter((token) => !LEGAL.has(token) && token !== "the");
+  if (spoken.includes("of")) return spoken.join(" ");
   const parsed = parsePersonName(person);
   const names = new Set(
     [...(parsed?.given || []), parsed?.surname || "", ...tokens(person)]
@@ -261,10 +450,15 @@ export function companySearchTerm(org: string, person = ""): string {
       .filter(Boolean),
   );
   const shortAt = phrase.findIndex((token) => isShortBrandToken(token) && !names.has(token));
-  if (shortAt >= 0) return phrase.slice(shortAt, shortAt + 3).join(" ");
+  const longerBefore = shortAt > 0 && phrase.slice(0, shortAt).some((token) => isDistinctiveCompanyToken(token) && !names.has(token));
+  if (shortAt >= 0 && !longerBefore) return phrase.slice(shortAt, shortAt + 3).join(" ");
   const brand = phrase.filter((token) => isDistinctiveCompanyToken(token));
-  const distinctive = brand.filter((token) => !names.has(token) && !isStandaloneGenericQueryToken(token));
-  // "building" alone is not Gilbane Building Company. Quote the whole name, including a short token.
+  const distinctive = brand.filter((token) => !names.has(token) && !isSearchTermGeneric(token));
+  // "ocean" and "plaza" are dictionary words. Keep the whole brand, minus legal suffixes.
+  if (distinctive.length === 1 && (isOrdinaryDictionaryWord(distinctive[0]) || isCommonQueryStem(distinctive[0]))) {
+    return phrase.join(" ");
+  }
+  // A surname plus only a generic word, such as "Brodsky Organization", stays the whole brand.
   if (distinctive.length) return distinctive.join(" ");
   return phrase.join(" ");
 }
@@ -344,7 +538,17 @@ export function domainMatchesOrgStem(label: string, org: string): boolean {
   if (!stem || compact.length < 2) return false;
   if (compact === stem) return true;
   const peeled = compact.replace(DOMAIN_STATE_TAIL, "");
-  return peeled.length >= 2 && peeled === stem;
+  if (peeled.length >= 2 && peeled === stem) return true;
+  const brand = initialBrandStem(org);
+  return brand.length >= 3 && (compact === brand || peeled === brand);
+}
+
+/** "M&T Bank" is mt plus the b in Bank, so mtb.com is this firm. */
+export function initialBrandStem(org: string): string {
+  const phrase = companyPhraseTokens(stripQaOrg(org));
+  const initials = phrase.filter((token) => isShortBrandToken(token)).join("");
+  const next = phrase.find((token) => !isShortBrandToken(token));
+  return `${initials}${next ? next[0] : ""}`;
 }
 
 /** The site's own brand label. jll.com is "jll". A generic label such as "usa" is not a brand. */
@@ -444,8 +648,11 @@ function caseFold(token: string): string {
 
 function givenPattern(part: string): string {
   const key = part.toLowerCase();
-  const alts = [...new Set((NICKNAMES[key] || [key]).map((item) => item.toLowerCase()))];
-  return `(?:${alts.map(caseFold).join("|")})`;
+  const alts = new Set<string>([key, ...(NICKNAMES[key] || [])]);
+  for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+    if (formal !== key && nicks.includes(key)) alts.add(formal);
+  }
+  return `(?:${[...alts].map((item) => caseFold(item.toLowerCase())).join("|")})`;
 }
 
 /** Hyphenated surnames also match with a space. A hyphen beside the word is still the same word. */
@@ -470,8 +677,12 @@ function orderedNameSpans(text: string, parsed: ParsedPersonName): NameSpan[] {
   const givenSeq = parsed.given
     .map((part, index) => (index === 0 ? `(?<![A-Za-z0-9-])${givenPattern(part)}` : `${NAME_MIDDLE}\\s+${givenPattern(part)}`))
     .join("");
-  const forward = new RegExp(`${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
-  const reverse = new RegExp(`${surname}\\s*,?\\s+(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?![A-Za-z0-9-])`, "g");
+  const leadingInitial = String.raw`(?:(?<![A-Za-z0-9-])[A-Z]\.?\s+)?`;
+  const forward = new RegExp(`${leadingInitial}${givenSeq}${NAME_MIDDLE}\\s+${surname}`, "g");
+  const reverse = new RegExp(
+    `${surname}\\s*,?\\s+(?:[A-Z]\\.?\\s+)?(?<![A-Za-z0-9-])${givenPattern(parsed.given[0])}(?:\\s+[A-Z]\\.?\\b)?(?![A-Za-z0-9-])`,
+    "g",
+  );
   const spans: NameSpan[] = [];
   const pushSurname = (start: number, whole: string) => {
     const local = new RegExp(surname, "g");
@@ -507,7 +718,7 @@ function companySpanRanges(text: string, org: string): { start: number; end: num
   const ranges: { start: number; end: number }[] = [];
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
-    const body = `(?<![A-Za-z0-9-])${prefix.map((token) => tokenBody(token)).join(PHRASE_GAP)}(?![A-Za-z0-9-])`;
+    const body = `(?<![A-Za-z0-9-])${prefix.map((token) => tokenBody(token)).join(phraseGapFor(org))}(?![A-Za-z0-9-])`;
     for (const match of text.matchAll(new RegExp(body, "g"))) {
       const start = match.index ?? 0;
       ranges.push({ start, end: start + match[0].length });
@@ -569,6 +780,8 @@ function otherGivenImmediatelyBefore(text: string, matchStart: number, parsed: P
  * That occurrence still counts for the person. A different given name in front of it does not.
  */
 export function personHit(text: string, name: string, org = "", options?: { ownFirm?: boolean }): PersonHit {
+  text = foldMarks(text);
+  name = foldMarks(name);
   const parsed = parsePersonName(name);
   if (!parsed || parsed.given.length < 1) return "none";
   const companyRanges = org ? companySpanRanges(text, org) : [];
@@ -592,6 +805,51 @@ export function mentionsPerson(text: string, name: string, org = ""): boolean {
   return personHit(text, name, org) === "match";
 }
 
+/** Where the full name, or a listed nickname plus the surname, sits in the text. */
+export function personSpan(text: string, person: string): { index: number; length: number } | null {
+  const parsed = parsePersonName(person);
+  if (!parsed?.given[0] || !parsed.surname) return null;
+  const givens = new Set<string>([parsed.given[0].toLowerCase()]);
+  const key = parsed.given[0].toLowerCase();
+  for (const nick of NICKNAMES[key] || []) givens.add(nick);
+  for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+    if (!nicks.includes(key)) continue;
+    givens.add(formal);
+    for (const nick of nicks) givens.add(nick);
+  }
+  const surname = parsed.surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const given of givens) {
+    const escaped = given.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const hit = new RegExp(`(?<![A-Za-z])${escaped}\\s+${surname}(?![A-Za-z])`, "i").exec(text);
+    if (hit?.index !== undefined) return { index: hit.index, length: hit[0].length };
+  }
+  return null;
+}
+
+/**
+ * A Form 3, 4, or 5 display name. "Kelly William Matthew" is surname, first name, middle name.
+ * The middle name may be the name the applicant goes by. This is not used on free text.
+ */
+export function reportingOwnerDisplayMatches(display: string, person: string): boolean {
+  if (mentionsPerson(display, person)) return true;
+  const parsed = parsePersonName(person);
+  if (!parsed?.surname || !parsed.given.length) return false;
+  const parts = display.replace(/\([^)]*\)/g, " ").split(/[^A-Za-z]+/).filter((part) => part.length >= 2);
+  if (parts.length < 2 || parts[0].toLowerCase() !== parsed.surname.toLowerCase()) return false;
+  const accepted = new Set<string>();
+  for (const given of parsed.given) {
+    const key = given.toLowerCase();
+    accepted.add(key);
+    for (const nick of NICKNAMES[key] || []) accepted.add(nick);
+    for (const [formal, nicks] of Object.entries(NICKNAMES)) {
+      if (!nicks.includes(key)) continue;
+      accepted.add(formal);
+      for (const nick of nicks) accepted.add(nick);
+    }
+  }
+  return parts.slice(1).some((part) => accepted.has(part.toLowerCase()));
+}
+
 function formerOrEx(text: string, org: string): boolean {
   const phrase = companyPhraseTokens(org);
   const token = phrase.find((part) => isDistinctiveCompanyToken(part)) || phrase[0];
@@ -601,16 +859,24 @@ function formerOrEx(text: string, org: string): boolean {
 }
 
 /**
- * A headline that places the person in a past role at this company.
+ * A headline that places this person in a past role at this company.
+ * "Peter Ho to retire, James Polk named successor" is a departure for Ho and an arrival for Polk.
  * "jump to Newmark from Cushman" is a departure from Cushman and a join at Newmark.
  */
-export function leftTheCompany(text: string, org: string): boolean {
+export function leftTheCompany(text: string, org: string, person = ""): boolean {
   if (!org.trim() || !mentionsCompany(text, org)) return false;
-  if (formerOrEx(text, org)) return true;
-  const explicit = /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(text);
-  const joiningLawsuit = /\b(?:joins?|joined|joining)\b/i.test(text) && /\blawsuits?\b/i.test(text);
+  const clauses = text.split(/\s*(?:;|,)\s*/).map((clause) => clause.trim()).filter(Boolean);
+  const mine = person ? clauses.filter((clause) => mentionsPerson(clause, person, org)) : [];
+  const scope = person ? (mine.length ? mine.join(". ") : "") : text;
+  if (person && !scope) return false;
+  if (person && /\bnamed\s+(?:successor|ceo|cfo|president|chairman)\b|\b(?:to|will)\s+succeed\b/i.test(scope) && !/\b(?:retire|retires|retired|retiring|leaves|left|leaving|departs|departed)\b/i.test(scope)) {
+    return false;
+  }
+  if (formerOrEx(scope, org)) return true;
+  const explicit = /\b(?:leaves|left|leaving|departs|departed|departing|retiring|retires|retired)\b|\b(?:steps|stepped|stepping) down\b|\bto (?:retire|step down)\b|\btaking a step back\b/i.test(scope);
+  const joiningLawsuit = /\b(?:joins?|joined|joining)\b/i.test(scope) && /\blawsuits?\b/i.test(scope);
   if (joiningLawsuit) return explicit;
-  const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(text);
+  const move = /\b(?:jumps|jumped|jump|joins|joined|joining)\s+(?:to\s+)?([\s\S]{0,90}?)\s+from\s+([\s\S]{0,120})/i.exec(scope);
   if (move) {
     const destination = move[1];
     const origin = move[2].split(/[.]/)[0];
@@ -647,7 +913,7 @@ function followedByLegalSuffix(text: string, token: string): boolean {
 
 function surnameOnly(text: string, token: string, org = ""): boolean {
   const phrase = companyPhraseTokens(org);
-  if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase)) return false;
+  if (phrase.length >= 2 && phrase.includes(token) && consecutivePhrase(text, phrase, org)) return false;
   if (followedByLegalSuffix(text, token)) return false;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const all = text.match(new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "gi")) || [];
@@ -695,10 +961,25 @@ export function companyPhraseTokens(org: string): string[] {
   return tokens(org).filter((token) => !LEGAL.has(token) && !STOP.has(token));
 }
 
-const PHRASE_GAP = `[\\s,.'’:"&/+-]+`;
+const PHRASE_GAP = `[\\s,.'’‘\u02BB:"&/+-]+`;
+
+/** "of" is part of Banc of California. It is not part of Ocean Bank. */
+function phraseGapFor(org: string): string {
+  const folded = org.toLowerCase().replace(/&amp;/g, "&");
+  const allow = ["of", "the"].filter((word) => new RegExp(`\\b${word}\\b`, "i").test(folded));
+  if (/\band\b/i.test(folded) || /&/.test(folded)) allow.push("and|&(?:amp;)?");
+  if (!allow.length) return PHRASE_GAP;
+  return `(?:${PHRASE_GAP}(?:(?:${allow.join("|")})\\s+)?)`;
+}
 
 function tokenBody(token: string): string {
-  const folded = `${caseFold(token)}(?:'s)?`;
+  const bare = token.replace(/['’‘\u02BB\u02BC]/g, "");
+  const apostrophe = `['’‘\u02BB\u02BC]`;
+  const letters = [...bare].map((char) => caseFold(char));
+  const joined = /^o[^aeiouy]/i.test(bare) && bare.length >= 5
+    ? `${letters[0]}(?:${apostrophe}|\\s)?${letters.slice(1).join(`${apostrophe}?`)}`
+    : letters.join(`${apostrophe}?`);
+  const folded = `${joined}(?:'s)?`;
   if (token.length < 8) return folded;
   const splits = [folded];
   for (let index = 4; index <= token.length - 3; index += 1) {
@@ -709,10 +990,31 @@ function tokenBody(token: string): string {
   return `(?:${splits.join("|")})`;
 }
 
-function consecutivePhrase(text: string, prefix: string[]): boolean {
+function consecutivePhrase(text: string, prefix: string[], org = ""): boolean {
   if (prefix.length < 2) return false;
   // The hyphen in "Kennedy-Wilson" may separate this firm's words. The hyphen in "page-turner" still blocks a different word.
-  return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(PHRASE_GAP)}(?![A-Za-z0-9-])`).test(text);
+  return new RegExp(`(?<![A-Za-z0-9-])${prefix.map(tokenBody).join(phraseGapFor(org))}(?![A-Za-z0-9-])`).test(text);
+}
+
+/** The only distinctive token is a dictionary word, or the whole name is ordinary words such as "Related Group". */
+function dictionaryBrand(phrase: string[], distinctive: string[]): boolean {
+  if (phrase.length < 2) return false;
+  const stems = distinctive.filter((token) => !isSearchTermGeneric(token));
+  if (stems.length === 1 && (isOrdinaryDictionaryWord(stems[0]) || isCommonQueryStem(stems[0]))) return true;
+  if (stems.length) return false;
+  return phrase.every((token) => isGenericFirmToken(token) || isSearchTermGeneric(token) || isOrdinaryDictionaryWord(token));
+}
+
+/** "Ocean Bank" is the firm. "ocean bank" in lowercase prose, and "ocean ... bank" apart, are not. */
+function properNamePhrase(text: string, prefix: string[], org = ""): boolean {
+  if (prefix.length < 2) return false;
+  const body = prefix.map(tokenBody).join(phraseGapFor(org));
+  const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9-])${body}(?![A-Za-z0-9-])`, "gi"));
+  for (const hit of hits) {
+    const words = (hit[0].replace(/[\u2018\u2019\u02BB\u02BC']/g, "").match(/[A-Za-z]+/g) || []).filter((word) => !STOP.has(word.toLowerCase()));
+    if (words.length >= 2 && words.every((word) => word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase())) return true;
+  }
+  return false;
 }
 
 /**
@@ -721,7 +1023,10 @@ function consecutivePhrase(text: string, prefix: string[]): boolean {
  * A single-token firm keeps a whole-word match.
  */
 export function mentionsCompany(text: string, org: string, person = ""): boolean {
+  text = collapseAmpersandInitials(foldMarks(text));
   const phrase = companyPhraseTokens(org);
+  const brand = initialBrandStem(org);
+  if (brand.length >= 3 && wordHit(text, brand)) return true;
   if (!phrase.length) return false;
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
   if (phrase.length === 1) {
@@ -732,15 +1037,58 @@ export function mentionsCompany(text: string, org: string, person = ""): boolean
     void person;
     return true;
   }
+  if (dictionaryBrand(phrase, distinctive)) {
+    for (let length = phrase.length; length >= 2; length -= 1) {
+      if (properNamePhrase(text, phrase.slice(0, length), org)) return true;
+    }
+    return false;
+  }
   const firstDistinctive = distinctive[0] || phrase[0];
   for (let length = phrase.length; length >= 2; length -= 1) {
     const prefix = phrase.slice(0, length);
     if (!prefix.includes(firstDistinctive)) continue;
-    if (consecutivePhrase(text, prefix)) return true;
+    if (consecutivePhrase(text, prefix, org)) return true;
   }
   // "trust" and "realty" are not required. "Vornado stock" is Vornado Realty Trust.
   // "Starwood Capital" is a different firm, and "Starwood's SREIT" is a different product.
-  if (distinctive.length === 1 && distinctive[0] === phrase[0] && !PLACE_BRAND.has(distinctive[0]) && brandMention(text, distinctive[0], phrase, org, person)) return true;
+  if (
+    distinctive.length === 1 &&
+    distinctive[0] === phrase[0] &&
+    !PLACE_BRAND.has(distinctive[0]) &&
+    !isCommonQueryStem(distinctive[0]) &&
+    !isOrdinaryDictionaryWord(distinctive[0]) &&
+    brandMention(text, distinctive[0], phrase, org, person)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * A news headline names this firm. A common stem such as "plaza" in lowercase prose,
+ * or inside a longer place name ("Grand Army Plaza"), does not.
+ */
+export function headlineNamesFirm(text: string, org: string, person = ""): boolean {
+  if (!mentionsCompany(text, org, person)) return false;
+  const phrase = companyPhraseTokens(org);
+  const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
+  const stem =
+    distinctive.find((token) => isOrdinaryDictionaryWord(token) || isCommonQueryStem(token)) ||
+    (!distinctive.length ? phrase.find((token) => isOrdinaryDictionaryWord(token) || isCommonQueryStem(token)) : undefined);
+  if (!stem) return true;
+  const industry = phrase.filter((token) => isIndustryQueryWord(token));
+  if (industry.length && !industry.some((word) => new RegExp(`(?<![A-Za-z0-9])${word}(?![A-Za-z0-9])`, "i").test(text))) return false;
+  const hits = text.matchAll(new RegExp(`(?<![A-Za-z0-9])(${stem})(?![A-Za-z0-9])`, "gi"));
+  for (const hit of hits) {
+    const word = hit[1] || "";
+    if (!word || word[0] !== word[0].toUpperCase()) continue;
+    const before = text.slice(0, hit.index).trimEnd().match(/([A-Za-z][A-Za-z'-]*)$/);
+    const rawPrevious = before?.[1] || "";
+    const previous = rawPrevious.toLowerCase();
+    const capitalized = rawPrevious.length > 0 && rawPrevious[0] === rawPrevious[0].toUpperCase() && rawPrevious[0] !== rawPrevious[0].toLowerCase();
+    if (capitalized && previous !== "the" && !phrase.includes(previous)) continue;
+    return true;
+  }
   return false;
 }
 
