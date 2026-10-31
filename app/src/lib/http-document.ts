@@ -68,6 +68,7 @@ const APP_PREFIXES = [
   "/alerts",
   "/member-nda",
   "/projects",
+  "/refer",
   "/api",
   "/apply",
   "/brand",
