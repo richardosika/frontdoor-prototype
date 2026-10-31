@@ -62,7 +62,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
       </p>
       {rows.length === 0 ? (
         <div className={`${card} mt-3 p-6 text-center text-[16px] text-mut`}>
-          {active ? tx("No projects match these filters.") : tx("No approved projects are seeking your category right now.")}
+          {active ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </div>
       ) : (
         <ul className="mt-3 grid gap-4 md:grid-cols-2">

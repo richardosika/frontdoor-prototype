@@ -201,7 +201,7 @@ export default async function FeedPage({
         />
         {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
           <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")} ({checklist.length} / {checklist.length})
-            {checklist.find((item) => item.note) ? <span className="block text-forest" data-testid="start-note-reach">{tx(checklist.find((item) => item.note)!.note!).replace("{category}", ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")).replace(/\bneed a ([AEIOU])/, "need an $1")}</span> : null}
+            {checklist.find((item) => item.note) ? <span className="block text-forest" data-testid="start-note-reach">{tx(checklist.find((item) => item.note)!.note!).replace("{category}", ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}</span> : null}
           </p>
         ) : null}
         <div className="mt-4 space-y-4 lg:hidden">

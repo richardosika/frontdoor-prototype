@@ -60,7 +60,7 @@ export async function GettingStarted({ items, category = "" }: { items: StartIte
               {mark}
               <span className="flex-1">
                 <span className={`block ${item.state === "done" ? "text-mut line-through decoration-line" : "text-mut opacity-60"}`}>{tx(item.label)}</span>
-                {item.note ? <span className="block text-[14px] text-forest" data-testid={`start-note-${item.id}`}>{tx(item.note).replace("{category}", category).replace(/\bneed a ([AEIOU])/, "need an $1")}</span> : null}
+                {item.note ? <span className="block text-[14px] text-forest" data-testid={`start-note-${item.id}`}>{tx(item.note).replace("{category}", category).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}</span> : null}
               </span>
               <span className="sr-only">{item.state === "done" ? tx("Done") : tx("Locked until the earlier steps are done")}</span>
             </li>

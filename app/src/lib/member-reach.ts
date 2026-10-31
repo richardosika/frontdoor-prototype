@@ -133,7 +133,7 @@ export function gettingStarted(input: {
     { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
     input.outreachSent === 0 && input.noMatches
-      ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: "No projects need a {category} yet. We'll alert you the moment one does." }
+      ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: "You're first in line. We'll alert you the moment a developer posts a project seeking a {category}." }
       : { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
   ]);
 }

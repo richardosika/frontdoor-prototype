@@ -226,7 +226,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
       </h2>
       {data.seekingMe.length === 0 ? (
         <p className="mt-2 text-[15px] text-mut">
-          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("No approved projects are seeking your category right now.")}
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </p>
       ) : null}
       <ul className="mt-2">
@@ -341,7 +341,10 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
   const headline = head && head.projects === 0 ? (
     <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
       <p className="font-serif text-[22px] leading-snug md:text-[28px]" data-testid="headline-empty">
-        {tx("You're all set. New projects seeking a {category} will show up here first.").replace("{category}", catLabel).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}
+        {tx("You're on the list. When a project seeking a {category} gets approved, you'll see it here before anyone outside the network.").replace("{category}", catLabel).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}
+      </p>
+      <p className="mt-3 text-[15px] text-paper md:text-[16px]" data-testid="headline-nudge">
+        <a href="/profile" className="underline decoration-brass">{tx("Get found faster: developers searching for a {category} see your profile in Find your team.").replace("{category}", catLabel).replace(/\bfor a ([AEIOU])/, "for an $1")}</a>
       </p>
       {results ? (
         <p className="mt-1 text-[15px] text-sand md:text-[17px]" data-testid="headline-network">
@@ -370,7 +373,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
       {filters ? <div className="mt-2"><SlimFilterBar path="/feed" filters={filters} anchor="ledger-seeking" /></div> : null}
       {data.seekingMe.length === 0 ? (
         <p className="mt-2 rounded border border-line bg-paper p-4 text-[15px] text-mut">
-          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("No approved projects are seeking your category right now.")}
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </p>
       ) : null}
       <ul className="mt-3 grid gap-4 lg:grid-cols-2">

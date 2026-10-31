@@ -53,7 +53,7 @@ describe("#48 no matching projects", () => {
   it("step 5 completes itself with a note, 5/5", () => {
     const items = gettingStarted({ ...base, noMatches: true });
     expect(items.filter((i) => i.done)).toHaveLength(5);
-    expect(items[4].note).toMatch(/^No projects need a \{category\} yet/);
+    expect(items[4].note).toMatch(/^You're first in line/);
   });
   it("stays open when projects match", () => {
     const items = gettingStarted({ ...base, noMatches: false });
