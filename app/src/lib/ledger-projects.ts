@@ -92,6 +92,10 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   return {
     myCategory,
     myCategories,
+    // #44 expanded: every approved developer project seeking one of my categories (ignores filters), for the headline.
+    allSeeking: others
+      .filter((project) => project.user.role === "DEVELOPER" && matchOf(project))
+      .map((project) => ({ id: project.id, valueLabel: project.valueLabel, at: project.reviewedAt ?? project.submittedAt, matchedCategory: matchOf(project) })),
     // #44: approved projects seeking me that I have not contacted yet (all of them, not only the first few shown).
     newForYou: others.filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && !contactStatus.get(contactKey(project.id, user.id, project.userId))).length,
     myProjects,

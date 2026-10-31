@@ -4,6 +4,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { memberCategories, parseSeeking } from "@/lib/project-contact";
+import { moneyDigits } from "@/lib/money";
 
 const DAY = 24 * 60 * 60 * 1000;
 export const ACCEPTED_IN_TALKS_DAYS = 14;
@@ -73,4 +74,27 @@ export async function loadMyWork(user: { id: string; role: string; extraCategori
     };
   });
   return { active, talks: inTalks(others, user.id).slice(0, 8), newForYou };
+}
+
+/** #44 expanded: the value headline. Total value sums each project's stated value; projects without one add nothing. */
+export function valueHeadline(input: { allSeeking: { valueLabel: string }[]; received: { status: string; fromId: string; project: { userId: string } }[] }) {
+  const total = input.allSeeking.reduce((sum, p) => sum + (Number(moneyDigits(p.valueLabel || "")) || 0), 0);
+  const developers = new Set(input.received.filter((r) => r.status === "PENDING" && r.fromId === r.project.userId).map((r) => r.fromId));
+  return { projects: input.allSeeking.length, total, developers: developers.size };
+}
+
+export function monthStart(now = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/** #44 expanded: "This month" results, from real data. Deals won = project contacts (not my own projects) accepted this month. */
+export async function loadResults(user: { id: string }, allSeeking: { at: Date }[], now = new Date()) {
+  const since = monthStart(now);
+  const [views, won] = await Promise.all([
+    prisma.profileView.findMany({ where: { memberId: user.id, createdAt: { gte: since } }, select: { viewerId: true }, distinct: ["viewerId"] }),
+    prisma.projectContact.count({
+      where: { status: "ACCEPTED", respondedAt: { gte: since }, OR: [{ fromId: user.id }, { toId: user.id }], project: { userId: { not: user.id } } },
+    }),
+  ]);
+  return { shown: allSeeking.filter((p) => p.at >= since).length, views: views.length, won };
 }

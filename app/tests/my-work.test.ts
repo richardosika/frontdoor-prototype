@@ -19,3 +19,19 @@ describe("#44 My work right now", () => {
     expect(items.find((i) => i.id === "work")?.href).toBe("/profile#past-work");
   });
 });
+
+import { valueHeadline } from "@/lib/my-work";
+describe("#44 value headline", () => {
+  it("sums stated values and counts developers with open requests to me", () => {
+    const h = valueHeadline({
+      allSeeking: [{ valueLabel: "$18,000,000" }, { valueLabel: "24000000" }, { valueLabel: "" }],
+      received: [
+        { status: "PENDING", fromId: "dev1", project: { userId: "dev1" } },
+        { status: "PENDING", fromId: "dev1", project: { userId: "dev1" } },
+        { status: "ACCEPTED", fromId: "dev2", project: { userId: "dev2" } },
+        { status: "PENDING", fromId: "other", project: { userId: "me" } },
+      ],
+    });
+    expect(h).toEqual({ projects: 3, total: 42000000, developers: 1 });
+  });
+});

@@ -26,6 +26,11 @@ export default async function MemberPage({
   const tx = await serverTx();
   const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
   if (!loaded) notFound();
+  // #44: count developer profile views (one per developer, member and day) for the member's results strip.
+  if (user.role === "DEVELOPER" && user.id !== loaded.member.id && !user.isAdmin) {
+    const day = new Date().toISOString().slice(0, 10);
+    await prisma.profileView.upsert({ where: { memberId_viewerId_day: { memberId: loaded.member.id, viewerId: user.id, day } }, create: { memberId: loaded.member.id, viewerId: user.id, day }, update: {} }).catch(() => null);
+  }
   // #38: the viewer's approved projects that seek this member's category, with any contact already sent.
   const categories = memberCategories(loaded.member);
   const mine = categories.length && user.id !== loaded.member.id

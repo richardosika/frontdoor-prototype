@@ -9,7 +9,9 @@ import { serverTx } from "@/lib/i18n/server";
 import { SlimFilterBar } from "@/components/slim-filters";
 import { isDeveloperRole, type SlimFilters } from "@/lib/member-reach";
 import type { loadLedgerProjects } from "@/lib/ledger-projects";
-import type { loadMyWork } from "@/lib/my-work";
+import type { loadMyWork, loadResults } from "@/lib/my-work";
+import { valueHeadline } from "@/lib/my-work";
+import { parseFacts } from "@/lib/project-facts";
 import { formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
 
@@ -24,7 +26,7 @@ function statusWord(status: string) {
   return "Pending";
 }
 
-export async function LedgerProjects({ data, role, filters, myWork }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null }) {
+export async function LedgerProjects({ data, role, filters, myWork, results }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null }) {
   const developer = isDeveloperRole(role);
   const tx = await serverTx();
   const ownerFirst = role === "DEVELOPER" || data.myProjects.length > 0;
@@ -281,7 +283,7 @@ export async function LedgerProjects({ data, role, filters, myWork }: { data: Da
   const work = myWork ? (
     <section id="ledger-my-work" className={`${box} scroll-mt-20`} data-testid="ledger-my-work" key="work">
       <h2 className={h2}>{tx("My work right now")}</h2>
-      <div className="mt-3 grid gap-4 md:grid-cols-3">
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="min-w-0" data-testid="my-work-active">
           <p className="text-[15px] font-semibold text-forest">{tx("Active")} <span className="text-mut">({myWork.active.length})</span></p>
           {myWork.active.length === 0 ? <p className="text-[15px] text-mut">{tx("No active projects yet. Once a developer accepts your request, the project shows here.")}</p> : null}
@@ -329,19 +331,83 @@ export async function LedgerProjects({ data, role, filters, myWork }: { data: Da
             })}
           </ul>
         </div>
-        <div className="min-w-0" data-testid="my-work-new">
-          <p className="text-[15px] font-semibold text-forest">{tx("New for you")}</p>
-          <p className="mt-1 font-serif text-[40px] leading-none text-forest" data-testid="my-work-new-count">{myWork.newForYou}</p>
-          <p className="mt-1 text-[14px] text-mut">{tx("Approved projects seeking your category that you have not contacted yet.")}</p>
-          <Link href="/deals" className="mt-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-forest underline decoration-brass">
-            {tx("See Opportunities")} ›
-          </Link>
-        </div>
       </div>
     </section>
   ) : null;
+  // #44 expanded: value headline, big opportunity cards, smaller My work, results strip.
+  const head = myWork ? valueHeadline({ allSeeking: data.allSeeking, received: data.received }) : null;
+  const catLabel = data.myCategories.map((id) => tx(seekLabel(id))).join(" / ");
+  const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const headline = head ? (
+    <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
+      <p className="font-serif text-[22px] leading-snug md:text-[28px]">
+        <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project needs a {category} right now" : "projects need a {category} right now").replace("{category}", catLabel)}
+      </p>
+      <p className="mt-1 text-[15px] text-sand md:text-[17px]">
+        <span data-testid="headline-value">{money.format(head.total)}</span> {tx("total project value")} · <span data-testid="headline-developers">{head.developers}</span>{" "}
+        {tx(head.developers === 1 ? "developer wants to talk to you" : "developers want to talk to you")}
+      </p>
+    </section>
+  ) : null;
+  const now = Date.now();
+  const opportunities = myWork ? (
+    <section id="ledger-seeking" className="scroll-mt-20" data-testid="ledger-opportunities" key="opps">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-serif text-[26px] leading-tight text-forest md:text-[30px]">{tx("Opportunities for you")}</h2>
+        <Link href="/deals" className="inline-flex min-h-11 items-center text-[15px] font-semibold text-forest underline decoration-brass">{tx("See all")} ›</Link>
+      </div>
+      {filters ? <div className="mt-2"><SlimFilterBar path="/feed" filters={filters} anchor="ledger-seeking" /></div> : null}
+      {data.seekingMe.length === 0 ? (
+        <p className="mt-2 rounded border border-line bg-paper p-4 text-[15px] text-mut">
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("No approved projects are seeking your category right now.")}
+        </p>
+      ) : null}
+      <ul className="mt-3 grid gap-4 lg:grid-cols-2">
+        {data.seekingMe.map((project) => {
+          const at = (project.reviewedAt ?? project.submittedAt).getTime();
+          const bid = parseFacts(project.roleFacts).bidDue;
+          const closes = bid ? new Date(`${bid}T23:59:00`).getTime() - now : NaN;
+          const isNew = now - at <= 7 * 86400000;
+          const soon = closes >= 0 && closes <= 14 * 86400000;
+          return (
+            <li key={project.id} className="flex min-w-0 flex-col rounded border border-line border-t-[4px] border-t-brass bg-paper p-4 md:p-5" data-testid="opportunity-card">
+              <div className="flex flex-wrap gap-2">
+                {isNew ? <span className="rounded-full bg-brass px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-paper" data-testid="tag-new">{tx("New")}</span> : null}
+                {soon ? <span className="rounded-full bg-[#A2412C] px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white" data-testid="tag-closes-soon">{tx("Closes soon")}</span> : null}
+                {project.matchedCategory ? <span className="rounded-full border border-brass px-2.5 py-0.5 text-[12px] text-forest">{tx(seekLabel(project.matchedCategory))}</span> : null}
+              </div>
+              <Link href={`/projects/${project.id}`} className="mt-2 font-serif text-[24px] leading-snug underline decoration-brass underline-offset-2 hover:text-forest [overflow-wrap:anywhere]">{project.name}</Link>
+              <p className="mt-1 text-[15px] text-mut [overflow-wrap:anywhere]">
+                <Link href={`/members/${project.user.id}`} className="text-ink underline decoration-line">{project.user.name}</Link>
+                {project.user.org ? ` · ${project.user.org}` : ""} · {project.location}
+              </p>
+              <p className="mt-1 text-[15px] text-ink">
+                {tx(project.asset)}{project.valueLabel ? ` · ${formatProjectValue(project.valueLabel)}` : ""} · {project.year}
+              </p>
+              <div className="mt-1 flex-1"><ProjectFacts category={project.matchedCategory ?? data.myCategory} project={project} /></div>
+              {project.status ? (
+                <p className="mt-3 text-[15px] font-semibold text-forest">{tx("Contact request")}: {tx(statusWord(project.status))}</p>
+              ) : (
+                <div className="mt-3">
+                  <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} back="/feed" label={tx("Express interest")} primary align="start" />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  ) : null;
+  const resultsStrip = results ? (
+    <section className="rounded border border-line bg-cream px-4 py-3" data-testid="ledger-results" key="results">
+      <p className="text-[15px] text-ink">
+        <span className="font-semibold text-forest">{tx("This month")}:</span>{" "}
+        <span data-testid="results-shown">{results.shown}</span> {tx("projects shown to you")} · <span data-testid="results-views">{results.views}</span> {tx("developers viewed your profile")} · <span data-testid="results-won">{results.won}</span> {tx("deals won")}
+      </p>
+    </section>
+  ) : null;
   const order = myWork
-    ? [work, seekingMe, circleShared]
+    ? [headline, opportunities, work, resultsStrip, circleShared]
     : ownerFirst
       ? [mine, outreach, seekingMe, circleShared]
       : [seekingMe, outreach, mine, circleShared];

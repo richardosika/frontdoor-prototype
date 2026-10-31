@@ -2,6 +2,20 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "project needs a {category} right now": ["proyecto necesita {category} ahora mismo", "Projekt braucht gerade {category}", "件のプロジェクトが今 {category} を必要としています"],
+  "projects need a {category} right now": ["proyectos necesitan {category} ahora mismo", "Projekte brauchen gerade {category}", "件のプロジェクトが今 {category} を必要としています"],
+  "total project value": ["de valor total de proyectos", "Gesamtprojektwert", "のプロジェクト総額"],
+  "developer wants to talk to you": ["desarrollador quiere hablar con usted", "Entwickler möchte mit Ihnen sprechen", "人のデベロッパーがあなたと話したがっています"],
+  "developers want to talk to you": ["desarrolladores quieren hablar con usted", "Entwickler möchten mit Ihnen sprechen", "人のデベロッパーがあなたと話したがっています"],
+  "See all": ["Ver todo", "Alle ansehen", "すべて見る"],
+  "New": ["Nuevo", "Neu", "新着"],
+  "Closes soon": ["Cierra pronto", "Endet bald", "まもなく締切"],
+  "Express interest": ["Expresar interés", "Interesse bekunden", "関心を伝える"],
+  "This month": ["Este mes", "Diesen Monat", "今月"],
+  "projects shown to you": ["proyectos mostrados", "Ihnen gezeigte Projekte", "件のプロジェクトを表示"],
+  "developers viewed your profile": ["desarrolladores vieron su perfil", "Entwickler haben Ihr Profil angesehen", "人のデベロッパーがプロフィールを閲覧"],
+  "deals won": ["acuerdos ganados", "gewonnene Aufträge", "件の成約"],
+  "Getting started is complete.": ["La puesta en marcha está completa.", "Der Einstieg ist abgeschlossen.", "はじめにのステップはすべて完了しました。"],
   "My work right now": ["Mi trabajo ahora", "Meine aktuelle Arbeit", "現在の仕事"],
   "Active": ["Activos", "Aktiv", "進行中"],
   "In talks": ["En conversación", "In Gesprächen", "協議中"],

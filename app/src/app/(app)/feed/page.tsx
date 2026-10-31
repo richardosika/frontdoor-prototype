@@ -5,7 +5,7 @@ import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
-import { loadMyWork } from "@/lib/my-work";
+import { loadMyWork, loadResults } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { gettingStarted, isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
@@ -38,7 +38,7 @@ export default async function FeedPage({
   const [application, outreachSent, ledgerProjects, circle] = await Promise.all([
     prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     prisma.projectContact.count({ where: { fromId: user.id } }),
-    loadLedgerProjects(user, { filters }),
+    loadLedgerProjects(user, { filters, limit: isDeveloperRole(user.role) ? 6 : 8 }),
     loadMyCircle(user),
   ]);
   const mine = ledgerProjects.myProjects;
@@ -100,9 +100,15 @@ export default async function FeedPage({
             </Link>
           </section>
         ) : null}
+        {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
         <GettingStarted items={checklist} />
         {note}
-        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou)} />
+        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou)}
+          results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
+        />
+        {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
+          <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")}</p>
+        ) : null}
         <div className="mt-4 space-y-4 lg:hidden">
           {circlePanel}
         </div>

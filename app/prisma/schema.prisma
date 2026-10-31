@@ -1139,3 +1139,15 @@ model DealChecklistComment {
 
   @@index([itemId, createdAt])
 }
+
+/// #44: a developer opened a member's profile (one row per viewer, member and day), for "developers viewed your profile".
+model ProfileView {
+  id        String   @id @default(cuid())
+  memberId  String
+  viewerId  String
+  day       String
+  createdAt DateTime @default(now())
+
+  @@unique([memberId, viewerId, day])
+  @@index([memberId, createdAt])
+}
