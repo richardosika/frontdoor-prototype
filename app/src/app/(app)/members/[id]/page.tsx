@@ -9,7 +9,7 @@ import { appBaseUrl } from "@/lib/url";
 import { isDeveloperRole } from "@/lib/member-reach";
 import { VendorProfile } from "@/components/vendor-profile";
 import { prisma } from "@/lib/prisma";
-import { canContactAboutProject, categoryForRole } from "@/lib/project-contact";
+import { canContactAboutProject, memberCategories } from "@/lib/project-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -27,16 +27,16 @@ export default async function MemberPage({
   const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
   if (!loaded) notFound();
   // #38: the viewer's approved projects that seek this member's category, with any contact already sent.
-  const category = categoryForRole(loaded.member.role);
-  const mine = category && user.id !== loaded.member.id
+  const categories = memberCategories(loaded.member);
+  const mine = categories.length && user.id !== loaded.member.id
     ? await prisma.trackProject.findMany({
-        where: { userId: user.id, reviewStatus: "APPROVED", seeking: { contains: category } },
+        where: { userId: user.id, reviewStatus: "APPROVED", OR: categories.map((id) => ({ seeking: { contains: id } })) },
         include: { contacts: { where: { OR: [{ toId: loaded.member.id }, { fromId: loaded.member.id }] }, select: { status: true } } },
         orderBy: { submittedAt: "desc" },
       })
     : [];
   const reach = mine
-    .filter((project) => canContactAboutProject({ project, from: { id: user.id, role: user.role }, to: { id: loaded.member.id, role: loaded.member.role } }).ok)
+    .filter((project) => canContactAboutProject({ project, from: { id: user.id, role: user.role }, to: { id: loaded.member.id, role: loaded.member.role, extraCategories: loaded.member.extraCategories } }).ok)
     .map((project) => ({ id: project.id, name: project.name, status: project.contacts[0]?.status ?? "" }));
   const backHref = isDeveloperRole(user.role) ? "/deals" : "/network";
   const backLabel = isDeveloperRole(user.role) ? tx("Find your team") : tx("My Circle");

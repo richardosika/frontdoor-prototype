@@ -7,7 +7,7 @@ import { inferNeed } from "@/lib/project-filter";
 export
 async function dealRoomRule(
   deal: { id: string; sponsorId: string; need: string; roleNeeded: string | null; projectId: string | null },
-  user: { id: string; role: string; isAdmin: boolean },
+  user: { id: string; role: string; extraCategories?: string | null; isAdmin: boolean },
 ) {
   if (user.isAdmin) return { ok: true as const };
   const [post, project] = await Promise.all([
@@ -19,5 +19,5 @@ async function dealRoomRule(
     roleNeeded: deal.roleNeeded,
     projectSeeking: project?.seeking,
   });
-  return canRequestDealRoom({ categories, requesterRole: user.role, related: await canMessagePair(user.id, deal.sponsorId) });
+  return canRequestDealRoom({ categories, requesterRole: user.role, requesterExtra: user.extraCategories, related: await canMessagePair(user.id, deal.sponsorId) });
 }

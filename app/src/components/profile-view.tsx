@@ -11,6 +11,7 @@ import { blockMember, openConversation, respondIntroduction, unblockMember } fro
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { categoryForRole, memberCategories } from "@/lib/project-contact";
 import { tierLabel } from "@/lib/format";
 import { canEditProject, parseSeeking, seekLabel, projectLocation, formatProjectValue, fixRoleTypos } from "@/lib/project-contact";
 import { canOpenProjectToCounterparties, type PublicVerification } from "@/lib/verification";
@@ -91,6 +92,7 @@ export async function ProfileView({
     insuranceInfo?: string;
     specialties?: string;
     privateTerms?: string;
+    extraCategories?: string;
     createdAt: Date;
   };
   projects: Project[];
@@ -155,6 +157,12 @@ export async function ProfileView({
           <span className="rounded-sm bg-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-paper">
             {tx(roleShort(roleLabel(member.role)))}
           </span>
+          {/* #42: the other categories this member also covers. */}
+          {memberCategories(member).slice(categoryForRole(member.role) ? 1 : 0).map((id) => (
+            <span key={id} className="rounded-sm border border-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-forest" data-testid={`member-category-${id}`}>
+              {tx(seekLabel(id))}
+            </span>
+          ))}
           <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
             {tx("Member since")} {member.createdAt.getFullYear()}
           </span>

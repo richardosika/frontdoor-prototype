@@ -219,6 +219,8 @@ export type JoinProfile = {
   email: string;
   phone: string;
   role: string;
+  /** #42: other seek categories the applicant also covers (optional). */
+  extraCategories?: string[];
   company: string;
   website: string;
   street: string;

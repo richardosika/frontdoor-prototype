@@ -1,6 +1,6 @@
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
-import { categoryForRole, parseSeeking } from "@/lib/project-contact";
+import { categoryMemberWhere, memberCategories, memberInCategory, parseSeeking } from "@/lib/project-contact";
 
 /** Notifications that belong on a member's Alerts page. Staff notices stay in Admin. */
 export function memberAlertWhere(userId: string) {
@@ -11,15 +11,15 @@ export const NEW_MEMBER_ALERT_TITLE = "New member matches your projects";
 
 /** Pure: which owners' approved projects seek the new member's category. Owner id -> project names. */
 export function matchNewMember(
-  member: { id: string; role: string },
+  member: { id: string; role: string; extraCategories?: string | null },
   projects: { userId: string; name: string; seeking: string; reviewStatus: string }[],
 ): Map<string, string[]> {
-  const category = categoryForRole(member.role);
+  const categories = memberCategories(member);
   const out = new Map<string, string[]>();
-  if (!category) return out;
+  if (!categories.length) return out;
   for (const project of projects) {
     if (project.userId === member.id || project.reviewStatus !== "APPROVED") continue;
-    if (!parseSeeking(project.seeking).includes(category)) continue;
+    if (!parseSeeking(project.seeking).some((id) => categories.includes(id))) continue;
     out.set(project.userId, [...(out.get(project.userId) ?? []), project.name]);
   }
   return out;
@@ -27,7 +27,7 @@ export function matchNewMember(
 
 /** Alert every member whose approved projects seek the new member's category, once per new member. */
 export async function alertNewMemberMatches(memberId: string): Promise<number> {
-  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { id: true, name: true, role: true, org: true, status: true, paymentStatus: true, isAdmin: true } });
+  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { id: true, name: true, role: true, extraCategories: true, org: true, status: true, paymentStatus: true, isAdmin: true } });
   if (!member || member.status !== "ACTIVE" || member.isAdmin || !(LISTED_PAYMENT_STATUSES as readonly string[]).includes(member.paymentStatus)) return 0;
   const projects = await prisma.trackProject.findMany({
     where: { reviewStatus: "APPROVED", seeking: { not: "" }, user: { status: "ACTIVE" } },
@@ -59,14 +59,14 @@ export async function alertProjectSeekers(projectId: string, onlyCategories?: st
     select: { id: true, name: true, seeking: true, reviewStatus: true, userId: true, location: true, asset: true, user: { select: { name: true, org: true } } },
   });
   if (!project || project.reviewStatus !== "APPROVED") return 0;
-  const { rolesForCategory } = await import("@/lib/project-contact");
   const categories = parseSeeking(project.seeking).filter((id) => !onlyCategories || onlyCategories.includes(id));
-  const roles = categories.flatMap((id) => rolesForCategory(id));
-  if (!roles.length) return 0;
-  const people = await prisma.user.findMany({
-    where: { id: { not: project.userId }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: roles as never[] } },
-    select: { id: true, email: true, locale: true, notifyMatches: true },
-  });
+  if (!categories.length) return 0;
+  const people = (
+    await prisma.user.findMany({
+      where: { id: { not: project.userId }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(categories) as object) },
+      select: { id: true, email: true, locale: true, notifyMatches: true, role: true, extraCategories: true },
+    })
+  ).filter((person) => categories.some((id) => memberInCategory(person, id)));
   const href = `/projects/${project.id}`;
   let sent = 0;
   for (const person of people) {

@@ -945,6 +945,7 @@ async function alignSeededDemo() {
   await ensureCategoryDemoMembers();
   await ensureMapleCourtDealRoom();
   await ensureRoleDemo();
+  await ensureMultiCategoryDemo();
 }
 
 async function ensureExtraProjects() {
@@ -1509,5 +1510,18 @@ async function ensureRoleDemo() {
   };
   for (const [id, value] of Object.entries(facts)) {
     await prisma.trackProject.updateMany({ where: { id, roleFacts: "{}" }, data: { roleFacts: JSON.stringify(value) } });
+  }
+}
+
+/** #42: demo members who cover more than one category. Only fills a blank extraCategories. */
+async function ensureMultiCategoryDemo() {
+  const combos: Record<string, string> = {
+    user_op: "SURETY_BONDING", // Owen Pratt: insurance + surety / bonding
+    user_cn: "STRUCTURAL_ENGINEER", // Carla Nunez: civil + structural engineer
+    user_dp: "PROPERTY_MANAGER", // Daniel Park: broker + property manager
+    user_jw: "RE_ATTORNEY", // Julian Weiss: zoning + real estate attorney
+  };
+  for (const [id, extraCategories] of Object.entries(combos)) {
+    await prisma.user.updateMany({ where: { id, extraCategories: "" }, data: { extraCategories } });
   }
 }

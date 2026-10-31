@@ -1,7 +1,7 @@
 import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { projectAudience } from "@/lib/project-contact-db";
-import { canContactAboutProject, categoryForRole, projectDetailsVisible } from "@/lib/project-contact";
+import { canContactAboutProject, memberCategories, projectDetailsVisible } from "@/lib/project-contact";
 import { projectAccessible } from "@/lib/member-reach";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
@@ -27,9 +27,10 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
   });
   if (!member || member.status !== "ACTIVE") return null;
   if (viewerId !== memberId && blocksMembership(member.paymentStatus)) return null;
-  const viewer = (await prisma.user.findUnique({ where: { id: viewerId }, select: { id: true, role: true, isAdmin: true } })) ?? {
+  const viewer = (await prisma.user.findUnique({ where: { id: viewerId }, select: { id: true, role: true, extraCategories: true, isAdmin: true } })) ?? {
     id: viewerId,
     role: "",
+    extraCategories: "",
     isAdmin: false,
   };
   const [connection, introduction] = await Promise.all([
@@ -98,14 +99,14 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
   const inOwnerCircle = connection?.status === "ACCEPTED";
   // #25: a member sees another member's project only when it seeks their category or they are in the owner's circle.
   // A developer whose approved project seeks this member's category also sees the member's past work (Find your team).
-  const memberCategory = categoryForRole(member.role);
+  const memberCats = memberCategories(member);
   const teamCandidate =
-    viewer.id !== member.id && memberCategory
-      ? (await prisma.trackProject.count({ where: { userId: viewer.id, reviewStatus: "APPROVED", seeking: { contains: memberCategory } } })) > 0
+    viewer.id !== member.id && memberCats.length
+      ? (await prisma.trackProject.count({ where: { userId: viewer.id, reviewStatus: "APPROVED", OR: memberCats.map((id) => ({ seeking: { contains: id } })) } })) > 0
       : false;
   const visibleProjects = member.projects.filter(
     (project) =>
-      projectAccessible(project, { id: viewer.id, isAdmin: viewer.isAdmin, role: viewer.role, inOwnerCircle }) ||
+      projectAccessible(project, { id: viewer.id, isAdmin: viewer.isAdmin, role: viewer.role, extraCategories: viewer.extraCategories, inOwnerCircle }) ||
       (teamCandidate && project.reviewStatus === "APPROVED"),
   );
   const audiences = new Map(
@@ -136,7 +137,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       detailsVisible: projectDetailsVisible(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle }),
       canContact:
         viewer.id !== project.userId &&
-        canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role }, to: { id: member.id, role: member.role } }).ok,
+        canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role, extraCategories: viewer.extraCategories }, to: { id: member.id, role: member.role, extraCategories: member.extraCategories } }).ok,
       contactStatus: project.contacts[0]?.status ?? "",
       documents: project.documents,
       documentsVisible: viewer.id === project.userId || viewer.isAdmin || (audiences.get(project.id) ?? []).includes(viewer.id),
@@ -161,6 +162,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       org: member.org,
       location: member.location,
       role: member.role,
+      extraCategories: member.extraCategories,
       tier: member.tier,
       bio: member.bio,
       website: member.website,

@@ -4,6 +4,7 @@ import { currentLocale } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n/messages";
 import { phrase } from "@/lib/i18n/phrases";
 import { roleProfile } from "@/lib/role-profile";
+import { SEEK_CATEGORIES, categoryForRole, parseSeeking } from "@/lib/project-contact";
 
 const labelCls = "mb-2 block font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-forest";
 const field =
@@ -35,6 +36,7 @@ export async function ProfileEditor({
     specialties?: string;
     privateTerms?: string;
     role?: string;
+    extraCategories?: string;
   };
 }) {
   const locale = await currentLocale();
@@ -97,6 +99,36 @@ export async function ProfileEditor({
         <input name="checkSize" defaultValue={member.checkSize} className={field} placeholder="$1–5M" />
       </label>
       {/* #30: no "What I am looking for" for anyone; developers have no services blurb. Saved data stays in the database. */}
+      {/* #42: any member may answer more than one category; they appear under each one. */}
+      <fieldset data-testid="profile-categories">
+        <input type="hidden" name="profileCategoriesShown" value="1" />
+        <legend className={labelCls}>{phrase(locale, "Categories you cover")}</legend>
+        <p className="mb-3 font-sans text-[14px] text-mut">
+          {phrase(locale, "Your main category comes from your membership type. Tick any others you also cover; developers looking for those categories will see you there too.")}
+        </p>
+        <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+          {SEEK_CATEGORIES.map((category) => {
+            const primary = categoryForRole(member.role) === category.id;
+            return (
+              <label key={category.id} className="flex min-h-11 items-center gap-3 font-sans text-[16px] text-ink">
+                <input
+                  type="checkbox"
+                  name="extraCategories"
+                  value={category.id}
+                  className={box}
+                  defaultChecked={primary || parseSeeking(member.extraCategories ?? "").includes(category.id)}
+                  disabled={primary}
+                  data-testid={`category-${category.id}`}
+                />
+                <span>
+                  {phrase(locale, category.label)}
+                  {primary ? <span className="text-mut"> · {phrase(locale, "main")}</span> : null}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
       {member.role !== "DEVELOPER" ? (
         <label data-testid="profile-services">
           <span className={labelCls}>{phrase(locale, "About my services")}</span>

@@ -1,16 +1,17 @@
 import { factScore } from "@/lib/project-facts";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
-import { categoryForRole, parseSeeking, rolesForCategory } from "@/lib/project-contact";
+import { categoryMemberWhere, memberCategories, memberInCategory, parseSeeking } from "@/lib/project-contact";
 import { circleIds } from "@/lib/project-contact-db";
 import type { MemberRole } from "@prisma/client";
 import { matchesSlimFilters, type SlimFilters } from "@/lib/member-reach";
 
 /** Everything the role-aware top of the Ledger needs: my projects, who they seek, outreach, and projects seeking me. */
-export async function loadLedgerProjects(user: { id: string; role: string }, options: { filters?: SlimFilters; limit?: number } = {}) {
+export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number } = {}) {
   const limit = options.limit ?? 6;
   const keep = (project: { asset: string; state: string; location: string; valueLabel: string }) => !options.filters || matchesSlimFilters(project, options.filters);
-  const myCategory = categoryForRole(user.role);
+  const myCategories = memberCategories(user);
+  const myCategory = myCategories[0] ?? null;
   const circle = await circleIds(user.id);
   const [mine, sent, received, others] = await Promise.all([
     prisma.trackProject.findMany({ where: { userId: user.id }, orderBy: [{ submittedAt: "desc" }] }),
@@ -48,11 +49,10 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
 
   const wanted = new Set<string>();
   for (const project of mine) if (project.reviewStatus === "APPROVED") for (const id of parseSeeking(project.seeking)) wanted.add(id);
-  const roles = [...wanted].flatMap((id) => rolesForCategory(id)) as MemberRole[];
-  const candidates = roles.length
+  const candidates = wanted.size
     ? await prisma.user.findMany({
-        where: { id: { not: user.id }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: roles } },
-        select: { id: true, name: true, org: true, role: true, location: true },
+        where: { id: { not: user.id }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere([...wanted]) as object) },
+        select: { id: true, name: true, org: true, role: true, location: true, extraCategories: true },
         orderBy: { name: "asc" },
         take: 200,
       })
@@ -66,20 +66,22 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
         ? parseSeeking(project.seeking).map((category) => ({
             category,
             members: candidates
-              .filter((member) => (rolesForCategory(category) as string[]).includes(member.role))
+              .filter((member) => memberInCategory(member, category))
               .slice(0, 3)
               .map((member) => ({ ...member, status: contactStatus.get(contactKey(project.id, user.id, member.id)) ?? "" })),
           }))
         : [],
   }));
 
-  const seekingMe = myCategory
+  // #42: the category of mine each project seeks (first match in my order), so multi-category members see every match.
+  const matchOf = (project: { seeking: string }) => myCategories.find((id) => parseSeeking(project.seeking).includes(id)) ?? null;
+  const seekingMe = myCategories.length
     ? others
-        .filter((project) => parseSeeking(project.seeking).includes(myCategory) && keep(project))
+        .filter((project) => matchOf(project) && keep(project))
         // Overnight: projects that give this member type the facts it needs come first, then newest.
-        .sort((a, b) => factScore(myCategory, b) - factScore(myCategory, a))
+        .sort((a, b) => factScore(matchOf(b)!, b) - factScore(matchOf(a)!, a))
         .slice(0, limit)
-        .map((project) => ({ ...project, status: contactStatus.get(contactKey(project.id, user.id, project.userId)) ?? "" }))
+        .map((project) => ({ ...project, matchedCategory: matchOf(project), status: contactStatus.get(contactKey(project.id, user.id, project.userId)) ?? "" }))
     : [];
   const seekingIds = new Set(seekingMe.map((project) => project.id));
   const circleShared = others
@@ -88,6 +90,7 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
 
   return {
     myCategory,
+    myCategories,
     myProjects,
     sent,
     received: received.map((row) => ({ ...row, ownerIsMe: row.project.userId === user.id, inCircle: circle.has(row.fromId) })),
@@ -108,12 +111,13 @@ export async function loadFindTeam(user: { id: string }) {
     orderBy: { submittedAt: "desc" },
   });
   const open = projects.filter((project) => project.reviewStatus === "APPROVED" && parseSeeking(project.seeking).length > 0);
-  const roles = [...new Set(open.flatMap((project) => parseSeeking(project.seeking).flatMap((id) => rolesForCategory(id))))] as MemberRole[];
+  const wantedIds = [...new Set(open.flatMap((project) => parseSeeking(project.seeking)))];
   const [members, contacts] = await Promise.all([
-    roles.length
+    wantedIds.length
       ? prisma.user.findMany({
-          where: { id: { not: user.id }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: roles } },
+          where: { id: { not: user.id }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(wantedIds) as object) },
           select: {
+            extraCategories: true,
             id: true,
             name: true,
             initials: true,
@@ -144,7 +148,7 @@ export async function loadFindTeam(user: { id: string }) {
       groups: parseSeeking(project.seeking).map((category) => ({
         category,
         members: members
-          .filter((member) => (rolesForCategory(category) as string[]).includes(member.role))
+          .filter((member) => memberInCategory(member, category))
           .map((member) => ({ ...member, status: status.get(`${project.id}:${member.id}`) ?? "" })),
       })),
     })),

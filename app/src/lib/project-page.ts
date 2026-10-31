@@ -10,7 +10,7 @@ export type ProjectPageView = "owner" | "full" | "basic" | "hidden";
  */
 export function projectPageView(
   project: { userId: string; reviewStatus: string; shareWithCircle: boolean; seeking?: string },
-  viewer: { id: string; isAdmin: boolean; inOwnerCircle: boolean; role?: string; teamCandidate?: boolean },
+  viewer: { id: string; isAdmin: boolean; inOwnerCircle: boolean; role?: string; extraCategories?: string | null; teamCandidate?: boolean },
 ): ProjectPageView {
   if (project.userId === viewer.id) return "owner";
   if (!projectAccessible({ ...project, seeking: project.seeking ?? "" }, { ...viewer, role: viewer.role ?? "" })) return "hidden";

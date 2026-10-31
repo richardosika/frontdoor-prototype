@@ -193,9 +193,9 @@ export async function contactAboutProject(formData: FormData) {
   const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
   if (!project) go(back, "error", "Project not found.");
   const toId = project.userId === user.id ? String(formData.get("toId") || "") : project.userId;
-  const to = await prisma.user.findUnique({ where: { id: toId }, select: { id: true, role: true, status: true, email: true, locale: true, notifyIntros: true } });
+  const to = await prisma.user.findUnique({ where: { id: toId }, select: { id: true, role: true, extraCategories: true, status: true, email: true, locale: true, notifyIntros: true } });
   if (!to || to.status !== "ACTIVE") go(back, "error", "That member is not available.");
-  const decision = canContactAboutProject({ project, from: { id: user.id, role: user.role }, to: { id: to.id, role: to.role } });
+  const decision = canContactAboutProject({ project, from: { id: user.id, role: user.role, extraCategories: user.extraCategories }, to: { id: to.id, role: to.role, extraCategories: to.extraCategories } });
   if (!decision.ok) go(back, "error", decision.reason);
   if (await isBlocked(user.id, to.id)) go(back, "error", "Messaging is closed between these members.");
   const recent = await prisma.projectContact.count({ where: { fromId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } } });

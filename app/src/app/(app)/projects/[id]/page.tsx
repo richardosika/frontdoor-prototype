@@ -17,7 +17,7 @@ import { eligibleForDirectory } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { projectPageView } from "@/lib/project-page";
-import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryForRole, formatProjectValue, parseSeeking, projectLocation, rolesForCategory, seekLabel } from "@/lib/project-contact";
+import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryMemberWhere, memberCategories, memberInCategory, formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   });
   if (!project || (project.user.status !== "ACTIVE" && !viewer.isAdmin)) return <ProjectNotAvailable tx={tx} />;
   const ownerCircle = await circleIds(project.userId);
-  const view = projectPageView(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle: ownerCircle.has(viewer.id), role: viewer.role });
+  const view = projectPageView(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle: ownerCircle.has(viewer.id), role: viewer.role, extraCategories: viewer.extraCategories });
   // #25: not sought and not in the owner's circle: nothing about the project is shown.
   if (view === "hidden") return <ProjectNotAvailable tx={tx} />;
   const isOwner = view === "owner";
@@ -59,18 +59,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const files = project.documents.filter((doc) => !doc.contentType.startsWith("image/"));
   const full = view === "owner" || view === "full";
   const myContact = project.contacts.find((c) => c.fromId === viewer.id || c.toId === viewer.id);
-  const canContact = !isOwner && canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role }, to: { id: project.userId, role: project.user.role } }).ok;
-  const myCategory = categoryForRole(viewer.role);
+  const canContact = !isOwner && canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role, extraCategories: viewer.extraCategories }, to: { id: project.userId, role: project.user.role } }).ok;
+  // #42: the first of my categories this project seeks (or my primary one).
+  const myCategory = memberCategories(viewer).find((id) => seeking.includes(id)) ?? memberCategories(viewer)[0] ?? null;
 
   const matches = isOwner && project.reviewStatus === "APPROVED" && seeking.length
     ? (
         await prisma.user.findMany({
-          where: { status: "ACTIVE", id: { not: project.userId }, role: { in: seeking.flatMap(rolesForCategory) } },
-          select: { id: true, name: true, initials: true, photoId: true, role: true, org: true, location: true, status: true, paymentStatus: true },
+          where: { status: "ACTIVE", id: { not: project.userId }, ...(categoryMemberWhere(seeking) as object) },
+          select: { id: true, name: true, initials: true, photoId: true, role: true, extraCategories: true, org: true, location: true, status: true, paymentStatus: true },
           orderBy: { name: "asc" },
           take: 24,
         })
-      ).filter(eligibleForDirectory)
+      ).filter(eligibleForDirectory).filter((member) => seeking.some((id) => memberInCategory(member, id)))
     : [];
   const ownDeals = isOwner ? await prisma.deal.findMany({ where: { sponsorId: viewer.id }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }) : [];
 
@@ -125,10 +126,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <ProjectFacts category={null} project={project} all />
         ) : (
           <div data-testid="project-facts-for-you">
-            {factsFor(categoryForRole(viewer.role), project).length ? (
+            {factsFor(myCategory, project).length ? (
               <p className="mt-4 text-[12px] font-semibold uppercase tracking-wider text-brass">{tx("What matters for you")}</p>
             ) : null}
-            <ProjectFacts category={categoryForRole(viewer.role)} project={project} valueVisible={full} />
+            <ProjectFacts category={myCategory} project={project} valueVisible={full} />
           </div>
         )}
         {isOwner ? (

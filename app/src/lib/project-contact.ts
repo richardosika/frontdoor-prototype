@@ -54,6 +54,26 @@ export function categoryForRole(role: string | null | undefined): string | null 
   return SEEK_CATEGORIES.find((item) => (item.roles as string[]).includes(role))?.id ?? null;
 }
 
+/** #42: a member and the extra categories they also answer. */
+export type CategoryMember = { role: string | null | undefined; extraCategories?: string | null };
+
+/** Every category a member answers: the one from their role first, then their extra categories, in catalog order. */
+export function memberCategories(member: CategoryMember): string[] {
+  const primary = categoryForRole(member.role);
+  const extra = parseSeeking(member.extraCategories ?? "").filter((id) => id !== primary);
+  return primary ? [primary, ...extra] : extra;
+}
+
+export function memberInCategory(member: CategoryMember, category: string): boolean {
+  return memberCategories(member).includes(category);
+}
+
+/** Prisma where for members answering any of these categories (by role or extra category). Post-filter with memberInCategory. */
+export function categoryMemberWhere(categories: string[]): { OR: Record<string, unknown>[] } {
+  const roles = [...new Set(categories.flatMap((id) => rolesForCategory(id)))];
+  return { OR: [...(roles.length ? [{ role: { in: roles } }] : []), ...categories.map((id) => ({ extraCategories: { contains: id } }))] };
+}
+
 export function rolesForCategory(id: string): RoleId[] {
   return BY_ID.get(id)?.roles ?? [];
 }
@@ -69,13 +89,13 @@ export function serializeSeeking(value: string[]): string {
   return parseSeeking(value).join(",");
 }
 
-export function projectSeeksRole(project: { seeking: string }, role: string | null | undefined): boolean {
-  const category = categoryForRole(role);
-  return Boolean(category && parseSeeking(project.seeking).includes(category));
+export function projectSeeksRole(project: { seeking: string }, role: string | null | undefined, extraCategories?: string | null): boolean {
+  const seeking = parseSeeking(project.seeking);
+  return memberCategories({ role, extraCategories }).some((id) => seeking.includes(id));
 }
 
 export type ContactProject = { userId: string; seeking: string; reviewStatus: string };
-export type ContactParty = { id: string; role: string };
+export type ContactParty = { id: string; role: string; extraCategories?: string | null };
 
 export type ContactDecision = { ok: true; category: string } | { ok: false; reason: string };
 
@@ -102,8 +122,8 @@ export function canContactAboutProject(input: { project: ContactProject; from: C
   const ownerReceives = project.userId === to.id;
   if (!ownerSends && !ownerReceives) return { ok: false, reason: CONTACT_REASONS.notOwner };
   const other = ownerSends ? to : from;
-  const category = categoryForRole(other.role);
-  if (!category || !seeking.includes(category)) {
+  const category = memberCategories(other).find((id) => seeking.includes(id));
+  if (!category) {
     return { ok: false, reason: ownerSends ? CONTACT_REASONS.recipientCategory : CONTACT_REASONS.wrongCategory };
   }
   return { ok: true, category };
@@ -290,10 +310,9 @@ export const DEAL_ROOM_REASON =
   "This deal room is not seeking your category. Access requests are open to members in the categories it seeks, and to the sponsor's circle and accepted contacts.";
 
 /** Deal-room access follows the contact rule: a sought category, or an existing relationship (circle, accepted contact or introduction, administrator). */
-export function canRequestDealRoom(input: { categories: string[]; requesterRole: string; related: boolean }): { ok: true } | { ok: false; reason: string } {
+export function canRequestDealRoom(input: { categories: string[]; requesterRole: string; requesterExtra?: string | null; related: boolean }): { ok: true } | { ok: false; reason: string } {
   if (input.related) return { ok: true };
-  const category = categoryForRole(input.requesterRole);
-  if (category && input.categories.includes(category)) return { ok: true };
+  if (memberCategories({ role: input.requesterRole, extraCategories: input.requesterExtra }).some((id) => input.categories.includes(id))) return { ok: true };
   return { ok: false, reason: DEAL_ROOM_REASON };
 }
 

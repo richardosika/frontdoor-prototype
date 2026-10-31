@@ -37,6 +37,7 @@ import {
   type JoinState,
 } from "@/lib/join-form";
 import { US_STATES } from "@/lib/member-network";
+import { SEEK_CATEGORIES, categoryForRole } from "@/lib/project-contact";
 import { publicStatusPath } from "@/lib/public-status";
 
 const RQ = <span className="text-[#9b2c22]"> *</span>;
@@ -184,6 +185,28 @@ export function JoinApplication({
                 ))}
               </select>
             </label>
+            {/* #42: an applicant may cover more than one category. */}
+            <fieldset className="sm:col-span-2" data-testid="join-extra-categories">
+              <legend className={labelCls}>Other categories you also cover (optional)</legend>
+              <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                {SEEK_CATEGORIES.filter((item) => item.id !== categoryForRole(profile.role)).map((item) => {
+                  const picked = (profile.extraCategories ?? []).includes(item.id);
+                  return (
+                    <label key={item.id} className="flex min-h-11 items-center gap-3 text-[15px]">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 accent-[#1F3A2E]"
+                        checked={picked}
+                        onChange={() =>
+                          patch({ extraCategories: picked ? (profile.extraCategories ?? []).filter((id) => id !== item.id) : [...(profile.extraCategories ?? []), item.id] })
+                        }
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">Your company</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">

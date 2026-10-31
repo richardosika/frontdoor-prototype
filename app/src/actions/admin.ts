@@ -1,5 +1,6 @@
 "use server";
 
+import { categoryForRole, serializeSeeking } from "@/lib/project-contact";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -221,6 +222,10 @@ export async function reviewApplication(formData: FormData) {
       name: application.name,
       initials: initialsFromName(application.name),
       role: application.role as MemberRole,
+      // #42: categories the applicant also covers, from the join form.
+      extraCategories: serializeSeeking(
+        ((extra) => (Array.isArray(extra) ? extra.map(String) : []))((application.joinProfile as { extraCategories?: unknown } | null)?.extraCategories).filter((id) => id !== categoryForRole(application.role)),
+      ),
       org: application.org,
       location: application.location,
       credentialNote: card && !card.deletedAt ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,

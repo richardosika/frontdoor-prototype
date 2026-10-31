@@ -7,17 +7,17 @@ import { roleProfile } from "@/lib/role-profile";
  * members in the categories their own approved projects seek ("Find your team"); everyone else sees only people
  * connected to them through a project ("My Circle").
  */
-import { categoryForRole, parseSeeking } from "@/lib/project-contact";
+import { memberCategories, parseSeeking } from "@/lib/project-contact";
 
 export type AccessProject = { userId: string; reviewStatus: string; seeking: string };
-export type AccessViewer = { id: string; isAdmin: boolean; role: string; inOwnerCircle: boolean };
+export type AccessViewer = { id: string; isAdmin: boolean; role: string; extraCategories?: string | null; inOwnerCircle: boolean };
 
 export function projectAccessible(project: AccessProject, viewer: AccessViewer): boolean {
   if (project.userId === viewer.id || viewer.isAdmin) return true;
   if (project.reviewStatus !== "APPROVED") return false;
   if (viewer.inOwnerCircle) return true;
-  const category = categoryForRole(viewer.role);
-  return Boolean(category && parseSeeking(project.seeking).includes(category));
+  const seeking = parseSeeking(project.seeking);
+  return memberCategories(viewer).some((id) => seeking.includes(id));
 }
 
 /** Developers build teams; every other member type answers projects. */

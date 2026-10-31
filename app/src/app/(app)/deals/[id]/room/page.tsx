@@ -3,7 +3,7 @@ import type { MemberRole } from "@prisma/client";
 import { DealChecklist } from "@/components/deal-checklist";
 import { ensureStarterChecklist } from "@/lib/deal-checklist-db";
 import { readChecklistFilter } from "@/lib/deal-checklist";
-import { rolesForCategory } from "@/lib/project-contact";
+import { categoryMemberWhere, memberInCategory } from "@/lib/project-contact";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -71,14 +71,13 @@ export default async function DealRoomPage({
   if (deal.sponsorId === user.id && project?.reviewStatus === "APPROVED" && wantedCategories.length) {
     const contacts = await prisma.projectContact.findMany({ where: { projectId: project.id }, select: { fromId: true, toId: true, status: true } });
     const people = await prisma.user.findMany({
-      where: { status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: wantedCategories.flatMap((id) => rolesForCategory(id)) as MemberRole[] } },
+      where: { status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(wantedCategories) as object) },
       orderBy: { name: "asc" },
       take: 200,
     });
     for (const category of wantedCategories) {
-      const roles = rolesForCategory(category) as string[];
       candidates[category] = people
-        .filter((person) => roles.includes(person.role) && !memberIds.has(person.id))
+        .filter((person) => memberInCategory(person, category) && !memberIds.has(person.id))
         .slice(0, 6)
         .map((person) => ({ id: person.id, name: person.name, initials: person.initials, photoId: person.photoId, role: person.role, org: person.org, location: person.location, status: contacts.find((c) => c.fromId === person.id || c.toId === person.id)?.status ?? "" }));
     }

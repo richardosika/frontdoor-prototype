@@ -2,6 +2,9 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "Categories you cover": ["Categorías que cubre", "Ihre Kategorien", "対応カテゴリー"],
+  "Your main category comes from your membership type. Tick any others you also cover; developers looking for those categories will see you there too.": ["Su categoría principal viene de su tipo de membresía. Marque cualquier otra que también cubra; los desarrolladores que busquen esas categorías también le verán allí.", "Ihre Hauptkategorie ergibt sich aus Ihrer Mitgliedsart. Kreuzen Sie weitere an, die Sie ebenfalls abdecken; Entwickler, die diese Kategorien suchen, sehen Sie dort ebenfalls.", "主なカテゴリーは会員種別で決まります。ほかにも対応するカテゴリーがあればチェックしてください。そのカテゴリーを探すデベロッパーにも表示されます。"],
+  "main": ["principal", "Haupt", "メイン"],
   "Project details saved.": ["Detalles del proyecto guardados.", "Projektangaben gespeichert.", "プロジェクトの詳細を保存しました。"],
   "Lender license or registration": ["Licencia o registro de prestamista", "Kreditgeber-Lizenz oder Registrierung", "貸金業ライセンスまたは登録"],
   "e.g. NJ Residential Mortgage Lender, or exempt": ["p. ej., NJ Residential Mortgage Lender, o exento", "z. B. NJ Residential Mortgage Lender oder befreit", "例：NJ Residential Mortgage Lender、または適用除外"],
