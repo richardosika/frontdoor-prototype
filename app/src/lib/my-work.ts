@@ -12,11 +12,11 @@ export const ACCEPTED_IN_TALKS_DAYS = 14;
 export type TalkState = "Sent" | "Received" | "Accepted";
 
 /** Pure: which contacts are "in talks" and with what label, newest first. */
-export function inTalks<T extends { status: string; fromId: string; createdAt: Date; respondedAt?: Date | null }>(rows: T[], userId: string, now = new Date()): (T & { state: TalkState })[] {
+export function inTalks<T extends { status: string; fromId: string; createdAt: Date; decidedAt?: Date | null }>(rows: T[], userId: string, now = new Date()): (T & { state: TalkState })[] {
   const out: (T & { state: TalkState })[] = [];
   for (const row of rows) {
     if (row.status === "PENDING") out.push({ ...row, state: row.fromId === userId ? "Sent" : "Received" });
-    else if (row.status === "ACCEPTED" && now.getTime() - (row.respondedAt ?? row.createdAt).getTime() <= ACCEPTED_IN_TALKS_DAYS * DAY) out.push({ ...row, state: "Accepted" });
+    else if (row.status === "ACCEPTED" && now.getTime() - (row.decidedAt ?? row.createdAt).getTime() <= ACCEPTED_IN_TALKS_DAYS * DAY) out.push({ ...row, state: "Accepted" });
   }
   return out.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
@@ -93,7 +93,7 @@ export async function loadResults(user: { id: string }, allSeeking: { at: Date }
   const [views, won] = await Promise.all([
     prisma.profileView.findMany({ where: { memberId: user.id, createdAt: { gte: since } }, select: { viewerId: true }, distinct: ["viewerId"] }),
     prisma.projectContact.count({
-      where: { status: "ACCEPTED", respondedAt: { gte: since }, OR: [{ fromId: user.id }, { toId: user.id }], project: { userId: { not: user.id } } },
+      where: { status: "ACCEPTED", decidedAt: { gte: since }, OR: [{ fromId: user.id }, { toId: user.id }], project: { userId: { not: user.id } } },
     }),
   ]);
   return { shown: allSeeking.filter((p) => p.at >= since).length, views: views.length, won };

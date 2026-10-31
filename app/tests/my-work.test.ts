@@ -8,8 +8,8 @@ describe("#44 My work right now", () => {
     const rows = [
       { id: "a", status: "PENDING", fromId: "me", createdAt: d(1) },
       { id: "b", status: "PENDING", fromId: "dev", createdAt: d(2) },
-      { id: "c", status: "ACCEPTED", fromId: "me", createdAt: d(30), respondedAt: d(3) },
-      { id: "e", status: "ACCEPTED", fromId: "me", createdAt: d(40), respondedAt: d(30) },
+      { id: "c", status: "ACCEPTED", fromId: "me", createdAt: d(30), decidedAt: d(3) },
+      { id: "e", status: "ACCEPTED", fromId: "me", createdAt: d(40), decidedAt: d(30) },
       { id: "f", status: "DECLINED", fromId: "me", createdAt: d(1) },
     ];
     expect(inTalks(rows, "me").map((r) => [r.id, r.state])).toEqual([["a", "Sent"], ["b", "Received"], ["c", "Accepted"]]);
