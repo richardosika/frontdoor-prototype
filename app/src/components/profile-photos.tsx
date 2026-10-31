@@ -1,8 +1,36 @@
 import { serverTx } from "@/lib/i18n/server";
+import { PHOTO_HINTS } from "@/lib/photo-hints";
 import { btnOutline } from "@/components/ui";
 import { ImageCropUpload } from "@/components/image-crop-upload";
 import { moveGalleryImage, removeMemberImage, saveGalleryCaption, uploadMemberImage } from "@/actions/images";
 import { GALLERY_MAX, IMAGE_ACCEPT, IMAGE_TARGET } from "@/lib/member-images";
+
+
+/** A tiny profile mockup with the spot this upload fills highlighted in brass. */
+function PlacementHint({ kind, text, label }: { kind: "avatar" | "cover" | "gallery"; text: string; label: string }) {
+  const on = "bg-brass";
+  const off = "bg-line";
+  return (
+    <div className="mb-3 flex items-start gap-3" data-testid={`photo-hint-${kind}`}>
+      <div aria-hidden className="w-[92px] shrink-0 overflow-hidden rounded border border-line bg-paper" title={label}>
+        <div className={`h-6 ${kind === "cover" ? on : off}`} />
+        <div className="-mt-3 flex items-end gap-1 px-1.5">
+          <span className={`block h-6 w-6 rounded-full border-2 border-paper ${kind === "avatar" ? on : "bg-mut/40"}`} />
+          <span className="mb-0.5 block h-1.5 w-10 rounded bg-forest/60" />
+        </div>
+        <div className="mt-1.5 grid grid-cols-3 gap-0.5 px-1.5 pb-1.5">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={`block h-3 rounded-[2px] ${kind === "gallery" ? on : off}`} />
+          ))}
+        </div>
+      </div>
+      <p className="min-w-0 text-[14px] leading-snug text-ink">
+        <span className="sr-only">{label}: </span>
+        {text}
+      </p>
+    </div>
+  );
+}
 
 type GalleryImage = { id: string; caption: string; width: number; height: number };
 
@@ -39,6 +67,7 @@ export async function ProfilePhotos({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="min-w-0 rounded border border-line bg-cream p-4">
               <h3 className="mb-2 font-serif text-lg text-forest">{tx("Profile photo")}</h3>
+              <PlacementHint kind="avatar" text={tx(PHOTO_HINTS.avatar)} label={tx("Where it shows")} />
               <ImageCropUpload action={uploadMemberImage} kind="AVATAR" aspect={1} accept={IMAGE_ACCEPT} labels={{ ...labels, save: tx("Save profile photo") }} />
               {photoId ? (
                 <form action={removeMemberImage} className="mt-2">
@@ -49,6 +78,7 @@ export async function ProfilePhotos({
             </div>
             <div className="min-w-0 rounded border border-line bg-cream p-4">
               <h3 className="mb-2 font-serif text-lg text-forest">{tx("Cover image or company logo")}</h3>
+              <PlacementHint kind="cover" text={tx(PHOTO_HINTS.cover)} label={tx("Where it shows")} />
               <ImageCropUpload action={uploadMemberImage} kind="COVER" aspect={IMAGE_TARGET.COVER.aspect} accept={IMAGE_ACCEPT} labels={{ ...labels, save: tx("Save cover image") }} />
               {coverId ? (
                 <form action={removeMemberImage} className="mt-2">
@@ -106,6 +136,7 @@ export async function ProfilePhotos({
       {isSelf && gallery.length < GALLERY_MAX ? (
         <div className="mt-4 rounded border border-line bg-cream p-4">
           <h3 className="mb-2 font-serif text-lg text-forest">{tx("Add a photo")}</h3>
+          <PlacementHint kind="gallery" text={tx(PHOTO_HINTS.gallery)} label={tx("Where it shows")} />
           <ImageCropUpload
             action={uploadMemberImage}
             kind="GALLERY"

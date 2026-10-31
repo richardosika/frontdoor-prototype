@@ -163,3 +163,15 @@ describe("#30 profile fields", () => {
     for (const key of ["About my services", "A short bio shown on your card when developers look for their team."]) expect(PHRASES[key]).toHaveLength(3);
   });
 });
+
+describe("#31 photo hints", () => {
+  it("each upload says what to upload and where it shows, in all languages", async () => {
+    const { PHOTO_HINTS } = await import("@/lib/photo-hints");
+    for (const key of [...Object.values(PHOTO_HINTS), "Where it shows"]) {
+      expect(PHRASES[key], key).toHaveLength(3);
+      for (const v of [key, ...PHRASES[key]]) expect(v).not.toMatch(BANNED);
+    }
+    const src = read("src/components/profile-photos.tsx");
+    for (const k of ["avatar", "cover", "gallery"]) expect(src).toContain(`<PlacementHint kind="${k}"`);
+  });
+});
