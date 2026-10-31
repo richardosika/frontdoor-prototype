@@ -21,6 +21,7 @@ import { projectContactEmail, projectReviewEmail } from "@/lib/project-review-em
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { appBaseUrl } from "@/lib/url";
 import { ensureVerificationCase } from "@/lib/verification-db";
+import { DOC_ERROR, SUBMIT_FILES_MAX, announceDocumentChange, readUpload } from "@/lib/project-upload";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -60,7 +61,7 @@ export async function addProject(formData: FormData) {
       state: value.state,
       location: projectLocation(value),
       year: value.year,
-      valueLabel: formatProjectValue(value.valueLabel),
+      valueLabel: value.valueLabel,
       role: value.role,
       summary: value.summary,
       seeking: serializeSeeking(value.seeking),
@@ -75,7 +76,8 @@ export async function addProject(formData: FormData) {
   await queueProjectVerification(project.id, value.name);
   await notifyAdmins({ title: "Project to review", body: `${user.name} submitted ${value.name}.`, href: "/admin/projects" });
   refresh();
-  go(back, "notice", "Project submitted. It is pending review and stays hidden from other members until it is approved.");
+  // #35: back to the Ledger with a thank-you card.
+  redirect(`/feed?submitted=${project.id}`);
 }
 
 /** Edit a project that is pending review or came back for more information. Saving sends it back to review. */
@@ -99,7 +101,7 @@ export async function resubmitProject(formData: FormData) {
       state: value.state,
       location: projectLocation(value),
       year: value.year,
-      valueLabel: formatProjectValue(value.valueLabel),
+      valueLabel: value.valueLabel,
       role: value.role,
       summary: value.summary,
       seeking: serializeSeeking(value.seeking),
@@ -148,7 +150,7 @@ export async function reviewProject(formData: FormData) {
   });
   const status = outcome.status as "APPROVED" | "NEEDS_INFO" | "DECLINED";
   const base = await appBaseUrl();
-  const link = status === "NEEDS_INFO" ? `${base}/profile#project-${project.id}` : `${base}/feed`;
+  const link = status === "NEEDS_INFO" ? `${base}/profile#project-${project.id}` : status === "APPROVED" ? `${base}/deals` : `${base}/feed`;
   const locale = isLocale(project.user.locale) ? project.user.locale : "en";
   const mail = projectReviewEmail({
     locale,
@@ -162,7 +164,7 @@ export async function reviewProject(formData: FormData) {
   await notify(project.userId, {
     title: mail.subject,
     body: outcome.note ? `${project.name}: ${outcome.note}` : project.name,
-    href: status === "NEEDS_INFO" ? `/profile#project-${project.id}` : "/feed",
+    href: status === "NEEDS_INFO" ? `/profile#project-${project.id}` : status === "APPROVED" ? "/deals" : "/feed",
   });
   refresh();
   redirect(`/admin/projects?notice=${encodeURIComponent(`${project.name}: ${status}`)}`);
@@ -254,31 +256,6 @@ export async function addContactToCircle(formData: FormData) {
   go("/feed", "notice", "Added to My Circle.");
 }
 
-const DOC_MAX = 5 * 1024 * 1024;
-const DOC_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
-
-const DOC_ERROR = "Choose a PDF, JPG, PNG, or HEIC up to 5 MB.";
-const SUBMIT_FILES_MAX = 10;
-
-/** Read one uploaded file. HEIC photos are converted to WebP so every browser can show them. */
-async function readUpload(file: File): Promise<{ fileName: string; contentType: string; sizeBytes: number; bytes: Uint8Array<ArrayBuffer> } | null> {
-  if (file.size > DOC_MAX) return null;
-  const raw = new Uint8Array(await file.arrayBuffer());
-  const fileName = file.name.replace(/[^\w .()-]/g, "_").slice(0, 180) || "document";
-  const { sniffImage, processImage } = await import("@/lib/member-images");
-  if (sniffImage(raw) === "heic") {
-    try {
-      const out = await processImage(raw, "GALLERY", null);
-      return { fileName: fileName.replace(/\.(heic|heif)$/i, "") + ".webp", contentType: out.contentType, sizeBytes: out.sizeBytes, bytes: new Uint8Array(out.bytes) };
-    } catch {
-      return null;
-    }
-  }
-  const contentType = file.type || "application/octet-stream";
-  if (!DOC_TYPES.has(contentType)) return null;
-  return { fileName, contentType, sizeBytes: file.size, bytes: raw };
-}
-
 async function readDocument(formData: FormData, back: string) {
   const upload = formData.get("file");
   const file = upload instanceof File && upload.size > 0 ? upload : null;
@@ -298,7 +275,7 @@ async function readSubmissionFiles(formData: FormData) {
     if (!(file instanceof File) || file.size === 0) continue;
     if (out.length >= SUBMIT_FILES_MAX) return { ok: false as const, reason: "Attach up to 10 files." };
     const read = await readUpload(file);
-    if (!read) return { ok: false as const, reason: DOC_ERROR };
+    if (!read) return { ok: false as const, reason: `${file.name}: ${DOC_ERROR}` };
     const title = (titles[i] || "").trim().slice(0, 120) || file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Document";
     out.push({ title, ...read });
   }
@@ -310,35 +287,6 @@ async function ownProject(formData: FormData, userId: string, back: string) {
   const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
   if (!project || project.userId !== userId) go(back, "error", "Project not found.");
   return project;
-}
-
-/** Tell everyone involved in the project, in their language. The project's review status never changes here. */
-async function announceDocumentChange(
-  project: { id: string; name: string; userId: string; reviewStatus: string },
-  owner: { name: string },
-  change: "added" | "replaced" | "removed",
-  documentTitle: string,
-) {
-  if (project.reviewStatus !== "APPROVED") return 0;
-  const { projectAudience } = await import("@/lib/project-contact-db");
-  const { projectDocumentEmail } = await import("@/lib/project-review-email");
-  const ids = await projectAudience(project.id);
-  if (!ids.length) return 0;
-  const people = await prisma.user.findMany({ where: { id: { in: ids }, status: "ACTIVE" }, select: { id: true, email: true, locale: true, notifyDocuments: true } });
-  const link = `${await appBaseUrl()}/projects/${project.id}`;
-  for (const person of people) {
-    const mail = projectDocumentEmail({
-      locale: isLocale(person.locale) ? person.locale : "en",
-      change,
-      ownerName: owner.name,
-      projectName: project.name,
-      documentTitle,
-      link,
-    });
-    await notify(person.id, { title: mail.subject, body: `${owner.name}: ${documentTitle}`, href: `/projects/${project.id}` });
-    if (person.notifyDocuments) await sendEmail({ to: person.email, subject: mail.subject, text: mail.text });
-  }
-  return people.length;
 }
 
 function sentNotice(count: number) {

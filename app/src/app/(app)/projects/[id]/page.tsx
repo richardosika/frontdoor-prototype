@@ -4,6 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { ProjectDocuments } from "@/components/project-documents";
 import { ReviewChip } from "@/components/project-form";
+import { ReviewTracker } from "@/components/review-tracker";
 import { btn, btnOutline, card, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { serverTx } from "@/lib/i18n/server";
@@ -79,6 +80,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </div>
       ) : null}
 
+      {isOwner && project.reviewStatus !== "APPROVED" ? (
+        <section className={`${box} border-brass bg-brass-soft`} data-testid="project-review-status">
+          <h2 className={h2}>{tx("Review status")}</h2>
+          <ReviewTracker status={project.reviewStatus} />
+          <p className="mt-3 text-[16px] leading-relaxed text-ink">
+            {project.reviewStatus === "PENDING_REVIEW"
+              ? tx("Our team is reviewing this project. Other members cannot see it until it is approved. We'll send you an alert and an email as soon as it's approved or if we need anything else.")
+              : project.reviewStatus === "NEEDS_INFO"
+                ? tx("Our team needs a little more information. Edit the project and resubmit it.")
+                : tx("This project was not approved.")}
+          </p>
+        </section>
+      ) : null}
       <section className={box} data-testid="project-overview">
         <div className="flex flex-wrap items-center gap-2">
           <ReviewChip status={project.reviewStatus} />

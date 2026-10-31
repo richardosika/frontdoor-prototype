@@ -203,3 +203,16 @@ describe("#33 money inputs", () => {
     expect(read("src/components/project-form.tsx")).toContain('<MoneyInput name="valueLabel"');
   });
 });
+
+describe("#36 pending project in Getting started", () => {
+  it("shows step 5 waiting and keeps step 6 locked while a project is pending", () => {
+    const items = gettingStarted({ role: "DEVELOPER", profileDone: true, ndaAccepted: true, projectCount: 2, seekingSet: true, approvedProject: true, projectPending: true, outreachSent: 1, hasPhoto: true });
+    expect(items.map((i) => i.state)).toEqual(["done", "done", "done", "done", "waiting", "locked"]);
+    expect(items[4].done).toBe(false);
+    expect(read("src/app/(app)/feed/page.tsx")).toContain('project.reviewStatus === "APPROVED" && parseSeeking(project.seeking).length > 0');
+    expect(PHRASES["Waiting for staff approval"]).toHaveLength(3);
+  });
+  it("Find your team offers outreach only for approved projects", () => {
+    expect(read("src/lib/ledger-projects.ts")).toContain('project.reviewStatus === "APPROVED" && parseSeeking(project.seeking).length > 0');
+  });
+});

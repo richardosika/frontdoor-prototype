@@ -31,6 +31,19 @@ export async function GettingStarted({ items }: { items: StartItem[] }) {
               {item.state === "done" ? "✓" : item.state === "locked" ? "🔒︎" : index + 1}
             </span>
           );
+          if (item.state === "waiting") {
+            return (
+              <li key={item.id} data-state="waiting" className="-mx-2 flex min-h-12 items-center gap-3 rounded bg-cream px-2 py-2 text-[16px]">
+                <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-dashed border-brass bg-paper text-[12px] font-bold text-brass">
+                  {index + 1}
+                </span>
+                <span className="flex-1">
+                  <span className="block font-semibold text-ink">{tx(item.label)}</span>
+                  <span className="block text-[14px] text-brass">{tx("Waiting for staff approval")}</span>
+                </span>
+              </li>
+            );
+          }
           if (item.state === "current") {
             return (
               <li key={item.id} data-state="current">

@@ -16,12 +16,12 @@ export function projectReviewEmail(input: {
   const name = `“${input.projectName}”`;
   if (input.status === "APPROVED") {
     return {
-      subject: p("Your project is approved"),
+      subject: p("{project} is approved").replace("{project}", input.projectName),
       text: [
         hello,
-        `${name}: ${p("A Private Floor administrator approved your project. It is now listed for members in the categories it is seeking.")}`,
+        p("Good news: {project} is approved. It is now open to members in the categories it is seeking, and you can start building your team.").replace("{project}", name),
         input.note ? `${p("Note from the reviewer:")} ${input.note}` : "",
-        `${p("Open your Ledger")}\n${input.link}`,
+        `${p("Find your team")}\n${input.link}`,
       ].filter(Boolean).join("\n\n"),
     };
   }

@@ -176,7 +176,8 @@ describe("project review workflow", () => {
     expect(en.subject).toBe("More information needed for your project");
     expect(en.text).toContain("Add the address");
     expect(en.text).toContain("https://x/profile");
-    expect(projectReviewEmail({ ...base, locale: "es", status: "APPROVED" }).subject).toBe("Su proyecto está aprobado");
+    expect(projectReviewEmail({ ...base, locale: "es", status: "APPROVED" }).subject).toBe("Ironbound está aprobado");
+    expect(projectReviewEmail({ ...base, locale: "en", status: "APPROVED" }).text).toContain("Find your team");
     expect(projectReviewEmail({ ...base, locale: "de", status: "DECLINED" }).subject).toBe("Ihr Projekt wurde nicht genehmigt");
     expect(projectReviewEmail({ ...base, locale: "ja", status: "APPROVED" }).text).toContain("こんにちは");
     expect(projectContactEmail("ja", "https://x/feed").subject).toBe(phrase("ja", "A member contacted you about a project"));

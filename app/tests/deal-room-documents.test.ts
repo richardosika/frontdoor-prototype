@@ -45,9 +45,10 @@ describe("project documents", () => {
     expect(docs).not.toMatch(/reviewStatus:/);
     expect(docs).not.toMatch(/trackProject\.update/);
     expect(docs.match(/announceDocumentChange\(/g)?.length).toBe(3);
-    expect(actions).toMatch(/if \(project\.reviewStatus !== "APPROVED"\) return 0;/);
-    expect(actions).toMatch(/await notify\(person\.id/);
-    expect(actions).toMatch(/await sendEmail\(\{ to: person\.email/);
+    const upload = read("lib/project-upload.ts");
+    expect(upload).toMatch(/if \(project\.reviewStatus !== "APPROVED"\) return 0;/);
+    expect(upload).toMatch(/await notify\(person\.id/);
+    expect(upload).toMatch(/sendEmail\(\{ to: person\.email/);
   });
   it("the download checks access", () => {
     expect(read("app/api/project-documents/[id]/route.ts")).toMatch(/canViewProjectDocuments\(doc\.projectId, viewer\)/);

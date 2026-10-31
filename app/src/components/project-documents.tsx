@@ -1,4 +1,5 @@
-import { addProjectDocument, linkProjectDeal, removeProjectDocument, replaceProjectDocument } from "@/actions/projects";
+import { FileUploader } from "@/components/file-uploader";
+import { linkProjectDeal, removeProjectDocument, replaceProjectDocument } from "@/actions/projects";
 import { btn, btnOutline, field } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
 
@@ -67,20 +68,14 @@ export async function ProjectDocuments({
         ))}
       </ul>
       {isOwner ? (
-        <form action={addProjectDocument} className="mt-2 grid gap-2">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="back" value={back} />
-          <input name="title" className={`${field} text-[16px]`} placeholder={tx("Document title")} required />
-          <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required className="min-w-0 text-[14px]" aria-label={tx("Upload a document")} />
-          <button className={btn} type="submit">
-            {tx("Upload a document")}
-          </button>
-          <p className="text-[14px] leading-relaxed text-mut">
-            {approved
-              ? tx("Changing documents does not send an approved project back to review. Everyone involved in this project gets an alert and an email about the change.")
-              : tx("PDF, JPG, or PNG up to 5 MB.")}
-          </p>
-        </form>
+        <div className="mt-2 grid gap-2">
+          <FileUploader mode="direct" projectId={projectId} />
+          {approved ? (
+            <p className="text-[14px] leading-relaxed text-mut">
+              {tx("Changing documents does not send an approved project back to review. Everyone involved in this project gets an alert and an email about the change.")}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {isOwner && deals && deals.length ? (
         <form action={linkProjectDeal} className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">

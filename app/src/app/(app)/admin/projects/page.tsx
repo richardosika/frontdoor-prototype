@@ -6,7 +6,7 @@ import { btn, btnOutline, card, field } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
 import { timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { parseSeeking, reviewLabel, seekLabel } from "@/lib/project-contact";
+import { formatProjectValue, parseSeeking, reviewLabel, seekLabel } from "@/lib/project-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +61,7 @@ export default async function ProjectReviewPage({
                 <div>Role: {project.role || "—"}</div>
                 <div>Address: {[project.street, project.location].filter(Boolean).join(", ")}</div>
                 <div>Year completed / expected: {project.year}</div>
-                <div>Total project value: {project.valueLabel}</div>
+                <div>Total project value: {formatProjectValue(project.valueLabel)}</div>
                 <div>Share with circle: {project.shareWithCircle ? "Yes" : "No"}</div>
                 <div className="sm:col-span-2">Seeking: {parseSeeking(project.seeking).map(seekLabel).join(", ") || "Nothing"}</div>
                 {project.summary ? <div className="sm:col-span-2">Notes: {project.summary}</div> : null}

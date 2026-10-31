@@ -79,16 +79,16 @@ export function matchesSlimFilters(project: { asset: string; state: string; loca
   return true;
 }
 
-export type StartItem = { id: string; label: string; href: string; done: boolean; state: "done" | "current" | "locked" };
+export type StartItem = { id: string; label: string; href: string; done: boolean; state: "done" | "current" | "waiting" | "locked" };
 
 /** Setup runs strictly in order: a step counts as done only once every earlier step is done. */
-export function sequential(items: { id: string; label: string; href: string; done: boolean }[]): StartItem[] {
+export function sequential(items: { id: string; label: string; href: string; done: boolean; waiting?: boolean }[]): StartItem[] {
   let open = true;
-  return items.map((item) => {
+  return items.map(({ waiting, ...item }) => {
     if (open && item.done) return { ...item, done: true, state: "done" as const };
     if (open) {
       open = false;
-      return { ...item, done: false, state: "current" as const };
+      return { ...item, done: false, state: waiting ? ("waiting" as const) : ("current" as const) };
     }
     return { ...item, done: false, state: "locked" as const };
   });
@@ -102,6 +102,8 @@ export function gettingStarted(input: {
   projectCount: number;
   seekingSet: boolean;
   approvedProject: boolean;
+  /** #36: a project is waiting for staff (pending or needs info). */
+  projectPending?: boolean;
   outreachSent: number;
   hasPhoto: boolean;
 }): StartItem[] {
@@ -111,7 +113,8 @@ export function gettingStarted(input: {
       { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
       { id: "project", label: "Add your first project", href: "/feed#ledger-add-project", done: input.projectCount > 0 },
       { id: "seeking", label: "Choose who you're seeking", href: "/feed#ledger-my-projects", done: input.seekingSet },
-      { id: "approved", label: "Submit and get approved by staff", href: "/feed#ledger-my-projects", done: input.approvedProject },
+      // #36: done only when an approved project seeks someone and nothing newer is still waiting for staff.
+      { id: "approved", label: "Submit and get approved by staff", href: "/feed#ledger-my-projects", done: input.approvedProject && !input.projectPending, waiting: Boolean(input.projectPending) },
       { id: "reach", label: "Reach out to a member on your team", href: "/deals", done: input.outreachSent > 0 },
     ]);
   }
