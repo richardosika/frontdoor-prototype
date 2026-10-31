@@ -37,6 +37,7 @@ export async function ProfileEditor({
     privateTerms?: string;
     role?: string;
     extraCategories?: string;
+    pendingCategories?: string;
   };
 }) {
   const locale = await currentLocale();
@@ -104,11 +105,13 @@ export async function ProfileEditor({
         <input type="hidden" name="profileCategoriesShown" value="1" />
         <legend className={labelCls}>{phrase(locale, "Categories you cover")}</legend>
         <p className="mb-3 font-sans text-[14px] text-mut">
-          {phrase(locale, "Your main category comes from your membership type. Tick any others you also cover; developers looking for those categories will see you there too.")}
+          {phrase(locale, "Your main category comes from your membership type. Tick any others you also cover; developers looking for those categories will see you there too.")}{" "}
+          {phrase(locale, "Staff review each new category (licensed ones against public records) before it counts. Add the license or credential for it below.")}
         </p>
         <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
           {SEEK_CATEGORIES.map((category) => {
             const primary = categoryForRole(member.role) === category.id;
+            const pending = parseSeeking(member.pendingCategories ?? "").includes(category.id);
             return (
               <label key={category.id} className="flex min-h-11 items-center gap-3 font-sans text-[16px] text-ink">
                 <input
@@ -116,13 +119,14 @@ export async function ProfileEditor({
                   name="extraCategories"
                   value={category.id}
                   className={box}
-                  defaultChecked={primary || parseSeeking(member.extraCategories ?? "").includes(category.id)}
+                  defaultChecked={primary || pending || parseSeeking(member.extraCategories ?? "").includes(category.id)}
                   disabled={primary}
                   data-testid={`category-${category.id}`}
                 />
                 <span>
                   {phrase(locale, category.label)}
                   {primary ? <span className="text-mut"> · {phrase(locale, "main")}</span> : null}
+                  {pending ? <span className="text-brass" data-testid={`category-pending-${category.id}`}> · {phrase(locale, "Pending staff review")}</span> : null}
                 </span>
               </label>
             );

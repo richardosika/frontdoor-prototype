@@ -190,6 +190,8 @@ model User {
   role           MemberRole
   /// #42: more seek categories this member also answers, comma list of SEEK_CATEGORIES ids (primary comes from role).
   extraCategories String         @default("")
+  /// #42 review: extra categories the member asked for, waiting for staff review. They count nowhere until approved.
+  pendingCategories String       @default("")
   org            String
   location       String
   bio            String           @default("")

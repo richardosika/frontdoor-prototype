@@ -163,6 +163,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       location: member.location,
       role: member.role,
       extraCategories: member.extraCategories,
+      pendingCategories: viewerId === memberId ? member.pendingCategories : "",
       tier: member.tier,
       bio: member.bio,
       website: member.website,

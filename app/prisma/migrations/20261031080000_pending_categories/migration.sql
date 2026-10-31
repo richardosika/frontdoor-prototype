@@ -1,0 +1,1 @@
+ALTER TABLE "User" ADD COLUMN "pendingCategories" TEXT NOT NULL DEFAULT '';

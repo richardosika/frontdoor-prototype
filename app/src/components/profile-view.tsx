@@ -93,6 +93,7 @@ export async function ProfileView({
     specialties?: string;
     privateTerms?: string;
     extraCategories?: string;
+    pendingCategories?: string;
     createdAt: Date;
   };
   projects: Project[];
@@ -163,6 +164,14 @@ export async function ProfileView({
               {tx(seekLabel(id))}
             </span>
           ))}
+          {/* #42 review: only the member sees their own pending categories. */}
+          {isSelf
+            ? parseSeeking(member.pendingCategories ?? "").map((id) => (
+                <span key={id} className="rounded-sm border border-dashed border-brass px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-mut" data-testid={`member-category-pending-${id}`}>
+                  {tx(seekLabel(id))} · {tx("Pending staff review")}
+                </span>
+              ))
+            : null}
           <span className="rounded-sm border border-line px-2.5 py-1 text-[11px] text-mut">
             {tx("Member since")} {member.createdAt.getFullYear()}
           </span>

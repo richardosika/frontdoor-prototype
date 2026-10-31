@@ -1,6 +1,7 @@
 "use server";
 
-import { categoryForRole, serializeSeeking } from "@/lib/project-contact";
+import { applyCategoryPicks } from "@/lib/category-review";
+import { seekLabel } from "@/lib/project-contact";
 import { readAlertPrefs } from "@/lib/alert-prefs";
 import { phrase } from "@/lib/i18n/phrases";
 import { isLocale } from "@/lib/i18n/messages";
@@ -37,15 +38,21 @@ export async function saveProfile(formData: FormData) {
       .map((key) => [key, String(formData.get(key) || "").trim().slice(0, key === "yearsInBusiness" ? 40 : key === "typicalJobSize" ? 80 : key === "specialties" ? 300 : 400)]),
   );
   const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
-  // #42: extra categories (the main one comes from the role and is never stored twice).
-  const primaryCategory = categoryForRole(user.role);
-  const extraCategories = formData.has("profileCategoriesShown")
-    ? serializeSeeking(formData.getAll("extraCategories").map(String).filter((id) => id !== primaryCategory))
-    : undefined;
+  // #42: extra categories. Approved ones stay; new picks wait for staff review and count nowhere until approved.
+  const picks = formData.has("profileCategoriesShown")
+    ? applyCategoryPicks({ role: user.role, approved: user.extraCategories, pending: user.pendingCategories, picked: formData.getAll("extraCategories").map(String) })
+    : null;
   await prisma.user.update({
     where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...(extraCategories === undefined ? {} : { extraCategories }), location },
+    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location },
   });
+  if (picks?.added.length) {
+    await notifyAdmins({
+      title: "Category review needed",
+      body: `${user.name} (${user.org}) asked to add: ${picks.added.map(seekLabel).join(", ")}`,
+      href: "/admin/categories",
+    });
+  }
   const upload = formData.get("card");
   if (upload instanceof File && upload.size > 0) {
     const bytes = new Uint8Array(await upload.arrayBuffer());
