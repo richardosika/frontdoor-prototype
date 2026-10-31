@@ -341,7 +341,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
   const headline = head ? (
     <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
       <p className="font-serif text-[22px] leading-snug md:text-[28px]">
-        <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project needs a {category} right now" : "projects need a {category} right now").replace("{category}", catLabel)}
+        <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project needs a {category} right now" : "projects need a {category} right now").replace("{category}", catLabel).replace(/\b(needs?) a ([AEIOU])/, "$1 an $2")}
       </p>
       <p className="mt-1 text-[15px] text-sand md:text-[17px]">
         <span data-testid="headline-value">{money.format(head.total)}</span> {tx("total project value")} · <span data-testid="headline-developers">{head.developers}</span>{" "}
