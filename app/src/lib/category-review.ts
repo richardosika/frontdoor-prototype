@@ -56,3 +56,6 @@ export function decideCategory(
   const extra = approve ? serializeSeeking([...parseSeeking(input.approved), input.category]) : serializeSeeking(parseSeeking(input.approved));
   return { ok: true, extraCategories: extra, pendingCategories: serializeSeeking(rest), approved: approve };
 }
+
+export const CATEGORY_APPROVED_TITLE = "Category approved";
+export const CATEGORY_DECLINED_TITLE = "Category not approved";

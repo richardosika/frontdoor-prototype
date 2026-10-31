@@ -45,6 +45,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
     label: "Members",
     links: [
       { href: "/admin/members", label: "Members" },
+      { href: "/admin/categories", label: "Category review" },
       { href: "/admin/access", label: "Introductions and deal rooms" },
     ],
   },

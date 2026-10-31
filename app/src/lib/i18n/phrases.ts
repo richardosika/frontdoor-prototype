@@ -2,6 +2,13 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "Pending staff review": ["Pendiente de revisión del personal", "Prüfung durch das Team ausstehend", "スタッフ確認待ち"],
+  "Staff review each new category (licensed ones against public records) before it counts. Add the license or credential for it below.": ["El personal revisa cada categoría nueva (las que requieren licencia, contra registros públicos) antes de que cuente. Agregue abajo la licencia o credencial correspondiente.", "Das Team prüft jede neue Kategorie (lizenzpflichtige anhand öffentlicher Register), bevor sie zählt. Tragen Sie unten die Lizenz oder den Nachweis dafür ein.", "新しいカテゴリーは、有効になる前にスタッフが確認します（免許が必要なものは公的記録と照合）。下にそのカテゴリーの免許や資格を入力してください。"],
+  "Category approved": ["Categoría aprobada", "Kategorie freigegeben", "カテゴリーが承認されました"],
+  "Category not approved": ["Categoría no aprobada", "Kategorie nicht freigegeben", "カテゴリーは承認されませんでした"],
+  "Developers looking for this category can now find you, and projects seeking it reach you.": ["Los desarrolladores que buscan esta categoría ya pueden encontrarle, y los proyectos que la buscan le llegarán.", "Entwickler, die diese Kategorie suchen, finden Sie jetzt, und Projekte, die sie suchen, erreichen Sie.", "このカテゴリーを探すデベロッパーがあなたを見つけられるようになり、このカテゴリーを求めるプロジェクトがあなたに届きます。"],
+  "Staff could not confirm this category, so it is not on your profile. You can add the license or credential and ask again.": ["El personal no pudo confirmar esta categoría, por lo que no figura en su perfil. Puede agregar la licencia o credencial y volver a solicitarla.", "Das Team konnte diese Kategorie nicht bestätigen, daher steht sie nicht in Ihrem Profil. Sie können die Lizenz oder den Nachweis ergänzen und erneut anfragen.", "スタッフがこのカテゴリーを確認できなかったため、プロフィールには表示されません。免許や資格を追加して再度申請できます。"],
+  "Open your profile": ["Abra su perfil", "Profil öffnen", "プロフィールを開く"],
   "Categories you cover": ["Categorías que cubre", "Ihre Kategorien", "対応カテゴリー"],
   "Your main category comes from your membership type. Tick any others you also cover; developers looking for those categories will see you there too.": ["Su categoría principal viene de su tipo de membresía. Marque cualquier otra que también cubra; los desarrolladores que busquen esas categorías también le verán allí.", "Ihre Hauptkategorie ergibt sich aus Ihrer Mitgliedsart. Kreuzen Sie weitere an, die Sie ebenfalls abdecken; Entwickler, die diese Kategorien suchen, sehen Sie dort ebenfalls.", "主なカテゴリーは会員種別で決まります。ほかにも対応するカテゴリーがあればチェックしてください。そのカテゴリーを探すデベロッパーにも表示されます。"],
   "main": ["principal", "Haupt", "メイン"],
