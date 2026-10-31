@@ -942,6 +942,9 @@ async function alignSeededDemo() {
   await alignSeedTiers();
   await applySeedCaseMap();
   await ensureDemoAccessAndNotices();
+  await ensureCategoryDemoMembers();
+  await ensureMapleCourtDealRoom();
+  await ensureRoleDemo();
 }
 
 async function ensureExtraProjects() {
@@ -1466,4 +1469,36 @@ async function ensureMapleCourtDealRoom() {
     ["user_gl", "Grace Liu marked Architect agreement done", 70],
   ];
   for (const [actorId, summary, hours] of events) await prisma.dealEvent.create({ data: { dealId: id, actorId, summary, createdAt: hoursAgo(hours) } });
+}
+
+/** Overnight: one filled, role-fitting profile per main member type, plus role facts on demo projects. Only fills blanks. */
+async function ensureRoleDemo() {
+  const profiles: Record<string, { specialties: string; licenses?: string; typicalJobSize?: string; insuranceInfo?: string; privateTerms?: string; yearsInBusiness?: string }> = {
+    user_ls: { specialties: "Construction, bridge, mini-perm", licenses: "NJ licensed lender (commercial, exempt from residential licensing)", typicalJobSize: "$3M to $40M", privateTerms: "Demo only: construction pricing quoted per deal.", yearsInBusiness: "14" },
+    user_mt: { specialties: "Construction, DSCR, bridge, agency", licenses: "NMLS 1987432 (individual), NMLS 402211 (company)", typicalJobSize: "$1M to $25M", privateTerms: "Demo only: fee quoted per placement.", yearsInBusiness: "9" },
+    user_tn: { specialties: "Multifamily, mixed-use; value-add and ground-up", licenses: "Accredited investor", typicalJobSize: "$500K to $5M", yearsInBusiness: "11" },
+    user_rk: { specialties: "Ground-up multifamily, long hold", licenses: "Accredited investor, qualified purchaser", typicalJobSize: "$1M to $15M", yearsInBusiness: "20" },
+    user_ev: { specialties: "Concrete, framing, general conditions" },
+    user_gl: { specialties: "Multifamily, mixed-use, adaptive reuse", licenses: "NJ Registered Architect AI 21AI01884500", typicalJobSize: "20 to 200 units", insuranceInfo: "Professional liability $2M", yearsInBusiness: "16" },
+    user_hc: { specialties: "Acquisitions, construction contracts, JV agreements", licenses: "Bar: NJ 2008, NY 2009", typicalJobSize: "$5M to $100M", yearsInBusiness: "17" },
+    user_sr: { specialties: "Reg D 506(b)/(c) offerings, fund formation", licenses: "Bar: NY 2006, NJ 2007", typicalJobSize: "$2M to $50M", yearsInBusiness: "18" },
+    user_jw: { specialties: "Use variances, site plan, redevelopment plans", licenses: "Bar: NJ 2004", typicalJobSize: "10 to 300 units", yearsInBusiness: "21" },
+    user_op: { specialties: "Builder's risk, general liability, umbrella, OCIP", licenses: "NJ producer license 1045523", typicalJobSize: "$5M to $75M", yearsInBusiness: "12" },
+  };
+  for (const [id, data] of Object.entries(profiles)) {
+    const user = await prisma.user.findUnique({ where: { id }, select: { specialties: true, licenses: true, typicalJobSize: true, insuranceInfo: true, privateTerms: true, yearsInBusiness: true } });
+    if (!user) continue;
+    const patch: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data)) if (value && !(user as Record<string, string | null>)[key]) patch[key] = value;
+    if (Object.keys(patch).length) await prisma.user.update({ where: { id }, data: patch });
+  }
+  const facts: Record<string, Record<string, string>> = {
+    proj_maple_court: { stage: "Pre-construction", units: "48", scope: "Ground-up, 4 stories wood frame over podium", startDate: "2027-03", bidDue: "2026-12-15", designStage: "Construction documents", loanAmount: "18000000", ltcTarget: "65% LTC", loanType: "Construction", need: "Builder's risk quote, ALTA survey, Phase I" },
+    proj_ironbound: { stage: "Entitlements", units: "72", designStage: "Schematic design", loanAmount: "26000000", ltcTarget: "60% LTC", loanType: "Construction", equityRaise: "6000000", holdPeriod: "5 to 7 years", need: "Use variance and site plan approval" },
+    proj_halsey: { stage: "Design", units: "36", scope: "Adaptive reuse of a 1920s warehouse", startDate: "2027-06", designStage: "Design development", equityRaise: "4000000", holdPeriod: "7 to 10 years" },
+    proj_broad_townhomes: { stage: "Pre-construction", units: "24", scope: "Townhomes, wood frame", startDate: "2027-04", bidDue: "2027-01-20", loanAmount: "9500000", loanType: "Construction" },
+  };
+  for (const [id, value] of Object.entries(facts)) {
+    await prisma.trackProject.updateMany({ where: { id, roleFacts: "{}" }, data: { roleFacts: JSON.stringify(value) } });
+  }
 }
