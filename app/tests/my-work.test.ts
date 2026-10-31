@@ -35,3 +35,15 @@ describe("#44 value headline", () => {
     expect(h).toEqual({ projects: 3, total: 42000000, developers: 1 });
   });
 });
+
+import { viewChart } from "@/lib/my-work";
+describe("#47 view chart", () => {
+  it("7 days, today last, distinct viewers", () => {
+    const now = new Date("2026-10-31T15:00:00Z");
+    const c = viewChart([{ viewerId: "a", createdAt: now }, { viewerId: "a", createdAt: now }, { viewerId: "b", createdAt: new Date("2026-10-29T15:00:00Z") }], now);
+    expect(c).toHaveLength(7);
+    expect(c[6].count).toBe(1);
+    expect(c[4].count).toBe(1);
+    expect(c.reduce((n, d) => n + d.count, 0)).toBe(2);
+  });
+});

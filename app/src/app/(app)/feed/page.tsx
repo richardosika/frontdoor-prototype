@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requestConnection } from "@/actions/social";
+import { roleLabel, roleShort } from "@/lib/roles";
 import { JoinEntryBanner } from "@/components/already-signed-in";
 import { Banner } from "@/components/banner";
 import { GettingStarted } from "@/components/getting-started";
@@ -26,7 +28,8 @@ export default async function FeedPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
-  const t = translator(await currentLocale());
+  const locale = await currentLocale();
+  const t = translator(locale);
   const tx = await serverTx();
   const params = await searchParams;
   const developer = isDeveloperRole(user.role);
@@ -59,6 +62,7 @@ export default async function FeedPage({
 
   const myWork = isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou);
   const side = myWork ? await loadSidePanels(user, myWork.active) : null;
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "America/New_York" });
   const dayFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
   const panel = "rounded border border-line bg-paper p-5";
   const panelH = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brass";
@@ -66,18 +70,57 @@ export default async function FeedPage({
   const sidePanels = side ? (
     <>
       <div className={panel} data-testid="ledger-viewed-you">
-        <h2 className={panelH}>{tx("Who viewed you")}</h2>
-        <p className="mt-1 text-[14px] text-ink">
+        <h2 className={panelH}>{tx("Who viewed your profile")}</h2>
+        <p className="mt-1 font-serif text-[18px] leading-snug text-forest">
           {side.viewers.length} {tx(side.viewers.length === 1 ? "developer viewed your profile this week" : "developers viewed your profile this week")}
         </p>
+        <div className="mt-3" data-testid="viewed-chart" aria-label={tx("Profile views, last 7 days")}>
+          <div className="flex h-16 items-end gap-1.5">
+            {side.chart.map((d) => (
+              <i key={d.day} title={`${d.day}: ${d.count}`} data-count={d.count} className={`block flex-1 rounded-t-sm ${d.count ? "bg-brass" : "bg-line"}`} style={{ height: `${Math.max(12, (d.count / Math.max(1, ...side.chart.map((x) => x.count))) * 100)}%` }} />
+            ))}
+          </div>
+          <div className="mt-1 flex gap-1.5 text-center text-[11px] text-mut">
+            {side.chart.map((d) => <span key={d.day} className="flex-1">{weekday.format(d.date)}</span>)}
+          </div>
+        </div>
         <ul className="mt-2">
-          {side.viewers.slice(0, 5).map((v) => (
-            <li key={v.id} className="border-t border-line py-2 first:border-t-0">
-              <Link href={`/members/${v.id}`} className="text-[15px] font-semibold text-forest underline decoration-line [overflow-wrap:anywhere]">{v.name}</Link>
-              {v.org ? <span className="block text-[13px] text-mut [overflow-wrap:anywhere]">{v.org}</span> : null}
+          {side.viewers.slice(0, 3).map((v) => {
+            const ago = Math.max(0, Math.floor((Date.now() - v.lastViewed.getTime()) / 86400000));
+            return (
+              <li key={v.id} className="border-t border-line py-2 first:border-t-0" data-testid="viewer-row">
+                <Link href={`/members/${v.id}`} className="text-[15px] font-semibold text-forest underline decoration-line [overflow-wrap:anywhere]">{v.name}</Link>
+                <span className="block text-[13px] text-mut [overflow-wrap:anywhere]">{[v.org, v.location].filter(Boolean).join(" · ")}</span>
+                <span className="mt-1 inline-block rounded-full bg-brass-soft px-2 py-0.5 text-[12px] text-forest">{tx(roleShort(roleLabel(v.role)))}</span>
+                <span className="block text-[13px] text-mut">{ago === 0 ? tx("Viewed today") : ago === 1 ? tx("Viewed 1 day ago") : tx("Viewed {n} days ago").replace("{n}", String(ago))}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <Link href="/viewers" className="mt-2 inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass" data-testid="see-all-viewers">{tx("See all viewers")} →</Link>
+        <p className="text-[12px] text-mut">{tx("Only approved members are shown.")}</p>
+      </div>
+      <div className={panel} data-testid="ledger-people">
+        <h2 className={panelH}>{tx("People you may want to work with")}</h2>
+        <p className="mt-1 text-[13px] text-mut">{tx("Approved members on your projects")}</p>
+        {side.people.length === 0 ? <p className="mt-2 text-[14px] text-mut">{tx("No one new on your projects yet.")}</p> : null}
+        <ul className="mt-1">
+          {side.people.map((p) => (
+            <li key={p.id} className="flex items-start gap-3 border-t border-line py-2 first:border-t-0" data-testid="people-row">
+              <div className="min-w-0 flex-1">
+                <Link href={`/members/${p.id}`} className="text-[15px] font-semibold text-forest underline decoration-line [overflow-wrap:anywhere]">{p.name}</Link>
+                {p.org ? <span className="block text-[13px] text-mut [overflow-wrap:anywhere]">{p.org}</span> : null}
+                <span className="mt-1 inline-block rounded-full bg-brass-soft px-2 py-0.5 text-[12px] text-forest">{tx(roleShort(roleLabel(p.role)))}</span>
+                {p.projectName ? <span className="block text-[13px] italic text-ink [overflow-wrap:anywhere]">{tx("On {project}").replace("{project}", p.projectName)}</span> : null}
+              </div>
+              <form action={requestConnection}>
+                <input type="hidden" name="toId" value={p.id} />
+                <button type="submit" className="min-h-11 rounded-sm border border-forest px-3 text-[14px] font-semibold text-forest" data-testid="people-connect">{tx("Connect")}</button>
+              </form>
             </li>
           ))}
         </ul>
+        <p className="text-[12px] text-mut">{tx("Suggestions come only from shared projects.")}</p>
       </div>
       <div className={panel} data-testid="ledger-upcoming">
         <h2 className={panelH}>{tx("Upcoming")}</h2>

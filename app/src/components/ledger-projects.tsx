@@ -338,7 +338,18 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
   const head = myWork ? valueHeadline({ allSeeking: data.allSeeking, received: data.received }) : null;
   const catLabel = data.myCategories.map((id) => tx(seekLabel(id))).join(" / ");
   const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-  const headline = head ? (
+  const headline = head && head.projects === 0 ? (
+    <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
+      <p className="font-serif text-[22px] leading-snug md:text-[28px]" data-testid="headline-empty">
+        {tx("You're all set. New projects seeking a {category} will show up here first.").replace("{category}", catLabel).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}
+      </p>
+      {results ? (
+        <p className="mt-1 text-[15px] text-sand md:text-[17px]" data-testid="headline-network">
+          {tx(results.network === 1 ? "{n} project approved across the network this month" : "{n} projects approved across the network this month").replace("{n}", String(results.network))}
+        </p>
+      ) : null}
+    </section>
+  ) : head ? (
     <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
       <p className="font-serif text-[22px] leading-snug md:text-[28px]">
         <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project needs a {category} right now" : "projects need a {category} right now").replace("{category}", catLabel).replace(/\b(needs?) a ([AEIOU])/, "$1 an $2")}
