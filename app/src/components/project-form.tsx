@@ -1,6 +1,7 @@
 import { addProject, resubmitProject } from "@/actions/projects";
 import { btn, field, labelCls } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
+import { MoneyInput } from "@/components/money-input";
 import { PROJECT_ASSET_CLASSES, SEEK_CATEGORIES, US_STATES, parseSeeking, reviewLabel } from "@/lib/project-contact";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { ProjectUploadRows } from "@/components/project-upload-rows";
@@ -89,7 +90,7 @@ export async function ProjectForm({ back, project }: { back: "/profile" | "/feed
       </label>
       <label className="block">
         <span className={label}>{tx("Total project value ($)")}</span>
-        <input name="valueLabel" defaultValue={project?.valueLabel} className={big} inputMode="decimal" placeholder="24,000,000" required />
+        <MoneyInput name="valueLabel" defaultValue={project?.valueLabel} className={big} required />
       </label>
       <label className="block sm:col-span-2">
         <span className={label}>{tx("Project notes")}</span>

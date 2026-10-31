@@ -7,6 +7,7 @@
  * each other's circle can message without a project.
  */
 import type { RoleId } from "@/lib/roles";
+import { moneyDigits } from "@/lib/money";
 
 export type SeekCategory = { id: string; label: string; roles: RoleId[] };
 
@@ -218,7 +219,7 @@ export function readProjectForm(form: { get(name: string): unknown; getAll(name:
     city: text("city", 80),
     state: text("state", 2).toUpperCase(),
     year: Number(form.get("year") || 0),
-    valueLabel: text("valueLabel", 40),
+    valueLabel: moneyDigits(text("valueLabel", 40)) || text("valueLabel", 40),
     role: text("role", 60),
     summary: text("summary", 600),
     seeking: parseSeeking(form.getAll("seeking").map(String)),

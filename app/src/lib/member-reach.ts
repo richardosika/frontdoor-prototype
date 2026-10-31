@@ -51,19 +51,8 @@ export const DEAL_SIZE_BANDS = [
   { id: "gt100", label: "$100M and up", min: 100_000_000, max: Number.POSITIVE_INFINITY },
 ] as const;
 
-/** Read a project value such as "$24M", "$2.5 million", "24,000,000" or "$850K" as dollars, or null. */
-export function parseDollars(label: string): number | null {
-  const clean = label.toLowerCase().replace(/[$,\s]/g, "");
-  const match = clean.match(/^(\d+(?:\.\d+)?)(k|m|mm|million|b|bn|billion)?/);
-  if (!match) return null;
-  const n = Number(match[1]);
-  if (!Number.isFinite(n)) return null;
-  const unit = match[2] ?? "";
-  if (unit === "k") return n * 1_000;
-  if (unit === "m" || unit === "mm" || unit === "million") return n * 1_000_000;
-  if (unit === "b" || unit === "bn" || unit === "billion") return n * 1_000_000_000;
-  return n;
-}
+export { parseDollars } from "@/lib/money";
+import { parseDollars } from "@/lib/money";
 
 export type SlimFilters = { asset: string; state: string; size: string };
 

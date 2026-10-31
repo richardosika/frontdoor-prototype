@@ -189,3 +189,17 @@ describe("#32 track record", () => {
     for (const k of ["My Projects", "Past Projects"]) expect(PHRASES[k]).toHaveLength(3);
   });
 });
+
+describe("#33 money inputs", () => {
+  it("formats as you type per language and stores digits", async () => {
+    const { formatMoneyDigits, moneyDigits } = await import("@/lib/money");
+    expect(formatMoneyDigits("15000000", "en")).toBe("15,000,000");
+    expect(formatMoneyDigits("15000000", "de")).toBe("15.000.000");
+    expect(formatMoneyDigits("15000000", "es")).toBe("15.000.000");
+    expect(formatMoneyDigits("15000000", "ja")).toBe("15,000,000");
+    expect(moneyDigits("$15,000,000")).toBe("15000000");
+    expect(moneyDigits("$24M")).toBe("24000000");
+    expect(moneyDigits("15.000.000")).toBe("15000000");
+    expect(read("src/components/project-form.tsx")).toContain('<MoneyInput name="valueLabel"');
+  });
+});
