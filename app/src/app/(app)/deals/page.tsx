@@ -23,7 +23,7 @@ const h2 = "text-[13px] font-semibold uppercase tracking-[0.16em] text-brass";
 function statusWord(status: string) {
   if (status === "ACCEPTED") return "Accepted";
   if (status === "DECLINED") return "Declined";
-  return "Sent";
+  return "Pending";
 }
 
 /**

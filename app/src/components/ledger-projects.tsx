@@ -21,7 +21,7 @@ const box = "rounded border border-line bg-paper p-4 md:p-5";
 function statusWord(status: string) {
   if (status === "ACCEPTED") return "Accepted";
   if (status === "DECLINED") return "Declined";
-  return "Sent";
+  return "Pending";
 }
 
 export async function LedgerProjects({ data, role, filters, myWork }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null }) {
