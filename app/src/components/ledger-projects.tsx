@@ -219,7 +219,7 @@ export async function LedgerProjects({ data, role, filters }: { data: Data; role
     <section id="ledger-seeking" className={`${box} scroll-mt-20`} data-testid="ledger-seeking-me" key="seeking">
       {filters ? <SlimFilterBar path="/feed" filters={filters} anchor="ledger-seeking" /> : null}
       <h2 className={h2}>
-        {tx("Projects seeking your category")}: {tx(seekLabel(data.myCategory))}
+        {tx("Projects seeking your category")}: {data.myCategories.map((id) => tx(seekLabel(id))).join(", ")}
       </h2>
       {data.seekingMe.length === 0 ? (
         <p className="mt-2 text-[15px] text-mut">
@@ -236,7 +236,7 @@ export async function LedgerProjects({ data, role, filters }: { data: Data; role
               </Link>
               {project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.location} · {project.year}
             </p>
-            <ProjectFacts category={data.myCategory} project={project} />
+            <ProjectFacts category={project.matchedCategory ?? data.myCategory} project={project} />
             {project.status ? (
               <p className="mt-1 text-[14px] text-mut">
                 {tx("Contact request")}: {tx(statusWord(project.status))}
