@@ -16,7 +16,9 @@ export async function ProjectDocuments({
   approved,
   deals,
   linkedDealId,
+  back = "/profile",
 }: {
+  back?: string;
   projectId: string;
   documents: Doc[];
   isOwner: boolean;
@@ -45,7 +47,7 @@ export async function ProjectDocuments({
                 <form action={replaceProjectDocument} className="contents">
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="documentId" value={doc.id} />
-                  <input type="hidden" name="back" value="/profile" />
+                  <input type="hidden" name="back" value={back} />
                   <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required className="min-w-0 text-[14px]" aria-label={tx("Replace file")} />
                   <button className={btnOutline} type="submit">
                     {tx("Replace file")}
@@ -54,7 +56,7 @@ export async function ProjectDocuments({
                 <form action={removeProjectDocument}>
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="documentId" value={doc.id} />
-                  <input type="hidden" name="back" value="/profile" />
+                  <input type="hidden" name="back" value={back} />
                   <button className={`${btnOutline} w-full`} type="submit">
                     {tx("Remove")}
                   </button>
@@ -67,7 +69,7 @@ export async function ProjectDocuments({
       {isOwner ? (
         <form action={addProjectDocument} className="mt-2 grid gap-2">
           <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="back" value="/profile" />
+          <input type="hidden" name="back" value={back} />
           <input name="title" className={`${field} text-[16px]`} placeholder={tx("Document title")} required />
           <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required className="min-w-0 text-[14px]" aria-label={tx("Upload a document")} />
           <button className={btn} type="submit">
@@ -83,7 +85,7 @@ export async function ProjectDocuments({
       {isOwner && deals && deals.length ? (
         <form action={linkProjectDeal} className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
           <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="back" value="/profile" />
+          <input type="hidden" name="back" value={back} />
           <label className="block min-w-0">
             <span className="mb-1 block text-[13px] font-semibold uppercase tracking-wider text-mut">{tx("Linked deal room")}</span>
             <select name="dealId" defaultValue={linkedDealId || ""} className={`${field} text-[16px]`}>

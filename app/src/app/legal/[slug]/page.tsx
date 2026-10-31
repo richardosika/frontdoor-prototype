@@ -6,6 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { documentVersion, legalDoc, memberFacingLegal, readLegalMarkdown } from "@/lib/legal";
 import { renderMarkdown } from "@/lib/markdown";
+import { currentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,9 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const doc = legalDoc(slug);
   if (!doc) notFound();
-  const [locale, tx] = await Promise.all([currentLocale(), serverTx()]);
+  const [locale, tx, viewer] = await Promise.all([currentLocale(), serverTx(), currentUser().catch(() => null)]);
+  // #19: signed-in members go back to the Ledger; everyone else to the homepage.
+  const homeHref = viewer && viewer.status === "ACTIVE" ? "/feed" : "/";
   const source = readLegalMarkdown(doc.file, locale);
   const version = documentVersion(source);
   const html = renderMarkdown(memberFacingLegal(source));
@@ -27,8 +30,8 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
         </p>
         <div className="mt-4" dangerouslySetInnerHTML={{ __html: html }} />
         <p className="mt-8 flex flex-wrap items-center gap-4 text-sm">
-          <Link href="/apply" className="underline decoration-brass">
-            {tx("Back to apply")}
+          <Link href={homeHref} className="underline decoration-brass" data-testid="legal-back-home">
+            {tx("Back to home")}
           </Link>
           <AdminEntryLink />
         </p>

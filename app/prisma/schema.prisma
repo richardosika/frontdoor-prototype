@@ -196,6 +196,13 @@ model User {
   notifyMessages Boolean          @default(true)
   notifyIntros   Boolean          @default(true)
   notifyDeals    Boolean          @default(true)
+  /// #29 alert emails: new matching members, staff project decisions, document updates, deal room activity.
+  notifyMatches          Boolean  @default(true)
+  notifyProjectDecisions Boolean  @default(true)
+  notifyDocuments        Boolean  @default(true)
+  notifyDealRoom         Boolean  @default(true)
+  /// "INSTANT" or "DAILY".
+  alertDigest            String   @default("INSTANT")
   deletionRequestedAt DateTime?
   tier           VerificationTier @default(INVITED)
   isAdmin        Boolean          @default(false)

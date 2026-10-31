@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   return (
     <Shell
-      user={{ name: user.name, initials: user.initials, photoId: user.photoId, tier: user.tier, isAdmin: user.isAdmin, memberSince: user.createdAt.getFullYear() }}
+      user={{ name: user.name, initials: user.initials, photoId: user.photoId, tier: user.tier, isAdmin: user.isAdmin, memberSince: user.createdAt.getFullYear(), role: user.role }}
       unread={unread}
       alerts={alerts}
       locale={await currentLocale()}

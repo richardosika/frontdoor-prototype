@@ -48,7 +48,7 @@ export async function deliverPortalMessage(input: {
 
   const recipient = await prisma.user.findUnique({
     where: { id: input.toId },
-    select: { id: true, email: true, status: true, locale: true, notifyMessages: true, notifyIntros: true, notifyDeals: true },
+    select: { id: true, email: true, status: true, locale: true, notifyMessages: true, notifyIntros: true, notifyDeals: true, notifyDealRoom: true },
   });
   if (!recipient || recipient.status !== "ACTIVE") return { ok: false, reason: "That member is not available." };
 
@@ -75,7 +75,9 @@ export async function deliverPortalMessage(input: {
   const emailOn =
     kind === "INTRO" || kind === "CONNECTION"
       ? recipient.notifyIntros
-      : kind === "ACCESS" || kind === "DEAL" || kind === "VOUCH"
+      : kind === "ACCESS"
+        ? recipient.notifyDealRoom
+        : kind === "DEAL" || kind === "VOUCH"
         ? recipient.notifyDeals
         : recipient.notifyMessages;
   if (emailOn) {

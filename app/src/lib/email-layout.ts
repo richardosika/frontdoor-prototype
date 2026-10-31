@@ -15,6 +15,8 @@ const SERIF = "Georgia,'EB Garamond','Times New Roman',serif";
 const URL_RE = /https?:\/\/[^\s<>"']+/gi;
 const SIGN_RE = /^Richard Osika,\s*Founder\b/i;
 const CODE_RE = /\bcode is\s+(\d{4})\b/i;
+/** A line holding only `[[code:ABC123]]` renders as a boxed code (referral codes). */
+export const CODE_MARKER_RE = /^\[\[code:([A-Z0-9-]{4,24})\]\]$/;
 
 const FOOTER_LINE = `${BRAND.legalName}, ${BRAND.address} · ${BRAND.contactPhone} · ${BRAND.contactEmail}`;
 const FOOTER_NOTE = "Private Floor does not offer securities or take investments.";
@@ -29,6 +31,7 @@ type Block =
   | { type: "p"; html: string }
   | { type: "button"; label: string; url: string }
   | { type: "code"; digits: string }
+  | { type: "refcode"; code: string }
   | { type: "sign"; text: string };
 
 type AssetEnv = {
@@ -93,6 +96,11 @@ function blocksFromText(text: string): Block[] {
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
     if (!line) continue;
+    const marked = line.match(CODE_MARKER_RE);
+    if (marked) {
+      blocks.push({ type: "refcode", code: marked[1] ?? "" });
+      continue;
+    }
     if (SIGN_RE.test(line)) {
       blocks.push({ type: "sign", text: line });
       continue;
@@ -148,6 +156,10 @@ function codeHtml(digits: string): string {
 function blockHtml(block: Block): string {
   if (block.type === "button") return buttonHtml(block.label, block.url);
   if (block.type === "code") return codeHtml(block.digits);
+  if (block.type === "refcode") {
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 20px;">
+<tr><td align="center" bgcolor="${CREAM}" style="background:${CREAM};border:1px solid ${BRASS};padding:16px 24px;font-family:${SERIF};font-size:24px;line-height:1;letter-spacing:0.18em;color:${FOREST};">${escapeHtml(block.code)}</td></tr></table>`;
+  }
   if (block.type === "sign") {
     return `<p style="margin:20px 0 0;font-family:${SERIF};font-size:16px;line-height:1.5;color:${FOREST};">${escapeHtml(block.text)}</p>`;
   }
@@ -155,12 +167,12 @@ function blockHtml(block: Block): string {
 }
 
 /** Table layout around an already-rendered plain-text letter. The founder line is kept once. */
-export function brandedNoticeHtml(input: { text: string; headline: string; logoUrl: string }): string {
+export function brandedNoticeHtml(input: { text: string; headline: string; logoUrl: string; lang?: string }): string {
   const headline = escapeHtml(input.headline.trim() || BRAND.club).toUpperCase();
   const body = blocksFromText(input.text).map(blockHtml).join("");
   const logo = escapeHtml(input.logoUrl);
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(input.lang || "en")}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

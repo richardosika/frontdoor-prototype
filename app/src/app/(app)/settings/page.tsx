@@ -15,6 +15,7 @@ import { requireUser } from "@/lib/current-user";
 import { DUES_BILLING_NOTE, currentMonthlyCents, firstMonthCents, formatMoney } from "@/lib/dues";
 import { formatAuditTime, formatLongEtDate } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments";
+import { ALERT_DIGESTS, ALERT_EMAIL_TYPES } from "@/lib/alert-prefs";
 
 export const dynamic = "force-dynamic";
 
@@ -33,22 +34,38 @@ export default async function SettingsPage({
         <Banner error={params.error ? tx(params.error) : undefined} notice={params.notice ? tx(params.notice) : undefined} />
       </div>
       <BillingSection user={user} tx={tx} />
-      <section className={`${card} mt-4 p-4`}>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Notifications")}</h2>
-        <p className="mt-1 text-sm text-ink">{tx("The bell always records an alert. Email copies go only to the test recipient, and only when the box is on.")}</p>
-        <form action={saveNotificationPrefs} className="mt-3 space-y-2 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="notifyMessages" defaultChecked={user.notifyMessages} />
-            {tx("Messages")}
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="notifyIntros" defaultChecked={user.notifyIntros} />
-            {tx("Introductions")}
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="notifyDeals" defaultChecked={user.notifyDeals} />
-            {tx("Deals and deal rooms")}
-          </label>
+      <section id="alert-emails" className={`${card} mt-4 scroll-mt-20 p-4`} data-testid="alert-email-settings">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Alert emails")}</h2>
+        <p className="mt-1 text-sm text-ink">{tx("The bell always records an alert. Choose which alerts also come by email.")}</p>
+        <p className="mt-1 text-[13px] text-mut">{tx("During testing, alert emails go only to the Private Floor test inbox. At launch they go to your own email address.")}</p>
+        <form action={saveNotificationPrefs} className="mt-3 grid gap-4 text-[15px]">
+          <fieldset className="grid gap-1">
+            <legend className="mb-1 text-[13px] font-semibold text-forest">{tx("Email me about")}</legend>
+            <label className="flex min-h-11 items-center gap-3">
+              <input type="checkbox" className="h-5 w-5 accent-[#1f3a2c]" name="notifyMessages" defaultChecked={user.notifyMessages} />
+              {tx("Messages")}
+            </label>
+            <label className="flex min-h-11 items-center gap-3">
+              <input type="checkbox" className="h-5 w-5 accent-[#1f3a2c]" name="notifyIntros" defaultChecked={user.notifyIntros} />
+              {tx("Introductions and project contact requests")}
+            </label>
+            {ALERT_EMAIL_TYPES.map((item) => (
+              <label key={item.field} className="flex min-h-11 items-center gap-3">
+                <input type="checkbox" className="h-5 w-5 accent-[#1f3a2c]" name={item.field} defaultChecked={user[item.field]} />
+                {tx(item.label)}
+              </label>
+            ))}
+            <input type="hidden" name="notifyDeals" value={user.notifyDeals ? "on" : ""} />
+          </fieldset>
+          <fieldset className="grid gap-1">
+            <legend className="mb-1 text-[13px] font-semibold text-forest">{tx("How often")}</legend>
+            {ALERT_DIGESTS.map((item) => (
+              <label key={item.id} className="flex min-h-11 items-center gap-3">
+                <input type="radio" className="h-5 w-5 accent-[#1f3a2c]" name="alertDigest" value={item.id} defaultChecked={(user.alertDigest || "INSTANT") === item.id} />
+                {tx(item.label)}
+              </label>
+            ))}
+          </fieldset>
           <button className={btn} type="submit">
             {tx("Save notification settings")}
           </button>

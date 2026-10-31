@@ -73,7 +73,7 @@ describe("profile photos and messages empty state", () => {
   it("shows a full-width helpful empty state with the three next steps", () => {
     const page = read("app/(app)/messages/page.tsx");
     expect(page).toContain('data-testid="messages-empty"');
-    for (const href of ["/profile#add-project", "/feed#ledger-seeking", "/network"]) expect(page).toContain(href);
+    for (const href of ["/profile#add-project", "/deals", "/network"]) expect(page).toContain(href);
     expect(read("components/ledger-projects.tsx")).toContain('id="ledger-seeking"');
   });
   it("every new phrase is translated and avoids banned words", () => {

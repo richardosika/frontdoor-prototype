@@ -814,6 +814,7 @@ async function main() {
 
   await ensureExtraProjects();
   await alignProjectContactDemo();
+  await alignMapleCourtDemo();
   await seedVerification();
 
   console.log(`Seeded ${BRAND.name} demo data. Password for every member: cornicio-demo`);
@@ -934,6 +935,7 @@ async function alignSeededDemo() {
   await fillDemoProjectFields();
   await ensureExtraProjects();
   await alignProjectContactDemo();
+  await alignMapleCourtDemo();
   await ensureMissingVerificationCases();
   await alignSeedTiers();
   await applySeedCaseMap();
@@ -1263,3 +1265,97 @@ async function alignProjectContactDemo() {
 }
 
 const DEMO_PDF = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 62>>stream\nBT /F1 18 Tf 72 720 Td (Ironbound Lofts rent roll - demo only) Tj ET\nendstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
+
+/** A sample project page: Marcus Hale's Maple Court Townhomes, with documents, photos, and contact requests. Idempotent. */
+async function alignMapleCourtDemo() {
+  const id = "proj_maple_court";
+  const owner = await prisma.user.findUnique({ where: { id: "user_mh" }, select: { id: true } });
+  if (!owner) return;
+  const existing = await prisma.trackProject.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) {
+    await prisma.trackProject.create({
+      data: {
+        id,
+        userId: owner.id,
+        name: "Sample: Maple Court Townhomes",
+        asset: "Single family / townhome",
+        street: "40 Maple Court",
+        city: "Montclair",
+        state: "NJ",
+        location: "Montclair, NJ",
+        year: 2028,
+        valueLabel: "$18,000,000",
+        role: "Developer",
+        summary:
+          "24 for-sale townhome and single-family units on 3.1 acres, five minutes from Bay Street station. Site plan approval in hand; construction start targeted for spring 2027.\nLooking for a general contractor, construction financing, and an architect to take the schematic design through construction documents.",
+        seeking: "GENERAL_CONTRACTOR,FINANCING,ARCHITECT_ENGINEER",
+        shareWithCircle: true,
+        reviewStatus: "APPROVED",
+        submittedAt: new Date(),
+        reviewedAt: new Date(),
+      },
+    });
+  }
+  const docCount = await prisma.projectDocument.count({ where: { projectId: id } });
+  if (docCount === 0) {
+    const sharp = (await import("sharp")).default;
+    const photo = async (label: string, sky: string, body: string) =>
+      new Uint8Array(
+        await sharp(
+          Buffer.from(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="1200" height="900" fill="${sky}"/><rect y="640" width="1200" height="260" fill="#6f8a5b"/>` +
+              Array.from({ length: 6 }, (_, i) => `<rect x="${60 + i * 185}" y="380" width="170" height="270" fill="${body}" stroke="#3b3b3b" stroke-width="4"/><polygon points="${50 + i * 185},385 ${145 + i * 185},290 ${240 + i * 185},385" fill="#5a4636"/><rect x="${120 + i * 185}" y="540" width="50" height="110" fill="#2f3e46"/>`).join("") +
+              `<text x="40" y="70" font-family="sans-serif" font-size="44" fill="#1f2b24">${label}</text></svg>`,
+          ),
+        )
+          .png()
+          .toBuffer(),
+      );
+    const front = await photo("Maple Court, street view (rendering)", "#cfe0ea", "#e8dcc6");
+    const rear = await photo("Maple Court, courtyard (rendering)", "#e9d8c4", "#d8d0c0");
+    const pdf = new Uint8Array(Buffer.from(samplePdf("Maple Court Townhomes - Site plan summary (sample)")));
+    await prisma.projectDocument.createMany({
+      data: [
+        { projectId: id, title: "Site plan summary", fileName: "maple-court-site-plan.pdf", contentType: "application/pdf", sizeBytes: pdf.byteLength, bytes: pdf },
+        { projectId: id, title: "Street view rendering", fileName: "maple-court-street.png", contentType: "image/png", sizeBytes: front.byteLength, bytes: front },
+        { projectId: id, title: "Courtyard rendering", fileName: "maple-court-courtyard.png", contentType: "image/png", sizeBytes: rear.byteLength, bytes: rear },
+      ],
+    });
+  }
+  const contacts = [
+    { fromId: "user_mt", category: "FINANCING", status: "PENDING", note: "We lend on for-sale townhome projects in Essex County. Happy to look at the budget." },
+    { fromId: "user_gl", category: "ARCHITECT_ENGINEER", status: "ACCEPTED", note: "Our studio has done three Montclair infill projects. Would welcome a call." },
+  ] as const;
+  for (const c of contacts) {
+    const from = await prisma.user.findUnique({ where: { id: c.fromId }, select: { id: true } });
+    if (!from) continue;
+    await prisma.projectContact.upsert({
+      where: { projectId_fromId_toId: { projectId: id, fromId: c.fromId, toId: owner.id } },
+      update: {},
+      create: { projectId: id, fromId: c.fromId, toId: owner.id, category: c.category, note: c.note, status: c.status },
+    });
+  }
+}
+
+/** A one-page PDF with a title line, for sample documents. */
+function samplePdf(title: string): string {
+  const text = title.replace(/[()\\]/g, "");
+  const stream = `BT /F1 20 Tf 60 720 Td (${text}) Tj 0 -40 Td /F1 12 Tf (24 units - 3.1 acres - Montclair, NJ - sample document for the demo) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let out = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((body, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return out;
+}

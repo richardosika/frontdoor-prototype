@@ -21,7 +21,10 @@ export default async function ProjectReviewPage({
     prisma.trackProject.findMany({
       where: { reviewStatus: "PENDING_REVIEW" },
       orderBy: { submittedAt: "asc" },
-      include: { user: { select: { id: true, name: true, org: true, role: true } } },
+      include: {
+        user: { select: { id: true, name: true, org: true, role: true } },
+        documents: { select: { id: true, title: true, fileName: true, contentType: true, sizeBytes: true }, orderBy: { createdAt: "asc" } },
+      },
     }),
     prisma.trackProject.findMany({
       where: { reviewStatus: { in: ["NEEDS_INFO", "DECLINED"] } },
@@ -64,6 +67,26 @@ export default async function ProjectReviewPage({
                 {project.summary ? <div className="sm:col-span-2">Notes: {project.summary}</div> : null}
                 {project.reviewNote ? <div className="sm:col-span-2 text-mut">Earlier note: {project.reviewNote}</div> : null}
               </dl>
+              <div className="mt-3" data-testid="admin-project-files">
+                <p className="text-[12px] font-semibold uppercase tracking-wider text-mut">Documents &amp; photos ({project.documents.length})</p>
+                {project.documents.length === 0 ? <p className="text-[15px] text-mut">No files attached.</p> : null}
+                <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {project.documents.map((doc) => (
+                    <li key={doc.id} className="overflow-hidden rounded border border-line bg-paper">
+                      <a href={`/api/project-documents/${doc.id}`} target="_blank" rel="noreferrer" className="block">
+                        {doc.contentType.startsWith("image/") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={`/api/project-documents/${doc.id}`} alt={doc.title} className="block aspect-[4/3] w-full object-cover" />
+                        ) : (
+                          <span className="flex aspect-[4/3] items-center justify-center bg-cream text-[20px] font-semibold text-forest">PDF</span>
+                        )}
+                        <span className="block px-2 py-1 text-[14px] text-ink underline decoration-brass">{doc.title}</span>
+                        <span className="block px-2 pb-1 text-[12px] text-mut">{doc.fileName} · {Math.max(1, Math.round(doc.sizeBytes / 1024))} KB</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
               <form action={reviewProject} className="mt-3 grid gap-2">
                 <input type="hidden" name="projectId" value={project.id} />
                 <textarea

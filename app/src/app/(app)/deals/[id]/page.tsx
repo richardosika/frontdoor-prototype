@@ -45,6 +45,23 @@ export default async function DealPage({
   const isSponsor = deal.sponsorId === user.id;
   const approved = mine?.status === "APPROVED" || isSponsor;
   const roomRule = approved ? { ok: true as const } : await dealRoomRule(deal, user);
+  // #26: deals are no longer an open feed. Only the sponsor, staff, members who asked for the room, and members the
+  // deal (or its project) is seeking can open it.
+  if (!approved && !mine && !user.isAdmin && !roomRule.ok) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-10 md:px-8 md:py-16" data-testid="deal-not-available">
+        <section className="rounded border border-line bg-paper p-6 text-center sm:p-10">
+          <h1 className="font-serif text-[30px] text-forest sm:text-[36px]">{tx("Project not available")}</h1>
+          <p className="mx-auto mt-3 max-w-md text-[17px] leading-relaxed text-ink">
+            {tx("This project is not open to you. Projects are shown only to members in the categories they are seeking and to the owner's circle.")}
+          </p>
+          <Link href="/feed" className={`${btn} mt-6`}>
+            {tx("Back to the Ledger")}
+          </Link>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -4,6 +4,7 @@ import { ConversationList } from "@/components/conversation-list";
 import { btn, btnOutline } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { listConversations } from "@/lib/conversations";
+import { isDeveloperRole } from "@/lib/member-reach";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,18 @@ export default async function MessagesPage() {
             {tx("Conversations open when a member accepts your contact about a project, or when you are in each other's circle.")}
           </p>
           <p className="mx-auto mt-2 max-w-2xl text-[16px] leading-relaxed text-mut">
-            {tx("Add an approved project so the right members can reach you, contact members whose projects seek your category, or grow your circle.")}
+            {isDeveloperRole(user.role)
+              ? tx("Add a project and choose who it is seeking, then reach out to matching members from Find your team.")
+              : tx("Add an approved project so the right members can reach you, contact members whose projects seek your category, or grow your circle.")}
           </p>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/profile#add-project" className={btn}>
               {tx("Add a project")}
             </Link>
-            <Link href="/feed#ledger-seeking" className={btnOutline}>
-              {tx("Projects seeking your category")}
+            <Link href="/deals" className={btnOutline} data-testid="messages-empty-find">
+              {isDeveloperRole(user.role) ? tx("Find your team") : tx("Opportunities for you")}
             </Link>
-            <Link href="/network" className={btnOutline}>
+            <Link href={isDeveloperRole(user.role) ? "/deals#my-circle" : "/network"} className={btnOutline}>
               {tx("My Circle")}
             </Link>
           </div>

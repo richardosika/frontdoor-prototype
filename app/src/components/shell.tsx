@@ -13,15 +13,11 @@ import { LocaleProvider } from "@/components/locale-context";
 import { tierLabel } from "@/lib/format";
 import { setLanguage } from "@/actions/language";
 import { phrase } from "@/lib/i18n/phrases";
-import { LOCALES, translator, type Locale, type MessageKey } from "@/lib/i18n/messages";
+import { LOCALES, translator, type Locale } from "@/lib/i18n/messages";
+import { memberNav } from "@/lib/member-reach";
+import { roleLabel, roleShort } from "@/lib/roles";
 
-const TABS: { href: string; label: string; key: MessageKey; icon: string; test: string }[] = [
-  { href: "/feed", label: "Ledger", key: "nav.ledger", icon: "⌂", test: "tab-feed" },
-  { href: "/deals", label: "Deals", key: "nav.deals", icon: "◈", test: "tab-deals" },
-  { href: "/network", label: "Network", key: "nav.network", icon: "⚇", test: "tab-network" },
-  { href: "/messages", label: "Messages", key: "nav.messages", icon: "✉", test: "tab-messages" },
-  { href: "/profile", label: "Profile", key: "nav.profile", icon: "☺", test: "tab-profile" },
-];
+const ICONS: Record<string, string> = { "/feed": "⌂", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺" };
 
 function LanguagePicker({ locale, label }: { locale: Locale; label: string }) {
   return (
@@ -63,7 +59,7 @@ export function Shell({
   locale = "en",
   children,
 }: {
-  user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean; memberSince?: number };
+  user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean; memberSince?: number; role?: string };
   unread: number;
   alerts: number;
   locale?: Locale;
@@ -71,6 +67,8 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const t = translator(locale);
+  const TABS = memberNav(user.role).map((tab) => ({ ...tab, icon: ICONS[tab.href] ?? "•", text: phrase(locale, tab.label) }));
+  const typeLabel = user.role ? phrase(locale, roleShort(roleLabel(user.role))) : "";
   const memberLine = t("membership.member", { tier: phrase(locale, tierLabel(user.tier)) });
   const sinceLabel = `${phrase(locale, "Member since")} ${user.memberSince ?? new Date().getFullYear()}`;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -111,7 +109,7 @@ export function Shell({
           </span>
         </Link>
         <div className="mb-4 hidden lg:block" data-testid="sidebar-membership">
-          <MembershipCard name={user.name} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
+          <MembershipCard name={user.name} typeLabel={typeLabel} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
         </div>
         <div ref={memberRef} className="relative mb-5">
           <button
@@ -160,7 +158,7 @@ export function Shell({
               >
                 {on ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
                 <span className="grid h-6 w-6 place-items-center text-xl">{tab.icon}</span>
-                <span className="hidden lg:inline">{t(tab.key)}</span>
+                <span className="hidden lg:inline">{tab.text}</span>
                 {tab.href === "/messages" && unread > 0 ? (
                   <span className="ml-auto hidden rounded-sm bg-brass px-1.5 text-[10px] font-sans font-bold lg:inline">{unread}</span>
                 ) : null}
@@ -252,7 +250,7 @@ export function Shell({
               className={`relative flex min-h-11 flex-1 flex-col items-center justify-center text-center font-serif text-[11px] ${on ? "text-forest" : "text-mut"}`}
             >
               <span className="block text-xl leading-none">{tab.icon}</span>
-              {t(tab.key)}
+              {tab.text}
               {tab.href === "/messages" && unread > 0 ? (
                 <span className="absolute right-[18%] top-0 rounded-sm bg-brass px-1 text-[9px] font-sans font-bold text-paper">{unread}</span>
               ) : null}
@@ -276,7 +274,7 @@ export function Shell({
         <div className="fixed inset-0 z-40 md:hidden">
           <button type="button" className="absolute inset-0 bg-forest/40" aria-label={t("menu.close")} onClick={() => setMenuOpen(false)} />
           <div className="absolute inset-x-0 bottom-[calc(3.4rem+env(safe-area-inset-bottom,0px))] rounded-t border border-line bg-paper px-4 pb-4 pt-4">
-            <MembershipCard name={user.name} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
+            <MembershipCard name={user.name} typeLabel={typeLabel} statusLabel={phrase(locale, "Approved Member")} sinceLabel={sinceLabel} />
             <Link href="/settings" className="mt-3 flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {t("menu.settings")}
             </Link>

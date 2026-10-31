@@ -1,7 +1,8 @@
 import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { projectAudience } from "@/lib/project-contact-db";
-import { canContactAboutProject, projectDetailsVisible, projectVisibleTo } from "@/lib/project-contact";
+import { canContactAboutProject, categoryForRole, projectDetailsVisible } from "@/lib/project-contact";
+import { projectAccessible } from "@/lib/member-reach";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
 export async function loadMemberProfile(viewerId: string, memberId: string) {
@@ -95,7 +96,18 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       : null,
   );
   const inOwnerCircle = connection?.status === "ACCEPTED";
-  const visibleProjects = member.projects.filter((project) => projectVisibleTo(project, viewer));
+  // #25: a member sees another member's project only when it seeks their category or they are in the owner's circle.
+  // A developer whose approved project seeks this member's category also sees the member's past work (Find your team).
+  const memberCategory = categoryForRole(member.role);
+  const teamCandidate =
+    viewer.id !== member.id && memberCategory
+      ? (await prisma.trackProject.count({ where: { userId: viewer.id, reviewStatus: "APPROVED", seeking: { contains: memberCategory } } })) > 0
+      : false;
+  const visibleProjects = member.projects.filter(
+    (project) =>
+      projectAccessible(project, { id: viewer.id, isAdmin: viewer.isAdmin, role: viewer.role, inOwnerCircle }) ||
+      (teamCandidate && project.reviewStatus === "APPROVED"),
+  );
   const audiences = new Map(
     await Promise.all(
       visibleProjects.map(async (project) => [project.id, viewer.id === project.userId || viewer.isAdmin ? [] : await projectAudience(project.id)] as const),

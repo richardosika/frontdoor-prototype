@@ -3,6 +3,7 @@ import { btn, field, labelCls } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
 import { PROJECT_ASSET_CLASSES, SEEK_CATEGORIES, US_STATES, parseSeeking, reviewLabel } from "@/lib/project-contact";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
+import { ProjectUploadRows } from "@/components/project-upload-rows";
 
 export type EditableProject = {
   id: string;
@@ -115,6 +116,19 @@ export async function ProjectForm({ back, project }: { back: "/profile" | "/feed
       <p className="text-[14px] leading-relaxed text-mut sm:col-span-2">
         {tx("Private Floor staff review every project. Other members see it only after it is approved.")}
       </p>
+      {project ? null : (
+        <ProjectUploadRows
+          labels={{
+            heading: tx("Documents & photos"),
+            help: tx("Attach plans, budgets, renderings, or site photos for staff review. PDF, JPG, PNG, or HEIC, up to 5 MB each."),
+            label: tx("Label"),
+            labelPlaceholder: tx("e.g. Site plan"),
+            file: tx("File"),
+            add: tx("Add another file"),
+            remove: tx("Remove"),
+          }}
+        />
+      )}
       <button className={`${btn} sm:col-span-2`} type="submit">
         {project ? tx("Save and resubmit") : tx("Submit for review")}
       </button>

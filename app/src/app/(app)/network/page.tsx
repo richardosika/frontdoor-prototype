@@ -1,108 +1,51 @@
-import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { respondIntroduction } from "@/actions/social";
-import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
+import { MyCircleList } from "@/components/my-circle";
 import { PageHeader } from "@/components/page-header";
-import { ProjectFilterBar } from "@/components/project-filters";
-import { btn, btnOutline, chipOff, chipOn } from "@/components/ui";
+import { btn, btnOutline } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
-import { directoryMatch } from "@/lib/member-network";
-import { directoryNeedMatch, projectQuery, settleProjectQuery, sortDirectory } from "@/lib/project-filter";
+import { serverTx } from "@/lib/i18n/server";
+import { loadMyCircle } from "@/lib/ledger-projects";
+import { isDeveloperRole } from "@/lib/member-reach";
 import { prisma } from "@/lib/prisma";
-import { ROLES, roleLabel, roleShort } from "@/lib/roles";
-import { toPublicVerification, type VerificationStatus } from "@/lib/verification";
+import { roleLabel, roleShort } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-export default async function NetworkPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const tx = await serverTx();
+/**
+ * #28: no member browses the full member list. Developers find people through "Find your team"; everyone else
+ * sees "My Circle": only people connected through a project. The full directory stays in admin.
+ */
+export default async function NetworkPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const user = await requireUser();
+  if (isDeveloperRole(user.role) && !user.isAdmin) redirect("/deals#my-circle");
+  const tx = await serverTx();
   const params = await searchParams;
-  const settled = settleProjectQuery("/network", params, "network");
-  if (settled.redirectTo) redirect(settled.redirectTo);
-  const filters = settled.filters;
-  const role = filters.role || "";
-  const state = filters.state || "";
-  const dealType = filters.dealType || "";
-  const assetClass = filters.assetClass || "";
-  const [rows, saved] = await Promise.all([
-    prisma.user.findMany({
-      where: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, id: { not: user.id } },
-      orderBy: { name: "asc" },
-    }),
-    prisma.savedFilter.findMany({
-      where: { userId: user.id, surface: "network" },
-      orderBy: { createdAt: "desc" },
-      take: 12,
-    }),
+  const [people, incoming] = await Promise.all([
+    loadMyCircle(user),
+    prisma.introduction.findMany({ where: { toId: user.id, status: "PENDING" }, include: { from: true } }),
   ]);
-  const members = sortDirectory(
-    rows.filter(
-      (member) =>
-        directoryMatch(
-          {
-            role: member.role,
-            location: member.location,
-            markets: member.markets,
-            dealTypes: member.dealTypes,
-            assetClasses: member.assetClasses,
-            name: member.name,
-            org: member.org,
-            bio: member.bio,
-          },
-          { role, state, dealType, assetClass, q: filters.q },
-        ) &&
-        directoryNeedMatch(member, filters.need),
-    ),
-    filters.sort,
-  );
-  const [introductions, cases] = await Promise.all([
-    prisma.introduction.findMany({
-      where: {
-        OR: [{ fromId: user.id }, { toId: user.id }],
-        status: { in: ["PENDING", "ACCEPTED"] },
-      },
-      include: { from: true, to: true },
-    }),
-    prisma.verificationCase.findMany({
-      where: { userId: { in: members.map((member) => member.id) }, subject: "MEMBER" },
-      select: { userId: true, status: true, verifiedAt: true, expiresAt: true, checks: { select: { result: true } } },
-    }),
-  ]);
-  const incoming = introductions.filter((item) => item.toId === user.id && item.status === "PENDING");
-
-  function introFor(id: string) {
-    const row = introductions.find((item) => item.fromId === id || item.toId === id);
-    if (!row) return "NONE" as const;
-    if (row.status === "ACCEPTED") return "ACCEPTED" as const;
-    if (row.fromId === user.id) return "PENDING" as const;
-    return "INCOMING" as const;
-  }
-
-  function badgeFor(id: string) {
-    const record = cases.find((item) => item.userId === id);
-    return toPublicVerification(record ? { ...record, status: record.status as VerificationStatus } : null);
-  }
-
   const error = typeof params.error === "string" ? params.error : undefined;
   const notice = typeof params.notice === "string" ? params.notice : undefined;
 
   return (
-    <div className="mx-auto max-w-[1180px] px-4 pb-6 pt-3 md:pt-6 lg:px-8">
-      <PageHeader title={tx("Network")} />
-      <p className="mt-1 text-sm text-ink">{tx("Email and phone stay off this directory. Contact opens through a project that is seeking your category. The conversation stays inside Private Floor.")}</p>
-      <div className="mt-4">
-        <Banner error={error} notice={notice} />
+    <div className="mx-auto max-w-[980px] px-4 pb-8 pt-3 md:pt-6 lg:px-8" data-testid="my-circle">
+      <PageHeader title={tx("My Circle")} />
+      <p className="mt-1 text-[16px] leading-relaxed text-ink">
+        {tx("People connected to you through a project, with the projects you share. Email and phone stay private; messages stay inside Private Floor.")}
+      </p>
+      {user.isAdmin ? (
+        <Link href="/admin/members" className="mt-2 inline-block text-[14px] font-semibold text-forest underline decoration-brass">
+          {tx("Full member directory (admin)")}
+        </Link>
+      ) : null}
+      <div className="mt-3">
+        <Banner error={error ? tx(error) : undefined} notice={notice ? tx(notice) : undefined} />
       </div>
       {incoming.length ? (
-        <section className="mb-4 rounded border border-brass bg-brass-soft p-4">
+        <section className="mb-4 mt-3 rounded border border-brass bg-brass-soft p-4">
           <h2 className="text-sm font-semibold">{tx("Introduction requests")}</h2>
           <ul className="mt-2 space-y-3">
             {incoming.map((item) => (
@@ -129,68 +72,9 @@ export default async function NetworkPage({
           </ul>
         </section>
       ) : null}
-      <ProjectFilterBar path="/network" filters={filters} saved={saved} />
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <RoleChip href={projectQuery("/network", { ...filters, role: undefined })} on={!role}>
-          {tx("All")}
-        </RoleChip>
-        {ROLES.map((item) => (
-          <RoleChip key={item.id} href={projectQuery("/network", { ...filters, role: item.id })} on={role === item.id}>
-            {tx(roleShort(item.label))}
-          </RoleChip>
-        ))}
+      <div className="mt-4">
+        <MyCircleList people={people} />
       </div>
-      <p className="mt-3 text-xs text-mut">
-        {members.length} {tx(members.length === 1 ? "member" : "members")}
-      </p>
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {members.map((member) => {
-          const intro = introFor(member.id);
-          return (
-            <article key={member.id} className="rounded border border-line bg-paper p-4">
-              <Link href={`/members/${member.id}`} className="flex items-center gap-3">
-                <Avatar initials={member.initials} photoId={member.photoId} />
-                <span>
-                  <span className="block text-sm font-semibold">{member.name}</span>
-                  <span className="block text-[11px] text-mut">
-                    {tx(roleShort(roleLabel(member.role)))} · {member.org}
-                  </span>
-                  <span className="block text-[11px] text-mut">{member.location}</span>
-                </span>
-              </Link>
-              {member.lookingFor ? <p className="mt-2 line-clamp-2 text-xs text-ink">{member.lookingFor}</p> : null}
-              <div className="mt-3">
-                {intro === "ACCEPTED" ? (
-                  <Link href={`/members/${member.id}`} className={`${btnOutline} w-full`}>
-                    {tx("Open messages")}
-                  </Link>
-                ) : intro === "PENDING" ? (
-                  <p className="rounded border border-line bg-cream px-3 py-2 text-sm text-ink">
-                    {tx("Introduction requested. It stays inside Private Floor until they accept.")}
-                  </p>
-                ) : intro === "INCOMING" ? (
-                  <Link href={`/members/${member.id}`} className={`${btn} w-full`}>
-                    {tx("Respond")}
-                  </Link>
-                ) : (
-                  <Link href={`/members/${member.id}`} className={`${btnOutline} w-full`}>
-                    {tx("View projects")}
-                  </Link>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {members.length === 0 ? <p className="mt-6 text-sm text-mut">{tx("No members match those filters.")}</p> : null}
     </div>
-  );
-}
-
-function RoleChip({ href, on, children }: { href: string; on: boolean; children: React.ReactNode }) {
-  return (
-    <Link href={href} className={on ? chipOn : chipOff}>
-      {children}
-    </Link>
   );
 }

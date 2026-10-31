@@ -1,0 +1,6 @@
+-- #29 alert email settings
+ALTER TABLE "User" ADD COLUMN "notifyMatches" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "User" ADD COLUMN "notifyProjectDecisions" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "User" ADD COLUMN "notifyDocuments" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "User" ADD COLUMN "notifyDealRoom" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "User" ADD COLUMN "alertDigest" TEXT NOT NULL DEFAULT 'INSTANT';

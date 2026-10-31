@@ -3,6 +3,8 @@ import { addContactToCircle, contactAboutProject, respondProjectContact } from "
 import { ProjectForm, ReviewChip } from "@/components/project-form";
 import { btn, btnOutline, field } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
+import { SlimFilterBar } from "@/components/slim-filters";
+import { isDeveloperRole, type SlimFilters } from "@/lib/member-reach";
 import type { loadLedgerProjects } from "@/lib/ledger-projects";
 import { seekLabel } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -18,12 +20,13 @@ function statusWord(status: string) {
   return "Sent";
 }
 
-export async function LedgerProjects({ data, role }: { data: Data; role: string }) {
+export async function LedgerProjects({ data, role, filters }: { data: Data; role: string; filters?: SlimFilters }) {
+  const developer = isDeveloperRole(role);
   const tx = await serverTx();
   const ownerFirst = role === "DEVELOPER" || data.myProjects.length > 0;
 
   const mine = (
-    <section className={box} data-testid="ledger-my-projects" key="mine">
+    <section id="ledger-my-projects" className={`${box} scroll-mt-20`} data-testid="ledger-my-projects" key="mine">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className={h2}>{tx("My projects")}</h2>
       </div>
@@ -32,7 +35,7 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
         {data.myProjects.map((project) => (
           <li key={project.id} className="border-b border-line py-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[17px] font-semibold">{project.name}</span>
+              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest"><span className="text-[17px] font-semibold">{project.name}</span></Link>
               <ReviewChip status={project.reviewStatus} />
             </div>
             <p className="text-[15px] text-mut">
@@ -63,7 +66,7 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
           </li>
         ))}
       </ul>
-      <details className="mt-3" data-testid="ledger-add-project">
+      <details id="ledger-add-project" className="mt-3 scroll-mt-20" data-testid="ledger-add-project">
         <summary className={`${btn} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>{tx("Add a project")}</summary>
         <div className="mt-4 rounded border border-line bg-cream p-4 md:p-5">
           <ProjectForm back="/feed" />
@@ -78,7 +81,7 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
       <h2 className={h2}>{tx("Who I'm looking for")}</h2>
       {approvedWithSeeking.map((project) => (
         <div key={project.id} className="mt-3">
-          <p className="text-[16px] font-semibold">{project.name}</p>
+          <p className="text-[16px] font-semibold"><Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link></p>
           {project.lookingFor.map((group) => (
             <div key={group.category} className="mt-2 border-l-2 border-brass pl-3">
               <p className="text-[15px] font-semibold text-forest">{tx(seekLabel(group.category))}</p>
@@ -188,16 +191,22 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
     </section>
   );
 
-  const seekingMe = data.myCategory ? (
+  // #21: developers do not get the "Projects seeking your category" box; everyone else gets it with a slim filter bar.
+  const seekingMe = data.myCategory && !developer ? (
     <section id="ledger-seeking" className={`${box} scroll-mt-20`} data-testid="ledger-seeking-me" key="seeking">
+      {filters ? <SlimFilterBar path="/feed" filters={filters} anchor="ledger-seeking" /> : null}
       <h2 className={h2}>
         {tx("Projects seeking your category")}: {tx(seekLabel(data.myCategory))}
       </h2>
-      {data.seekingMe.length === 0 ? <p className="mt-2 text-[15px] text-mut">{tx("No approved projects are seeking your category right now.")}</p> : null}
+      {data.seekingMe.length === 0 ? (
+        <p className="mt-2 text-[15px] text-mut">
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("No approved projects are seeking your category right now.")}
+        </p>
+      ) : null}
       <ul className="mt-2">
         {data.seekingMe.map((project) => (
           <li key={project.id} className="border-b border-line py-3 last:border-0">
-            <p className="text-[16px] font-semibold">{project.name}</p>
+            <p className="text-[16px] font-semibold"><Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link></p>
             <p className="text-[15px] text-mut">
               <Link href={`/members/${project.user.id}`} className="text-ink underline decoration-line">
                 {project.user.name}
@@ -231,14 +240,14 @@ export async function LedgerProjects({ data, role }: { data: Data; role: string 
         {data.circleShared.map((project) => (
           <li key={project.id} className="border-b border-line py-3 last:border-0">
             <p className="text-[16px] font-semibold">
-              {project.name} <span className="font-serif font-normal text-forest">{project.valueLabel}</span>
+              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link> <span className="font-serif font-normal text-forest">{project.valueLabel}</span>
             </p>
             <p className="text-[15px] text-mut">
               {project.user.name} · {tx(project.asset)} · {project.street ? `${project.street}, ` : ""}
               {project.location} · {project.year}
             </p>
             {project.summary ? <p className="mt-1 text-[15px] text-ink">{project.summary}</p> : null}
-            <Link href={`/members/${project.user.id}#project-${project.id}`} className="mt-1 inline-block text-[15px] font-semibold text-forest underline decoration-brass">
+            <Link href={`/projects/${project.id}`} className="mt-1 inline-block text-[15px] font-semibold text-forest underline decoration-brass">
               {tx("Open the project")}
             </Link>
           </li>

@@ -282,7 +282,7 @@ export async function ProfileView({
                 <span className="hidden h-12 w-12 shrink-0 place-items-center rounded-sm border border-line bg-cream text-forest sm:grid">▦</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <b className="text-[18px] font-semibold">{project.name}</b>
+                    <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest"><b className="text-[18px] font-semibold">{project.name}</b></Link>
                     {isSelf ? <ReviewChip status={project.reviewStatus} /> : null}
                   </div>
                   <div className="mt-1 text-[15px] text-mut">

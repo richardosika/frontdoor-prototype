@@ -69,18 +69,15 @@ describe("Ledger", () => {
     expect(fallback.matched).toBe(false);
     expect(fallback.items.map((item) => item.id)).toEqual(["new-other", "old-match"]);
   });
-  it("tabs are Matched for you and Requests, with old Seeking links kept working", () => {
+  it("the Ledger has no open feed tabs; old Seeking links still settle (batch 6 #26)", () => {
     const page = read("app/(app)/feed/page.tsx");
-    expect(page).toContain('label: "Matched for you"');
-    expect(page).toContain('label: "Requests"');
-    expect(page).not.toMatch(/label: "(Deals|Seeking|For you|My circle)"/);
+    expect(page).not.toContain('label: "Matched for you"');
     expect(page).not.toContain("Membership status");
-    expect(page).toContain('t("ledger.matchedTitle")');
     expect(settleProjectQuery("/feed", { tab: "seeking" }, "feed").filters.tab).toBe("requests");
   });
   it("sidebar says Ledger and keeps Settings and Sign out inside the member menu", () => {
     const shell = read("components/shell.tsx");
-    expect(shell).toContain('label: "Ledger"');
+    expect(read("lib/member-reach.ts")).toContain('label: "Ledger"');
     expect(shell).toContain("<LanguagePicker");
     expect(shell).toContain('data-testid="member-menu"');
     expect(shell).toContain('data-testid="sidebar-membership"');

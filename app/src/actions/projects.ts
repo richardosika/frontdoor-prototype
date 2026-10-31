@@ -26,6 +26,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 function backPath(formData: FormData): string {
   const back = String(formData.get("back") || "/profile");
+  if (/^\/projects\/[A-Za-z0-9_-]+$/.test(back)) return back;
   return back === "/feed" ? "/feed" : "/profile";
 }
 
@@ -34,6 +35,7 @@ function go(back: string, key: "error" | "notice", text: string): never {
 }
 
 function refresh() {
+  revalidatePath("/projects/[id]", "page");
   revalidatePath("/profile");
   revalidatePath("/feed");
   revalidatePath("/admin/projects");
@@ -46,6 +48,8 @@ export async function addProject(formData: FormData) {
   const read = readProjectForm(formData, PROJECT_ROLE_LABELS);
   if (!read.ok) go(back, "error", read.reason);
   const value = read.value;
+  const attached = await readSubmissionFiles(formData);
+  if (!attached.ok) go(back, "error", attached.reason);
   const project = await prisma.trackProject.create({
     data: {
       userId: user.id,
@@ -65,6 +69,7 @@ export async function addProject(formData: FormData) {
       submittedAt: new Date(),
     },
   });
+  if (attached.files.length) await prisma.projectDocument.createMany({ data: attached.files.map((file) => ({ projectId: project.id, ...file })) });
   await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
   const { queueProjectVerification } = await import("@/lib/verify/queue");
   await queueProjectVerification(project.id, value.name);
@@ -153,7 +158,7 @@ export async function reviewProject(formData: FormData) {
     note: outcome.note,
     link,
   });
-  await sendEmail({ to: project.user.email, subject: mail.subject, text: mail.text });
+  if (project.user.notifyProjectDecisions) await sendEmail({ to: project.user.email, subject: mail.subject, text: mail.text });
   await notify(project.userId, {
     title: mail.subject,
     body: outcome.note ? `${project.name}: ${outcome.note}` : project.name,
@@ -170,7 +175,7 @@ export async function reviewProject(formData: FormData) {
 export async function contactAboutProject(formData: FormData) {
   const user = await requireUser();
   const rawBack = String(formData.get("back") || "/feed");
-  const back = /^\/members\/[A-Za-z0-9_-]+$/.test(rawBack) ? rawBack : rawBack === "/profile" ? "/profile" : "/feed";
+  const back = /^\/(members|projects)\/[A-Za-z0-9_-]+$/.test(rawBack) ? rawBack : ["/profile", "/deals", "/network"].includes(rawBack) ? rawBack : "/feed";
   const projectId = String(formData.get("projectId") || "");
   const note = String(formData.get("note") || "").trim().slice(0, 500);
   const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
@@ -205,7 +210,8 @@ export async function respondProjectContact(formData: FormData) {
   const user = await requireUser();
   const contactId = String(formData.get("contactId") || "");
   const decision = String(formData.get("decision") || "");
-  if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect("/feed");
+  const respondBack = /^\/projects\/[A-Za-z0-9_-]+$/.test(String(formData.get("back") || "")) ? String(formData.get("back")) : "/feed";
+  if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect(respondBack);
   const contact = await prisma.projectContact.findUnique({ where: { id: contactId }, include: { from: true, project: true } });
   if (!contact || contact.toId !== user.id || contact.status !== "PENDING") redirect("/feed");
   await prisma.projectContact.update({ where: { id: contact.id }, data: { status: decision, decidedAt: new Date() } });
@@ -226,7 +232,7 @@ export async function respondProjectContact(formData: FormData) {
     if (sent.ok) redirect(`/messages/${sent.conversationId}`);
   }
   refresh();
-  go("/feed", "notice", decision === "ACCEPTED" ? "Contact accepted." : "Contact declined.");
+  go(respondBack, "notice", decision === "ACCEPTED" ? "Contact accepted." : "Contact declined.");
 }
 
 /** After an accepted project contact, the project owner can add the other member to My Circle. */
@@ -251,18 +257,52 @@ export async function addContactToCircle(formData: FormData) {
 const DOC_MAX = 5 * 1024 * 1024;
 const DOC_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
+const DOC_ERROR = "Choose a PDF, JPG, PNG, or HEIC up to 5 MB.";
+const SUBMIT_FILES_MAX = 10;
+
+/** Read one uploaded file. HEIC photos are converted to WebP so every browser can show them. */
+async function readUpload(file: File): Promise<{ fileName: string; contentType: string; sizeBytes: number; bytes: Uint8Array<ArrayBuffer> } | null> {
+  if (file.size > DOC_MAX) return null;
+  const raw = new Uint8Array(await file.arrayBuffer());
+  const fileName = file.name.replace(/[^\w .()-]/g, "_").slice(0, 180) || "document";
+  const { sniffImage, processImage } = await import("@/lib/member-images");
+  if (sniffImage(raw) === "heic") {
+    try {
+      const out = await processImage(raw, "GALLERY", null);
+      return { fileName: fileName.replace(/\.(heic|heif)$/i, "") + ".webp", contentType: out.contentType, sizeBytes: out.sizeBytes, bytes: new Uint8Array(out.bytes) };
+    } catch {
+      return null;
+    }
+  }
+  const contentType = file.type || "application/octet-stream";
+  if (!DOC_TYPES.has(contentType)) return null;
+  return { fileName, contentType, sizeBytes: file.size, bytes: raw };
+}
+
 async function readDocument(formData: FormData, back: string) {
   const upload = formData.get("file");
   const file = upload instanceof File && upload.size > 0 ? upload : null;
-  if (!file) go(back, "error", "Choose a PDF, JPG, or PNG up to 5 MB.");
-  const contentType = file.type || "application/octet-stream";
-  if (!DOC_TYPES.has(contentType) || file.size > DOC_MAX) go(back, "error", "Choose a PDF, JPG, or PNG up to 5 MB.");
-  return {
-    fileName: file.name.replace(/[^\w .()-]/g, "_").slice(0, 180) || "document",
-    contentType,
-    sizeBytes: file.size,
-    bytes: Buffer.from(new Uint8Array(await file.arrayBuffer())),
-  };
+  if (!file) go(back, "error", DOC_ERROR);
+  const read = await readUpload(file);
+  if (!read) go(back, "error", DOC_ERROR);
+  return read;
+}
+
+/** Files attached to a new project at submission, each with a label. Labels default to the file name. */
+async function readSubmissionFiles(formData: FormData) {
+  const files = formData.getAll("docFile");
+  const titles = formData.getAll("docTitle").map(String);
+  const out: { title: string; fileName: string; contentType: string; sizeBytes: number; bytes: Uint8Array<ArrayBuffer> }[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!(file instanceof File) || file.size === 0) continue;
+    if (out.length >= SUBMIT_FILES_MAX) return { ok: false as const, reason: "Attach up to 10 files." };
+    const read = await readUpload(file);
+    if (!read) return { ok: false as const, reason: DOC_ERROR };
+    const title = (titles[i] || "").trim().slice(0, 120) || file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Document";
+    out.push({ title, ...read });
+  }
+  return { ok: true as const, files: out };
 }
 
 async function ownProject(formData: FormData, userId: string, back: string) {
@@ -284,8 +324,8 @@ async function announceDocumentChange(
   const { projectDocumentEmail } = await import("@/lib/project-review-email");
   const ids = await projectAudience(project.id);
   if (!ids.length) return 0;
-  const people = await prisma.user.findMany({ where: { id: { in: ids }, status: "ACTIVE" }, select: { id: true, email: true, locale: true } });
-  const link = `${await appBaseUrl()}/members/${project.userId}#project-${project.id}`;
+  const people = await prisma.user.findMany({ where: { id: { in: ids }, status: "ACTIVE" }, select: { id: true, email: true, locale: true, notifyDocuments: true } });
+  const link = `${await appBaseUrl()}/projects/${project.id}`;
   for (const person of people) {
     const mail = projectDocumentEmail({
       locale: isLocale(person.locale) ? person.locale : "en",
@@ -295,8 +335,8 @@ async function announceDocumentChange(
       documentTitle,
       link,
     });
-    await notify(person.id, { title: mail.subject, body: `${owner.name}: ${documentTitle}`, href: `/members/${project.userId}#project-${project.id}` });
-    await sendEmail({ to: person.email, subject: mail.subject, text: mail.text });
+    await notify(person.id, { title: mail.subject, body: `${owner.name}: ${documentTitle}`, href: `/projects/${project.id}` });
+    if (person.notifyDocuments) await sendEmail({ to: person.email, subject: mail.subject, text: mail.text });
   }
   return people.length;
 }
@@ -364,4 +404,18 @@ export async function linkProjectDeal(formData: FormData) {
   }
   refresh();
   go(back, "notice", "Deal room link saved.");
+}
+
+/** Owners change what an approved project is looking for. The listing stays approved; matching follows the new categories. */
+export async function updateProjectSeeking(formData: FormData) {
+  const user = await requireUser();
+  const back = backPath(formData);
+  const projectId = String(formData.get("projectId") || "");
+  const project = await prisma.trackProject.findUnique({ where: { id: projectId }, select: { userId: true } });
+  if (!project || project.userId !== user.id) go(back, "error", "Project not found.");
+  const seeking = serializeSeeking(formData.getAll("seeking").map(String));
+  if (!seeking) go(back, "error", "Choose at least one category.");
+  await prisma.trackProject.update({ where: { id: projectId }, data: { seeking } });
+  refresh();
+  go(back, "notice", "Saved what this project is looking for.");
 }

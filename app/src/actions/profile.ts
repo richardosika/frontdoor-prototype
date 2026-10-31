@@ -1,4 +1,6 @@
 "use server";
+
+import { readAlertPrefs } from "@/lib/alert-prefs";
 import { phrase } from "@/lib/i18n/phrases";
 import { isLocale } from "@/lib/i18n/messages";
 import { normalizeWebUrl } from "@/lib/web-url";
@@ -65,6 +67,7 @@ export async function saveNotificationPrefs(formData: FormData) {
       notifyMessages: formData.get("notifyMessages") === "on",
       notifyIntros: formData.get("notifyIntros") === "on",
       notifyDeals: formData.get("notifyDeals") === "on",
+      ...readAlertPrefs(formData),
     },
   });
   revalidatePath("/settings");
