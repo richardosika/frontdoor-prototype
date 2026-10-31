@@ -296,6 +296,9 @@ model User {
   images         MemberImage[]
   projectContactsSent     ProjectContact[] @relation("ProjectContactFrom")
   projectContactsReceived ProjectContact[] @relation("ProjectContactTo")
+  bidRequests             BidRequest[]     @relation("BidRequester")
+  bidInboxes              BidRecipient[]
+  bids                    Bid[]
 
   @@index([paymentStatus])
 }
@@ -419,6 +422,7 @@ model TrackProject {
   contacts      ProjectContact[]
   documents     ProjectDocument[]
   deals         Deal[]
+  bidRequests   BidRequest[]
 
   @@index([reviewStatus])
 }
@@ -1151,4 +1155,85 @@ model ProfileView {
 
   @@unique([memberId, viewerId, day])
   @@index([memberId, createdAt])
+}
+
+/// #51 Bids / proposals. A staff-approved standard form per category. Each edit is a new version; requests keep the version they used.
+model BidTemplate {
+  id          String       @id @default(cuid())
+  category    String
+  name        String
+  version     Int          @default(1)
+  /// DRAFT, APPROVED or RETIRED. Requesters only pick APPROVED templates.
+  status      String       @default("DRAFT")
+  /// JSON array of fields (see src/lib/bids.ts BidField).
+  fields      String       @default("[]")
+  approvedAt  DateTime?
+  approvedBy  String       @default("")
+  createdAt   DateTime     @default(now())
+  requests    BidRequest[]
+
+  @@unique([category, version])
+  @@index([status])
+}
+
+model BidRequest {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     TrackProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   User           @relation("BidRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    BidTemplate    @relation(fields: [templateId], references: [id])
+  title       String
+  dueAt       DateTime
+  /// JSON array of up to 3 custom questions.
+  questions   String         @default("[]")
+  units       Int?
+  squareFeet  Int?
+  basisNote   String         @default("")
+  /// OPEN, AWARDED or CLOSED.
+  status      String         @default("OPEN")
+  isSample    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  recipients  BidRecipient[]
+  bids        Bid[]
+
+  @@index([projectId])
+  @@index([requesterId])
+}
+
+model BidRecipient {
+  id        String     @id @default(cuid())
+  requestId String
+  request   BidRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    User       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@unique([requestId, memberId])
+  @@index([memberId])
+}
+
+/// A bid is private between the bidder and the requester.
+model Bid {
+  id             String     @id @default(cuid())
+  requestId      String
+  request        BidRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  bidderId       String
+  bidder         User       @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+  /// DRAFT, SUBMITTED, SHORTLISTED, DECLINED, AWARDED, NOT_SELECTED.
+  status         String     @default("DRAFT")
+  values         String     @default("{}")
+  answers        String     @default("[]")
+  pdfName        String     @default("")
+  pdfSize        Int        @default(0)
+  /// Optional PDF, stored in the database like project documents (max 25 MB). Large-file storage (R2) is deferred.
+  pdfBytes       Bytes?
+  submittedAt    DateTime?
+  decidedAt      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([requestId, bidderId])
+  @@index([bidderId])
 }

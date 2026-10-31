@@ -19,6 +19,7 @@ export const SEED_DEAL_IDS = [
   "deal_brarch",
   "deal_nzone",
   "deal_edlend",
+  "deal_maple_court",
 ] as const;
 
 /** Vouches the seed creates. Any other confirmation is testing data, even on a seeded project. */
