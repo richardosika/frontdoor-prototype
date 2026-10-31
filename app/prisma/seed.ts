@@ -946,6 +946,7 @@ async function alignSeededDemo() {
   await ensureMapleCourtDealRoom();
   await ensureRoleDemo();
   await ensureMultiCategoryDemo();
+  await ensureBidsDemo();
 }
 
 async function ensureExtraProjects() {
@@ -1547,5 +1548,86 @@ async function ensureMultiCategoryDemo() {
     const have = maple.seeking.split(",").filter(Boolean);
     const want = [...new Set([...have, "SURETY_BONDING", "STRUCTURAL_ENGINEER", "PROPERTY_MANAGER"])];
     if (want.length !== have.length) await prisma.trackProject.update({ where: { id: maple.id }, data: { seeking: want.join(",") } });
+  }
+}
+
+/**
+ * #51 Bids demo (marked sample). Staff-approved templates for every category, two sample GCs on Maple Court,
+ * Owen Pratt (insurance) on Maple Court so a GC can ask him for a quote, and one sample GC request from Marcus
+ * with two proposals in and Elena's still to do. Idempotent: built once.
+ */
+async function ensureBidsDemo() {
+  const { ensureBidTemplates } = await import("../src/lib/bids-db");
+  await ensureBidTemplates();
+  const project = await prisma.trackProject.findUnique({ where: { id: "proj_maple_court" }, select: { id: true } });
+  const owner = await prisma.user.findUnique({ where: { id: "user_mh" }, select: { id: true } });
+  if (!project || !owner) return;
+  const gcs = [
+    { id: "user_gc_oak", email: "sam.oakline@oaklinebuild.example", name: "Sam Okafor", initials: "SO", org: "Sample: Oakline Construction", location: "Paterson, NJ", credentialNote: "NJ HIC / GC registration (sample)", bio: "Sample member for the Bids demo. Fictional.", insuranceCoverage: [{ type: "GL", limit: 1000000, aggregate: 2000000 }, { type: "UMBRELLA", limit: 5000000 }] },
+    { id: "user_gc_hr", email: "ines.reyes@halvorsenreyes.example", name: "Ines Reyes", initials: "IR", org: "Sample: Halvorsen & Reyes", location: "Hoboken, NJ", credentialNote: "NJ GC registration (sample)", bio: "Sample member for the Bids demo. Fictional.", insuranceCoverage: [{ type: "GL", limit: 2000000, aggregate: 4000000 }, { type: "UMBRELLA", limit: 15000000 }] },
+  ];
+  for (const [i, gc] of gcs.entries()) {
+    const exists = await prisma.user.findFirst({ where: { OR: [{ id: gc.id }, { email: gc.email }] }, select: { id: true } });
+    if (!exists) await prisma.user.create({ data: { ...gc, role: "GENERAL_CONTRACTOR", tier: "VERIFIED", passwordHash, isAdmin: false, status: "ACTIVE", phone: `201-555-${3100 + i}`, seenWelcome: true } });
+  }
+  const deal = await prisma.deal.findUnique({ where: { id: "deal_maple_court" }, select: { id: true } });
+  for (const requesterId of ["user_gc_oak", "user_gc_hr", "user_op"]) {
+    const person = await prisma.user.findUnique({ where: { id: requesterId }, select: { id: true } });
+    if (!person) continue;
+    if (deal) {
+      await prisma.dealAccess.upsert({
+        where: { dealId_requesterId: { dealId: deal.id, requesterId } },
+        update: {},
+        create: { dealId: deal.id, requesterId, status: "APPROVED", ndaAcknowledged: true, ndaAcknowledgedAt: new Date(), reviewedAt: new Date() },
+      });
+    }
+    await prisma.projectContact.upsert({
+      where: { projectId_fromId_toId: { projectId: project.id, fromId: requesterId, toId: owner.id } },
+      update: {},
+      create: { projectId: project.id, fromId: requesterId, toId: owner.id, category: requesterId === "user_op" ? "INSURANCE" : "GENERAL_CONTRACTOR", note: "Sample: on the Maple Court team for the Bids demo.", status: "ACCEPTED", decidedAt: new Date(Date.now() - 20 * 86_400_000) },
+    });
+  }
+  const id = "bidreq_sample_maple_gc";
+  if (await prisma.bidRequest.findUnique({ where: { id }, select: { id: true } })) return;
+  const template = await prisma.bidTemplate.findFirst({ where: { category: "GENERAL_CONTRACTOR", status: "APPROVED" }, orderBy: { version: "desc" } });
+  if (!template) return;
+  const recipients = ["user_ev", "user_gc_oak", "user_gc_hr"];
+  const have = await prisma.user.findMany({ where: { id: { in: recipients } }, select: { id: true } });
+  await prisma.bidRequest.create({
+    data: {
+      id,
+      projectId: project.id,
+      requesterId: owner.id,
+      templateId: template.id,
+      title: "Sample: GC proposals · Maple Court Townhomes",
+      dueAt: new Date(Date.now() + 20 * 86_400_000),
+      questions: JSON.stringify(["Can you hold pricing through a March 2027 closing?", "Describe your experience with for-sale townhomes over 20 units."]),
+      units: 24,
+      squareFeet: 62400,
+      basisNote: "Sample: schematic design set",
+      isSample: true,
+      recipients: { create: have.map((h) => ({ memberId: h.id })) },
+    },
+  });
+  const bids = [
+    {
+      bidderId: "user_gc_oak",
+      values: { total: "12450000", generalConditions: "910000", sitework: "1480000", structure: "3650000", mep: "2980000", finishes: "2830000", feePct: "3.5", contingency: "", alternates: "ALT-1 Rooftop terraces +$210,000", start: "2027-04-01", duration: "18", paymentTerms: "Monthly, 10% retainage", validUntil: "2027-01-15", bonding: "", exclusionList: ["Permit & utility fees excluded", "Builder's risk by owner", "Hazardous material abatement excluded"], exclusions: "Winter conditions", assumptions: "Sample proposal." },
+      answers: ["", "Two townhome communities in Passaic County, 52 units total (sample)."],
+      pdf: false,
+    },
+    {
+      bidderId: "user_gc_hr",
+      values: { total: "13380000", generalConditions: "1020000", sitework: "1560000", structure: "3720000", mep: "3160000", finishes: "2950000", feePct: "4.5", contingency: "620000", alternates: "ALT-1 Rooftop terraces +$240,000", start: "2027-03-01", duration: "15", paymentTerms: "Monthly, 10% retainage to 5% at 50%", validUntil: "2027-03-31", bonding: "$25M single / $75M aggregate", exclusionList: ["Permit & utility fees excluded"], exclusions: "", assumptions: "Sample proposal. Assumes SD set; MEP design-assist." },
+      answers: ["Yes, through March 31 with a lumber escalation clause (sample).", "Five for-sale townhome projects since 2020, 180 units (sample)."],
+      pdf: true,
+    },
+  ];
+  for (const b of bids) {
+    if (!have.some((h) => h.id === b.bidderId)) continue;
+    const bytes = b.pdf ? new Uint8Array(Buffer.from(samplePdf("Sample: Halvorsen & Reyes - Maple Court GC proposal"))) : null;
+    await prisma.bid.create({
+      data: { requestId: id, bidderId: b.bidderId, status: "SUBMITTED", values: JSON.stringify(b.values), answers: JSON.stringify(b.answers), submittedAt: new Date(), ...(bytes ? { pdfName: "Sample_HalvorsenReyes_MapleCourt_Proposal.pdf", pdfSize: bytes.byteLength, pdfBytes: bytes } : {}) },
+    });
   }
 }
