@@ -1,3 +1,4 @@
+import { normalizeCoverage } from "@/lib/insurance";
 import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { projectAudience } from "@/lib/project-contact-db";
@@ -177,6 +178,7 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       typicalJobSize: member.typicalJobSize,
       licenses: member.licenses,
       insuranceInfo: member.insuranceInfo,
+      insuranceCoverage: normalizeCoverage(member.insuranceCoverage),
       specialties: member.specialties,
       // Private rates and terms only ever go back to the member themself.
       privateTerms: viewerId === memberId ? member.privateTerms : "",

@@ -90,6 +90,7 @@ export async function ProfileView({
     typicalJobSize?: string;
     licenses?: string;
     insuranceInfo?: string;
+    insuranceCoverage?: unknown;
     specialties?: string;
     privateTerms?: string;
     extraCategories?: string;

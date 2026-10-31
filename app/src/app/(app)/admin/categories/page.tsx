@@ -1,3 +1,4 @@
+import { coverageSummary, normalizeCoverage } from "@/lib/insurance";
 import Link from "next/link";
 import { reviewMemberCategory } from "@/actions/category-review";
 import { Banner } from "@/components/banner";
@@ -19,7 +20,7 @@ export default async function CategoryReviewPage({ searchParams }: { searchParam
     where: { pendingCategories: { not: "" } },
     select: {
       id: true, name: true, org: true, role: true, location: true, website: true, extraCategories: true, pendingCategories: true,
-      licenses: true, credentialNote: true, insuranceInfo: true, specialties: true, yearsInBusiness: true,
+      licenses: true, credentialNote: true, insuranceInfo: true, insuranceCoverage: true, specialties: true, yearsInBusiness: true,
     },
     orderBy: { name: "asc" },
   });
@@ -51,7 +52,7 @@ export default async function CategoryReviewPage({ searchParams }: { searchParam
                 <dt className="font-semibold text-forest">Credential on file</dt>
                 <dd className="[overflow-wrap:anywhere]">{member.credentialNote || "None"}</dd>
                 <dt className="font-semibold text-forest">Insurance / bonding</dt>
-                <dd className="[overflow-wrap:anywhere]">{member.insuranceInfo || "None given"}</dd>
+                <dd className="[overflow-wrap:anywhere]">{[coverageSummary(normalizeCoverage(member.insuranceCoverage)), member.insuranceInfo].filter(Boolean).join(" · ") || "None given"}</dd>
                 <dt className="font-semibold text-forest">Services</dt>
                 <dd className="[overflow-wrap:anywhere]">{member.specialties || "None given"}</dd>
                 <dt className="font-semibold text-forest">Website</dt>

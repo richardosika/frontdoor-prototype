@@ -210,6 +210,7 @@ model User {
   typicalJobSize  String          @default("")
   licenses        String          @default("")
   insuranceInfo   String          @default("")
+  insuranceCoverage Json         @default("[]")
   /// Overnight: role-specific list (loan types, practice areas, coverage lines, services).
   specialties     String          @default("")
   /// Overnight: rates and terms note, never shown to other members.

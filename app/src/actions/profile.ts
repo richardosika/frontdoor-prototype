@@ -1,4 +1,5 @@
 "use server";
+import { coverageFromForm } from "@/lib/insurance";
 
 import { applyCategoryPicks } from "@/lib/category-review";
 import { seekLabel } from "@/lib/project-contact";
@@ -37,6 +38,7 @@ export async function saveProfile(formData: FormData) {
       .filter((key) => formData.has(key))
       .map((key) => [key, String(formData.get(key) || "").trim().slice(0, key === "yearsInBusiness" ? 40 : key === "typicalJobSize" ? 80 : key === "specialties" ? 300 : 400)]),
   );
+  const insurance = formData.has("insuranceShown") ? { insuranceCoverage: coverageFromForm(formData) } : {};
   const location = String(formData.get("location") || "").trim().slice(0, 120) || user.location;
   // #42: extra categories. Approved ones stay; new picks wait for staff review and count nowhere until approved.
   const picks = formData.has("profileCategoriesShown")
@@ -44,7 +46,7 @@ export async function saveProfile(formData: FormData) {
     : null;
   await prisma.user.update({
     where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location },
+    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location },
   });
   if (picks?.added.length) {
     await notifyAdmins({
