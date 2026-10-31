@@ -110,6 +110,7 @@ describe("#51 cleanup keeps the Bids demo", () => {
   it("sample GCs and Maple Court survive CLEAN_TEST_DATA", async () => {
     const { keptUser, BIDS_DEMO_USER_IDS, BIDS_DEMO_PROJECT_IDS } = await import("@/lib/clean-test-data");
     for (const id of BIDS_DEMO_USER_IDS) expect(keptUser({ id })).toBe(true);
+    for (const id of ["user_demo_lender", "user_demo_lp"]) expect(keptUser({ id })).toBe(true);
     expect(BIDS_DEMO_PROJECT_IDS).toContain("proj_maple_court");
   });
 });

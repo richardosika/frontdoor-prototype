@@ -42,7 +42,9 @@ export const CLEAN_TEST_DATA_IGNORED = "CLEAN_TEST_DATA is not 1 or dry. Cleanup
 /** #51: the Bids demo (sample GCs, Maple Court and its requests, bids and PDFs) stays through cleanup. */
 export const BIDS_DEMO_USER_IDS = ["user_gc_oak", "user_gc_hr"] as const;
 export const BIDS_DEMO_PROJECT_IDS = ["proj_maple_court"] as const;
-const SEED_USERS = new Set<string>([...SEED_USER_IDS, ...BIDS_DEMO_USER_IDS]);
+/** Lender and Investor/LP demo logins stay through cleanup too. */
+export const LENDER_INVESTOR_DEMO_USER_IDS = ["user_demo_lender", "user_demo_lp"] as const;
+const SEED_USERS = new Set<string>([...SEED_USER_IDS, ...BIDS_DEMO_USER_IDS, ...LENDER_INVESTOR_DEMO_USER_IDS]);
 const SEED_PROJECTS = new Set<string>([...SEED_PROJECT_IDS, ...BIDS_DEMO_PROJECT_IDS]);
 const SEED_DEALS = new Set<string>(SEED_DEAL_IDS);
 const SEED_CONFIRMATIONS = new Set<string>(SEED_CONFIRMATION_TOKENS);

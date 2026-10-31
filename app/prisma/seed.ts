@@ -947,6 +947,7 @@ async function alignSeededDemo() {
   await ensureRoleDemo();
   await ensureMultiCategoryDemo();
   await ensureBidsDemo();
+  await ensureLenderInvestorDemo();
 }
 
 async function ensureExtraProjects() {
@@ -1629,5 +1630,71 @@ async function ensureBidsDemo() {
     await prisma.bid.create({
       data: { requestId: id, bidderId: b.bidderId, status: "SUBMITTED", values: JSON.stringify(b.values), answers: JSON.stringify(b.answers), submittedAt: new Date(), ...(bytes ? { pdfName: "Sample_HalvorsenReyes_MapleCourt_Proposal.pdf", pdfSize: bytes.byteLength, pdfBytes: bytes } : {}) },
     });
+  }
+}
+
+/**
+ * Lender and Investor/LP demo logins (marked sample, free roles, no dues). Profiles complete, NDA accepted, connected
+ * to Marcus Hale's Ironbound project and Newark deal room and Priya Anand's Raritan project. Idempotent; kept by cleanup.
+ */
+async function ensureLenderInvestorDemo() {
+  const { memberNdaVersion } = await import("../src/lib/member-nda");
+  const ndaVersion = memberNdaVersion();
+  const demo = [
+    {
+      id: "user_demo_lender", email: "maya.brooks@hudsonharborcredit.example", name: "Maya Brooks", initials: "MB", role: "LENDER" as MemberRole,
+      org: "Sample: Hudson Harbor Credit", location: "Morristown, NJ", credentialNote: "NJ licensed commercial lender (sample)",
+      bio: "Sample lender for the demo. Construction and bridge debt on NJ/NY multifamily and mixed-use. Fictional.",
+      phone: "973-555-0142", website: "https://hudsonharborcredit.example", markets: "NJ, NY", dealTypes: "Construction, bridge, mini-perm",
+      assetClasses: "Multifamily, mixed-use, self-storage", checkSize: "$3M to $35M", lookingFor: "Ground-up and value-add projects up to 65% LTC",
+      offering: "Construction and bridge loans, 12 to 36 months", specialties: "Construction, bridge, mini-perm", licenses: "NJ licensed commercial lender (sample)",
+      typicalJobSize: "$3M to $35M", yearsInBusiness: "12", privateTerms: "Demo only: SOFR + 375 to 475, 1 pt origination.",
+    },
+    {
+      id: "user_demo_lp", email: "owen.castillo@castillofamilycap.example", name: "Owen Castillo", initials: "OC", role: "INVESTOR_PE" as MemberRole,
+      org: "Sample: Castillo Capital Partners", location: "Montclair, NJ", credentialNote: "Accredited-investor attestation (sample)",
+      bio: "Sample investor/LP for the demo. Passive equity in NJ/NY multifamily and mixed-use. Fictional.",
+      phone: "973-555-0187", website: "https://castillofamilycap.example", markets: "NJ, NY", dealTypes: "LP (passive equity), co-GP",
+      assetClasses: "Multifamily, mixed-use, adaptive reuse", checkSize: "$250K to $3M", lookingFor: "Value-add and ground-up deals with a 5 to 10 year hold",
+      offering: "LP equity checks from $250K", specialties: "Multifamily, mixed-use; value-add and ground-up", licenses: "Accredited investor",
+      typicalJobSize: "$250K to $3M", yearsInBusiness: "8",
+    },
+  ];
+  for (const person of demo) {
+    const exists = await prisma.user.findFirst({ where: { OR: [{ id: person.id }, { email: person.email }] }, select: { id: true } });
+    if (!exists) {
+      await prisma.user.create({
+        data: { ...person, tier: "VERIFIED", passwordHash, isAdmin: false, status: "ACTIVE", paymentStatus: "NOT_REQUIRED", seenWelcome: true, ndaAcceptedAt: new Date(), ndaVersion, checklistDone: "" },
+      });
+    }
+  }
+  const links = [
+    { projectId: "proj_ironbound", ownerId: "user_mh", toId: "user_demo_lender", category: "FINANCING", status: "PENDING" as const, note: "Sample: 72 units in Newark, looking for a $26M construction loan at about 60% LTC. Open to a call?" },
+    { projectId: "proj_raritan", ownerId: "user_pa", toId: "user_demo_lender", category: "FINANCING", status: "ACCEPTED" as const, note: "Sample: construction loan for the Edison storage expansion." },
+    { projectId: "proj_ironbound", ownerId: "user_mh", toId: "user_demo_lp", category: "EQUITY", status: "PENDING" as const, note: "Sample: raising $6M of LP equity for Ironbound, 5 to 7 year hold. Interested?" },
+  ];
+  for (const link of links) {
+    const [project, owner, to] = await Promise.all([
+      prisma.trackProject.findUnique({ where: { id: link.projectId }, select: { id: true } }),
+      prisma.user.findUnique({ where: { id: link.ownerId }, select: { id: true } }),
+      prisma.user.findUnique({ where: { id: link.toId }, select: { id: true } }),
+    ]);
+    if (!project || !owner || !to) continue;
+    await prisma.projectContact.upsert({
+      where: { projectId_fromId_toId: { projectId: project.id, fromId: owner.id, toId: to.id } },
+      update: {},
+      create: { projectId: project.id, fromId: owner.id, toId: to.id, category: link.category, note: link.note, status: link.status, ...(link.status === "ACCEPTED" ? { decidedAt: new Date(Date.now() - 3 * 86_400_000) } : {}) },
+    });
+  }
+  const deal = await prisma.deal.findUnique({ where: { id: "deal_newark" }, select: { id: true } });
+  if (deal) {
+    for (const requesterId of ["user_demo_lender", "user_demo_lp"]) {
+      if (!(await prisma.user.findUnique({ where: { id: requesterId }, select: { id: true } }))) continue;
+      await prisma.dealAccess.upsert({
+        where: { dealId_requesterId: { dealId: deal.id, requesterId } },
+        update: {},
+        create: { dealId: deal.id, requesterId, status: "APPROVED", ndaAcknowledged: true, ndaAcknowledgedAt: new Date(), reviewedAt: new Date() },
+      });
+    }
   }
 }
