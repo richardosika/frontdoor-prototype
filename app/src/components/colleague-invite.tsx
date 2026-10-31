@@ -46,7 +46,7 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       {sent ? (
         <div className="mt-3 rounded border border-brass bg-brass-soft px-3 py-3" data-testid="referral-sent">
           <p className="font-serif text-lg">{tx("Referral sent")}</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
+          <p className="mt-1 text-sm leading-relaxed text-ink [overflow-wrap:anywhere]">
             {tx("We emailed {name} your referral with code {code}. Their application is still personally reviewed.")
               .replace("{name}", `${sent.name} (${sent.email})`)
               .replace("{code}", sent.code)}
