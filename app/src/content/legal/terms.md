@@ -229,7 +229,7 @@ We may change the Platform at any time. We may update these Terms by posting the
 
 17.2 **Agreement to arbitrate.** If the dispute is not resolved, you and we agree that any dispute, claim, or controversy arising out of or relating to these Terms or the Platform will be resolved by final and binding individual arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules, before a single arbitrator. The arbitration will take place in Bergen County, New Jersey, or by video conference. The Federal Arbitration Act governs this Section 17.
 
-17.3 **Waiver of court and jury.** **YOU AND WE UNDERSTAND AND AGREE THAT, BY AGREEING TO ARBITRATION, EACH OF US IS GIVING UP THE RIGHT TO SUE IN COURT AND THE RIGHT TO HAVE A JUDGE OR JURY DECIDE THE DISPUTE.** An arbitrator, not a court, will decide the dispute, and the arbitrator's decision is final, subject to limited court review.
+17.3 **Waiver of court and jury.** **YOU AND WE UNDERSTAND AND AGREE THAT, BY AGREEING TO ARBITRATION, EACH OF US IS GIVING UP THE RIGHT TO SUE IN COURT AND THE RIGHT TO HAVE A JUDGE OR JURY DECIDE THE DISPUTE.** An arbitrator, not a court, will decide the dispute, and the arbitrator's decision is final, subject to narrow court review.
 
 17.4 **Class action waiver.** You and we may bring claims only in an individual capacity, not as a plaintiff or class member in any purported class, collective, consolidated, or representative proceeding.
 
