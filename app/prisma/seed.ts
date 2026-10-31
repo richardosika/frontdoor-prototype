@@ -1480,7 +1480,7 @@ async function ensureRoleDemo() {
     user_tn: { specialties: "Multifamily, mixed-use; value-add and ground-up", licenses: "Accredited investor", typicalJobSize: "$500K to $5M", yearsInBusiness: "11" },
     user_rk: { specialties: "Ground-up multifamily, long hold", licenses: "Accredited investor, qualified purchaser", typicalJobSize: "$1M to $15M", yearsInBusiness: "20" },
     user_ev: { specialties: "Concrete, framing, general conditions" },
-    user_gl: { specialties: "Multifamily, mixed-use, adaptive reuse", licenses: "NJ Registered Architect AI 21AI01884500", typicalJobSize: "20 to 200 units", insuranceInfo: "Professional liability $2M", yearsInBusiness: "16" },
+    user_gl: { specialties: "Multifamily, mixed-use, adaptive reuse", licenses: "NJ Registered Architect AI 21AI01884500", typicalJobSize: "20 to 200 units", yearsInBusiness: "16" },
     user_hc: { specialties: "Acquisitions, construction contracts, JV agreements", licenses: "Bar: NJ 2008, NY 2009", typicalJobSize: "$5M to $100M", yearsInBusiness: "17" },
     user_sr: { specialties: "Reg D 506(b)/(c) offerings, fund formation", licenses: "Bar: NY 2006, NJ 2007", typicalJobSize: "$2M to $50M", yearsInBusiness: "18" },
     user_jw: { specialties: "Use variances, site plan, redevelopment plans", licenses: "Bar: NJ 2004", typicalJobSize: "10 to 300 units", yearsInBusiness: "21" },
@@ -1492,6 +1492,23 @@ async function ensureRoleDemo() {
     const patch: Record<string, string> = {};
     for (const [key, value] of Object.entries(data)) if (value && !(user as Record<string, string | null>)[key]) patch[key] = value;
     if (Object.keys(patch).length) await prisma.user.update({ where: { id }, data: patch });
+  }
+  // #46: demo insurance as structured lines; clear old free-text notes that only repeated them.
+  const insurance: Record<string, { coverage: { type: string; limit: number | null; aggregate?: number | null }[]; stale: string[] }> = {
+    user_ev: {
+      coverage: [{ type: "GL", limit: 2000000, aggregate: 4000000 }, { type: "UMBRELLA", limit: 10000000 }, { type: "BUILDERS_RISK", limit: null }, { type: "WORKERS_COMP", limit: null }],
+      stale: ["General liability $2M per occurrence / $4M aggregate; umbrella $10M; builder's risk available; workers' comp"],
+    },
+    user_gl: { coverage: [{ type: "PROFESSIONAL", limit: 2000000 }], stale: ["Professional liability $2M"] },
+  };
+  for (const [id, item] of Object.entries(insurance)) {
+    const user = await prisma.user.findUnique({ where: { id }, select: { insuranceInfo: true, insuranceCoverage: true } });
+    if (!user) continue;
+    const empty = !Array.isArray(user.insuranceCoverage) || user.insuranceCoverage.length === 0;
+    const stale = item.stale.includes(user.insuranceInfo.trim());
+    if (empty || stale) {
+      await prisma.user.update({ where: { id }, data: { ...(empty ? { insuranceCoverage: item.coverage } : {}), ...(stale ? { insuranceInfo: "" } : {}) } });
+    }
   }
   // A demo member per type should look complete: fill markets and an offering line where blank.
   for (const id of Object.keys(profiles)) {

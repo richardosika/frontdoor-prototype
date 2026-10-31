@@ -413,7 +413,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
     <section className="rounded border border-line bg-cream px-4 py-3" data-testid="ledger-results" key="results">
       <p className="text-[15px] text-ink">
         <span className="font-semibold text-forest">{tx("This month")}:</span>{" "}
-        <span data-testid="results-shown">{results.shown}</span> {tx("projects shown to you")} · <span data-testid="results-views">{results.views}</span> {tx("developers viewed your profile")} · <span data-testid="results-won">{results.won}</span> {tx("deals won")}
+        <span data-testid="results-shown">{results.shown}</span> {tx(results.shown === 1 ? "project shown to you" : "projects shown to you")} · <span data-testid="results-views">{results.views}</span> {tx(results.views === 1 ? "developer viewed your profile" : "developers viewed your profile")} · <span data-testid="results-won">{results.won}</span> {tx(results.won === 1 ? "deal won" : "deals won")}
       </p>
     </section>
   ) : null;
