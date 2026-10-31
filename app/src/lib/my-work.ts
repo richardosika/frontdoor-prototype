@@ -92,9 +92,13 @@ export async function loadResults(user: { id: string }, allSeeking: { at: Date }
   const since = monthStart(now);
   const [views, won, network] = await Promise.all([
     prisma.profileView.findMany({ where: { memberId: user.id, createdAt: { gte: since } }, select: { viewerId: true }, distinct: ["viewerId"] }),
-    prisma.projectContact.count({
-      where: { status: "ACCEPTED", decidedAt: { gte: since }, OR: [{ fromId: user.id }, { toId: user.id }], project: { userId: { not: user.id } } },
-    }),
+    // #51: plus bids awarded this month (contacts created by an award are counted once, as the award).
+    Promise.all([
+      prisma.projectContact.count({
+        where: { status: "ACCEPTED", decidedAt: { gte: since }, note: { not: "Awarded through Bids" }, OR: [{ fromId: user.id }, { toId: user.id }], project: { userId: { not: user.id } } },
+      }),
+      prisma.bid.count({ where: { bidderId: user.id, status: "AWARDED", decidedAt: { gte: since } } }),
+    ]).then(([a, b]) => a + b),
     // #48: nationwide activity for the empty headline (a count only, no project details).
     prisma.trackProject.count({ where: { reviewStatus: "APPROVED", OR: [{ reviewedAt: { gte: since } }, { reviewedAt: null, createdAt: { gte: since } }] } }),
   ]);
