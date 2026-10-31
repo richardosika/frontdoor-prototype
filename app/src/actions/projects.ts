@@ -20,6 +20,7 @@ import {
   seekLabel,
 } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { readFacts, serializeFacts } from "@/lib/project-facts";
 import { projectContactEmail, projectReviewEmail } from "@/lib/project-review-email";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { appBaseUrl } from "@/lib/url";
@@ -69,6 +70,7 @@ export async function addProject(formData: FormData) {
       summary: value.summary,
       seeking: serializeSeeking(value.seeking),
       shareWithCircle: value.shareWithCircle,
+      roleFacts: serializeFacts(readFacts(formData)),
       reviewStatus: "PENDING_REVIEW",
       submittedAt: new Date(),
     },
@@ -109,6 +111,7 @@ export async function resubmitProject(formData: FormData) {
       summary: value.summary,
       seeking: serializeSeeking(value.seeking),
       shareWithCircle: value.shareWithCircle,
+      roleFacts: serializeFacts(readFacts(formData)),
       reviewStatus: "PENDING_REVIEW",
       submittedAt: new Date(),
     },
@@ -169,6 +172,10 @@ export async function reviewProject(formData: FormData) {
     body: outcome.note ? `${project.name}: ${outcome.note}` : project.name,
     href: status === "NEEDS_INFO" ? `/profile#project-${project.id}` : status === "APPROVED" ? "/deals" : "/feed",
   });
+  if (status === "APPROVED") {
+    const { alertProjectSeekers } = await import("@/lib/member-alerts");
+    await alertProjectSeekers(project.id);
+  }
   refresh();
   redirect(`/admin/projects?notice=${encodeURIComponent(`${project.name}: ${status}`)}`);
 }
@@ -381,4 +388,17 @@ export async function updateProjectSeeking(formData: FormData) {
   await prisma.trackProject.update({ where: { id: projectId }, data: { seeking } });
   refresh();
   go(back, "notice", "Saved what this project is looking for.");
+}
+
+/** Owner updates the optional details for the members a project seeks. Supplementary, so no new staff review. */
+export async function updateProjectFacts(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") || "");
+  const project = await prisma.trackProject.findUnique({ where: { id: projectId }, select: { id: true, userId: true } });
+  const back = `/projects/${projectId}`;
+  if (!project || project.userId !== user.id) go("/feed", "error", "Project not found.");
+  await prisma.trackProject.update({ where: { id: project.id }, data: { roleFacts: serializeFacts(readFacts(formData)) } });
+  refresh();
+  revalidatePath(back);
+  go(back, "notice", "Project details saved.");
 }

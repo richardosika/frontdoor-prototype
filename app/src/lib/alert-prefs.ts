@@ -3,7 +3,7 @@
  * For now every email goes only to the test recipient (see src/lib/notices.ts). At launch each member's own address.
  */
 export const ALERT_EMAIL_TYPES = [
-  { field: "notifyMatches", label: "New matching members" },
+  { field: "notifyMatches", label: "New matching members", otherLabel: "New projects seeking my category" },
   { field: "notifyProjectDecisions", label: "Staff decisions on my projects" },
   { field: "notifyDocuments", label: "Document updates on projects I'm part of" },
   { field: "notifyDealRoom", label: "Deal room activity" },

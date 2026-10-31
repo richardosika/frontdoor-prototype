@@ -46,3 +46,44 @@ export async function alertNewMemberMatches(memberId: string): Promise<number> {
   }
   return sent;
 }
+
+export const NEW_PROJECT_ALERT_TITLE = "New project seeking your category";
+
+/**
+ * Overnight: when staff approve a project (or the owner adds a category), alert every approved member in the
+ * categories it seeks, once per project. Email follows each member's "new matches" setting.
+ */
+export async function alertProjectSeekers(projectId: string, onlyCategories?: string[]): Promise<number> {
+  const project = await prisma.trackProject.findUnique({
+    where: { id: projectId },
+    select: { id: true, name: true, seeking: true, reviewStatus: true, userId: true, location: true, asset: true, user: { select: { name: true, org: true } } },
+  });
+  if (!project || project.reviewStatus !== "APPROVED") return 0;
+  const { rolesForCategory } = await import("@/lib/project-contact");
+  const categories = parseSeeking(project.seeking).filter((id) => !onlyCategories || onlyCategories.includes(id));
+  const roles = categories.flatMap((id) => rolesForCategory(id));
+  if (!roles.length) return 0;
+  const people = await prisma.user.findMany({
+    where: { id: { not: project.userId }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: roles as never[] } },
+    select: { id: true, email: true, locale: true, notifyMatches: true },
+  });
+  const href = `/projects/${project.id}`;
+  let sent = 0;
+  for (const person of people) {
+    if (await prisma.notification.count({ where: { userId: person.id, href, title: NEW_PROJECT_ALERT_TITLE } })) continue;
+    const body = `${project.name} · ${project.user.name}${project.user.org ? ` (${project.user.org})` : ""} · ${project.location}`;
+    await prisma.notification.create({ data: { userId: person.id, audience: "member", title: NEW_PROJECT_ALERT_TITLE, body, href } });
+    if (person.notifyMatches) {
+      const [{ sendEmail }, { appBaseUrl }, { phrase }, { isLocale }] = await Promise.all([import("@/lib/email"), import("@/lib/url"), import("@/lib/i18n/phrases"), import("@/lib/i18n/messages")]);
+      const locale = isLocale(person.locale) ? person.locale : "en";
+      const p = (text: string) => phrase(locale, text);
+      await sendEmail({
+        to: person.email,
+        subject: `${p(NEW_PROJECT_ALERT_TITLE)}: ${project.name}`,
+        text: `${p("An approved project on Private Floor is seeking your category.")}\n\n${body}\n\n${p("Open the project")}\n${await appBaseUrl()}${href}`,
+      });
+    }
+    sent += 1;
+  }
+  return sent;
+}

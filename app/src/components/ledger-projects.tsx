@@ -2,6 +2,7 @@ import Link from "next/link";
 import { addContactToCircle, respondProjectContact } from "@/actions/projects";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { memberLine } from "@/lib/member-line";
+import { ProjectFacts } from "@/components/project-facts";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
 import { btn, btnOutline } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
@@ -235,6 +236,7 @@ export async function LedgerProjects({ data, role, filters }: { data: Data; role
               </Link>
               {project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.location} · {project.year}
             </p>
+            <ProjectFacts category={data.myCategory} project={project} />
             {project.status ? (
               <p className="mt-1 text-[14px] text-mut">
                 {tx("Contact request")}: {tx(statusWord(project.status))}
@@ -273,7 +275,7 @@ export async function LedgerProjects({ data, role, filters }: { data: Data; role
     </section>
   ) : null;
 
-  const order = ownerFirst ? [mine, outreach, seekingMe, circleShared] : [outreach, seekingMe, mine, circleShared];
+  const order = ownerFirst ? [mine, outreach, seekingMe, circleShared] : [seekingMe, outreach, mine, circleShared];
   return (
     <div className="mb-6 grid gap-4" data-testid="ledger-projects">
       {order}

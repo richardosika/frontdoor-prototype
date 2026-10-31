@@ -5,6 +5,7 @@ import { MoneyInput } from "@/components/money-input";
 import { PROJECT_ASSET_CLASSES, SEEK_CATEGORIES, US_STATES, parseSeeking, reviewLabel } from "@/lib/project-contact";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { FileUploader } from "@/components/file-uploader";
+import { ProjectFactsFields } from "@/components/project-facts-fields";
 
 export type EditableProject = {
   id: string;
@@ -19,6 +20,7 @@ export type EditableProject = {
   summary: string;
   seeking: string;
   shareWithCircle: boolean;
+  roleFacts?: string;
 };
 
 const big = `${field} text-[16px]`;
@@ -110,6 +112,7 @@ export async function ProjectForm({ back, project }: { back: "/profile" | "/feed
           ))}
         </div>
       </fieldset>
+      <ProjectFactsFields roleFacts={project?.roleFacts} />
       <label className="flex min-h-11 items-center gap-2 text-[15px] text-ink sm:col-span-2">
         <input type="checkbox" name="shareWithCircle" defaultChecked={project?.shareWithCircle ?? false} className="h-5 w-5 accent-forest" />
         {tx("Share project details with My Circle")}

@@ -1,3 +1,4 @@
+import { factScore } from "@/lib/project-facts";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { categoryForRole, parseSeeking, rolesForCategory } from "@/lib/project-contact";
@@ -75,6 +76,8 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
   const seekingMe = myCategory
     ? others
         .filter((project) => parseSeeking(project.seeking).includes(myCategory) && keep(project))
+        // Overnight: projects that give this member type the facts it needs come first, then newest.
+        .sort((a, b) => factScore(myCategory, b) - factScore(myCategory, a))
         .slice(0, limit)
         .map((project) => ({ ...project, status: contactStatus.get(contactKey(project.id, user.id, project.userId)) ?? "" }))
     : [];

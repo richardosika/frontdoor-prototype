@@ -52,7 +52,7 @@ export default async function SettingsPage({
             {ALERT_EMAIL_TYPES.map((item) => (
               <label key={item.field} className="flex min-h-11 items-center gap-3">
                 <input type="checkbox" className="h-5 w-5 accent-[#1f3a2c]" name={item.field} defaultChecked={user[item.field]} />
-                {tx(item.label)}
+                {tx(user.role !== "DEVELOPER" && "otherLabel" in item ? item.otherLabel : item.label)}
               </label>
             ))}
             <input type="hidden" name="notifyDeals" value={user.notifyDeals ? "on" : ""} />

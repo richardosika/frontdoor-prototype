@@ -206,6 +206,10 @@ model User {
   typicalJobSize  String          @default("")
   licenses        String          @default("")
   insuranceInfo   String          @default("")
+  /// Overnight: role-specific list (loan types, practice areas, coverage lines, services).
+  specialties     String          @default("")
+  /// Overnight: rates and terms note, never shown to other members.
+  privateTerms    String          @default("")
   checklistDone  String           @default("")
   notifyMessages Boolean          @default(true)
   notifyIntros   Boolean          @default(true)
@@ -377,6 +381,8 @@ model Application {
 }
 
 model TrackProject {
+  /// Overnight: optional role-relevant details as JSON (see src/lib/project-facts.ts).
+  roleFacts      String   @default("{}")
   id         String         @id @default(cuid())
   userId     String
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)

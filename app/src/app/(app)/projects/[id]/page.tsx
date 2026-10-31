@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
+import { ProjectFacts } from "@/components/project-facts";
+import { ProjectFactsFields } from "@/components/project-facts-fields";
+import { factsFor } from "@/lib/project-facts";
 import { memberLine } from "@/lib/member-line";
-import { contactAboutProject, respondProjectContact, setProjectSharing, updateProjectSeeking } from "@/actions/projects";
+import { contactAboutProject, respondProjectContact, setProjectSharing, updateProjectSeeking, updateProjectFacts } from "@/actions/projects";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { ProjectDocuments } from "@/components/project-documents";
@@ -118,6 +121,26 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <Fact label={tx("Value")} value={full ? formatProjectValue(project.valueLabel) : tx("Shared after contact")} />
           <Fact label={tx("Owner's role")} value={tx(fixRoleTypos(project.role)) || "—"} />
         </dl>
+        {isOwner || viewer.isAdmin ? (
+          <ProjectFacts category={null} project={project} all />
+        ) : (
+          <div data-testid="project-facts-for-you">
+            {factsFor(categoryForRole(viewer.role), project).length ? (
+              <p className="mt-4 text-[12px] font-semibold uppercase tracking-wider text-brass">{tx("What matters for you")}</p>
+            ) : null}
+            <ProjectFacts category={categoryForRole(viewer.role)} project={project} valueVisible={full} />
+          </div>
+        )}
+        {isOwner ? (
+          <details className="mt-4 rounded border border-line bg-cream p-3" data-testid="project-facts-edit">
+            <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit details for the members you're seeking")}</summary>
+            <form action={updateProjectFacts} className="mt-2 grid gap-3">
+              <input type="hidden" name="projectId" value={project.id} />
+              <ProjectFactsFields roleFacts={project.roleFacts} />
+              <button className={`${btn} justify-self-start`} type="submit">{tx("Save details")}</button>
+            </form>
+          </details>
+        ) : null}
         {full && project.summary ? (
           <div className="mt-4">
             <p className="text-[12px] font-semibold uppercase tracking-wider text-mut">{tx("Notes")}</p>

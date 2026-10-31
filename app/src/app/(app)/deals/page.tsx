@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
+import { ProjectFacts } from "@/components/project-facts";
 import { memberLine } from "@/lib/member-line";
 import { contactAboutProject } from "@/actions/projects";
 import { Avatar } from "@/components/avatar";
@@ -74,23 +75,18 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                 {project.name}
               </Link>
               <p className="mt-1 text-[15px] text-mut">
-                {project.user.name} · {tx(project.asset)} · {project.location} · {project.year}
+                {project.user.name}{project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.location} · {project.year}
               </p>
-              {project.valueLabel ? <p className="mt-1 text-[16px] font-semibold text-forest">{formatProjectValue(project.valueLabel)}</p> : null}
+              <ProjectFacts category={data.myCategory} project={project} compact />
               {project.why === "seeking" ? (
                 project.status ? (
                   <p className="mt-3 text-[14px] text-mut">
                     {tx("Contact request")}: {tx(statusWord(project.status))}
                   </p>
                 ) : (
-                  <form action={contactAboutProject} className="mt-3 grid gap-2">
-                    <input type="hidden" name="projectId" value={project.id} />
-                    <input type="hidden" name="back" value="/deals" />
-                    <input name="note" className={`${field} text-[16px]`} placeholder={tx("A short note. It stays inside Private Floor.")} />
-                    <button className={btn} type="submit">
-                      {tx("Contact about this project")}
-                    </button>
-                  </form>
+                  <div className="mt-auto pt-3">
+                    <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} back="/deals" label={tx("Contact about this project")} primary align="start" />
+                  </div>
                 )
               ) : (
                 <Link href={`/projects/${project.id}`} className={`${btnOutline} mt-3`}>
