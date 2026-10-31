@@ -2,6 +2,18 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "My work right now": ["Mi trabajo ahora", "Meine aktuelle Arbeit", "現在の仕事"],
+  "Active": ["Activos", "Aktiv", "進行中"],
+  "In talks": ["En conversación", "In Gesprächen", "協議中"],
+  "New for you": ["Nuevo para usted", "Neu für Sie", "あなたへの新着"],
+  "No active projects yet. Once a developer accepts your request, the project shows here.": ["Aún no hay proyectos activos. Cuando un desarrollador acepte su solicitud, el proyecto aparecerá aquí.", "Noch keine aktiven Projekte. Sobald ein Entwickler Ihre Anfrage annimmt, erscheint das Projekt hier.", "進行中のプロジェクトはまだありません。デベロッパーがリクエストを承諾すると、ここに表示されます。"],
+  "Your role": ["Su función", "Ihre Rolle", "あなたの役割"],
+  "Next": ["Siguiente", "Als Nächstes", "次の予定"],
+  "Open the deal room": ["Abrir la sala de negocios", "Datenraum öffnen", "ディールルームを開く"],
+  "No open requests.": ["No hay solicitudes abiertas.", "Keine offenen Anfragen.", "未完了のリクエストはありません。"],
+  "Approved projects seeking your category that you have not contacted yet.": ["Proyectos aprobados que buscan su categoría y que aún no ha contactado.", "Freigegebene Projekte, die Ihre Kategorie suchen und die Sie noch nicht kontaktiert haben.", "あなたのカテゴリーを求めている承認済みプロジェクトのうち、まだ連絡していないもの。"],
+  "See Opportunities": ["Ver oportunidades", "Chancen ansehen", "案件を見る"],
+  "Add past work": ["Agregar trabajo anterior", "Bisherige Arbeit hinzufügen", "過去の実績を追加"],
   "Referrals left": ["Recomendaciones disponibles", "Verbleibende Empfehlungen", "残りの紹介数"],
   "Your referrals": ["Sus recomendaciones", "Ihre Empfehlungen", "あなたの紹介"],
   "Applied": ["Solicitó", "Beworben", "申請済み"],

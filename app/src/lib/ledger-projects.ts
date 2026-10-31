@@ -77,7 +77,8 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   const matchOf = (project: { seeking: string }) => myCategories.find((id) => parseSeeking(project.seeking).includes(id)) ?? null;
   const seekingMe = myCategories.length
     ? others
-        .filter((project) => matchOf(project) && keep(project))
+        // #44: only developer projects seek people; a non-developer's past work never matches.
+        .filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && keep(project))
         // Overnight: projects that give this member type the facts it needs come first, then newest.
         .sort((a, b) => factScore(matchOf(b)!, b) - factScore(matchOf(a)!, a))
         .slice(0, limit)
@@ -91,6 +92,8 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   return {
     myCategory,
     myCategories,
+    // #44: approved projects seeking me that I have not contacted yet (all of them, not only the first few shown).
+    newForYou: others.filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && !contactStatus.get(contactKey(project.id, user.id, project.userId))).length,
     myProjects,
     sent,
     received: received.map((row) => ({ ...row, ownerIsMe: row.project.userId === user.id, inCircle: circle.has(row.fromId) })),

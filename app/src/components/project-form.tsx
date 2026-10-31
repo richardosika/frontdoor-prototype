@@ -27,7 +27,7 @@ const big = `${field} text-[16px]`;
 const label = `${labelCls} text-[12px]`;
 
 /** The project form, used on the profile and on the Ledger. New and edited projects go to staff review. */
-export async function ProjectForm({ back, project }: { back: "/profile" | "/feed"; project?: EditableProject }) {
+export async function ProjectForm({ back, project, pastWork = false }: { back: "/profile" | "/feed"; project?: EditableProject; pastWork?: boolean }) {
   const tx = await serverTx();
   const seeking = new Set(parseSeeking(project?.seeking ?? ""));
   const id = project ? `p-${project.id}` : `new-${back.slice(1)}`;
@@ -98,6 +98,8 @@ export async function ProjectForm({ back, project }: { back: "/profile" | "/feed
         <span className={label}>{tx("Project notes")}</span>
         <textarea name="summary" rows={2} defaultValue={project?.summary} className={big} placeholder={tx("Optional")} />
       </label>
+      {/* #44: past work by non-developers is a track record only: no seeking, no matching. */}
+      {pastWork ? null : <>
       <fieldset className="min-w-0 sm:col-span-2">
         <legend className={label}>{tx("Who is this project seeking?")}</legend>
         <p className="mb-2 text-[14px] leading-relaxed text-mut">
@@ -113,6 +115,7 @@ export async function ProjectForm({ back, project }: { back: "/profile" | "/feed
         </div>
       </fieldset>
       <ProjectFactsFields roleFacts={project?.roleFacts} />
+      </>}
       <label className="flex min-h-11 items-center gap-2 text-[15px] text-ink sm:col-span-2">
         <input type="checkbox" name="shareWithCircle" defaultChecked={project?.shareWithCircle ?? false} className="h-5 w-5 accent-forest" />
         {tx("Share project details with My Circle")}

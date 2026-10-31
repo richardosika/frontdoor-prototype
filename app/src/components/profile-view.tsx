@@ -283,8 +283,8 @@ export async function ProfileView({
           </span>
           <span className="text-[16px] leading-relaxed text-ink">{tx("Approved members are in the platform.")}</span>
         </div>
-        <h2 className="mb-2 mt-6 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass" data-testid="track-record-title">
-          {member.role === "DEVELOPER" ? tx("My Projects") : tx("Past Projects")}
+        <h2 id="past-work" className="mb-2 mt-6 scroll-mt-20 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass" data-testid="track-record-title">
+          {member.role === "DEVELOPER" ? tx("My Projects") : tx("Past work")}
         </h2>
         {projects.length === 0 ? <p className="text-[16px] text-mut">{tx("No projects listed yet.")}</p> : null}
         <ul>
@@ -323,7 +323,7 @@ export async function ProfileView({
                   <details className="mt-2 rounded border border-line bg-paper p-3" open={project.reviewStatus === "NEEDS_INFO"}>
                     <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit and resubmit")}</summary>
                     <div className="mt-3">
-                      <ProjectForm back="/profile" project={project} />
+                      <ProjectForm back="/profile" project={project} pastWork={member.role !== "DEVELOPER"} />
                     </div>
                   </details>
                 ) : null}
@@ -358,8 +358,8 @@ export async function ProfileView({
         </ul>
         {isSelf ? (
           <section id="add-project" className="mt-6 min-w-0 rounded border border-line bg-cream p-5 sm:p-7">
-            <h2 className="mb-4 font-serif text-2xl text-forest sm:text-[28px]">{tx("Add a project")}</h2>
-            <ProjectForm back="/profile" />
+            <h2 className="mb-4 font-serif text-2xl text-forest sm:text-[28px]">{member.role === "DEVELOPER" ? tx("Add a project") : tx("Add past work")}</h2>
+            <ProjectForm back="/profile" pastWork={member.role !== "DEVELOPER"} />
           </section>
         ) : null}
       </div>

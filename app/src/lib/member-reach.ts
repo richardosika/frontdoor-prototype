@@ -128,7 +128,7 @@ export function gettingStarted(input: {
     rp.credentialRequired
       ? { id: "profile", label: `Complete your profile with your ${rp.credential.toLowerCase()}`, href: "/profile#profile-credential", done: input.profileDone && Boolean(input.hasCredential) }
       : { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
-    { id: "work", label: rp.portfolio, href: "/feed#ledger-add-project", done: input.projectCount > 0 },
+    { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
     { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
   ]);

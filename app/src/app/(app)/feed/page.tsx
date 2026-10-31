@@ -5,6 +5,7 @@ import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
+import { loadMyWork } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { gettingStarted, isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
@@ -101,7 +102,7 @@ export default async function FeedPage({
         ) : null}
         <GettingStarted items={checklist} />
         {note}
-        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} />
+        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou)} />
         <div className="mt-4 space-y-4 lg:hidden">
           {circlePanel}
         </div>
