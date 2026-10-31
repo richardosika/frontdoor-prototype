@@ -1,4 +1,5 @@
 import { Banner } from "@/components/banner";
+import { BidsWon } from "@/components/bids-won";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
@@ -40,6 +41,7 @@ export default async function ProfilePage({
         blockedByThem={false}
         ownDeals={loaded.ownDeals}
       />
+      <BidsWon memberId={loaded.member.id} />
     </div>
   );
 }

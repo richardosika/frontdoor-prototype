@@ -94,6 +94,11 @@ export default async function DealRoomPage({
         <div className={`mt-3 p-5 ${card}`}>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Deal room")}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
+          {project && project.reviewStatus === "APPROVED" ? (
+            <Link href={`/bids/new?project=${project.id}`} className="mt-3 inline-flex min-h-11 items-center rounded-sm border border-forest px-4 text-[14px] font-semibold text-forest" data-testid="room-request-bids">
+              {tx("Request bids")}
+            </Link>
+          ) : null}
           <p className="mt-2 text-sm text-ink">
             Approved members and {deal.sponsor.name} can list documents, ask questions, and see what changed. {BRAND.name} stores the file name, type, and size. It does not keep the file and does not process a payment.
           </p>

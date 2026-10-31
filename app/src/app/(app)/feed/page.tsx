@@ -7,6 +7,7 @@ import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
+import { BidsStrip } from "@/components/bids-strip";
 import { loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
@@ -196,6 +197,7 @@ export default async function FeedPage({
         {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
         <GettingStarted items={checklist} category={ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")} />
         {note}
+        <BidsStrip userId={user.id} />
         <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
           results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
         />

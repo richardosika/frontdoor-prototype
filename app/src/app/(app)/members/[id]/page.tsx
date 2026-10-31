@@ -2,6 +2,7 @@ import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Banner } from "@/components/banner";
+import { BidsWon } from "@/components/bids-won";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
@@ -82,6 +83,7 @@ export default async function MemberPage({
         blockedByThem={loaded.blockedByThem}
       />
       )}
+      <BidsWon memberId={loaded.member.id} />
     </div>
   );
 }

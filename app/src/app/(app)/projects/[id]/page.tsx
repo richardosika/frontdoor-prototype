@@ -19,6 +19,7 @@ import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { projectPageView } from "@/lib/project-page";
 import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryMemberWhere, memberCategories, memberInCategory, formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
+import { canRequestBids } from "@/lib/bids";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </p>
         ) : null}
       </section>
+
+      {project.reviewStatus === "APPROVED" && !viewer.isAdmin && canRequestBids({ viewerId: viewer.id, ownerId: project.userId, audience }) ? (
+        <ProjectBids projectId={project.id} viewerId={viewer.id} tx={tx} />
+      ) : null}
 
       <section className={box} data-testid="project-seeking">
         <h2 className={h2}>{isOwner ? tx("What you're looking for") : tx("What this project is looking for")}</h2>
@@ -346,5 +351,35 @@ function ProjectNotAvailable({ tx }: { tx: (text: string) => string }) {
         </Link>
       </section>
     </div>
+  );
+}
+
+/** #51: Request bids from members already on this project; the requester's own requests on it. */
+async function ProjectBids({ projectId, viewerId, tx }: { projectId: string; viewerId: string; tx: (s: string) => string }) {
+  const mine = await prisma.bidRequest.findMany({
+    where: { projectId, requesterId: viewerId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, status: true, template: { select: { name: true } }, _count: { select: { recipients: true } }, bids: { where: { status: { not: "DRAFT" } }, select: { id: true } } },
+  });
+  return (
+    <section className={box} data-testid="project-bids">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className={h2}>{tx("Bids")}</h2>
+          <p className="text-[15px] text-ink">{tx("Ask members already on this project for proposals on a standard form, then compare them side by side.")}</p>
+        </div>
+        <Link href={`/bids/new?project=${projectId}`} className={btn} data-testid="request-bids">{tx("Request bids")}</Link>
+      </div>
+      {mine.length ? (
+        <ul className="mt-3">
+          {mine.map((r) => (
+            <li key={r.id} className="border-t border-line py-2">
+              <Link href={`/bids/${r.id}`} className="text-[15px] font-semibold text-forest underline decoration-brass">{tx(r.template.name)}</Link>
+              <span className="ml-2 text-[14px] text-mut">{r.bids.length} {tx("of")} {r._count.recipients} {tx("received")} · {tx(r.status === "OPEN" ? "Open" : r.status === "AWARDED" ? "Awarded" : "Closed")}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }
