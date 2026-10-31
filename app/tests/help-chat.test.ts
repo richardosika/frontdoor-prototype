@@ -65,3 +65,9 @@ describe("#49 keyword fallback ignores weak legal-page matches", () => {
     expect(r.escalate).toBe(true);
   });
 });
+
+describe("#50 wording in Help", () => {
+  it("never says no projects need them", () => {
+    for (const t of MEMBER_TOPICS) for (const v of Object.values(t.body)) expect(v).not.toMatch(/no project needs|no projects need/i);
+  });
+});

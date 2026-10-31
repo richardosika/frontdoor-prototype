@@ -142,7 +142,7 @@ export function HelpWidget() {
           </form>
         </section>
       ) : null}
-      <button type="button" aria-expanded={open} onClick={toggle} className="ml-auto flex min-h-11 items-center rounded-sm bg-forest px-4 font-serif text-lg text-paper shadow-[0_8px_24px_rgba(31,58,46,0.25)]" data-testid="help-launch">{tx("Help")}</button>
+      <button type="button" aria-expanded={open} onClick={toggle} className={`${open ? "hidden" : "flex"} ml-auto min-h-11 items-center rounded-sm bg-forest px-4 font-serif text-lg text-paper shadow-[0_8px_24px_rgba(31,58,46,0.25)]`} data-testid="help-launch">{tx("Help")}</button>
     </div>
   );
 }
