@@ -59,7 +59,7 @@ export default async function FeedPage({
       <p className="mt-1 text-[14px] text-mut">{circle.length === 1 ? t("ledger.connection") : t("ledger.connections", { count: circle.length })}</p>
       <p className="mt-2 text-[14px] leading-relaxed text-ink">{tx("People connected to you through a project.")}</p>
       <Link href={developer ? "/deals#my-circle" : "/network"} className="mt-3 inline-block text-[14px] font-semibold text-forest underline decoration-brass">
-        {developer ? tx("Find your team") : tx("Open My Circle")}
+        {tx("Open My Circle")}
       </Link>
     </div>
   );

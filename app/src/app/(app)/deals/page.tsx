@@ -129,7 +129,7 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
         </div>
       ) : null}
       {team.projects.map((project) => (
-        <section key={project.id} className={`${card} mt-4 p-4 md:p-5`} data-testid="team-project">
+        <section key={project.id} className={`${card} mt-4 min-w-0 p-4 md:p-5`} data-testid="team-project">
           <p className={h2}>{tx("For project")}</p>
           <Link href={`/projects/${project.id}`} className="font-serif text-[24px] leading-snug underline decoration-brass underline-offset-2">
             {project.name}
@@ -138,14 +138,14 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
             {tx(project.asset)} · {project.location}
           </p>
           {project.groups.map((group) => (
-            <div key={group.category} className="mt-4 border-l-2 border-brass pl-3">
+            <div key={group.category} className="mt-4 min-w-0 border-l-2 border-brass pl-3">
               <p className="text-[16px] font-semibold text-forest">
                 {tx(seekLabel(group.category))} <span className="font-normal text-mut">· {group.members.length}</span>
               </p>
               {group.members.length === 0 ? <p className="text-[15px] text-mut">{tx("No matching members yet.")}</p> : null}
-              <ul className="mt-2 grid gap-3 lg:grid-cols-2">
+              <ul className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {group.members.map((member) => (
-                  <li key={member.id} className="rounded border border-line bg-cream p-3">
+                  <li key={member.id} className="min-w-0 rounded border border-line bg-cream p-3">
                     <Link href={`/members/${member.id}`} className="flex items-center gap-3">
                       <Avatar initials={member.initials} photoId={member.photoId} size="sm" />
                       <span className="min-w-0">
@@ -174,11 +174,11 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
                           {tx("Outreach")}: {tx(statusWord(member.status))}
                         </span>
                       ) : (
-                        <form action={contactAboutProject}>
+                        <form action={contactAboutProject} className="min-w-0 max-w-full">
                           <input type="hidden" name="projectId" value={project.id} />
                           <input type="hidden" name="toId" value={member.id} />
                           <input type="hidden" name="back" value="/deals" />
-                          <button className={btnOutline} type="submit">
+                          <button className={`${btnOutline} h-auto max-w-full whitespace-normal text-left`} type="submit">
                             {tx("Reach out about")} {project.name}
                           </button>
                         </form>
