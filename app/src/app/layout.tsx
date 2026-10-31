@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { EB_Garamond, Libre_Franklin } from "next/font/google";
 import { HelpWidget } from "@/components/help-widget";
+import { LocaleProvider } from "@/components/locale-context";
+import { currentLocale } from "@/lib/i18n/server";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -28,12 +30,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await currentLocale().catch(() => "en" as const);
   return (
     <html lang="en">
       <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>
         {children}
-        <HelpWidget />
+        <LocaleProvider locale={locale}>
+          <HelpWidget />
+        </LocaleProvider>
       </body>
     </html>
   );
