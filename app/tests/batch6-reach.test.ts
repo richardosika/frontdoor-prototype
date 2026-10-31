@@ -83,6 +83,12 @@ describe("#24 getting started", () => {
     const items = gettingStarted({ role: "DEVELOPER", ...base });
     expect(items.map((i) => i.id)).toEqual(["nda", "profile", "project", "seeking", "approved", "reach"]);
     expect(items.find((i) => i.id === "nda")?.done).toBe(true);
+    // Richard's case: NDA, project and approval true but profile not: only NDA counts; profile is current; rest locked.
+    const richard = gettingStarted({ role: "DEVELOPER", ...base, projectCount: 1, approvedProject: true });
+    expect(richard.map((i) => i.state)).toEqual(["done", "current", "locked", "locked", "locked", "locked"]);
+    expect(richard.filter((i) => i.done)).toHaveLength(1);
+    const later = gettingStarted({ role: "DEVELOPER", ...base, profileDone: true, projectCount: 1, approvedProject: true });
+    expect(later.map((i) => i.state)).toEqual(["done", "done", "done", "current", "locked", "locked"]);
     const all = gettingStarted({ role: "DEVELOPER", profileDone: true, ndaAccepted: true, projectCount: 1, seekingSet: true, approvedProject: true, outreachSent: 1, hasPhoto: true });
     expect(all.every((i) => i.done)).toBe(true);
   });
@@ -131,7 +137,7 @@ describe("copy", () => {
     ...memberNav("DEVELOPER").map((t) => t.label),
     ...memberNav("LENDER").map((t) => t.label),
     ...DEAL_SIZE_BANDS.map((b) => b.label),
-    "Opportunities for you", "Project not available", "Back to home", "Referral sent", "Alert emails", "Past work", "Shared projects",
+    "Opportunities for you", "Start", "Locked until the earlier steps are done", "Complete each step in order. The next step opens when the one before it is done.", "Project not available", "Back to home", "Referral sent", "Alert emails", "Past work", "Shared projects",
   ];
   it("is in all four languages and never uses banned words", () => {
     for (const key of keys) {

@@ -659,6 +659,10 @@ const P: Record<string, readonly [string, string, string]> = {
   "You have sent too many referrals today. Try again tomorrow.": ["Hoy ha enviado demasiadas recomendaciones. Inténtelo mañana.", "Sie haben heute zu viele Empfehlungen gesendet. Versuchen Sie es morgen erneut.", "本日の紹介の上限に達しました。明日もう一度お試しください。"],
   "Could not create a referral code. Try again.": ["No se pudo crear un código de referencia. Inténtelo de nuevo.", "Der Empfehlungscode konnte nicht erstellt werden. Versuchen Sie es erneut.", "紹介コードを作成できませんでした。もう一度お試しください。"],
   "Could not send that referral.": ["No se pudo enviar esa recomendación.", "Diese Empfehlung konnte nicht gesendet werden.", "紹介を送信できませんでした。"],
+  "Start": ["Empezar", "Starten", "開始"],
+  "Locked until the earlier steps are done": ["Bloqueado hasta completar los pasos anteriores", "Gesperrt, bis die vorherigen Schritte erledigt sind", "前のステップが完了するまでロックされています"],
+  "Complete each step in order. The next step opens when the one before it is done.": ["Complete cada paso en orden. El siguiente paso se abre cuando el anterior está hecho.", "Erledigen Sie die Schritte der Reihe nach. Der nächste Schritt öffnet sich, sobald der vorherige erledigt ist.", "各ステップを順番に進めてください。前のステップが完了すると次のステップが開きます。"],
+  "Submit and get approved by staff": ["Envíe y obtenga la aprobación del equipo", "Einreichen und genehmigen lassen", "提出して承認を受ける"],
 };
 
 export const PHRASES = P;

@@ -90,7 +90,20 @@ export function matchesSlimFilters(project: { asset: string; state: string; loca
   return true;
 }
 
-export type StartItem = { id: string; label: string; href: string; done: boolean };
+export type StartItem = { id: string; label: string; href: string; done: boolean; state: "done" | "current" | "locked" };
+
+/** Setup runs strictly in order: a step counts as done only once every earlier step is done. */
+export function sequential(items: { id: string; label: string; href: string; done: boolean }[]): StartItem[] {
+  let open = true;
+  return items.map((item) => {
+    if (open && item.done) return { ...item, done: true, state: "done" as const };
+    if (open) {
+      open = false;
+      return { ...item, done: false, state: "current" as const };
+    }
+    return { ...item, done: false, state: "locked" as const };
+  });
+}
 
 /** The role-tailored "Getting started" checklist. Every item completes itself from what the member has done. */
 export function gettingStarted(input: {
@@ -104,20 +117,20 @@ export function gettingStarted(input: {
   hasPhoto: boolean;
 }): StartItem[] {
   if (isDeveloperRole(input.role)) {
-    return [
+    return sequential([
       { id: "nda", label: "Accept the Member NDA", href: "/member-nda", done: input.ndaAccepted },
       { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
       { id: "project", label: "Add your first project", href: "/feed#ledger-add-project", done: input.projectCount > 0 },
       { id: "seeking", label: "Choose who you're seeking", href: "/feed#ledger-my-projects", done: input.seekingSet },
-      { id: "approved", label: "Get a project approved by staff", href: "/feed#ledger-my-projects", done: input.approvedProject },
+      { id: "approved", label: "Submit and get approved by staff", href: "/feed#ledger-my-projects", done: input.approvedProject },
       { id: "reach", label: "Reach out to a member on your team", href: "/deals", done: input.outreachSent > 0 },
-    ];
+    ]);
   }
-  return [
+  return sequential([
     { id: "nda", label: "Accept the Member NDA", href: "/member-nda", done: input.ndaAccepted },
     { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
     { id: "work", label: "Add a past project to show your work", href: "/feed#ledger-add-project", done: input.projectCount > 0 },
     { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
-  ];
+  ]);
 }
