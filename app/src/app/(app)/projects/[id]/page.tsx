@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ReachOut, StatusPill } from "@/components/reach-out";
+import { memberLine } from "@/lib/member-line";
 import { contactAboutProject, respondProjectContact, setProjectSharing, updateProjectSeeking } from "@/actions/projects";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
@@ -186,7 +188,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <div className="min-w-0 flex-1">
                     <Link href={`/members/${other.id}`} className="font-semibold text-forest underline decoration-brass">{other.name}</Link>
                     <p className="text-[14px] text-mut">
-                      {tx(roleLabel(other.role))} · {incoming ? tx("Received") : tx("Sent")} · {tx(statusLabel(c.status))}
+                      {memberLine(other, tx)}
+                    </p>
+                    <p className="text-[13px] text-mut">
+                      {incoming ? tx("Received") : tx("Sent")} · {tx(statusLabel(c.status))}
                     </p>
                     {c.note ? <p className="mt-1 text-[15px] text-ink">“{c.note}”</p> : null}
                   </div>
@@ -216,22 +221,17 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             {matches.map((m) => {
               const already = project.contacts.some((c) => c.fromId === m.id || c.toId === m.id);
               return (
-                <li key={m.id} className="flex items-center gap-3 rounded border border-line bg-paper p-3">
+                <li key={m.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded border border-line bg-paper p-3">
                   <Avatar initials={m.initials} photoId={m.photoId} />
                   <div className="min-w-0 flex-1">
                     <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass">{m.name}</Link>
-                    <p className="text-[14px] text-mut">{tx(roleLabel(m.role))} · {m.location}</p>
+                    <p className="text-[14px] text-mut" data-testid="member-line">{memberLine(m, tx)}</p>
                   </div>
                   {already ? (
-                    <span className="text-[13px] text-mut">{tx("Contacted")}</span>
-                  ) : (
-                    <form action={contactAboutProject}>
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="toId" value={m.id} />
-                      <input type="hidden" name="back" value={back} />
-                      <button className={btnOutline} type="submit">{tx("Reach out")}</button>
-                    </form>
-                  )}
+                    <StatusPill status={project.contacts.find((c) => c.fromId === m.id || c.toId === m.id)?.status ?? "PENDING"} />
+                  ) : project.reviewStatus === "APPROVED" ? (
+                    <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} toId={m.id} back={back} />
+                  ) : null}
                 </li>
               );
             })}

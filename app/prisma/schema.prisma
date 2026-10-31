@@ -192,6 +192,11 @@ model User {
   checkSize      String           @default("")
   lookingFor     String           @default("")
   offering       String           @default("")
+  /// #38 vendor profile basics (optional).
+  yearsInBusiness String          @default("")
+  typicalJobSize  String          @default("")
+  licenses        String          @default("")
+  insuranceInfo   String          @default("")
   checklistDone  String           @default("")
   notifyMessages Boolean          @default(true)
   notifyIntros   Boolean          @default(true)

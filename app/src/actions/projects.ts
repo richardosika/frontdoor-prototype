@@ -16,7 +16,10 @@ import {
   readProjectForm,
   reviewOutcome,
   serializeSeeking,
+  parseSeeking,
+  seekLabel,
 } from "@/lib/project-contact";
+import { roleLabel, roleShort } from "@/lib/roles";
 import { projectContactEmail, projectReviewEmail } from "@/lib/project-review-email";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { appBaseUrl } from "@/lib/url";
@@ -197,9 +200,21 @@ export async function contactAboutProject(formData: FormData) {
   await prisma.projectContact.create({
     data: { projectId, fromId: user.id, toId: to.id, category: decision.category, note },
   });
-  await notify(to.id, { title: "Project contact request", body: `${user.name}: ${project.name}`, href: "/feed" });
+  await notify(to.id, { title: "Project contact request", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: "/feed#ledger-outreach" });
   if (to.notifyIntros) {
-    const mail = projectContactEmail(isLocale(to.locale) ? to.locale : "en", `${await appBaseUrl()}/feed`);
+    const base = await appBaseUrl();
+    const mail = projectContactEmail({
+      locale: isLocale(to.locale) ? to.locale : "en",
+      link: `${base}/feed#ledger-outreach`,
+      fromName: user.name,
+      fromOrg: user.org,
+      fromRole: roleShort(roleLabel(user.role)),
+      projectName: project.name,
+      basics: [project.asset, projectLocation(project) || project.location, project.year ? String(project.year) : ""].filter(Boolean).join(" · "),
+      seeking: parseSeeking(project.seeking).map(seekLabel),
+      note,
+      profileLink: `${base}/members/${user.id}`,
+    });
     await sendEmail({ to: to.email, subject: mail.subject, text: mail.text });
   }
   refresh();

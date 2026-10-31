@@ -27,6 +27,10 @@ export async function ProfileEditor({
     checkSize: string;
     lookingFor: string;
     offering: string;
+    yearsInBusiness?: string;
+    typicalJobSize?: string;
+    licenses?: string;
+    insuranceInfo?: string;
     role?: string;
   };
 }) {
@@ -95,6 +99,27 @@ export async function ProfileEditor({
           <textarea name="offering" defaultValue={member.offering} rows={3} maxLength={800} className={field} />
           <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "A short bio shown on your card when developers look for their team.")}</span>
         </label>
+      ) : null}
+      {member.role !== "DEVELOPER" ? (
+        <div className="grid gap-5 sm:grid-cols-2" data-testid="profile-vendor-fields">
+          <label>
+            <span className={labelCls}>{phrase(locale, "Years in business")}</span>
+            <input name="yearsInBusiness" defaultValue={member.yearsInBusiness ?? ""} maxLength={40} className={field} inputMode="numeric" />
+          </label>
+          <label>
+            <span className={labelCls}>{phrase(locale, "Typical job size")}</span>
+            <input name="typicalJobSize" defaultValue={member.typicalJobSize ?? ""} maxLength={80} className={field} placeholder="$2M to $20M" />
+          </label>
+          <label className="sm:col-span-2">
+            <span className={labelCls}>{phrase(locale, "Licenses")}</span>
+            <textarea name="licenses" defaultValue={member.licenses ?? ""} rows={2} maxLength={400} className={field} />
+          </label>
+          <label className="sm:col-span-2">
+            <span className={labelCls}>{phrase(locale, "Insurance")}</span>
+            <textarea name="insuranceInfo" defaultValue={member.insuranceInfo ?? ""} rows={2} maxLength={400} className={field} />
+            <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Optional. Shown on your profile to developers.")}</span>
+          </label>
+        </div>
       ) : null}
       <label>
         <span className={labelCls}>{t("profile.card")}</span>

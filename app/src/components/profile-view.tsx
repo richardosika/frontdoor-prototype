@@ -84,6 +84,10 @@ export async function ProfileView({
     checkSize: string;
     lookingFor: string;
     offering: string;
+    yearsInBusiness?: string;
+    typicalJobSize?: string;
+    licenses?: string;
+    insuranceInfo?: string;
     createdAt: Date;
   };
   projects: Project[];

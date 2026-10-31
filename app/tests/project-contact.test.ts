@@ -180,7 +180,18 @@ describe("project review workflow", () => {
     expect(projectReviewEmail({ ...base, locale: "en", status: "APPROVED" }).text).toContain("Find your team");
     expect(projectReviewEmail({ ...base, locale: "de", status: "DECLINED" }).subject).toBe("Ihr Projekt wurde nicht genehmigt");
     expect(projectReviewEmail({ ...base, locale: "ja", status: "APPROVED" }).text).toContain("こんにちは");
-    expect(projectContactEmail("ja", "https://x/feed").subject).toBe(phrase("ja", "A member contacted you about a project"));
+    const contact = {
+      locale: "en" as const, link: "https://x/feed", fromName: "Richard Osika", fromOrg: "Private Floor Club", fromRole: "Developer",
+      projectName: "Morristown", basics: "Multifamily · Morristown, NJ · 2027", seeking: ["General Contractor"], note: "Can we talk this week?", profileLink: "https://x/members/r",
+    };
+    const mail = projectContactEmail(contact);
+    expect(mail.subject).toBe("Richard Osika (Private Floor Club) wants to connect about Morristown");
+    expect(mail.text).toContain("Multifamily · Morristown, NJ · 2027");
+    expect(mail.text).toContain("General Contractor");
+    expect(mail.text).toContain("Can we talk this week?");
+    expect(mail.text).toContain("https://x/members/r");
+    expect(projectContactEmail({ ...contact, fromOrg: "" }).subject).toBe("Richard Osika wants to connect about Morristown");
+    expect(projectContactEmail({ ...contact, locale: "ja" }).subject).toContain("Morristown");
   });
 });
 
@@ -211,7 +222,7 @@ describe("project form", () => {
     expect(PROJECT_ROLE_LABELS).toContain("General Contractor");
     expect(PROJECT_ROLE_LABELS).toContain("Lender / Debt Fund");
     expect(formatProjectValue("24000000")).toBe("$24,000,000");
-    expect(formatProjectValue("$24M")).toBe("$24M");
+    expect(formatProjectValue("$24M")).toBe("$24,000,000");
   });
   it("labels the year and dollar fields clearly", () => {
     const text = read("components/project-form.tsx");

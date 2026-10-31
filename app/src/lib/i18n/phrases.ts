@@ -697,6 +697,23 @@ const P: Record<string, readonly [string, string, string]> = {
   "Waiting for staff approval": ["Esperando la aprobación del equipo", "Wartet auf Genehmigung", "承認待ち"],
   "{project} is approved": ["{project} está aprobado", "{project} ist genehmigt", "{project} が承認されました"],
   "Good news: {project} is approved. It is now open to members in the categories it is seeking, and you can start building your team.": ["Buenas noticias: {project} está aprobado. Ya está abierto a los miembros de las categorías que busca y puede empezar a formar su equipo.", "Gute Nachrichten: {project} ist genehmigt. Es ist jetzt für Mitglieder der gesuchten Kategorien sichtbar, und Sie können Ihr Team zusammenstellen.", "うれしいお知らせです。{project} が承認されました。募集しているカテゴリーのメンバーに公開され、チームづくりを始められます。"],
+  "{sender} wants to connect about {project}": ["{sender} quiere conectar sobre {project}", "{sender} möchte sich wegen {project} austauschen", "{sender} が {project} についてつながりを希望しています"],
+  "{sender} wants to connect with you about a project on Private Floor.": ["{sender} quiere conectar con usted sobre un proyecto en Private Floor.", "{sender} möchte sich auf Private Floor mit Ihnen über ein Projekt austauschen.", "{sender} が Private Floor のプロジェクトについてあなたとつながりを希望しています。"],
+  "Their note": ["Su nota", "Ihre Notiz", "メッセージ"],
+  "Accept or decline on your Ledger.": ["Acepte o rechace en su Ledger.", "Nehmen Sie im Ledger an oder lehnen Sie ab.", "Ledger で承諾または辞退してください。"],
+  "View their profile": ["Ver su perfil", "Profil ansehen", "プロフィールを見る"],
+  "Matching opens after approval": ["Las coincidencias se abren tras la aprobación", "Passende Mitglieder erscheinen nach der Genehmigung", "承認後にマッチングが始まります"],
+  "Years in business": ["Años en el negocio", "Jahre im Geschäft", "営業年数"],
+  "Typical job size": ["Tamaño típico de obra", "Typische Auftragsgröße", "一般的な案件規模"],
+  "Licenses": ["Licencias", "Lizenzen", "許認可"],
+  "Optional. Shown on your profile to developers.": ["Opcional. Se muestra en su perfil a los desarrolladores.", "Optional. Wird Entwicklern in Ihrem Profil angezeigt.", "任意。デベロッパーにプロフィールで表示されます。"],
+  "Reach out about a project": ["Contactar sobre un proyecto", "Wegen eines Projekts kontaktieren", "プロジェクトについて連絡する"],
+  "About": ["Sobre", "Zu", "対象"],
+  "Which project?": ["¿Qué proyecto?", "Welches Projekt?", "どのプロジェクトですか?"],
+  "Add a short note (optional)": ["Añada una nota breve (opcional)", "Kurze Notiz hinzufügen (optional)", "短いメッセージを追加(任意)"],
+  "Send request": ["Enviar solicitud", "Anfrage senden", "リクエストを送信"],
+  "Personally reviewed by Private Floor staff": ["Revisado personalmente por el equipo de Private Floor", "Persönlich vom Private-Floor-Team geprüft", "Private Floor スタッフが個別に確認済み"],
+  "More": ["Más", "Mehr", "その他"],
 };
 
 export const PHRASES = P;

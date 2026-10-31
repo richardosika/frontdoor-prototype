@@ -216,3 +216,18 @@ describe("#36 pending project in Getting started", () => {
     expect(read("src/lib/ledger-projects.ts")).toContain('project.reviewStatus === "APPROVED" && parseSeeking(project.seeking).length > 0');
   });
 });
+
+import { memberLine } from "@/lib/member-line";
+import { formatProjectValue } from "@/lib/project-contact";
+describe("#37 member line and #33 value", () => {
+  it("shows company, type and city, and leaves out a missing company", () => {
+    expect(memberLine({ org: "Voss & Reed", role: "GENERAL_CONTRACTOR", location: "Hoboken, NJ" })).toBe("Voss & Reed · General Contractor · Hoboken, NJ");
+    expect(memberLine({ org: "", role: "GENERAL_CONTRACTOR", location: "Hoboken, NJ" })).toBe("General Contractor · Hoboken, NJ");
+  });
+  it("spells out short amounts", () => {
+    expect(formatProjectValue("40M")).toBe("$40,000,000");
+    expect(formatProjectValue("$1.5m")).toBe("$1,500,000");
+    expect(formatProjectValue("750K")).toBe("$750,000");
+    expect(formatProjectValue("15000000")).toBe("$15,000,000");
+  });
+});

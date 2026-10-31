@@ -48,11 +48,32 @@ export function projectReviewEmail(input: {
 }
 
 /** The email the other member gets when someone contacts them about a project. */
-export function projectContactEmail(locale: Locale, link: string): { subject: string; text: string } {
-  const p = (text: string) => phrase(locale, text);
+export function projectContactEmail(input: {
+  locale: Locale;
+  link: string;
+  fromName: string;
+  fromOrg: string;
+  fromRole: string;
+  projectName: string;
+  basics: string;
+  seeking: string[];
+  note: string;
+  profileLink: string;
+}): { subject: string; text: string } {
+  const p = (text: string) => phrase(input.locale, text);
+  const who = input.fromOrg ? `${input.fromName} (${input.fromOrg})` : input.fromName;
+  const subject = p("{sender} wants to connect about {project}").replace("{sender}", who).replace("{project}", input.projectName);
   return {
-    subject: p("A member contacted you about a project"),
-    text: `${p("A member contacted you about a project on Private Floor. Accept or decline on your Ledger.")}\n\n${p("Open your Ledger")}\n${link}`,
+    subject,
+    text: [
+      p("{sender} wants to connect with you about a project on Private Floor.").replace("{sender}", who),
+      [input.fromName, [input.fromOrg, p(input.fromRole)].filter(Boolean).join(" · ")].filter(Boolean).join("\n"),
+      [`${p("Project")}: ${input.projectName}`, input.basics, input.seeking.length ? `${p("Seeking")}: ${input.seeking.map(p).join(", ")}` : ""].filter(Boolean).join("\n"),
+      input.note ? `${p("Their note")}: “${input.note}”` : "",
+      p("Accept or decline on your Ledger."),
+      `${p("Open your Ledger")}\n${input.link}`,
+      `${p("View their profile")}\n${input.profileLink}`,
+    ].filter(Boolean).join("\n\n"),
   };
 }
 

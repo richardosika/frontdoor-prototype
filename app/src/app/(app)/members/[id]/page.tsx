@@ -7,6 +7,9 @@ import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
 import { appBaseUrl } from "@/lib/url";
 import { isDeveloperRole } from "@/lib/member-reach";
+import { VendorProfile } from "@/components/vendor-profile";
+import { prisma } from "@/lib/prisma";
+import { canContactAboutProject, categoryForRole } from "@/lib/project-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,18 @@ export default async function MemberPage({
   const tx = await serverTx();
   const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
   if (!loaded) notFound();
+  // #38: the viewer's approved projects that seek this member's category, with any contact already sent.
+  const category = categoryForRole(loaded.member.role);
+  const mine = category && user.id !== loaded.member.id
+    ? await prisma.trackProject.findMany({
+        where: { userId: user.id, reviewStatus: "APPROVED", seeking: { contains: category } },
+        include: { contacts: { where: { OR: [{ toId: loaded.member.id }, { fromId: loaded.member.id }] }, select: { status: true } } },
+        orderBy: { submittedAt: "desc" },
+      })
+    : [];
+  const reach = mine
+    .filter((project) => canContactAboutProject({ project, from: { id: user.id, role: user.role }, to: { id: loaded.member.id, role: loaded.member.role } }).ok)
+    .map((project) => ({ id: project.id, name: project.name, status: project.contacts[0]?.status ?? "" }));
   const backHref = isDeveloperRole(user.role) ? "/deals" : "/network";
   const backLabel = isDeveloperRole(user.role) ? tx("Find your team") : tx("My Circle");
   return (
@@ -33,6 +48,18 @@ export default async function MemberPage({
       <div className="md:px-0">
         <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
       </div>
+      {user.id !== loaded.member.id ? (
+        <VendorProfile
+          member={loaded.member}
+          projects={loaded.projects}
+          gallery={loaded.gallery}
+          reach={reach}
+          canMessage={loaded.intro === "ACCEPTED" || loaded.connection === "ACCEPTED"}
+          blockedByViewer={loaded.blockedByViewer}
+          blockedByThem={loaded.blockedByThem}
+          reviewed
+        />
+      ) : (
       <ProfileView
         member={loaded.member}
         projects={loaded.projects}
@@ -49,6 +76,7 @@ export default async function MemberPage({
         blockedByViewer={loaded.blockedByViewer}
         blockedByThem={loaded.blockedByThem}
       />
+      )}
     </div>
   );
 }

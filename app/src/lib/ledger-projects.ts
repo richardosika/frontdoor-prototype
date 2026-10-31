@@ -15,13 +15,16 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
     prisma.trackProject.findMany({ where: { userId: user.id }, orderBy: [{ submittedAt: "desc" }] }),
     prisma.projectContact.findMany({
       where: { fromId: user.id },
-      include: { project: { select: { id: true, name: true, userId: true } }, to: { select: { id: true, name: true, role: true } } },
+      include: { project: { select: { id: true, name: true, userId: true } }, to: { select: { id: true, name: true, role: true, org: true, location: true } } },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
     prisma.projectContact.findMany({
       where: { toId: user.id },
-      include: { project: { select: { id: true, name: true, userId: true } }, from: { select: { id: true, name: true, role: true } } },
+      include: {
+        project: { select: { id: true, name: true, userId: true, asset: true, location: true, city: true, state: true, year: true, seeking: true } },
+        from: { select: { id: true, name: true, role: true, org: true, location: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
@@ -31,7 +34,7 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
         reviewStatus: "APPROVED",
         user: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] } },
       },
-      include: { user: { select: { id: true, name: true, org: true, role: true } } },
+      include: { user: { select: { id: true, name: true, org: true, role: true, location: true } } },
       orderBy: { submittedAt: "desc" },
       take: 200,
     }),
@@ -48,7 +51,7 @@ export async function loadLedgerProjects(user: { id: string; role: string }, opt
   const candidates = roles.length
     ? await prisma.user.findMany({
         where: { id: { not: user.id }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, role: { in: roles } },
-        select: { id: true, name: true, org: true, role: true },
+        select: { id: true, name: true, org: true, role: true, location: true },
         orderBy: { name: "asc" },
         take: 200,
       })

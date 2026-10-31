@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ReachOut, StatusPill } from "@/components/reach-out";
+import { memberLine } from "@/lib/member-line";
 import { contactAboutProject } from "@/actions/projects";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
@@ -151,7 +153,7 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
                       <span className="min-w-0">
                         <span className="block truncate text-[16px] font-semibold">{member.name}</span>
                         <span className="block truncate text-[13px] text-mut">
-                          {tx(roleShort(roleLabel(member.role)))} · {member.org} · {member.location}
+                          {memberLine(member, tx)}
                         </span>
                       </span>
                     </Link>
@@ -175,18 +177,9 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
                     )}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {member.status ? (
-                        <span className="rounded-sm border border-line bg-paper px-2 py-1 text-[13px] font-semibold text-forest" data-testid="outreach-status">
-                          {tx("Outreach")}: {tx(statusWord(member.status))}
-                        </span>
+                        <StatusPill status={member.status} />
                       ) : (
-                        <form action={contactAboutProject} className="min-w-0 max-w-full">
-                          <input type="hidden" name="projectId" value={project.id} />
-                          <input type="hidden" name="toId" value={member.id} />
-                          <input type="hidden" name="back" value="/deals" />
-                          <button className={`${btnOutline} h-auto max-w-full whitespace-normal text-left`} type="submit">
-                            {tx("Reach out about")} {project.name}
-                          </button>
-                        </form>
+                        <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} toId={member.id} back="/deals" label={`${tx("Reach out about")} ${project.name}`} align="start" />
                       )}
                       <Link href={`/members/${member.id}`} className="text-[14px] font-semibold text-forest underline decoration-brass">
                         {tx("View profile")}

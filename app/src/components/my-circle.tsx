@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { memberLine } from "@/lib/member-line";
 import { openConversation } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { btn, btnOutline } from "@/components/ui";
@@ -27,9 +28,8 @@ export async function MyCircleList({ people }: { people: Circle }) {
             <span className="min-w-0">
               <span className="block truncate text-[16px] font-semibold">{person.name}</span>
               <span className="block truncate text-[13px] text-mut">
-                {tx(roleShort(roleLabel(person.role)))} · {person.org}
+                {memberLine(person, tx)}
               </span>
-              <span className="block truncate text-[13px] text-mut">{person.location}</span>
             </span>
           </Link>
           <p className="mt-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-brass">{tx("Shared projects")}</p>

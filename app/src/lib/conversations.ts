@@ -29,7 +29,7 @@ export async function listConversations(userId: string) {
       id: conversation.id,
       name: other.name,
       initials: other.initials,
-      sub: `${roleShort(roleLabel(other.role))} · ${tierLabel(other.tier)}`,
+      sub: [other.org, roleShort(roleLabel(other.role)), other.location].filter(Boolean).join(" · "),
       preview: last?.body ?? "New conversation",
       time: last ? timeAgo(last.createdAt) : "",
       unread: unreadMap.get(conversation.id) ?? 0,

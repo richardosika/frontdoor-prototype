@@ -242,8 +242,15 @@ export function projectLocation(input: { city: string; state: string }): string 
 /** Normalize a dollar entry: "24000000" becomes "$24,000,000"; text like "$24M" stays. */
 export function formatProjectValue(value: string): string {
   const clean = value.trim();
-  if (/^\d[\d,]*(\.\d+)?$/.test(clean)) {
-    const number = Number(clean.replace(/,/g, ""));
+  // "40M", "$1.5m", "750K", "2 million": spell the full amount out.
+  const short = clean.replace(/^\$\s*/, "").match(/^(\d+(?:\.\d+)?)\s*(k|m|mm|b|thousand|million|billion)$/i);
+  if (short) {
+    const unit = short[2].toLowerCase();
+    const scale = unit.startsWith("k") || unit === "thousand" ? 1e3 : unit.startsWith("b") ? 1e9 : 1e6;
+    return `$${Math.round(Number(short[1]) * scale).toLocaleString("en-US")}`;
+  }
+  if (/^\$?\d[\d,]*(\.\d+)?$/.test(clean)) {
+    const number = Number(clean.replace(/[$,]/g, ""));
     if (Number.isFinite(number)) return `$${number.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   }
   return clean;

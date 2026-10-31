@@ -1,4 +1,5 @@
 import { serverTx } from "@/lib/i18n/server";
+import { memberLine } from "@/lib/member-line";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { blockMember, sendMessage, unblockMember } from "@/actions/social";
@@ -73,7 +74,7 @@ export default async function ThreadPage({
               {other.name} <TierBadge tier={other.tier} />
             </h1>
             <p className="truncate text-xs text-mut">
-              {tx(roleLabel(other.role))} · {other.location}
+              {memberLine(other, tx)}
             </p>
           </div>
           <div className="ml-auto flex gap-2">
