@@ -5,7 +5,7 @@ import { btn, btnOutline, field } from "@/components/ui";
 import { addChecklistItem, commentChecklistItem, reachOutForChecklist, removeChecklistItem, updateChecklistItem, uploadChecklistFile } from "@/actions/checklist";
 import { serverTx } from "@/lib/i18n/server";
 import { memberLine } from "@/lib/member-line";
-import { SEEK_CATEGORIES, seekLabel } from "@/lib/project-contact";
+import { SEEK_CATEGORIES, seekLabel, memberInCategory } from "@/lib/project-contact";
 import { timeAgo } from "@/lib/format";
 import {
   CHECKLIST_SECTIONS,
@@ -20,7 +20,7 @@ import {
   type ChecklistStatus,
 } from "@/lib/deal-checklist";
 
-type Person = { id: string; name: string; initials: string; photoId: string; role: string; org: string; location: string };
+type Person = { id: string; name: string; initials: string; photoId: string; role: string; extraCategories?: string | null; org: string; location: string };
 type Item = {
   id: string;
   section: string;
@@ -80,7 +80,6 @@ export async function DealChecklist({
   const mine = items.filter((item) => item.assigneeId === userId).length;
   const shown = filterChecklist(items, filter, userId, now);
   const byId = new Map(members.map((person) => [person.id, person]));
-  const memberRoles = new Set(members.map((person) => person.role));
   const sections = [...new Set([...CHECKLIST_SECTIONS, ...items.map((item) => item.section)])].filter((section) => shown.some((item) => item.section === section));
   const tabs: { id: ChecklistFilter; label: string; count: number }[] = [
     { id: "all", label: tx("All"), count: items.length },
@@ -169,7 +168,7 @@ export async function DealChecklist({
                   const late = isOverdue(item, now);
                   const who = item.assigneeId ? byId.get(item.assigneeId) : undefined;
                   const canEdit = manage || item.assigneeId === userId;
-                  const filled = item.status === "DONE" || Boolean(item.category && [...memberRoles].some((role) => SEEK_CATEGORIES.find((c) => c.id === item.category)?.roles.includes(role as never)));
+                  const filled = item.status === "DONE" || Boolean(item.category && members.some((person) => memberInCategory(person, item.category)));
                   const pool = item.category ? candidates[item.category] ?? [] : [];
                   return (
                     <li
