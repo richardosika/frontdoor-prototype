@@ -1492,6 +1492,15 @@ async function ensureRoleDemo() {
     for (const [key, value] of Object.entries(data)) if (value && !(user as Record<string, string | null>)[key]) patch[key] = value;
     if (Object.keys(patch).length) await prisma.user.update({ where: { id }, data: patch });
   }
+  // A demo member per type should look complete: fill markets and an offering line where blank.
+  for (const id of Object.keys(profiles)) {
+    const user = await prisma.user.findUnique({ where: { id }, select: { markets: true, offering: true, bio: true, lookingFor: true } });
+    if (!user) continue;
+    const patch: Record<string, string> = {};
+    if (user.markets.trim().length < 2) patch.markets = "NJ, NY";
+    if (user.offering.trim().length < 2 && user.bio.trim().length < 2 && user.lookingFor.trim().length < 2) patch.offering = profiles[id].specialties;
+    if (Object.keys(patch).length) await prisma.user.update({ where: { id }, data: patch });
+  }
   const facts: Record<string, Record<string, string>> = {
     proj_maple_court: { stage: "Pre-construction", units: "48", scope: "Ground-up, 4 stories wood frame over podium", startDate: "2027-03", bidDue: "2026-12-15", designStage: "Construction documents", loanAmount: "18000000", ltcTarget: "65% LTC", loanType: "Construction", need: "Builder's risk quote, ALTA survey, Phase I" },
     proj_ironbound: { stage: "Entitlements", units: "72", designStage: "Schematic design", loanAmount: "26000000", ltcTarget: "60% LTC", loanType: "Construction", equityRaise: "6000000", holdPeriod: "5 to 7 years", need: "Use variance and site plan approval" },
