@@ -134,8 +134,9 @@ function keyword(question: string, ctx: MemberContext, locale: Locale, faq: Help
     return { answer: body, escalate: false, kind: "answer", provider: "keyword" };
   }
   if (locale === "en") {
-    const ranked = rankChunks(question, faq);
-    if (ranked[0] && ranked[0].score >= 3) {
+    // FAQ articles only (not legal pages), and only on a strong match; otherwise hand off to staff.
+    const ranked = rankChunks(question, faq.filter((c) => c.kind === "faq"));
+    if (ranked[0] && ranked[0].score >= 6) {
       const v = vetReply(cleanHelpText(ranked[0].chunk.body).slice(0, 900));
       if (v.ok) return { answer: v.text, escalate: false, kind: "answer", provider: "keyword" };
     }

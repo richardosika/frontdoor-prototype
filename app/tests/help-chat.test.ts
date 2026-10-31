@@ -57,3 +57,11 @@ describe("#49 member help chat", () => {
     expect(systemPrompt(gc, "en", [])).not.toContain("Your projects and who you are seeking");
   });
 });
+
+describe("#49 keyword fallback ignores weak legal-page matches", () => {
+  it("hands off instead of quoting the terms", async () => {
+    const faq = [{ id: "t", title: "Terms of use", body: "We may change the Platform at any time and update the date.", kind: "legal", source: "terms" }] as never;
+    const r = await composeMemberAnswer({ question: "Can you change the date my card is charged?", ctx: gc, locale: "en", faq });
+    expect(r.escalate).toBe(true);
+  });
+});
