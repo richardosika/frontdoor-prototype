@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { sendReferral } from "@/actions/referral";
-import { CopyCode } from "@/components/copy-code";
+import { useRouter } from "next/navigation";
 import { useTx } from "@/components/locale-context";
 import { btn, btnOutline, field } from "@/components/ui";
 
-/** "Refer a colleague": sends the referral email with a one-use code, then shows a confirmation. */
-export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: string }[] }) {
+/** #43 "Refer a colleague": sends the referral email (code embedded in the apply link, never shown here), then a confirmation. */
+export function ColleagueInvite({ left }: { left: number }) {
   const tx = useTx();
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState<{ name: string; email: string; code: string } | null>(null);
+  const [sent, setSent] = useState<{ name: string; email: string } | null>(null);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,35 +30,28 @@ export function ColleagueInvite({ codes = [] }: { codes?: { code: string; note: 
       setError(result.error);
       return;
     }
-    setSent({ name: result.name, email: result.email, code: result.code });
+    setSent({ name: result.name, email: result.email });
+    router.refresh();
   }
 
   return (
     <div className="rounded border border-line bg-paper p-4" data-testid="refer-colleague">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Refer a colleague")}</h2>
-      {codes.length && !sent ? (
-        <div className="mt-2 space-y-2">
-          <p className="text-xs text-ink">{tx("Unused referral codes you can pass along.")}</p>
-          {codes.slice(0, 3).map((item) => (
-            <CopyCode key={item.code} code={item.code} caption={tx("Referral code")} />
-          ))}
-        </div>
-      ) : null}
       {sent ? (
         <div className="mt-3 rounded border border-brass bg-brass-soft px-3 py-3" data-testid="referral-sent">
           <p className="font-serif text-lg">{tx("Referral sent")}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink [overflow-wrap:anywhere]">
-            {tx("We emailed {name} your referral with code {code}. Their application is still personally reviewed.")
-              .replace("{name}", `${sent.name} (${sent.email})`)
-              .replace("{code}", sent.code)}
+            {tx("We emailed {name} your referral with a link to apply. Their application is still personally reviewed.").replace("{name}", `${sent.name} (${sent.email})`)}
           </p>
-          <button type="button" className={`${btnOutline} mt-3`} onClick={() => setSent(null)}>
+          {left > 0 ? <button type="button" className={`${btnOutline} mt-3`} onClick={() => setSent(null)}>
             {tx("Refer someone else")}
-          </button>
+          </button> : null}
         </div>
+      ) : left <= 0 ? (
+        <p className="mt-2 text-[15px] text-ink" data-testid="referrals-none-left">{tx("You have no referrals left.")}</p>
       ) : (
         <form onSubmit={onSubmit} className="mt-2 grid gap-2">
-          <p className="text-xs text-ink">{tx("We email your colleague a referral code and a link to apply. Every application is personally reviewed.")}</p>
+          <p className="text-[15px] text-ink">{tx("We email your colleague a link to apply with your referral already filled in. Every application is personally reviewed.")}</p>
           {error ? <p className="text-xs text-brass">{tx(error)}</p> : null}
           <div className="grid gap-2 sm:grid-cols-2">
             <input name="firstName" className={field} placeholder={tx("First name")} aria-label={tx("First name")} autoComplete="off" required />

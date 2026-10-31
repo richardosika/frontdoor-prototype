@@ -12,6 +12,8 @@ export type NoticeInput = {
   text: string;
   applicationId?: string | null;
   templateKey?: string;
+  /** Optional branded HTML built by the template (for example the referral code box). Default: built from text. */
+  html?: string;
 };
 
 /**
@@ -82,6 +84,7 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
     subject,
     text: body,
     to: target.to,
+    html: input.html,
   };
   // Resend can take several seconds. The page returns after the row is stored. The send finishes if the browser closes.
   runOnServer(() => sendStoredNotice(row.id, delivery));
@@ -90,7 +93,7 @@ export async function sendNotice(input: NoticeInput): Promise<{ id: string; deli
 
 async function sendStoredNotice(
   id: string,
-  input: { intendedTo: string; subject: string; text: string; to: string },
+  input: { intendedTo: string; subject: string; text: string; to: string; html?: string },
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
   if (!apiKey) return;
@@ -101,6 +104,7 @@ async function sendStoredNotice(
     to: input.to,
     from: emailFromAddress(),
   });
+  if (input.html) message.html = input.html;
   try {
     const result = await deliverResendMail({ message, apiKey, allowedTo: input.to });
     if (result.ok) {

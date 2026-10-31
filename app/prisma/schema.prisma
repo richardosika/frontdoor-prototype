@@ -306,6 +306,10 @@ model InviteCode {
   uses         Int           @default(0)
   note         String        @default("")
   expiresAt    DateTime?
+  /// #43: who a member referred with this code, and when the email went out. Empty means not sent yet.
+  referredName  String       @default("")
+  referredEmail String       @default("")
+  sentAt        DateTime?
   createdAt    DateTime      @default(now())
   createdById  String?
   createdBy    User?         @relation(fields: [createdById], references: [id])

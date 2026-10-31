@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { JoinEntryBanner } from "@/components/already-signed-in";
 import { Banner } from "@/components/banner";
-import { ColleagueInvite } from "@/components/colleague-invite";
 import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
@@ -35,9 +34,8 @@ export default async function FeedPage({
   const notice = typeof params.notice === "string" ? params.notice : undefined;
   const submittedId = typeof params.submitted === "string" ? params.submitted : "";
 
-  const [application, ownedCodes, outreachSent, ledgerProjects, circle] = await Promise.all([
+  const [application, outreachSent, ledgerProjects, circle] = await Promise.all([
     prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
-    prisma.inviteCode.findMany({ where: { createdById: user.id } }),
     prisma.projectContact.count({ where: { fromId: user.id } }),
     loadLedgerProjects(user, { filters }),
     loadMyCircle(user),
@@ -57,7 +55,6 @@ export default async function FeedPage({
     hasPhoto: Boolean(user.photoId),
     hasCredential: Boolean(user.licenses?.trim()),
   });
-  const unusedCodes = ownedCodes.filter((code) => code.uses < code.maxUses).map((code) => ({ code: code.code, note: code.note }));
 
   const circlePanel = (
     <div className="rounded border border-line bg-paper p-5" data-testid="ledger-circle">
@@ -107,12 +104,10 @@ export default async function FeedPage({
         <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} />
         <div className="mt-4 space-y-4 lg:hidden">
           {circlePanel}
-          <ColleagueInvite codes={unusedCodes} />
         </div>
       </section>
       <aside className="hidden space-y-4 lg:block">
         {circlePanel}
-        <ColleagueInvite codes={unusedCodes} />
       </aside>
     </div>
   );

@@ -2,6 +2,15 @@
 import type { Locale } from "@/lib/i18n/messages";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "Referrals left": ["Recomendaciones disponibles", "Verbleibende Empfehlungen", "残りの紹介数"],
+  "Your referrals": ["Sus recomendaciones", "Ihre Empfehlungen", "あなたの紹介"],
+  "Applied": ["Solicitó", "Beworben", "申請済み"],
+  "No referrals yet.": ["Aún no hay recomendaciones.", "Noch keine Empfehlungen.", "まだ紹介はありません。"],
+  "You have no referrals left.": ["No le quedan recomendaciones.", "Sie haben keine Empfehlungen mehr übrig.", "紹介できる残り枠はありません。"],
+  "You already referred this person.": ["Ya recomendó a esta persona.", "Sie haben diese Person bereits empfohlen.", "この方はすでに紹介済みです。"],
+  "Recommend someone you have worked with. We email them a link to apply; every application is personally reviewed.": ["Recomiende a alguien con quien haya trabajado. Le enviamos por correo un enlace para solicitar; cada solicitud se revisa personalmente.", "Empfehlen Sie jemanden, mit dem Sie gearbeitet haben. Wir senden ihm einen Link zur Bewerbung; jede Bewerbung wird persönlich geprüft.", "一緒に仕事をした方を紹介してください。申請用のリンクをメールでお送りします。すべての申請は個別に審査されます。"],
+  "We email your colleague a link to apply with your referral already filled in. Every application is personally reviewed.": ["Enviamos a su colega un enlace para solicitar con su recomendación ya incluida. Cada solicitud se revisa personalmente.", "Wir senden Ihrem Kollegen einen Bewerbungslink, in dem Ihre Empfehlung bereits eingetragen ist. Jede Bewerbung wird persönlich geprüft.", "あなたの紹介が入力済みの申請リンクを同僚にメールでお送りします。すべての申請は個別に審査されます。"],
+  "We emailed {name} your referral with a link to apply. Their application is still personally reviewed.": ["Enviamos a {name} su recomendación con un enlace para solicitar. Su solicitud igualmente se revisa personalmente.", "Wir haben {name} Ihre Empfehlung mit einem Bewerbungslink gesendet. Die Bewerbung wird dennoch persönlich geprüft.", "{name} に申請用リンク付きの紹介メールを送りました。申請は引き続き個別に審査されます。"],
   "Pending staff review": ["Pendiente de revisión del personal", "Prüfung durch das Team ausstehend", "スタッフ確認待ち"],
   "Staff review each new category (licensed ones against public records) before it counts. Add the license or credential for it below.": ["El personal revisa cada categoría nueva (las que requieren licencia, contra registros públicos) antes de que cuente. Agregue abajo la licencia o credencial correspondiente.", "Das Team prüft jede neue Kategorie (lizenzpflichtige anhand öffentlicher Register), bevor sie zählt. Tragen Sie unten die Lizenz oder den Nachweis dafür ein.", "新しいカテゴリーは、有効になる前にスタッフが確認します（免許が必要なものは公的記録と照合）。下にそのカテゴリーの免許や資格を入力してください。"],
   "Category approved": ["Categoría aprobada", "Kategorie freigegeben", "カテゴリーが承認されました"],
