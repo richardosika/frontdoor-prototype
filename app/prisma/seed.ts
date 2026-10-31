@@ -1524,4 +1524,11 @@ async function ensureMultiCategoryDemo() {
   for (const [id, extraCategories] of Object.entries(combos)) {
     await prisma.user.updateMany({ where: { id, extraCategories: "" }, data: { extraCategories } });
   }
+  // Maple Court also seeks the second categories, so the combos show up on Opportunities and Find your team.
+  const maple = await prisma.trackProject.findFirst({ where: { name: "Sample: Maple Court Townhomes" }, select: { id: true, seeking: true } });
+  if (maple) {
+    const have = maple.seeking.split(",").filter(Boolean);
+    const want = [...new Set([...have, "SURETY_BONDING", "STRUCTURAL_ENGINEER", "PROPERTY_MANAGER"])];
+    if (want.length !== have.length) await prisma.trackProject.update({ where: { id: maple.id }, data: { seeking: want.join(",") } });
+  }
 }
