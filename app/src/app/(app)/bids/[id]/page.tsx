@@ -76,7 +76,7 @@ function PlansList({ plans, tx }: { plans: { id: string; fileName: string; sizeB
             <a href={`/api/bid-plans/${plan.id}`} target="_blank" rel="noreferrer" className="font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]" data-testid="bid-plan-link">
               {plan.fileName}
             </a>
-            <span className="text-[13px] text-mut">{(plan.sizeBytes / 1024 / 1024).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB</span>
+            <span className="text-[13px] text-mut">{plan.sizeBytes < 1024 * 1024 ? `${Math.max(1, Math.round(plan.sizeBytes / 1024)).toLocaleString("en-US")} KB` : `${(plan.sizeBytes / 1024 / 1024).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB`}</span>
           </li>
         ))}
       </ul>
