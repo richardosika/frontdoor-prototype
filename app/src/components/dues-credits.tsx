@@ -1,5 +1,5 @@
 import { currentMonthlyCents, formatMoney } from "@/lib/dues";
-import { formatLongEtDate } from "@/lib/format";
+import { numberLocale } from "@/lib/money";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { nextChargeAfterCredits } from "@/lib/vendor-suggestions";
@@ -18,7 +18,7 @@ export async function DuesCredits({ user }: { user: { id: string; role: string; 
       <p className="font-semibold">{tx("Referral credits")}</p>
       {monthly > 0 && available > 0 ? (
         <p className="mt-1" data-testid="next-charge-after-credit">
-          {tx("Next dues charge")} {user.renewalAt ? formatLongEtDate(user.renewalAt) : ""}: {formatMoney(next.cents, locale)} ({tx("credit")} −{formatMoney(next.creditCents, locale)}).
+          {tx("Next dues charge")} {user.renewalAt ? new Intl.DateTimeFormat(numberLocale(locale), { dateStyle: "long", timeZone: "America/New_York" }).format(user.renewalAt) : ""}: {formatMoney(next.cents, locale)} ({tx("credit")} −{formatMoney(next.creditCents, locale)}).
           {available > 1 ? ` ${available} ${tx("free months available.")}` : ""}
         </p>
       ) : null}

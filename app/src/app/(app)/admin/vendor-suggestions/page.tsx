@@ -44,9 +44,9 @@ export default async function VendorSuggestionsAdminPage() {
           </div>
         ))}
       </div>
-      <div className="mt-5 grid grid-cols-1 items-start gap-5 lg:grid-cols-[2.4fr_1fr]">
+      <div className="mt-5 grid grid-cols-1 items-start gap-5 2xl:grid-cols-[2.4fr_1fr]">
         <section className={`${card} px-3 py-2`} data-testid="suggestion-queue">
-          <div className="hidden grid-cols-[1.3fr_1.1fr_1fr_0.9fr_0.8fr_1.4fr] gap-3 border-b border-line px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-mut md:grid">
+          <div className="hidden grid-cols-[1.4fr_1.1fr_1fr_0.9fr_0.9fr_minmax(220px,1.3fr)] gap-3 border-b border-line px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-mut lg:grid">
             <span>Vendor</span><span>Suggested by</span><span>Category</span><span>Location</span><span>Status</span><span>Actions</span>
           </div>
           {rows.length === 0 ? <p className="p-3 text-[14px] text-mut">No suggestions yet.</p> : null}
@@ -55,7 +55,7 @@ export default async function VendorSuggestionsAdminPage() {
             const code = row.inviteCodeId ? codeById.get(row.inviteCodeId) : undefined;
             const status = row.status as SuggestionStatus;
             return (
-              <div key={row.id} className="grid grid-cols-1 gap-1.5 border-b border-line px-2 py-3 text-[14px] text-ink last:border-0 md:grid-cols-[1.3fr_1.1fr_1fr_0.9fr_0.8fr_1.4fr] md:gap-3" data-testid="admin-suggestion-row">
+              <div key={row.id} className="grid grid-cols-1 gap-1.5 border-b border-line px-2 py-3 text-[14px] text-ink last:border-0 lg:grid-cols-[1.4fr_1.1fr_1fr_0.9fr_0.9fr_minmax(220px,1.3fr)] lg:gap-3" data-testid="admin-suggestion-row">
                 <div className="min-w-0">
                   <p className="font-semibold text-forest [overflow-wrap:anywhere]">{row.vendorName || (row.company ? row.company : "—")}</p>
                   <p className="text-[12px] text-mut [overflow-wrap:anywhere]">{demandOnly ? "No specific vendor" : row.vendorName ? row.company || row.website || "No website" : row.website || "No website"}</p>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { approveVendorSuggestion, declineVendorSuggestion } from "@/actions/vendor-suggestions";
 
-const sm = "inline-flex min-h-9 items-center rounded-sm px-3 text-[12px] font-semibold";
+const sm = "inline-flex min-h-9 items-center whitespace-nowrap rounded-sm px-3 text-[12px] font-semibold";
 const gold = `${sm} bg-brass text-forest`;
 const ghost = `${sm} border border-line bg-paper text-ink`;
 
@@ -32,7 +32,7 @@ export function VendorSuggestionActions({ id, status, link, applicationHref, dem
     }
   }
   return (
-    <div className="flex flex-wrap gap-1.5" data-testid="suggestion-actions">
+    <div className="flex flex-wrap content-start items-start gap-1.5" data-testid="suggestion-actions">
       {status === "IN_REVIEW" && !demandOnly ? (
         <button type="button" className={gold} disabled={busy} onClick={() => run("approve")} data-testid="approve-suggestion">
           Approve &amp; create referral link
