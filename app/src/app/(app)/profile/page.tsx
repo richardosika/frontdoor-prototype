@@ -1,5 +1,6 @@
 import { Banner } from "@/components/banner";
 import { BidsWon } from "@/components/bids-won";
+import { ReferralRecognition } from "@/components/referral-recognition";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
@@ -41,6 +42,7 @@ export default async function ProfilePage({
         blockedByThem={false}
         ownDeals={loaded.ownDeals}
       />
+      <ReferralRecognition memberId={loaded.member.id} />
       <BidsWon memberId={loaded.member.id} />
     </div>
   );

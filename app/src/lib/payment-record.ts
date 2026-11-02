@@ -137,6 +137,13 @@ export async function activatePaidMembership(input: {
       { templateKey: "admin_payment_received", applicationId: application?.id ?? null },
     );
   }
+  // Suggest a vendor: a referred vendor's first dues payment grants the member's credit; a renewal uses up a credit.
+  {
+    const { consumeDuesCredit, syncSuggestionsQuietly } = await import("@/lib/vendor-suggestions-db");
+    if (!first && !sameCharge) await consumeDuesCredit(user.id).catch(() => null);
+    const referred = await prisma.application.findFirst({ where: { userId: user.id, inviteCodeId: { not: null } }, select: { inviteCodeId: true } }).catch(() => null);
+    if (referred?.inviteCodeId) await syncSuggestionsQuietly({ inviteCodeId: referred.inviteCodeId });
+  }
   return { first, renewalAt };
 }
 

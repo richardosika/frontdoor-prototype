@@ -1,4 +1,5 @@
 import { currentLocale, serverTx } from "@/lib/i18n/server";
+import { DuesCredits } from "@/components/dues-credits";
 import Link from "next/link";
 import { cancelMembership } from "@/actions/payments";
 import { addSimulatedCard, pauseMembership, removeBackupCard, resumeMembershipNow, swapPaymentMethods } from "@/actions/billing";
@@ -152,6 +153,7 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
       <section id="billing" className={`${card} mt-4 p-4 text-sm`} data-testid="billing-free">
         <h2 className={h2}>{tx("Membership")}</h2>
         <p className="mt-2 text-[15px] text-ink">{tx("Membership is free for your role. There is nothing to pay.")}</p>
+        <DuesCredits user={user} />
         <p className="mt-3">
           <Link href="/legal/membership-dues" className="underline decoration-brass">
             {tx("Membership Dues and Refund Terms")}
@@ -173,6 +175,7 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
         <Receipt user={user} />
         {user.waiverReason ? <p>Waiver: {user.waiverReason}</p> : null}
       </div>
+      <DuesCredits user={user} />
 
       <h3 className="mt-5 font-serif text-lg text-forest">{tx("Payment methods")}</h3>
       <p className="mt-1 text-[14px] text-mut">{tx("If a charge on the primary card fails, the backup card is charged. Card numbers stay at Stripe.")}</p>

@@ -100,3 +100,46 @@ export async function deliverAdminNotice(
     console.error("Admin email failed", error);
   }
 }
+
+/** Admin email + in-app alert content for a new member vendor suggestion. */
+export function vendorSuggestionAdminNotice(input: {
+  base: string;
+  suggestionId: string;
+  memberName: string;
+  vendor: string;
+  company: string;
+  category: string;
+  location: string;
+  relation: string;
+  nameOk: boolean;
+  website?: string;
+  contact?: string;
+  note?: string;
+}) {
+  const who = input.vendor || input.company || "No specific vendor";
+  const subject = `New vendor suggestion: ${who} · ${input.category} · ${input.location}`;
+  const link = `${trimBase(input.base)}/admin/vendor-suggestions`;
+  const text = [
+    `A member suggested a vendor.`,
+    ``,
+    `Suggested by: ${input.memberName}`,
+    `Vendor: ${input.vendor || "—"}`,
+    `Company: ${input.company || "—"}`,
+    `Category: ${input.category}`,
+    `Location: ${input.location}`,
+    input.website ? `Website: ${input.website}` : "",
+    input.contact ? `Contact: ${input.contact}` : "",
+    `How they know them: ${input.relation}`,
+    `OK to mention the member's name: ${input.nameOk ? "Yes" : "No"}`,
+    input.note ? `Note: ${input.note}` : "",
+    ``,
+    `Open the queue: ${link}`,
+  ]
+    .filter((line, i, all) => line !== "" || (all[i - 1] ?? "") !== "")
+    .join("\n");
+  return {
+    subject,
+    text,
+    alert: { title: subject, body: `${input.memberName} suggested ${who} (${input.category}, ${input.location}).`, href: `/admin/vendor-suggestions` },
+  };
+}

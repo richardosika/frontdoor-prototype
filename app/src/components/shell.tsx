@@ -196,6 +196,19 @@ export function Shell({
               {referrals}
             </span>
           </Link>
+          {/* Suggest a vendor: private suggestions, personally reviewed. */}
+          <Link
+            href="/suggest"
+            data-testid="nav-suggest"
+            aria-label={phrase(locale, "Suggest a vendor")}
+            className={`relative flex min-h-11 items-center justify-center gap-3 rounded-sm px-3 py-3 font-serif text-[17px] lg:justify-start ${
+              pathname.startsWith("/suggest") ? "bg-brass/15 text-paper" : "text-sand hover:bg-paper/10"
+            }`}
+          >
+            {pathname.startsWith("/suggest") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
+            <span className="grid h-6 w-6 place-items-center text-lg">＋</span>
+            <span className="hidden lg:inline">{phrase(locale, "Suggest a vendor")}</span>
+          </Link>
           {user.isAdmin ? (
             <Link
               href="/admin"
@@ -303,6 +316,9 @@ export function Shell({
             <Link href="/refer" data-testid="menu-refer" className="flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {phrase(locale, "Refer a colleague")}
               <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{referrals}</span>
+            </Link>
+            <Link href="/suggest" data-testid="menu-suggest" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+              {phrase(locale, "Suggest a vendor")}
             </Link>
             {user.isAdmin ? (
               <Link href="/admin" className="flex min-h-11 items-center gap-2 border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>

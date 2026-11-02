@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Banner } from "@/components/banner";
 import { BidsWon } from "@/components/bids-won";
+import { ReferralRecognition } from "@/components/referral-recognition";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
@@ -83,6 +84,7 @@ export default async function MemberPage({
         blockedByThem={loaded.blockedByThem}
       />
       )}
+      <ReferralRecognition memberId={loaded.member.id} />
       <BidsWon memberId={loaded.member.id} />
     </div>
   );

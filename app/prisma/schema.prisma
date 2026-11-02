@@ -299,6 +299,8 @@ model User {
   bidRequests             BidRequest[]     @relation("BidRequester")
   bidInboxes              BidRecipient[]
   bids                    Bid[]
+  vendorSuggestions       VendorSuggestion[] @relation("SuggestedBy")
+  duesCredits             DuesCredit[]
 
   @@index([paymentStatus])
 }
@@ -1236,4 +1238,46 @@ model Bid {
 
   @@unique([requestId, bidderId])
   @@index([bidderId])
+}
+
+/// Suggest a vendor (restored to match migration 20261102170000_vendor_suggestions).
+model VendorSuggestion {
+  id              String   @id @default(cuid())
+  suggestedById   String
+  suggestedBy     User     @relation("SuggestedBy", fields: [suggestedById], references: [id], onDelete: Cascade)
+  vendorName      String   @default("")
+  company         String   @default("")
+  category        String
+  location        String   @default("")
+  website         String   @default("")
+  contact         String   @default("")
+  relation        String   @default("WORKED")
+  note            String   @default("")
+  nameOk          Boolean  @default(false)
+  status          String   @default("IN_REVIEW")
+  inviteCodeId    String?  @unique
+  applicationId   String?  @unique
+  vendorUserId    String?
+  reviewedAt      DateTime?
+  reviewedById    String?
+  statusChangedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([suggestedById, createdAt])
+  @@index([status])
+}
+
+model DuesCredit {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  suggestionId       String    @unique
+  cents              Int       @default(0)
+  status             String    @default("AVAILABLE")
+  reason             String    @default("")
+  stripeBalanceTxnId String    @default("")
+  appliedAt          DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

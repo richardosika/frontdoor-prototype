@@ -50,7 +50,7 @@ export async function sendReferral(input: { firstName: string; lastName: string;
   const name = `${firstName} ${lastName}`.trim();
   let code = "";
   // Reuse a code issued to this member earlier and never sent, else mint one.
-  const spare = await prisma.inviteCode.findFirst({ where: { createdById: user.id, sentAt: null, uses: 0 }, orderBy: { createdAt: "asc" } });
+  const spare = await prisma.inviteCode.findFirst({ where: { createdById: user.id, sentAt: null, uses: 0, NOT: { note: { startsWith: "Vendor suggestion" } } }, orderBy: { createdAt: "asc" } });
   if (spare) {
     await prisma.inviteCode.update({ where: { id: spare.id }, data: { note: `Referral from ${user.name} for ${name}` } });
     code = spare.code;

@@ -69,7 +69,7 @@ const SCORE_I18N = /puntuaci(ó|o)n|puntaje|calificaci(ó|o)n de verificaci|fuen
 const INJECTION_I18N = /ignora (las|tus|todas)|olvida (las|tus) (reglas|instrucciones)|cambia (las|tus) reglas|nuevas instrucciones|ignoriere|vergiss (die|deine|alle)|(ä|a)ndere (die|deine) regeln|neue anweisungen|systemprompt|指示を無視|ルールを(変更|無視|変え)|システムプロンプト|制限を解除/i;
 const BANNED = /\b(invite|invited|invites|invitation|founding member|limited)\b|invitar|invitaci|einlad|招待/i;
 const FORBIDDEN = /\b(ofac|courtlistener|edgar|duckduckgo|wikidata|gdelt|sdn|watchlists?|sanctions lists?|internal score|verification score)\b/i;
-export const ALLOWED_LINKS = ["/feed", "/profile", "/refer", "/viewers", "/messages", "/deals", "/network", "/member-nda", "/settings", "/alerts"];
+export const ALLOWED_LINKS = ["/feed", "/profile", "/refer", "/suggest", "/viewers", "/messages", "/deals", "/network", "/member-nda", "/settings", "/alerts"];
 
 export function prefilter(question: string): keyof typeof T | null {
   const kind = classifyQuestion(question);

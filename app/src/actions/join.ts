@@ -156,6 +156,10 @@ export async function submitJoinApplication(
   const company = profile.company.trim();
   // The applicant sees the status page right away. Thank-you letter, admin email and alert, and verification run after the response.
   after(async () => {
+    if (invite) {
+      const { syncSuggestionsQuietly } = await import("@/lib/vendor-suggestions-db");
+      await syncSuggestionsQuietly({ inviteCodeId: invite.id });
+    }
     await sendTemplate({
       key: "application_thanks",
       to: email,
