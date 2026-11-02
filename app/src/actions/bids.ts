@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { BID_PDF_MAX, canDecide, canEditBid, cleanQuestions, isPdf, missingFields, parseFields, readBidValues, ANSWER_MAX } from "@/lib/bids";
 import { bidAccess, bidNotice, parseQuestions } from "@/lib/bids-db";
 import type { BidField } from "@/lib/bid-templates";
+import { PLAN_MAX_BYTES, PLAN_MAX_FILES, canOpenRequest, isOpenToGcs, planType, safePlanName } from "@/lib/bid-plans";
 
 function go(path: string, key: "error" | "notice", text: string): never {
   redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(text)}`);
@@ -30,7 +31,18 @@ export async function createBidRequest(formData: FormData) {
   const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? new Date(`${dueRaw}T17:00:00-05:00`) : null;
   if (!dueAt || dueAt.getTime() < Date.now()) go(back, "error", "Pick a due date in the future.");
   const recipients = [...new Set(formData.getAll("recipient").map(String))].filter((id) => access.allowed.has(id));
-  if (!recipients.length) go(back, "error", "Select at least one member to send this request to.");
+  // General-contractor requests are open to every verified GC, so picking members is optional there.
+  if (!recipients.length && !isOpenToGcs(template.category)) go(back, "error", "Select at least one member to send this request to.");
+  const planFiles = formData.getAll("plans").filter((f): f is File => f instanceof File && f.size > 0);
+  if (planFiles.length > PLAN_MAX_FILES) go(back, "error", "Attach up to 5 plan files.");
+  const plans: { fileName: string; contentType: string; sizeBytes: number; bytes: Uint8Array<ArrayBuffer> }[] = [];
+  for (const file of planFiles) {
+    if (file.size > PLAN_MAX_BYTES) go(back, "error", "Each plan file can be up to 25 MB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const contentType = planType(file.name, bytes);
+    if (!contentType) go(back, "error", "Plans must be PDF, DWG, PNG, JPG or WebP files.");
+    plans.push({ fileName: safePlanName(file.name), contentType, sizeBytes: file.size, bytes });
+  }
   const questions = cleanQuestions(formData.getAll("question"));
   const int = (k: string) => {
     const n = Number(String(formData.get(k) || "").replace(/[,\s]/g, ""));
@@ -48,26 +60,44 @@ export async function createBidRequest(formData: FormData) {
       squareFeet: int("squareFeet"),
       basisNote: String(formData.get("basisNote") || "").trim().slice(0, 300),
       recipients: { create: recipients.map((memberId) => ({ memberId })) },
+      plans: { create: plans },
     },
   });
   const people = await prisma.user.findMany({ where: { id: { in: recipients }, status: "ACTIVE" }, select: { id: true, email: true, locale: true } });
   for (const p of people) await bidNotice(p, "request", { name: user.name, project: access.project.name, due: dueLabel(dueAt) }, `/bids/${request.id}`);
+  if (isOpenToGcs(template.category)) {
+    // Open request: an in-app alert to verified general contractors (picked members already got the email above).
+    const gcs = await prisma.user.findMany({
+      where: { role: "GENERAL_CONTRACTOR", status: "ACTIVE", paymentStatus: { in: ["PAID", "WAIVED", "NOT_REQUIRED"] }, id: { notIn: [user.id, ...recipients] } },
+      select: { id: true },
+      take: 500,
+    });
+    await prisma.notification.createMany({
+      data: gcs.map((gc) => ({ userId: gc.id, title: "New bid request open to general contractors", body: `${access.project.name} · ${dueLabel(dueAt)}`, href: `/bids/${request.id}` })),
+    }).catch(() => null);
+  }
   refresh();
   go(`/bids/${request.id}`, "notice", "Request sent.");
 }
 
-async function loadForBidder(requestId: string, userId: string) {
-  return prisma.bidRequest.findFirst({
-    where: { id: requestId, recipients: { some: { memberId: userId } } },
-    include: { template: true, project: { select: { name: true } }, requester: { select: { id: true, email: true, locale: true, name: true } }, bids: { where: { bidderId: userId } } },
+async function loadForBidder(requestId: string, user: { id: string; role: string; status: string; paymentStatus: string }) {
+  const req = await prisma.bidRequest.findUnique({
+    where: { id: requestId },
+    include: { template: true, project: { select: { name: true } }, requester: { select: { id: true, email: true, locale: true, name: true } }, bids: { where: { bidderId: user.id } }, recipients: { select: { memberId: true } } },
   });
+  if (!req) return null;
+  const access = canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category });
+  if (access !== "recipient" && access !== "open") return null;
+  // An open request: a verified GC who bids joins the recipients so the request shows on their Bids page.
+  if (access === "open") await prisma.bidRecipient.upsert({ where: { requestId_memberId: { requestId, memberId: user.id } }, update: {}, create: { requestId, memberId: user.id } });
+  return req;
 }
 
 export async function saveBid(formData: FormData) {
   const user = await requireUser();
   const requestId = String(formData.get("requestId") || "");
   const back = `/bids/${requestId}`;
-  const req = await loadForBidder(requestId, user.id);
+  const req = await loadForBidder(requestId, user);
   if (!req) go("/bids", "error", "This request is not available.");
   const existing = req.bids[0];
   if (!canEditBid({ requestStatus: req.status, dueAt: req.dueAt, bidStatus: existing?.status })) go(back, "error", "This request is closed for changes.");

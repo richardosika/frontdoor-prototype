@@ -8,6 +8,7 @@ import type { BidField } from "@/lib/bid-templates";
 import { bestPerRow, canDecide, canEditBid, numeric, parseFields, parseJson, perUnit } from "@/lib/bids";
 import { parseQuestions, profileFacts } from "@/lib/bids-db";
 import { requireUser } from "@/lib/current-user";
+import { canOpenRequest } from "@/lib/bid-plans";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 
@@ -38,12 +39,14 @@ export default async function BidRequestPage({ params, searchParams }: { params:
       requester: { select: { id: true, name: true, org: true } },
       template: true,
       recipients: { select: { memberId: true } },
+      plans: { select: { id: true, fileName: true, sizeBytes: true, contentType: true } },
     },
   });
   // Outsiders see nothing, not even that the request exists. Staff manage templates, not bids.
   if (!req) return <NotAvailable tx={tx} />;
   const isRequester = req.requesterId === user.id;
-  const isRecipient = req.recipients.some((r) => r.memberId === user.id);
+  // General-contractor requests are open: any verified GC can view the plans and bid without being picked.
+  const isRecipient = !isRequester && canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category }) !== null;
   // Staff: read-only view of the comparison and PDFs. No actions on behalf of members.
   const isStaff = !isRequester && !isRecipient && user.isAdmin;
   if (!isRequester && !isRecipient && !isStaff) return <NotAvailable tx={tx} />;
@@ -54,11 +57,31 @@ export default async function BidRequestPage({ params, searchParams }: { params:
     <>
       <Link href={isStaff ? "/admin/bids" : isRequester ? `/projects/${req.project.id}` : "/bids"} className="inline-flex min-h-11 items-center text-[15px] text-forest underline decoration-brass">‹ {isStaff ? "Admin · Bids" : isRequester ? req.project.name : tx("Bids")}</Link>
       {isStaff ? <p className="mt-2 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]" data-testid="staff-readonly">Staff view · read-only. Requested by {req.requester.name} ({req.requester.org}). Members cannot see each other&apos;s bids; staff cannot act for them here.</p> : null}
+      <PlansList plans={req.plans} tx={tx} />
       {q.error || q.notice ? <div className="mt-2"><Banner error={q.error ? tx(q.error) : undefined} notice={q.notice ? tx(q.notice) : undefined} /></div> : null}
     </>
   );
   if (isRequester || isStaff) return <Compare readOnly={isStaff} req={req} fields={fields} questions={questions} tx={tx} locale={locale} due={due} head={head} />;
   return <BidForm req={req} fields={fields} questions={questions} userId={user.id} tx={tx} locale={locale} due={due} head={head} />;
+}
+
+function PlansList({ plans, tx }: { plans: { id: string; fileName: string; sizeBytes: number; contentType: string }[]; tx: (s: string) => string }) {
+  if (!plans.length) return null;
+  return (
+    <section className="mt-3 rounded border border-line bg-paper p-4" data-testid="bid-plans">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Construction plans")}</h2>
+      <ul className="mt-1">
+        {plans.map((plan) => (
+          <li key={plan.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2 last:border-0">
+            <a href={`/api/bid-plans/${plan.id}`} target="_blank" rel="noreferrer" className="font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]" data-testid="bid-plan-link">
+              {plan.fileName}
+            </a>
+            <span className="text-[13px] text-mut">{(plan.sizeBytes / 1024 / 1024).toLocaleString("en-US", { maximumFractionDigits: 1 })} MB</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 type Req = NonNullable<Awaited<ReturnType<typeof loadReq>>>;

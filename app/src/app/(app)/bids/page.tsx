@@ -15,13 +15,13 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
   const tx = await serverTx();
   const locale = await currentLocale();
   const q = await searchParams;
-  const { toDo, sent, requested } = await loadBidsHome(user.id);
+  const { toDo, sent, requested, open } = await loadBidsHome(user.id);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" });
   const row = "flex flex-wrap items-start justify-between gap-2 border-b border-line py-3 last:border-0";
   return (
     <div className="mx-auto max-w-4xl px-4 pb-24 pt-3 md:pb-8 md:pt-6 lg:px-8" data-testid="bids-home">
       <PageHeader title={tx("Bids")} />
-      <p className="mt-2 text-[16px] leading-relaxed text-ink">{tx("Proposals on projects you're part of. Only members already on a project can see its requests, and every proposal is private between the bidder and the requester.")}</p>
+      <p className="mt-2 text-[16px] leading-relaxed text-ink">{tx("Proposals on projects you're part of. Only members already on a project can see its requests, and every proposal is private between the bidder and the requester.")} {tx("General contractor requests are open to every verified general contractor.")}</p>
       {q.error || q.notice ? <div className="mt-3"><Banner error={q.error ? tx(q.error) : undefined} notice={q.notice ? tx(q.notice) : undefined} /></div> : null}
 
       <section className={`${card} mt-5 p-4 sm:p-5`} data-testid="bids-received">
@@ -39,6 +39,23 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
           ))}
         </ul>
       </section>
+
+      {open.length ? (
+        <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bids-open">
+          <h2 className={h2}>{tx("Open to verified general contractors")} · {open.length}</h2>
+          <ul>
+            {open.map((r) => (
+              <li key={r.id} className={row}>
+                <Link href={`/bids/${r.id}`} className="min-w-0">
+                  <span className="block font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{r.project.name}</span>
+                  <span className="block text-[14px] text-mut">{r.requester.name} · {r.project.location} · {r._count.plans} {tx("plan files")} · {tx("Due")} {date.format(r.dueAt)}</span>
+                </Link>
+                <StatusPill status="NEW" tx={tx} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bids-sent">
         <h2 className={h2}>{tx("Bids sent")} · {sent.length}</h2>

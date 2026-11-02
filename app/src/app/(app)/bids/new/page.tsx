@@ -1,3 +1,4 @@
+import { PLAN_ACCEPT } from "@/lib/bid-plans";
 import Link from "next/link";
 import { createBidRequest } from "@/actions/bids";
 import { Banner } from "@/components/banner";
@@ -56,9 +57,9 @@ export default async function NewBidRequest({ searchParams }: { searchParams: Pr
       <Link href={`/projects/${access.project.id}`} className="inline-flex min-h-11 items-center text-[15px] text-forest underline decoration-brass">‹ {access.project.name}</Link>
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Request proposals")}</p>
       <h1 className="font-serif text-[30px] leading-tight text-forest sm:text-[36px]">{access.project.name}</h1>
-      <p className="mt-1 text-[15px] text-mut">{tx("Only members accepted onto this project can see this request and submit a proposal.")}</p>
+      <p className="mt-1 text-[15px] text-mut">{tx("Only members accepted onto this project can see this request and submit a proposal.")} {tx("General contractor requests are open to every verified general contractor.")}</p>
       {q.error ? <div className="mt-3"><Banner error={tx(q.error)} /></div> : null}
-      <form action={createBidRequest} className="mt-4">
+      <form action={createBidRequest} className="mt-4" encType="multipart/form-data">
         <input type="hidden" name="projectId" value={access.project.id} />
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={h2}>1 · {tx("Choose an approved template")}</h2>
@@ -99,6 +100,12 @@ export default async function NewBidRequest({ searchParams }: { searchParams: Pr
             </label>
           ))}
           <p className="text-[13px] text-mut">{tx("Short answer, 500 characters max")}</p>
+        </section>
+
+        <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bid-plans-upload">
+          <h2 className={h2}>{tx("Construction plans")}</h2>
+          <input type="file" name="plans" multiple accept={PLAN_ACCEPT} className="block w-full text-[15px] file:mr-3 file:min-h-11 file:rounded-sm file:border file:border-forest file:bg-paper file:px-4 file:font-semibold file:text-forest" />
+          <p className="mt-2 text-[13px] text-mut">{tx("PDF, DWG or images, up to 5 files and 25 MB each. General contractor requests are open: any verified general contractor can view the plans and bid. No approval step.")}</p>
         </section>
 
         <section className={`${card} mt-4 p-4 sm:p-5`}>

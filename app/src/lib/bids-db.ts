@@ -1,3 +1,4 @@
+import { isVerifiedGc } from "@/lib/bid-plans";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { allowedRecipients, canRequestBids, parseJson } from "@/lib/bids";
@@ -94,9 +95,27 @@ export async function loadBidsHome(userId: string) {
       },
     }),
   ]);
+  // General-contractor requests are open to every verified GC.
+  const viewer = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true, paymentStatus: true } });
+  const receivedIds = new Set(received.map((r) => r.request.id));
+  const open = viewer && isVerifiedGc(viewer)
+    ? (
+        await prisma.bidRequest.findMany({
+          where: { status: "OPEN", dueAt: { gt: new Date() }, requesterId: { not: userId }, template: { category: "GENERAL_CONTRACTOR" } },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          include: {
+            project: { select: { id: true, name: true, location: true } },
+            requester: { select: { id: true, name: true, org: true } },
+            template: { select: { name: true, version: true } },
+            _count: { select: { plans: true } },
+          },
+        })
+      ).filter((r) => !receivedIds.has(r.id))
+    : [];
   const toDo = received.filter((r) => !r.request.bids.length || r.request.bids[0].status === "DRAFT");
   const sent = received.filter((r) => r.request.bids.length && r.request.bids[0].status !== "DRAFT");
-  return { toDo, sent, requested };
+  return { toDo, sent, requested, open };
 }
 
 export function parseQuestions(json: string): string[] {
