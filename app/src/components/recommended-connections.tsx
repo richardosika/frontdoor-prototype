@@ -3,7 +3,7 @@ import { Avatar } from "@/components/avatar";
 import { card } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
-import { circleIds } from "@/lib/project-contact-db";
+import { circleIds, staffNameSet } from "@/lib/project-contact-db";
 import { parseSeeking } from "@/lib/project-contact";
 import { formatReason, NOT_STAFF_WHERE, recommend, type RecProject } from "@/lib/recommendations";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -16,7 +16,7 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
   const projectSelect = { name: true, asset: true, city: true, state: true, location: true, reviewStatus: true, seeking: true, bidRequests: { where: { status: "OPEN" }, select: { template: { select: { category: true } } } } } as const;
   type Row = { name: string; asset: string; city: string; state: string; location: string; reviewStatus: string; seeking: string; bidRequests: { template: { category: string } }[] };
   const toProject = (p: Row): RecProject => ({ ...p, seeking: parseSeeking(p.seeking), bidCategories: p.bidRequests.map((b) => b.template.category) });
-  const [projects, circle, others] = await Promise.all([
+  const [projects, circle, others, staff] = await Promise.all([
     prisma.trackProject.findMany({ where: { userId: user.id, reviewStatus: { not: "DECLINED" } }, select: projectSelect }),
     circleIds(user.id),
     prisma.user.findMany({
@@ -25,9 +25,10 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
       take: 400,
       orderBy: { createdAt: "desc" },
     }),
+    staffNameSet(),
   ]);
   const seeking = [...new Set(projects.filter((p) => p.reviewStatus === "APPROVED").flatMap((p) => parseSeeking(p.seeking)))];
-  const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, others.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle);
+  const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, others.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle, 6, staff);
   if (!picks.length) return null;
   const byId = new Map(others.map((o) => [o.id, o]));
   return (

@@ -60,3 +60,15 @@ describe("recommendations: staff and specific reasons", () => {
     expect(formatReason(line, (s) => PHRASES[s]?.[0] ?? s)).toBe("También activo en TX");
   });
 });
+
+describe("recommendations: staff by name", () => {
+  it("leaves out another account under a staff member's name", () => {
+    const others = [{ id: "ro", name: "Richard Osika", role: "DEVELOPER", location: "Austin, TX", markets: "", assetClasses: "", extraCategories: "", email: "r@captiva.example" }];
+    expect(recommend(dev, others, new Set(), 6, new Set(["richard osika"]))).toEqual([]);
+    expect(recommend(dev, [{ ...others[0], name: "Stephanie De La Torre", id: "s" }], new Set(), 6, new Set(["richard osika"])).length).toBe(1);
+  });
+  it("reads the city from a street address", () => {
+    expect(cityOf("100 Test St, Houston, TX")).toBe("Houston");
+  });
+});
+import { cityOf } from "@/lib/recommendations";

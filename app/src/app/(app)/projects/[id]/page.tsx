@@ -1,4 +1,5 @@
 import { NOT_STAFF_WHERE } from "@/lib/recommendations";
+import { staffNameSet } from "@/lib/project-contact-db";
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { ProjectFacts } from "@/components/project-facts";
@@ -66,6 +67,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   // #42: the first of my categories this project seeks (or my primary one).
   const myCategory = memberCategories(viewer).find((id) => seeking.includes(id)) ?? memberCategories(viewer)[0] ?? null;
 
+  const staffNames = isOwner ? await staffNameSet() : new Set<string>();
   const matches = isOwner && project.reviewStatus === "APPROVED" && seeking.length
     ? (
         await prisma.user.findMany({
@@ -74,7 +76,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           orderBy: { name: "asc" },
           take: 24,
         })
-      ).filter(eligibleForDirectory).filter((member) => seeking.some((id) => memberInCategory(member, id)))
+      ).filter(eligibleForDirectory).filter((member) => !staffNames.has(member.name.trim().toLowerCase())).filter((member) => seeking.some((id) => memberInCategory(member, id)))
     : [];
   const ownDeals = isOwner ? await prisma.deal.findMany({ where: { sponsorId: viewer.id }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }) : [];
 

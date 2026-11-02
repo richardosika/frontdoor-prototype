@@ -17,6 +17,7 @@ export type RecMember = {
   extraCategories?: string;
   email?: string;
   isAdmin?: boolean;
+  name?: string;
   projects?: RecProject[];
 };
 
@@ -28,8 +29,9 @@ export type ReasonLine = { key: string; vars: Record<string, string>; t: string[
 export const STAFF_EMAIL_DOMAIN = "privatefloorclub.com";
 
 /** Staff and admin accounts: the admin flag, or a Private Floor staff address. Company members are not staff. */
-export function isStaffAccount(user: { isAdmin?: boolean | null; email?: string | null }): boolean {
+export function isStaffAccount(user: { isAdmin?: boolean | null; email?: string | null; name?: string | null }, staffNames: Set<string> = new Set()): boolean {
   if (user.isAdmin) return true;
+  if (user.name && staffNames.has(user.name.trim().toLowerCase())) return true;
   const domain = (user.email || "").trim().toLowerCase().split("@")[1] || "";
   return domain === STAFF_EMAIL_DOMAIN;
 }
@@ -53,7 +55,7 @@ export function stateOf(location: string): string {
 /** "Austin, TX" → "Austin". */
 export function cityOf(location: string): string {
   const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
-  return parts.length > 1 ? parts[0] : "";
+  return parts.length > 1 ? parts[parts.length - 2] : "";
 }
 
 const low = (v: string) => v.trim().toLowerCase();
@@ -155,10 +157,10 @@ export function recommendReasons(viewer: RecMember & { seeking: string[] }, othe
 
 const WEIGHT: Record<Reason["kind"], number> = { category: 3, location: 2, projectType: 1 };
 
-/** Top matches, best first. Staff are never recommended. Each pick carries one specific reason line. */
-export function recommend(viewer: RecMember & { seeking: string[] }, others: RecMember[], exclude: Set<string>, limit = 6) {
+/** Top matches, best first. Staff are never recommended: admins, staff addresses, and other accounts under a staff member's name. Each pick carries one specific reason line. */
+export function recommend(viewer: RecMember & { seeking: string[] }, others: RecMember[], exclude: Set<string>, limit = 6, staffNames: Set<string> = new Set()) {
   return others
-    .filter((other) => other.id !== viewer.id && !exclude.has(other.id) && !isStaffAccount(other))
+    .filter((other) => other.id !== viewer.id && !exclude.has(other.id) && !isStaffAccount(other, staffNames))
     .map((other) => {
       const reasons = recommendReasons(viewer, other);
       const line = reasonLine(viewer, other);
