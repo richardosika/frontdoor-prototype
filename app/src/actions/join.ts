@@ -27,6 +27,7 @@ import { publicStatusPath } from "@/lib/public-status";
 import { givenNameFrom } from "@/lib/person-fields";
 import type { RoleId } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
+import { deliverAdminNotice, newApplicationAdminNotice } from "@/lib/admin-alerts";
 import { queueApplicationVerification } from "@/lib/verify/queue";
 
 export async function checkJoinEmail(emailRaw: string): Promise<{ ok: true } | { ok: false; title: string; detail: string }> {
@@ -152,21 +153,38 @@ export async function submitJoinApplication(
   });
 
   const base = await appBaseUrl();
-  await sendTemplate({
-    key: "application_thanks",
-    to: email,
-    applicationId: application.id,
-    vars: buildMailVars({
-      name,
-      givenName,
-      role: joinRoleLabel(profile.role),
-      org: profile.company.trim(),
-      statusLink: `${base}${publicStatusPath(statusToken)}`,
-    }),
-    person: { name, role: profile.role, org: profile.company.trim(), location },
-  });
-  after(() => {
-    void queueApplicationVerification(application.id, profile.company.trim(), { network: true }).catch(() => undefined);
+  const company = profile.company.trim();
+  // The applicant sees the status page right away. Thank-you letter, admin email and alert, and verification run after the response.
+  after(async () => {
+    await sendTemplate({
+      key: "application_thanks",
+      to: email,
+      applicationId: application.id,
+      vars: buildMailVars({
+        name,
+        givenName,
+        role: joinRoleLabel(profile.role),
+        org: company,
+        statusLink: `${base}${publicStatusPath(statusToken)}`,
+      }),
+      person: { name, role: profile.role, org: company, location },
+    }).catch((error) => console.error("Application thank-you notice failed", error));
+    await deliverAdminNotice(
+      newApplicationAdminNotice({
+        base,
+        applicationId: application.id,
+        name,
+        role: joinRoleLabel(profile.role),
+        company,
+        email,
+        location,
+        phone: profile.phone.trim(),
+        website: normalizeWebUrl(profile.website),
+        referralCode: code || "",
+      }),
+      { templateKey: "admin_new_application", applicationId: application.id },
+    );
+    await queueApplicationVerification(application.id, company, { network: true }).catch(() => undefined);
   });
   return { ok: true, statusToken };
 }

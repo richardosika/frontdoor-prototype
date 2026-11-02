@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
+import { useTx } from "@/components/locale-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkJoinEmail, submitJoinApplication } from "@/actions/join";
@@ -24,6 +25,8 @@ import {
   PARTICIPATION,
   ROLE_SPECIALTIES,
   companyFieldsOptional,
+  joinErrorField,
+  websiteOptional,
   emptyProfile,
   pageKind,
   pageOneErrors,
@@ -41,6 +44,25 @@ import { SEEK_CATEGORIES, categoryForRole } from "@/lib/project-contact";
 import { publicStatusPath } from "@/lib/public-status";
 
 const RQ = <span className="text-[#9b2c22]"> *</span>;
+
+type FieldIssue = { key: string; message: string } | null;
+const IssueContext = createContext<FieldIssue>(null);
+
+/** Inline error shown directly under the field that failed. */
+function FieldError({ name }: { name: string }) {
+  const issue = useContext(IssueContext);
+  const tx = useTx();
+  if (!issue || issue.key !== name) return null;
+  return (
+    <p id={`join-error-${name}`} role="alert" className="mt-1 text-sm font-semibold text-[#9b2c22]">
+      {tx(issue.message)}
+    </p>
+  );
+}
+
+function Spinner() {
+  return <span aria-hidden="true" className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent align-[-2px]" />;
+}
 
 function ChipSet({
   options,
@@ -93,10 +115,34 @@ export function JoinApplication({
   const [riskError, setRiskError] = useState(false);
   const [ndaError, setNdaError] = useState(false);
   const [cardName, setCardName] = useState("");
+  const [issue, setIssue] = useState<FieldIssue>(null);
+  const tx = useTx();
 
   function patch(partial: Partial<JoinProfile>) {
     setProfile((current) => ({ ...current, ...partial }));
+    if (issue && issue.key in partial) {
+      setIssue(null);
+      setError("");
+    }
   }
+
+  /** Show the error next to its field, scroll there, and focus the input. Unknown fields fall back to the top banner. */
+  function showIssue(message: string) {
+    const key = joinErrorField(message);
+    setIssue({ key, message });
+    setError(message);
+    requestAnimationFrame(() => {
+      const box = document.querySelector<HTMLElement>(`[data-field="${key}"]`);
+      if (!box) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      box.scrollIntoView({ block: "center", behavior: "smooth" });
+      const input = box.matches("input,select,textarea") ? box : box.querySelector<HTMLElement>("input,select,textarea");
+      input?.focus({ preventScroll: true });
+    });
+  }
+  const inlineShown = () => !!issue && typeof document !== "undefined" && !!document.querySelector(`[data-field="${issue.key}"]`);
 
   async function onEmailBlur(email: string) {
     const result = await checkJoinEmail(email);
@@ -108,10 +154,11 @@ export function JoinApplication({
     const issues = pageOneErrors(profile);
     if (alert) return;
     if (issues.length) {
-      setError(issues[0]);
+      showIssue(issues[0]);
       return;
     }
     setError("");
+    setIssue(null);
     setStep(2);
     window.scrollTo(0, 0);
   }
@@ -122,28 +169,42 @@ export function JoinApplication({
     setNdaError(profile.acceptMemberNda !== true);
     const issues = pageTwoErrors(profile);
     if (issues.length) {
-      setError(issues[0]);
+      showIssue(issues[0]);
       return;
     }
     setPending(true);
     setError("");
+    setIssue(null);
     const data = new FormData(event.currentTarget);
     data.set("profile", JSON.stringify(profile));
-    const result = await submitJoinApplication(data);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
+    let result: Awaited<ReturnType<typeof submitJoinApplication>>;
+    try {
+      result = await submitJoinApplication(data);
+    } catch {
+      setPending(false);
+      showIssue("The application could not be sent. Check your connection and try again.");
       return;
     }
+    if (!result.ok) {
+      setPending(false);
+      // A server-side rule on a step 1 field (company website, email) sends the applicant back to that field.
+      const key = joinErrorField(result.error);
+      if (["firstName", "lastName", "email", "phone", "role", "company", "website", "street", "city", "state", "zip", "links"].includes(key)) setStep(1);
+      showIssue(result.error);
+      return;
+    }
+    // Keep the in-progress state on screen until the status page loads.
     router.push(publicStatusPath(result.statusToken));
   }
 
   const kind = pageKind(profile.role);
   const companyOptional = companyFieldsOptional(profile.role);
+  const siteOptional = websiteOptional(profile.role);
   const stateCopy = stateListCopy(profile.role);
   const specialty = ROLE_SPECIALTIES[profile.role as keyof typeof ROLE_SPECIALTIES];
 
   return (
+    <IssueContext.Provider value={issue}>
     <div className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-8">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brass">Private Floor Club · Membership</p>
       <h1 className="mt-2 font-serif text-4xl font-normal text-forest">{step === 2 ? "Tell us about your business" : "Request to join"}</h1>
@@ -163,21 +224,21 @@ export function JoinApplication({
             continuePage();
           }}
         >
-          <p className="mb-4 text-right text-sm text-mut"><span className="text-[#9b2c22]">*</span> Required</p>
+          <p className="mb-4 text-right text-sm text-mut"><span className="text-[#9b2c22]">*</span> {tx("Required")}</p>
           {alert ? (
             <div role="alert" className="mb-4 border border-[#9b2c22] border-l-4 bg-[#fbefec] p-4 text-[#9b2c22]">
               <b className="block">{alert.title}</b>
               <p className="mt-1 text-sm">{alert.detail}</p>
             </div>
           ) : null}
-          {error ? <p className="mb-4 text-sm font-semibold text-[#9b2c22]">{error}</p> : null}
+          {error && !inlineShown() ? <p role="alert" className="mb-4 text-sm font-semibold text-[#9b2c22]">{tx(error)}</p> : null}
           <h2 className="font-serif text-2xl font-normal">About you</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label="First name" required value={profile.firstName} onChange={(value) => patch({ firstName: value })} />
-            <Field label="Last name" required value={profile.lastName} onChange={(value) => patch({ lastName: value })} />
-            <Field label="Work email" required type="email" value={profile.email} onChange={(value) => patch({ email: value })} onBlur={onEmailBlur} />
-            <Field label="Mobile phone" required type="tel" value={profile.phone} onChange={(value) => patch({ phone: value })} />
-            <label className="sm:col-span-2">
+            <Field name="firstName" label="First name" required value={profile.firstName} onChange={(value) => patch({ firstName: value })} />
+            <Field name="lastName" label="Last name" required value={profile.lastName} onChange={(value) => patch({ lastName: value })} />
+            <Field name="email" label="Work email" required type="email" value={profile.email} onChange={(value) => patch({ email: value })} onBlur={onEmailBlur} />
+            <Field name="phone" label="Mobile phone" required type="tel" value={profile.phone} onChange={(value) => patch({ phone: value })} />
+            <label className="sm:col-span-2" data-field="role">
               <span className={labelCls}>Role{RQ}</span>
               <select className={field} value={profile.role} onChange={(event) => patch({ role: event.target.value })}>
                 {JOIN_ROLES.map((role) => (
@@ -210,15 +271,16 @@ export function JoinApplication({
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">Your company</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label="Company name" required={!companyOptional} optional={companyOptional} value={profile.company} onChange={(value) => patch({ company: value })} />
-            <Field label="Company website" inputMode="url" required={!companyOptional} optional={companyOptional} value={profile.website} onChange={(value) => patch({ website: value })} />
-            <label className="sm:col-span-2">
+            <Field name="company" label="Company name" required={!companyOptional} optional={companyOptional} value={profile.company} onChange={(value) => patch({ company: value })} />
+            <Field name="website" label="Company website" inputMode="url" required={!siteOptional} optional={siteOptional} value={profile.website} onChange={(value) => patch({ website: value })} />
+            <label className="sm:col-span-2" data-field="street">
               <span className={labelCls}>Business street address{RQ}</span>
-              <input className={field} value={profile.street} onChange={(event) => patch({ street: event.target.value })} />
+              <input className={field} aria-invalid={issue?.key === "street" || undefined} value={profile.street} onChange={(event) => patch({ street: event.target.value })} />
+              <FieldError name="street" />
             </label>
             <Field label="Suite / unit" optional value={profile.suite} onChange={(value) => patch({ suite: value })} />
-            <Field label="City" required value={profile.city} onChange={(value) => patch({ city: value })} />
-            <label>
+            <Field name="city" label="City" required value={profile.city} onChange={(value) => patch({ city: value })} />
+            <label data-field="state">
               <span className={labelCls}>State{RQ}</span>
               <select className={field} value={profile.state} onChange={(event) => patch({ state: event.target.value })}>
                 <option value="">Select a state</option>
@@ -226,12 +288,14 @@ export function JoinApplication({
                   <option key={state} value={state}>{state}</option>
                 ))}
               </select>
+              <FieldError name="state" />
             </label>
-            <Field label="ZIP" required value={profile.zip} onChange={(value) => patch({ zip: value })} />
+            <Field name="zip" label="ZIP" required value={profile.zip} onChange={(value) => patch({ zip: value })} />
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">Professional profile{RQ}</h2>
           <p className="mt-1 text-sm text-mut">Required: at least one link to LinkedIn (personal or company), or a business Instagram, Facebook, or YouTube page.</p>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2" data-field="links">
+            <FieldError name="links" />
             {profile.links.map((link, index) => (
               <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[200px_1fr_44px]">
                 <select className={field} value={link.kind} onChange={(event) => {
@@ -259,9 +323,10 @@ export function JoinApplication({
           </div>
         </form>
       ) : (
-        <form className="mt-6 min-w-0 rounded border border-line border-t-[3px] border-t-brass bg-cream p-4 sm:p-8" onSubmit={submit}>
+        <form className="mt-6 min-w-0 rounded border border-line border-t-[3px] border-t-brass bg-cream p-4 sm:p-8" onSubmit={submit} aria-busy={pending || undefined}>
+          <fieldset disabled={pending} className="min-w-0 border-0 p-0 m-0 disabled:opacity-70">
           <p className="mb-4 text-right text-sm text-mut"><span className="text-[#9b2c22]">*</span> Required</p>
-          {error ? <p className="mb-4 text-sm font-semibold text-[#9b2c22]">{error}</p> : null}
+          {error && !inlineShown() ? <p role="alert" className="mb-4 text-sm font-semibold text-[#9b2c22]">{tx(error)}</p> : null}
           <h2 className="font-serif text-2xl font-normal">Company details</h2>
           <p className="text-sm text-mut">Your company name and website come from step 1.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -271,7 +336,7 @@ export function JoinApplication({
               <span className={labelCls}>What makes your company stand out (optional)</span>
               <textarea className={field} rows={3} value={profile.standout} onChange={(event) => patch({ standout: event.target.value })} />
             </label>
-            <Field label="Your title" required value={profile.title} onChange={(value) => patch({ title: value })} />
+            <Field name="title" label="Your title" required value={profile.title} onChange={(value) => patch({ title: value })} />
             <Field label="Year founded" optional value={profile.yearFounded} onChange={(value) => patch({ yearFounded: value })} />
             <Field label="Your name as it appears professionally" optional value={profile.professionalName} onChange={(value) => patch({ professionalName: value })} />
             <Field label="Former names or companies" optional value={profile.formerNames} onChange={(value) => patch({ formerNames: value })} />
@@ -283,12 +348,14 @@ export function JoinApplication({
 
           <h2 className="mt-6 font-serif text-2xl font-normal">Where and what you work on</h2>
           <div className="mt-3 space-y-4">
-            <div>
+            <div data-field="regions">
               <p className={labelCls}>Regions{RQ}</p>
+              <FieldError name="regions" />
               <ChipSet options={JOIN_REGIONS} value={profile.regions} onChange={(regions) => patch({ regions })} />
             </div>
-            <div>
+            <div data-field="propertyTypes">
               <p className={labelCls}>Property types{RQ}</p>
+              <FieldError name="propertyTypes" />
               <ChipSet options={JOIN_PROPERTY_TYPES} value={profile.propertyTypes} onChange={(propertyTypes) => patch({ propertyTypes })} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -297,7 +364,8 @@ export function JoinApplication({
             </div>
           </div>
 
-          <section className="mt-6 min-w-0 rounded border border-brass bg-[#fbf5e6] p-4" data-role-details={profile.role}>
+          <section className="mt-6 min-w-0 rounded border border-brass bg-[#fbf5e6] p-4" data-role-details={profile.role} data-field="roleDetails">
+            <FieldError name="roleDetails" />
             <h2 className="font-serif text-2xl font-normal">{JOIN_ROLES.find((role) => role.id === profile.role)?.label}</h2>
             {kind === "developer" ? (
               <DeveloperFields profile={profile} onChange={patch} />
@@ -425,9 +493,10 @@ export function JoinApplication({
           <textarea className={`${field} mt-2`} rows={3} value={profile.lookingFor} onChange={(event) => patch({ lookingFor: event.target.value })} />
           <h2 className="mt-6 font-serif text-2xl font-normal">Your sign-in</h2>
           <div className="mt-2 max-w-sm">
-            <Field label="Password" required type="password" value={profile.password} onChange={(value) => patch({ password: value })} />
+            <Field name="password" label="Password" required type="password" value={profile.password} onChange={(value) => patch({ password: value })} />
           </div>
-          <label className="mt-4 flex items-start gap-2 text-sm">
+          <FieldError name="acceptTerms" />
+          <label className="mt-4 flex items-start gap-2 text-sm" data-field="acceptTerms">
             <input type="checkbox" className="mt-1" checked={profile.acceptTerms} onChange={(event) => patch({ acceptTerms: event.target.checked })} />
             <span>{termsLabel}</span>
           </label>
@@ -435,7 +504,7 @@ export function JoinApplication({
             <input type="checkbox" className="mt-1" checked={profile.acceptVerification} onChange={(event) => patch({ acceptVerification: event.target.checked })} />
             <span>{verificationLabel}</span>
           </label>
-          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${riskError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-risk">
+          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${riskError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-risk" data-field="acceptMemberRisk">
             <input
               type="checkbox"
               name="acceptMemberRisk"
@@ -461,7 +530,7 @@ export function JoinApplication({
               {MEMBER_RISK_ERROR}
             </p>
           ) : null}
-          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${ndaError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-nda">
+          <label className={`mt-3 flex items-start gap-2 rounded-sm border p-3 text-sm ${ndaError ? "border-[#9b2c22] bg-[#9b2c22]/5" : "border-brass/60 bg-paper"}`} data-testid="member-nda" data-field="acceptMemberNda">
             <input
               type="checkbox"
               name="acceptMemberNda"
@@ -489,15 +558,26 @@ export function JoinApplication({
           ) : null}
           <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-between">
             <button className={btnOutline} type="button" onClick={() => { setStep(1); window.scrollTo(0, 0); }}>Back</button>
-            <button className={btn} type="submit" disabled={pending}>{pending ? "Sending…" : "Submit request"}</button>
+            <button className={btn} type="submit" disabled={pending} aria-busy={pending || undefined}>
+              {pending ? <span className="inline-flex items-center gap-2"><Spinner />{tx("Submitting your application…")}</span> : tx("Submit request")}
+            </button>
           </div>
+          {pending ? (
+            <p role="status" aria-live="polite" className="mt-3 flex items-center justify-center gap-2 rounded border border-brass/60 bg-paper p-3 text-sm text-forest sm:justify-end">
+              <Spinner />
+              {tx("Submitting your application… This takes a few seconds. Keep this page open.")}
+            </p>
+          ) : null}
+          </fieldset>
         </form>
       )}
     </div>
+    </IssueContext.Provider>
   );
 }
 
 function Field({
+  name,
   label,
   value,
   onChange,
@@ -507,6 +587,7 @@ function Field({
   inputMode,
   onBlur,
 }: {
+  name?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -516,10 +597,14 @@ function Field({
   inputMode?: "url" | "text";
   onBlur?: (value: string) => void;
 }) {
+  const issue = useContext(IssueContext);
+  const tx = useTx();
+  const invalid = !!name && issue?.key === name;
   return (
-    <label className="min-w-0">
-      <span className={labelCls}>{label}{required ? RQ : null}{optional ? " (optional)" : ""}</span>
-      <input className={field} type={type} inputMode={inputMode} autoCapitalize={inputMode === "url" ? "none" : undefined} spellCheck={inputMode === "url" ? false : undefined} placeholder={inputMode === "url" ? "example.com" : undefined} value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onBlur?.(event.target.value)} />
+    <label className="min-w-0" data-field={name}>
+      <span className={labelCls}>{label}{required ? RQ : null}{optional ? ` ${tx("(optional)")}` : ""}</span>
+      <input name={name ? `join-${name}` : undefined} aria-invalid={invalid || undefined} aria-describedby={invalid ? `join-error-${name}` : undefined} className={`${field}${invalid ? " border-[#9b2c22]" : ""}`} type={type} inputMode={inputMode} autoCapitalize={inputMode === "url" ? "none" : undefined} spellCheck={inputMode === "url" ? false : undefined} placeholder={inputMode === "url" ? "example.com" : undefined} value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onBlur?.(event.target.value)} />
+      {name ? <FieldError name={name} /> : null}
     </label>
   );
 }

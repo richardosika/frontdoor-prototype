@@ -11,6 +11,7 @@ import { renewalInOneMonth, renewalReminderDue } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
 import { appBaseUrl } from "@/lib/url";
+import { deliverAdminNotice, paymentReceivedAdminNotice } from "@/lib/admin-alerts";
 
 /** Plain-text receipt. Amounts stay. The founder sign-off and sign-in link match the other letters. */
 export function paymentReceiptText(input: {
@@ -116,6 +117,25 @@ export async function activatePaidMembership(input: {
       }),
       templateKey: "payment_due",
     });
+  }
+  // Stripe sends checkout.session.completed and invoice.paid for the same first charge: one admin notice only.
+  const sameCharge = !first && !!user.paidAt && Date.now() - user.paidAt.getTime() < 10 * 60_000;
+  if (!sameCharge) {
+    const base = await appBaseUrl();
+    const application = await prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, select: { id: true } }).catch(() => null);
+    await deliverAdminNotice(
+      paymentReceivedAdminNotice({
+        base,
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        amount: formatMoney(first ? firstMonthCents(monthlyCents) : monthlyCents),
+        role: roleLabel(user.role),
+        mode: input.mode,
+        first,
+      }),
+      { templateKey: "admin_payment_received", applicationId: application?.id ?? null },
+    );
   }
   return { first, renewalAt };
 }

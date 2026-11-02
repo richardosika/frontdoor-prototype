@@ -58,7 +58,8 @@ describe("two-page join form", () => {
       const profile = ready(role);
       profile.company = "";
       profile.website = "";
-      expect(pageOneErrors(profile)).toEqual([]);
+      // Website is optional only for Developers.
+      expect(pageOneErrors(profile)).toEqual(role === "DEVELOPER" ? [] : ["Enter your company website."]);
     }
     for (const role of ["GENERAL_CONTRACTOR", "BROKER", "FAMILY_OFFICE", "LENDER", "INSURANCE"]) {
       const profile = ready(role);

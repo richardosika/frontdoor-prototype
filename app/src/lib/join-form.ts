@@ -96,6 +96,39 @@ export function companyFieldsOptional(role: string): boolean {
   return role === "DEVELOPER" || role === "INVESTOR_PE";
 }
 
+/** Company website: optional only for Developers, required for every other role. */
+export function websiteOptional(role: string): boolean {
+  return role === "DEVELOPER";
+}
+
+/** Which form field a validation message belongs to, so the form can show it inline and focus it. */
+export function joinErrorField(message: string): string {
+  const m = message.toLowerCase();
+  const table: [RegExp, string][] = [
+    [/first name/, "firstName"],
+    [/last name/, "lastName"],
+    [/email/, "email"],
+    [/phone/, "phone"],
+    [/pick a role/, "role"],
+    [/company name/, "company"],
+    [/company website/, "website"],
+    [/street/, "street"],
+    [/city/, "city"],
+    [/zip/, "zip"],
+    [/two-letter (us )?state/, "state"],
+    [/professional link/, "links"],
+    [/your title/, "title"],
+    [/region/, "regions"],
+    [/property type/, "propertyTypes"],
+    [/password/, "password"],
+    [/agreement boxes/, "acceptTerms"],
+  ];
+  if (message === MEMBER_RISK_ERROR) return "acceptMemberRisk";
+  if (message === MEMBER_NDA_ERROR) return "acceptMemberNda";
+  for (const [re, key] of table) if (re.test(m)) return key;
+  return "roleDetails";
+}
+
 export function showsProjects(role: string): boolean {
   return pageKind(role) !== "attorney";
 }
@@ -352,10 +385,8 @@ export function pageOneErrors(profile: JoinProfile): string[] {
   if (!isRoleId(profile.role) || !JOIN_ROLES.some((role) => role.id === profile.role)) errors.push("Pick a role.");
   const company = profile.company.trim();
   const website = profile.website.trim();
-  if (!companyFieldsOptional(profile.role) || company || website) {
-    if (company.length < 2) errors.push("Enter your company name.");
-    if (website.length < 4) errors.push("Enter your company website.");
-  }
+  if ((!companyFieldsOptional(profile.role) || company) && company.length < 2) errors.push("Enter your company name.");
+  if ((!websiteOptional(profile.role) || website) && website.length < 4) errors.push("Enter your company website.");
   errors.push(...validateAddress({ street: profile.street, city: profile.city, state: profile.state, zip: profile.zip }));
   if (!profile.links.some((link) => link.url.trim().length > 4)) {
     errors.push("Add at least one professional link: LinkedIn, business Instagram, Facebook, or YouTube.");
