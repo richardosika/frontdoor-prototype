@@ -15,7 +15,7 @@ export async function pairRelation(a: string, b: string) {
     { fromId: a, toId: b },
     { fromId: b, toId: a },
   ];
-  const [connection, intro, contact, block, admins] = await Promise.all([
+  const [connection, intro, contact, block, admins, memberIntro] = await Promise.all([
     prisma.connection.findFirst({ where: { status: "ACCEPTED", OR: pair }, select: { id: true } }),
     prisma.introduction.findFirst({ where: { status: "ACCEPTED", OR: pair }, select: { id: true } }),
     prisma.projectContact.findFirst({ where: { status: "ACCEPTED", OR: pair }, select: { id: true } }),
@@ -24,10 +24,12 @@ export async function pairRelation(a: string, b: string) {
       select: { id: true },
     }),
     prisma.user.count({ where: { id: { in: [a, b] }, isAdmin: true } }),
+    // A member who knows both introduced them.
+    prisma.memberIntroduction.findFirst({ where: { OR: [{ memberAId: a, memberBId: b }, { memberAId: b, memberBId: a }] }, select: { id: true } }),
   ]);
   return {
     inCircle: Boolean(connection),
-    introAccepted: Boolean(intro),
+    introAccepted: Boolean(intro) || Boolean(memberIntro),
     contactAccepted: Boolean(contact),
     blocked: Boolean(block),
     adminInvolved: admins > 0,

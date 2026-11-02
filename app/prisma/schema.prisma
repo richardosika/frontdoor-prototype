@@ -1296,3 +1296,18 @@ model BidPlan {
 
   @@index([requestId])
 }
+
+/// A member introduces two members they know to each other. Opens a thread between the two and lets them message.
+model MemberIntroduction {
+  id             String   @id @default(cuid())
+  introducerId   String
+  memberAId      String
+  memberBId      String
+  note           String   @default("")
+  conversationId String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@unique([introducerId, memberAId, memberBId])
+  @@index([memberAId])
+  @@index([memberBId])
+}
