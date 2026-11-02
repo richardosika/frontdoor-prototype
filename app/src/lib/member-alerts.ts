@@ -1,3 +1,4 @@
+import { NOT_STAFF_WHERE } from "@/lib/recommendations";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { categoryMemberWhere, memberCategories, memberInCategory, parseSeeking } from "@/lib/project-contact";
@@ -63,7 +64,7 @@ export async function alertProjectSeekers(projectId: string, onlyCategories?: st
   if (!categories.length) return 0;
   const people = (
     await prisma.user.findMany({
-      where: { id: { not: project.userId }, status: "ACTIVE", isAdmin: false, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(categories) as object) },
+      where: { id: { not: project.userId }, status: "ACTIVE", ...NOT_STAFF_WHERE, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(categories) as object) },
       select: { id: true, email: true, locale: true, notifyMatches: true, role: true, extraCategories: true },
     })
   ).filter((person) => categories.some((id) => memberInCategory(person, id)));

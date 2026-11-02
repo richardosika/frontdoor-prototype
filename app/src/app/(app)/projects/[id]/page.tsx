@@ -1,3 +1,4 @@
+import { NOT_STAFF_WHERE } from "@/lib/recommendations";
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { ProjectFacts } from "@/components/project-facts";
@@ -68,7 +69,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const matches = isOwner && project.reviewStatus === "APPROVED" && seeking.length
     ? (
         await prisma.user.findMany({
-          where: { status: "ACTIVE", id: { not: project.userId }, ...(categoryMemberWhere(seeking) as object) },
+          where: { status: "ACTIVE", ...NOT_STAFF_WHERE, id: { not: project.userId }, ...(categoryMemberWhere(seeking) as object) },
           select: { id: true, name: true, initials: true, photoId: true, role: true, extraCategories: true, org: true, location: true, status: true, paymentStatus: true },
           orderBy: { name: "asc" },
           take: 24,

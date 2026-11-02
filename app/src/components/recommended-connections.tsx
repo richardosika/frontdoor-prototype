@@ -5,7 +5,7 @@ import { serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { circleIds } from "@/lib/project-contact-db";
 import { parseSeeking } from "@/lib/project-contact";
-import { recommend } from "@/lib/recommendations";
+import { formatReason, NOT_STAFF_WHERE, recommend, type RecProject } from "@/lib/recommendations";
 import { roleLabel, roleShort } from "@/lib/roles";
 
 /** Recommended connections with the reason for each, from location, profession or category, and project type. */
@@ -13,18 +13,21 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
   const tx = await serverTx();
   const user = await prisma.user.findUnique({ where: { id: viewer.id }, select: { id: true, role: true, location: true, markets: true, assetClasses: true, extraCategories: true } });
   if (!user) return null;
+  const projectSelect = { name: true, asset: true, city: true, state: true, location: true, reviewStatus: true, seeking: true, bidRequests: { where: { status: "OPEN" }, select: { template: { select: { category: true } } } } } as const;
+  type Row = { name: string; asset: string; city: string; state: string; location: string; reviewStatus: string; seeking: string; bidRequests: { template: { category: string } }[] };
+  const toProject = (p: Row): RecProject => ({ ...p, seeking: parseSeeking(p.seeking), bidCategories: p.bidRequests.map((b) => b.template.category) });
   const [projects, circle, others] = await Promise.all([
-    prisma.trackProject.findMany({ where: { userId: user.id, reviewStatus: "APPROVED" }, select: { seeking: true } }),
+    prisma.trackProject.findMany({ where: { userId: user.id, reviewStatus: { not: "DECLINED" } }, select: projectSelect }),
     circleIds(user.id),
     prisma.user.findMany({
-      where: { status: "ACTIVE", isAdmin: false, id: { not: user.id }, paymentStatus: { in: ["PAID", "WAIVED", "NOT_REQUIRED"] } },
-      select: { id: true, name: true, initials: true, photoId: true, role: true, org: true, location: true, markets: true, assetClasses: true, extraCategories: true },
+      where: { status: "ACTIVE", ...NOT_STAFF_WHERE, id: { not: user.id }, paymentStatus: { in: ["PAID", "WAIVED", "NOT_REQUIRED"] } },
+      select: { id: true, name: true, initials: true, photoId: true, role: true, org: true, location: true, markets: true, assetClasses: true, extraCategories: true, email: true, isAdmin: true, projects: { where: { reviewStatus: "APPROVED" }, select: projectSelect } },
       take: 400,
       orderBy: { createdAt: "desc" },
     }),
   ]);
-  const seeking = [...new Set(projects.flatMap((p) => parseSeeking(p.seeking)))];
-  const picks = recommend({ ...user, seeking }, others, circle);
+  const seeking = [...new Set(projects.filter((p) => p.reviewStatus === "APPROVED").flatMap((p) => parseSeeking(p.seeking)))];
+  const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, others.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle);
   if (!picks.length) return null;
   const byId = new Map(others.map((o) => [o.id, o]));
   return (
@@ -39,13 +42,7 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
               <div className="min-w-0">
                 <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{m.name}</Link>
                 <p className="text-[13px] text-mut [overflow-wrap:anywhere]">{tx(roleShort(roleLabel(m.role)))} · {m.org}</p>
-                <ul className="mt-1 flex flex-wrap gap-1" data-testid="recommended-reasons">
-                  {pick.reasons.map((r) => (
-                    <li key={r.kind} className="rounded-full border border-[#E9D9B0] bg-[#F6EEDB] px-2 py-0.5 text-[12px] text-forest">
-                      {tx(r.text)}{r.value ? `: ${tx(r.value)}` : ""}
-                    </li>
-                  ))}
-                </ul>
+                {pick.line ? <p className="mt-1 text-[13px] text-forest [overflow-wrap:anywhere]" data-testid="recommended-reasons">{formatReason(pick.line, tx)}</p> : null}
               </div>
             </li>
           );
