@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/help/answer";
-import { HELP_COOKIE, sessionFromHeader } from "@/lib/help/store";
+import { HELP_COOKIE, scopedHelpKey, sessionFromHeader } from "@/lib/help/store";
 import { currentUser } from "@/lib/current-user";
 import { notifyAdmins } from "@/lib/notify";
 import { sendNotice } from "@/lib/notices";
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const sessionKey = sessionFromHeader(request.headers.get("cookie"));
   let id = "";
   try { id = String(((await request.json()) as { id?: string }).id || ""); } catch { id = ""; }
-  const turn = id && sessionKey ? await prisma.helpTurn.findFirst({ where: { id, sessionKey } }) : null;
+  const turn = id && sessionKey ? await prisma.helpTurn.findFirst({ where: { id, sessionKey: { in: [sessionKey, scopedHelpKey(sessionKey, (await currentUser().catch(() => null))?.id)] } } }) : null;
   if (!turn) return NextResponse.json({ error: "That question was not found." }, { status: 404 });
   if (turn.feedback === "staff") return NextResponse.json({ ok: true, already: true });
   await prisma.helpTurn.update({ where: { id: turn.id }, data: { feedback: "staff", unanswered: true } });

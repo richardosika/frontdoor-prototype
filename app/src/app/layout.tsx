@@ -3,6 +3,7 @@ import { EB_Garamond, Libre_Franklin } from "next/font/google";
 import { HelpWidget } from "@/components/help-widget";
 import { LocaleProvider } from "@/components/locale-context";
 import { currentLocale } from "@/lib/i18n/server";
+import { auth } from "@/auth";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -32,12 +33,14 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await currentLocale().catch(() => "en" as const);
+  // The help chat remounts (blank) whenever the signed-in person changes.
+  const viewer = (await auth().catch(() => null))?.user?.id ?? "guest";
   return (
     <html lang="en">
       <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>
         {children}
         <LocaleProvider locale={locale}>
-          <HelpWidget />
+          <HelpWidget key={viewer} viewer={viewer} />
         </LocaleProvider>
       </body>
     </html>

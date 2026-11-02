@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/help/answer";
-import { sessionFromHeader } from "@/lib/help/store";
+import { scopedHelpKey, sessionFromHeader } from "@/lib/help/store";
+import { currentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
   const vote = payload.vote === "down" ? "down" : payload.vote === "up" ? "up" : "";
   if (!vote || !payload.id) return NextResponse.json({ error: "Choose up or down." }, { status: 400 });
   const saved = await prisma.helpTurn.updateMany({
-    where: { id: payload.id, sessionKey },
+    where: { id: payload.id, sessionKey: { in: [sessionKey, scopedHelpKey(sessionKey, (await currentUser().catch(() => null))?.id)] } },
     data: { feedback: vote },
   });
   if (saved.count !== 1) return NextResponse.json({ error: "That question is not in this Help session." }, { status: 404 });

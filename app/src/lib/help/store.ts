@@ -141,3 +141,12 @@ export async function answerQuestion(input: {
   });
   return { ...result, provider: result.provider, id: saved.id };
 }
+
+/**
+ * Help history belongs to one person. A signed-in member's turns are stored under the browser key plus their user id,
+ * so another login on the same browser never sees them; signed-out visitors keep the plain browser key.
+ */
+export function scopedHelpKey(sessionKey: string, userId?: string | null): string {
+  if (!sessionKey) return "";
+  return userId ? `${sessionKey}.u.${userId}` : sessionKey;
+}

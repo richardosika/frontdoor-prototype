@@ -2,7 +2,9 @@
 
 import bcrypt from "bcryptjs";
 import { AuthError, CredentialsSignin } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { HELP_COOKIE } from "@/lib/help/store";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DECLINED_APPLICATION_STATUSES, OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
@@ -48,6 +50,7 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   if (failure) return { error: failure };
 
   try {
+    await resetHelpChat();
     await signIn("credentials", { email, password, portal: "member", redirectTo: next });
   } catch (error) {
     if (error instanceof CredentialsSignin || (error instanceof AuthError && error.type === "CredentialsSignin")) {
@@ -85,6 +88,7 @@ export async function adminLoginAction(formData: FormData): Promise<{ error: str
     return { error: GENERIC_SIGN_IN_ERROR };
   }
   try {
+    await resetHelpChat();
     const destination = await signIn("credentials", {
       email,
       password: password.trim(),
@@ -106,6 +110,16 @@ export async function adminLoginAction(formData: FormData): Promise<{ error: str
   redirect("/admin");
 }
 
+/** Help chat starts blank for every login: drop the browser's help key on sign-in and sign-out. */
+async function resetHelpChat() {
+  try {
+    (await cookies()).delete(HELP_COOKIE);
+  } catch {
+    // read-only cookie store outside an action
+  }
+}
+
 export async function logoutAction() {
+  await resetHelpChat();
   await signOut({ redirectTo: "/" });
 }

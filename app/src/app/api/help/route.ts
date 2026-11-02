@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { HELP_EMAIL, normalizeQuestion, sameOrigin } from "@/lib/help/answer";
-import { HELP_COOKIE, answerQuestion, newHelpSession, sessionFromHeader } from "@/lib/help/store";
+import { HELP_COOKIE, answerQuestion, newHelpSession, scopedHelpKey, sessionFromHeader } from "@/lib/help/store";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/current-user";
 import { currentLocale } from "@/lib/i18n/server";
@@ -34,15 +34,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Help is unavailable." }, { status: 403 });
   }
   const { sessionKey, fresh } = openSession(request);
+  const user = await currentUser().catch(() => null);
   const turns = fresh
     ? []
     : await prisma.helpTurn.findMany({
-        where: { sessionKey },
+        where: { sessionKey: scopedHelpKey(sessionKey, user?.id) },
         orderBy: { createdAt: "asc" },
         take: 30,
         select: { id: true, question: true, answer: true, feedback: true, unanswered: true },
       });
-  const user = await currentUser().catch(() => null);
   const chips = user ? helpChips(isDeveloperRole(user.role), await currentLocale()) : [];
   return withSession({ turns: turns.map((t) => ({ ...t, escalate: t.unanswered })), chips, member: Boolean(user) }, 200, sessionKey, fresh);
 }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   // #49: signed-in members get the grounded, member-type-aware chat with staff hand-off.
   const user = await currentUser().catch(() => null);
   if (user && user.status === "ACTIVE") {
-    const member = await answerMemberQuestion({ question, sessionKey, user, locale: await currentLocale() });
+    const member = await answerMemberQuestion({ question, sessionKey: scopedHelpKey(sessionKey, user.id), user, locale: await currentLocale() });
     return withSession({ id: member.id, answer: member.answer, escalate: member.escalate, handoff: HELP_EMAIL }, 200, sessionKey, fresh);
   }
   const result = await answerQuestion({ question, sessionKey });

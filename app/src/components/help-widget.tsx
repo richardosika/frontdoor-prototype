@@ -28,7 +28,9 @@ function Rich({ text }: { text: string }) {
   );
 }
 
-export function HelpWidget() {
+const VIEWER_KEY = "pf_help_viewer";
+
+export function HelpWidget({ viewer = "guest" }: { viewer?: string }) {
   const tx = useTx();
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[] | null>(null);
@@ -38,6 +40,20 @@ export function HelpWidget() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const body = useRef<HTMLDivElement>(null);
+
+  // A different person signed in on this browser: drop anything help kept in browser storage.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(VIEWER_KEY) !== viewer) {
+        for (const store of [window.localStorage, window.sessionStorage]) {
+          for (const key of Object.keys(store)) if (key.startsWith("pf_help")) store.removeItem(key);
+        }
+        window.localStorage.setItem(VIEWER_KEY, viewer);
+      }
+    } catch {
+      // storage unavailable
+    }
+  }, [viewer]);
 
   useEffect(() => { body.current?.scrollTo({ top: body.current.scrollHeight }); }, [turns, pending, open]);
 
