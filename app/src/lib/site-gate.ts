@@ -46,18 +46,43 @@ export function parseBasicAuthorization(header: string | null): { username: stri
   }
 }
 
-export async function basicAuthorizationMatches(header: string | null, expectedPassword: string): Promise<boolean> {
+/** Extra per-tester gate logins from SITE_GATE_EXTRA_USERS, formatted "user:pass,user:pass". Bad entries are skipped. */
+export function parseExtraGateUsers(raw: string | undefined | null): Array<{ username: string; password: string }> {
+  if (!raw) return [];
+  const users: Array<{ username: string; password: string }> = [];
+  for (const entry of raw.split(",")) {
+    const trimmed = entry.trim();
+    const split = trimmed.indexOf(":");
+    if (split <= 0) continue;
+    const username = trimmed.slice(0, split).trim();
+    const password = trimmed.slice(split + 1);
+    if (!username || !password || username === SITE_GATE_USERNAME) continue;
+    users.push({ username, password });
+  }
+  return users;
+}
+
+export async function basicAuthorizationMatches(
+  header: string | null,
+  expectedPassword: string,
+  extraUsers: Array<{ username: string; password: string }> = [],
+): Promise<boolean> {
   const parsed = parseBasicAuthorization(header);
-  const [usernameOk, passwordOk] = await Promise.all([
-    constantTimeEqual(parsed?.username ?? "", SITE_GATE_USERNAME),
-    constantTimeEqual(parsed?.password ?? "", expectedPassword),
-  ]);
-  return usernameOk && passwordOk;
+  const candidates = [{ username: SITE_GATE_USERNAME, password: expectedPassword }, ...extraUsers];
+  let allowed = false;
+  for (const candidate of candidates) {
+    const [usernameOk, passwordOk] = await Promise.all([
+      constantTimeEqual(parsed?.username ?? "", candidate.username),
+      constantTimeEqual(parsed?.password ?? "", candidate.password),
+    ]);
+    if (usernameOk && passwordOk) allowed = true;
+  }
+  return allowed;
 }
 
 export function siteGateChallengeHeaders(): Record<string, string> {
   return {
-    "WWW-Authenticate": 'Basic realm="Site gate, username privatefloor", charset="UTF-8"',
+    "WWW-Authenticate": 'Basic realm="Private Floor tester gate (use your tester gate login, not your member email; member sign-in comes next)", charset="UTF-8"',
     "content-type": "text/plain; charset=utf-8",
     "cache-control": "no-store",
     "X-Robots-Tag": ROBOTS_TAG,

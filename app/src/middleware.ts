@@ -6,6 +6,7 @@ import { adminEntryRedirect, loggedInPublicRedirect } from "@/lib/session-gate";
 import {
   ROBOTS_TAG,
   basicAuthorizationMatches,
+  parseExtraGateUsers,
   siteGateChallengeHeaders,
   siteGateConfigured,
   siteGateExempt,
@@ -82,7 +83,11 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
   const path = req.nextUrl.pathname;
   const gatePassword = process.env.SITE_GATE_PASSWORD;
   if (siteGateConfigured(gatePassword) && !siteGateExempt(path)) {
-    const allowed = await basicAuthorizationMatches(req.headers.get("authorization"), gatePassword);
+    const allowed = await basicAuthorizationMatches(
+      req.headers.get("authorization"),
+      gatePassword,
+      parseExtraGateUsers(process.env.SITE_GATE_EXTRA_USERS),
+    );
     if (!allowed) return siteGateDenied();
   }
   if (skipsMemberSession(path)) return withRobots(NextResponse.next());

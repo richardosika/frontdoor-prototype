@@ -5,6 +5,7 @@ import {
   basicAuthorizationMatches,
   constantTimeEqual,
   parseBasicAuthorization,
+  parseExtraGateUsers,
   siteGateChallengeHeaders,
   siteGateConfigured,
   siteGateExempt,
@@ -56,7 +57,7 @@ describe("site gate", () => {
 
   it("does not put the password in the challenge", () => {
     const headers = siteGateChallengeHeaders();
-    expect(headers["WWW-Authenticate"]).toContain('Basic realm="Site gate, username privatefloor"');
+    expect(headers["WWW-Authenticate"]).toContain('Basic realm="Private Floor tester gate');
     expect(headers["X-Robots-Tag"]).toBe(ROBOTS_TAG);
     expect(JSON.stringify(headers)).not.toContain(PASSWORD);
     expect(parseBasicAuthorization(basic(SITE_GATE_USERNAME, PASSWORD))?.password).toBe(PASSWORD);
@@ -69,5 +70,19 @@ describe("site gate", () => {
     expect(skipsMemberSession("/icon.svg")).toBe(true);
     expect(skipsMemberSession("/login")).toBe(false);
     expect(skipsMemberSession("/api/auth/session")).toBe(false);
+  });
+
+  it("accepts extra tester logins and keeps the shared one", async () => {
+    const extra = parseExtraGateUsers(" julia:j-pass:x , stephanie:s-pass,bad,:nouser,privatefloor:hijack");
+    expect(extra).toEqual([
+      { username: "julia", password: "j-pass:x" },
+      { username: "stephanie", password: "s-pass" },
+    ]);
+    expect(await basicAuthorizationMatches(basic(SITE_GATE_USERNAME, PASSWORD), PASSWORD, extra)).toBe(true);
+    expect(await basicAuthorizationMatches(basic("julia", "j-pass:x"), PASSWORD, extra)).toBe(true);
+    expect(await basicAuthorizationMatches(basic("stephanie", "s-pass"), PASSWORD, extra)).toBe(true);
+    expect(await basicAuthorizationMatches(basic("julia", "s-pass"), PASSWORD, extra)).toBe(false);
+    expect(await basicAuthorizationMatches(basic(SITE_GATE_USERNAME, "hijack"), PASSWORD, extra)).toBe(false);
+    expect(parseExtraGateUsers(undefined)).toEqual([]);
   });
 });
