@@ -1,3 +1,4 @@
+import { formatUsd } from "@/lib/money";
 import type { RoleId } from "@/lib/roles";
 
 /** Full monthly price for every paid role. The first charge is half of this. Free roles stay at zero. */
@@ -36,14 +37,8 @@ export function firstMonthCents(monthlyCents: number): number {
   return Math.round(monthlyCents / 2);
 }
 
-export function formatMoney(cents: number): string {
-  const whole = cents % 100 === 0;
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
+export function formatMoney(cents: number, locale = "en"): string {
+  return formatUsd(cents / 100, locale, cents % 100 !== 0);
 }
 
 export function duesLabel(cents: number): string {

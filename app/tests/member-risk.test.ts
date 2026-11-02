@@ -53,7 +53,7 @@ describe("member risk checkbox", () => {
   });
   it("shows the label, the link and an inline error on the form", () => {
     const form = readFileSync(path.join(ROOT, "src/components/join-application.tsx"), "utf8");
-    expect(form).toContain("{MEMBER_RISK_LABEL}");
+    expect(form).toContain("{tx(MEMBER_RISK_LABEL)}");
     expect(form).toContain("href={MEMBER_RISK_HREF}");
     expect(form).toContain('id="member-risk-error"');
     expect(MEMBER_RISK_LABEL).toBe(

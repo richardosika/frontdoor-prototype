@@ -571,7 +571,7 @@ export function firstName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "there";
   if (parts.length === 1) return parts[0];
-  return parts.slice(0, -1).join(" ");
+  return parts[0];
 }
 
 /** Drops a label whose token rendered empty, such as "The decision is here:" with no link. */

@@ -233,7 +233,7 @@ export async function recordRefund(formData: FormData) {
   await sendNotice({
     intendedTo: member.email,
     subject: "Private Floor refund noted",
-    text: `Hello ${member.name},\n\nA Private Floor administrator recorded a refund note. No card number is stored. The floor stays closed until dues are paid again.\n`,
+    text: `Hello ${firstName(member.name)},\n\nA Private Floor administrator recorded a refund note. No card number is stored. The floor stays closed until dues are paid again.\n`,
   });
   revalidatePath("/admin");
   redirect(withQuery(adminReturn(formData, `/admin/members/${member.id}`), "notice", "Refund note saved"));

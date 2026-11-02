@@ -1,4 +1,4 @@
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { cancelMembership } from "@/actions/payments";
 import { addSimulatedCard, pauseMembership, removeBackupCard, resumeMembershipNow, swapPaymentMethods } from "@/actions/billing";
@@ -25,6 +25,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const user = await requireUser();
   const params = await searchParams;
   return (
@@ -118,9 +119,10 @@ async function Receipt({
   };
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const monthly = currentMonthlyCents(user.role, user.duesCents);
-  const first = formatMoney(firstMonthCents(monthly));
-  const full = formatMoney(monthly);
+  const first = formatMoney(firstMonthCents(monthly), locale);
+  const full = formatMoney(monthly, locale);
   return (
     <>
       <p>

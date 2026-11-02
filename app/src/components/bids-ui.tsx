@@ -1,3 +1,4 @@
+import { formatUsd } from "@/lib/money";
 import type { BidField } from "@/lib/bid-templates";
 import { numeric } from "@/lib/bids";
 
@@ -9,8 +10,8 @@ export const SECTIONS = [
   ["scope", "Exclusions & scope"],
 ] as const;
 
-export function money(n: number, cents = false): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: cents ? 2 : 0, minimumFractionDigits: cents ? 2 : 0 }).format(n);
+export function money(n: number, cents = false, locale = "en"): string {
+  return formatUsd(n, locale, cents);
 }
 
 export function fmtDate(iso: string, locale: string): string {
@@ -24,7 +25,7 @@ export function showValue(field: BidField, value: unknown, locale: string, tx: (
   const n = numeric(value);
   switch (field.type) {
     case "money":
-      return n == null ? String(value) : money(n);
+      return n == null ? String(value) : money(n, false, locale);
     case "percent":
       return n == null ? String(value) : `${n}%`;
     case "months":

@@ -33,14 +33,14 @@ export function joinName(firstName: string, lastName: string): string {
   return `${firstName.trim()} ${lastName.trim()}`.replace(/\s+/g, " ").trim();
 }
 
-/** The first-name field as entered. A stored full name keeps every word except the last. */
+/** The first-name field as entered. Without it, the first word of the full name. */
 export function givenNameFrom(givenName: string | null | undefined, fullName = ""): string {
   const given = (givenName || "").replace(/\s+/g, " ").trim();
   if (given) return given;
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "there";
   if (parts.length === 1) return parts[0];
-  return parts.slice(0, -1).join(" ");
+  return parts[0];
 }
 
 export function validatePersonName(firstName: string, lastName: string): string[] {

@@ -451,7 +451,7 @@ describe("QA fixes that stay outside grading", () => {
 
   it("keeps the full first name, the request email label, and the despite-grade audit", () => {
     expect(givenNameFrom("QA-TEST Mary Ann")).toBe("QA-TEST Mary Ann");
-    expect(givenNameFrom("", "QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
+    expect(givenNameFrom("", "QA-TEST Mary Ann Smith")).toBe("QA-TEST");
     expect(givenNameFrom("", "Alex Rivera")).toBe("Alex");
     expect(crmEventDisplay("email", "invite_received · Thank you for your request to join")).toEqual({
       label: "Request to join received",

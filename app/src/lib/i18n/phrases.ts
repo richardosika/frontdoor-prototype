@@ -1,6 +1,7 @@
 /** Member platform phrases. Key is the English text; values are Spanish, German, Japanese. English governs. */
 import type { Locale } from "@/lib/i18n/messages";
 import { BID_PHRASES } from "@/lib/i18n/bid-phrases";
+import { JOIN_PHRASES } from "@/lib/i18n/join-phrases";
 
 const P: Record<string, readonly [string, string, string]> = {
   "Who viewed you": ["Quién vio su perfil", "Wer Sie angesehen hat", "プロフィールを見た人"],
@@ -1076,6 +1077,7 @@ const P: Record<string, readonly [string, string, string]> = {
 
 // #51: bid phrases fill in only where the main list has no entry.
 for (const [k, v] of Object.entries(BID_PHRASES)) if (!P[k]) P[k] = v;
+for (const [k, v] of Object.entries(JOIN_PHRASES)) if (!P[k]) P[k] = v;
 export const PHRASES = P;
 
 const INDEX: Record<Exclude<Locale, "en">, 0 | 1 | 2> = { es: 0, de: 1, ja: 2 };

@@ -30,3 +30,20 @@ export function formatMoneyDigits(digits: string, locale = "en"): string {
   if (!Number.isFinite(n)) return digits;
   return new Intl.NumberFormat(NUMBER_LOCALE[locale] ?? "en-US", { maximumFractionDigits: 0, useGrouping: "always" as unknown as boolean }).format(n);
 }
+
+export function numberLocale(locale = "en"): string {
+  return NUMBER_LOCALE[locale] ?? "en-US";
+}
+
+/** A USD amount in the member's number format with thousands separators: en "$1,250,000", de "1.250.000 $", ja "$1,250,000". */
+export function formatUsd(amount: number, locale = "en", cents = false): string {
+  if (!Number.isFinite(amount)) return "";
+  return new Intl.NumberFormat(numberLocale(locale), {
+    style: "currency",
+    currency: "USD",
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 0,
+    useGrouping: "always" as unknown as boolean,
+  }).format(amount);
+}

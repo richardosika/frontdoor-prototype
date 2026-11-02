@@ -5,7 +5,7 @@ import { memberLine } from "@/lib/member-line";
 import { ProjectFacts } from "@/components/project-facts";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
 import { btn, btnOutline } from "@/components/ui";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { SlimFilterBar } from "@/components/slim-filters";
 import { isDeveloperRole, type SlimFilters } from "@/lib/member-reach";
 import type { loadLedgerProjects } from "@/lib/ledger-projects";
@@ -29,6 +29,7 @@ function statusWord(status: string) {
 export async function LedgerProjects({ data, role, filters, myWork, results }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null }) {
   const developer = isDeveloperRole(role);
   const tx = await serverTx();
+  const locale = await currentLocale();
   const ownerFirst = role === "DEVELOPER" || data.myProjects.length > 0;
 
   type Received = Data["received"][number];
@@ -262,7 +263,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
         {data.circleShared.map((project) => (
           <li key={project.id} className="border-b border-line py-3 last:border-0">
             <p className="text-[16px] font-semibold">
-              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link> <span className="font-normal text-forest">{formatProjectValue(project.valueLabel)}</span>
+              <Link href={`/projects/${project.id}`} className="underline decoration-brass underline-offset-2 hover:text-forest">{project.name}</Link> <span className="font-normal text-forest">{formatProjectValue(project.valueLabel, locale)}</span>
             </p>
             <p className="text-[15px] text-mut">
               {project.user.name}{project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.street ? `${project.street}, ` : ""}
@@ -396,7 +397,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
                 {project.user.org ? ` · ${project.user.org}` : ""} · {project.location}
               </p>
               <p className="mt-1 text-[15px] text-ink">
-                {tx(project.asset)}{project.valueLabel ? ` · ${formatProjectValue(project.valueLabel)}` : ""} · {project.year}
+                {tx(project.asset)}{project.valueLabel ? ` · ${formatProjectValue(project.valueLabel, locale)}` : ""} · {project.year}
               </p>
               <div className="mt-1 flex-1"><ProjectFacts category={project.matchedCategory ?? data.myCategory} project={project} /></div>
               {project.status ? (

@@ -1,3 +1,4 @@
+import { formatProjectValue } from "@/lib/project-contact";
 import { notFound } from "next/navigation";
 import { respondConfirmation } from "@/actions/profile";
 import { Logo } from "@/components/logo";
@@ -30,7 +31,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         <div className="mt-4 rounded border border-line bg-cream p-3 text-sm">
           <b>{project.name}</b>
           <p className="mt-1 text-mut">
-            {project.asset} · {project.location} · {project.year} · {project.valueLabel}
+            {project.asset} · {project.location} · {project.year} · {formatProjectValue(project.valueLabel)}
           </p>
           {project.summary ? <p className="mt-2 text-ink">{project.summary}</p> : null}
         </div>

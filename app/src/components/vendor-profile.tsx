@@ -6,7 +6,7 @@ import { ReachOut, StatusPill, type ReachProject } from "@/components/reach-out"
 import { btnOutline } from "@/components/ui";
 import { blockMember, openConversation, unblockMember } from "@/actions/social";
 import { coverageSummary, type Coverage } from "@/lib/insurance";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { roleProfile } from "@/lib/role-profile";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { fixRoleTypos, formatProjectValue, projectLocation } from "@/lib/project-contact";
@@ -58,6 +58,7 @@ export async function VendorProfile({
   reviewed: boolean;
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const closed = blockedByViewer || blockedByThem;
   const type = tx(roleShort(roleLabel(member.role)));
   const rp = roleProfile(member.role);
@@ -176,7 +177,7 @@ export async function VendorProfile({
                   <span className="min-w-0 flex-1">
                     <span className="block text-[17px] font-semibold text-forest underline decoration-brass underline-offset-2">{project.name}</span>
                     <span className="block text-[15px] text-mut">
-                      {[tx(project.asset), projectLocation(project) || project.location, String(project.year), project.detailsVisible && project.valueLabel ? formatProjectValue(project.valueLabel) : "", project.role ? tx(fixRoleTypos(project.role)) : ""]
+                      {[tx(project.asset), projectLocation(project) || project.location, String(project.year), project.detailsVisible && project.valueLabel ? formatProjectValue(project.valueLabel, locale) : "", project.role ? tx(fixRoleTypos(project.role)) : ""]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>

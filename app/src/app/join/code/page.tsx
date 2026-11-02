@@ -1,17 +1,18 @@
-import Link from "next/link";
+import { JoinHeader } from "@/components/join-header";
 import { ReferralCodePage } from "@/components/join-application";
-import { Logo } from "@/components/logo";
+import { LocaleProvider } from "@/components/locale-context";
+import { currentLocale } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export default function ReferralCodeRoute() {
+export default async function ReferralCodeRoute() {
+  const locale = await currentLocale();
   return (
-    <main className="min-h-dvh overflow-x-hidden bg-cream">
-      <header className="flex items-center justify-between bg-forest px-4 py-4 text-paper sm:px-8">
-        <Logo tone="paper" />
-        <Link href="/login" className="text-xs font-semibold uppercase tracking-[0.12em] text-brass">Sign in</Link>
-      </header>
-      <ReferralCodePage />
+    <main lang={locale} className="min-h-dvh overflow-x-hidden bg-cream">
+      <JoinHeader locale={locale} />
+      <LocaleProvider locale={locale}>
+        <ReferralCodePage />
+      </LocaleProvider>
     </main>
   );
 }

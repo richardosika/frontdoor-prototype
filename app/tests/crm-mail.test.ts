@@ -31,7 +31,7 @@ describe("email templates", () => {
     expect(renderTemplate("Code {referral_code}.", { invite_code: "PF-2" }, { signOff: false })).toBe("Code PF-2.");
     expect(renderTemplate("Code {invite_code}.", { referral_code: "PF-3" }, { signOff: false })).toBe("Code PF-3.");
     expect(firstName("Alex Rivera")).toBe("Alex");
-    expect(firstName("QA-TEST Mary Ann Smith")).toBe("QA-TEST Mary Ann");
+    expect(firstName("QA-TEST Mary Ann Smith")).toBe("QA-TEST");
   });
 
   it("keeps the declined letter free of a reason variable", () => {

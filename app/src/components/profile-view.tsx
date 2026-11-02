@@ -1,4 +1,4 @@
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { TierBadge } from "@/components/badge";
 import { Avatar } from "@/components/avatar";
@@ -111,6 +111,7 @@ export async function ProfileView({
   blockedByThem: boolean;
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const messagingClosed = blockedByViewer || blockedByThem;
 
   return (
@@ -305,7 +306,7 @@ export async function ProfileView({
                       {isSelf || listed ? <ReviewChip status={project.reviewStatus} /> : null}
                     </div>
                     <p className="mt-0.5 text-[15px] text-mut">
-                      {[tx(project.asset), projectLocation(project) || project.location, String(project.year), project.detailsVisible && project.valueLabel ? formatProjectValue(project.valueLabel) : ""]
+                      {[tx(project.asset), projectLocation(project) || project.location, String(project.year), project.detailsVisible && project.valueLabel ? formatProjectValue(project.valueLabel, locale) : ""]
                         .filter(Boolean)
                         .join(" · ")}
                       {project.role ? ` · ${tx(fixRoleTypos(project.role))}` : ""}

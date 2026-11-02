@@ -12,7 +12,7 @@ import { ReviewChip } from "@/components/project-form";
 import { ReviewTracker } from "@/components/review-tracker";
 import { btn, btnOutline, card, field } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { eligibleForDirectory } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
@@ -31,6 +31,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const { id } = await params;
   const query = await searchParams;
   const tx = await serverTx();
+  const locale = await currentLocale();
   const project = await prisma.trackProject.findUnique({
     where: { id },
     include: {
@@ -120,7 +121,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[15px] sm:grid-cols-4">
           <Fact label={tx("Asset class")} value={tx(project.asset)} />
           <Fact label={tx("Year")} value={String(project.year)} />
-          <Fact label={tx("Value")} value={full ? formatProjectValue(project.valueLabel) : tx("Shared after contact")} />
+          <Fact label={tx("Value")} value={full ? formatProjectValue(project.valueLabel, locale) : tx("Shared after contact")} />
           <Fact label={tx("Owner's role")} value={tx(fixRoleTypos(project.role)) || "—"} />
         </dl>
         {isOwner || viewer.isAdmin ? (

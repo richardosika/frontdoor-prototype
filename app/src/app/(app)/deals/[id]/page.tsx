@@ -1,4 +1,5 @@
-import { serverTx } from "@/lib/i18n/server";
+import { formatProjectValue } from "@/lib/project-contact";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { dealRoomRule } from "@/lib/deal-room-rule";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,6 +29,7 @@ export default async function DealPage({
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const user = await requireUser();
   const { id } = await params;
   const query = await searchParams;
@@ -100,7 +102,7 @@ export default async function DealPage({
                   {project.location} · {project.year} · {project.confirmations.filter((item) => item.status === "CONFIRMED").length} {tx("counterparties confirmed")}
                 </span>
               </span>
-              <span className="font-serif">{project.valueLabel}</span>
+              <span className="font-serif">{formatProjectValue(project.valueLabel, locale)}</span>
             </li>
           ))}
         </ul>
@@ -232,6 +234,7 @@ export default async function DealPage({
 
 async function NdaCopy({ html }: { html: string }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   return (
     <>
       <b>{tx("Deal-room NDA")}</b>

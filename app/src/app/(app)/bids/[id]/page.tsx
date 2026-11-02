@@ -1,3 +1,4 @@
+import { MoneyInput } from "@/components/money-input";
 import Link from "next/link";
 import { decideBid, saveBid } from "@/actions/bids";
 import { Banner } from "@/components/banner";
@@ -89,7 +90,7 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
   const best = bestPerRow(all, bids);
   const cell = (f: BidField, b: (typeof bids)[number]) => {
     const v = b.values[f.key];
-    const shown = f.key.startsWith("__") && v !== "" ? money(Number(v), f.key === "__perSf") : showValue(f, v, locale, tx);
+    const shown = f.key.startsWith("__") && v !== "" ? money(Number(v), f.key === "__perSf", locale) : showValue(f, v, locale, tx);
     if (!shown) return f.required !== false && f.type !== "profile" ? { text: `⚠ ${tx("Not provided")}`, cls: "bg-[#FBEAE3] font-semibold text-[#9A3B1E]", missing: true } : { text: "—", cls: "text-mut", missing: false };
     const win = best[f.key]?.includes(b.id) && bids.length > 1;
     return { text: shown, tag: win ? tx(BEST[f.best!]) : "", cls: win ? "bg-[#E4EFE7] font-bold text-forest" : "", missing: false };
@@ -201,11 +202,11 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
     if (f.type === "checks") return <div>{(f.options ?? []).map((o) => <label key={o} className="flex min-h-11 items-center gap-2 text-[15px]"><input type="checkbox" name={name} value={o} defaultChecked={Array.isArray(v) && v.includes(o)} disabled={dis} className="h-5 w-5 accent-forest" />{tx(o)}</label>)}</div>;
     if (f.type === "yesno") return <select name={name} defaultValue={String(v ?? "")} disabled={dis} className={field}><option value="">—</option><option value="yes">{tx("Yes")}</option><option value="no">{tx("No")}</option></select>;
     if (f.type === "date") return <input type="date" name={name} defaultValue={String(v ?? "")} disabled={dis} className={field} />;
-    const num = ["money", "percent", "number", "months"].includes(f.type);
+    if (f.type === "money") return <MoneyInput name={name} defaultValue={String(v ?? "")} disabled={dis} placeholder={f.hint ? tx(f.hint) : ""} className={field} />;
+    const num = ["percent", "number", "months"].includes(f.type);
     return (
       <div className="relative">
-        {f.type === "money" ? <span className="pointer-events-none absolute left-3 top-[11px] text-mut">$</span> : null}
-        <input name={name} defaultValue={String(v ?? "")} inputMode={num ? "decimal" : undefined} disabled={dis} placeholder={f.hint ? tx(f.hint) : ""} aria-required={req2} className={`${field} ${f.type === "money" ? "pl-7" : ""}`} />
+        <input name={name} defaultValue={String(v ?? "")} inputMode={num ? "decimal" : undefined} disabled={dis} placeholder={f.hint ? tx(f.hint) : ""} aria-required={req2} className={field} />
         {f.type === "percent" ? <span className="pointer-events-none absolute right-3 top-[11px] text-mut">%</span> : null}
       </div>
     );
