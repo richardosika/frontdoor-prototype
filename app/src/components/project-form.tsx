@@ -5,6 +5,7 @@ import { MoneyInput } from "@/components/money-input";
 import { PROJECT_ASSET_CLASSES, SEEK_CATEGORIES, US_STATES, parseSeeking, reviewLabel } from "@/lib/project-contact";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
 import { FileUploader } from "@/components/file-uploader";
+import { SubmitReviewButton } from "@/components/submit-review-button";
 import { ProjectFactsFields } from "@/components/project-facts-fields";
 
 export type EditableProject = {
@@ -126,9 +127,7 @@ export async function ProjectForm({ back, project, pastWork = false }: { back: "
       {project ? null : (
         <FileUploader mode="form" />
       )}
-      <button className={`${btn} sm:col-span-2`} type="submit">
-        {project ? tx("Save and resubmit") : tx("Submit for review")}
-      </button>
+      <SubmitReviewButton className="sm:col-span-2" label={project ? tx("Save and resubmit") : tx("Submit for review")} />
     </form>
   );
 }

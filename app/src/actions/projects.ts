@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requireAdmin, requireUser } from "@/lib/current-user";
 import { sendEmail } from "@/lib/email";
 import { isLocale } from "@/lib/i18n/messages";
@@ -77,10 +78,17 @@ export async function addProject(formData: FormData) {
     },
   });
   if (attached.files.length) await prisma.projectDocument.createMany({ data: attached.files.map((file) => ({ projectId: project.id, ...file })) });
-  await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
-  const { queueProjectVerification } = await import("@/lib/verify/queue");
-  await queueProjectVerification(project.id, value.name);
-  await notifyAdmins({ title: "Project to review", body: `${user.name} submitted ${value.name}.`, href: "/admin/projects" });
+  // The member sees the thank-you card right away; the review case, checks and admin alert run after the response.
+  after(async () => {
+    try {
+      await ensureVerificationCase({ subject: "PROJECT", projectId: project.id, actorId: user.id });
+      const { queueProjectVerification } = await import("@/lib/verify/queue");
+      await queueProjectVerification(project.id, value.name);
+    } catch (error) {
+      console.error("Project review setup failed", error);
+    }
+    await notifyAdmins({ title: "Project to review", body: `${user.name} submitted ${value.name}.`, href: "/admin/projects" }).catch(() => null);
+  });
   refresh();
   // #35: back to the Ledger with a thank-you card.
   redirect(`/feed?submitted=${project.id}`);
@@ -118,7 +126,7 @@ export async function resubmitProject(formData: FormData) {
       submittedAt: new Date(),
     },
   });
-  await notifyAdmins({ title: "Project resubmitted", body: `${user.name} resubmitted ${value.name}.`, href: "/admin/projects" });
+  after(() => notifyAdmins({ title: "Project resubmitted", body: `${user.name} resubmitted ${value.name}.`, href: "/admin/projects" }).catch(() => null));
   refresh();
   go(back, "notice", "Project resubmitted. It is pending review.");
 }
