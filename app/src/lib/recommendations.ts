@@ -49,7 +49,7 @@ export function recommendReasons(viewer: RecMember & { seeking: string[] }, othe
 
 const WEIGHT: Record<Reason["kind"], number> = { category: 3, location: 2, projectType: 1 };
 
-/** Top matches, best first. A match needs at least two reasons, or a category the viewer's projects seek. */
+/** Top matches, best first. A match needs the same area or market, or a category the viewer's projects seek. */
 export function recommend(viewer: RecMember & { seeking: string[] }, others: RecMember[], exclude: Set<string>, limit = 6) {
   return others
     .filter((other) => other.id !== viewer.id && !exclude.has(other.id))
@@ -57,7 +57,7 @@ export function recommend(viewer: RecMember & { seeking: string[] }, others: Rec
       const reasons = recommendReasons(viewer, other);
       return { id: other.id, reasons, score: reasons.reduce((sum, r) => sum + WEIGHT[r.kind], 0) };
     })
-    .filter((row) => row.reasons.length >= 2 || row.reasons.some((r) => r.kind === "category" && r.text === "Your projects seek"))
+    .filter((row) => row.score >= 2)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
     .slice(0, limit);
 }

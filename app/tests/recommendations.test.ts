@@ -14,7 +14,7 @@ describe("recommended connections", () => {
   it("ranks and filters weak matches and the circle", () => {
     const others = [
       { id: "g", role: "GENERAL_CONTRACTOR", location: "Dallas, TX", markets: "", assetClasses: "Multifamily", extraCategories: "" },
-      { id: "x", role: "BROKER", location: "Miami, FL", markets: "", assetClasses: "Retail", extraCategories: "" },
+      { id: "x", role: "BROKER", location: "Miami, FL", markets: "", assetClasses: "Multifamily", extraCategories: "" },
       { id: "c", role: "GENERAL_CONTRACTOR", location: "Austin, TX", markets: "", assetClasses: "", extraCategories: "" },
     ];
     expect(recommend(dev, others, new Set(["c"])).map((r) => r.id)).toEqual(["g"]);
