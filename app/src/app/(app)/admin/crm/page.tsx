@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StartReviewButton } from "@/components/start-review-button";
 import { addProspect } from "@/actions/crm";
 import { startGuidedReview } from "@/actions/verification";
 import { Banner } from "@/components/banner";
@@ -128,9 +129,7 @@ export default async function CrmPage({
                     <li key={person.id}>
                       <form action={startGuidedReview} className="mb-1">
                         <input type="hidden" name="personId" value={person.id} />
-                        <button className={`${btn} w-full`} type="submit">
-                          Start review
-                        </button>
+                        <StartReviewButton className={`${btn} w-full`} />
                       </form>
                       <Link href={`/admin/crm/${person.id}`} className={`${card} block p-3 text-sm`}>
                         <p className="font-semibold">{person.name}</p>

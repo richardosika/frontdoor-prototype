@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StartReviewButton } from "@/components/start-review-button";
 import { notFound } from "next/navigation";
 import { addCrmNote, deleteCrmPerson, saveCrmPerson, sendPersonInfo } from "@/actions/crm";
 import { startGuidedReview } from "@/actions/verification";
@@ -66,9 +67,7 @@ export default async function CrmPersonPage({
           {followUpDue(person.followUpAt) ? <p className="text-brass">Follow-up due {person.followUpAt?.toISOString().slice(0, 10)}</p> : null}
           <form action={startGuidedReview} className="pt-2">
             <input type="hidden" name="personId" value={person.id} />
-            <button className={btn} type="submit">
-              Start review
-            </button>
+            <StartReviewButton className={btn} />
           </form>
           <p className="flex flex-wrap gap-3 pt-1">
             {person.applicationId ? (

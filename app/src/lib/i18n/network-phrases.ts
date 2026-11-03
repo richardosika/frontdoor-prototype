@@ -3,6 +3,8 @@ export const NETWORK_PHRASES: Record<string, readonly [string, string, string]> 
   "Inbox": ["Recibidos", "Posteingang", "受信"],
   "Waiting for a reply": ["Esperando respuesta", "Wartet auf Antwort", "返信待ち"],
   "Nothing sent yet.": ["Aún no ha enviado nada.", "Noch nichts gesendet.", "まだ送信したものはありません。"],
+  "Start review": ["Iniciar revisión", "Prüfung starten", "審査を開始"],
+  "Preparing review…": ["Preparando la revisión…", "Prüfung wird vorbereitet…", "審査を準備中…"],
   "Sending to review…": ["Enviando a revisión…", "Wird zur Prüfung gesendet…", "審査に送信中…"],
   "Construction plans": ["Planos de construcción", "Baupläne", "施工図面"],
   "PDF, DWG or images, up to 5 files and 25 MB each. General contractor requests are open: any verified general contractor can view the plans and bid. No approval step.": [

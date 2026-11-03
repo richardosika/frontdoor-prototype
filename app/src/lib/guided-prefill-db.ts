@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { canAutofill, emptyPrefillFacts, suggestChecklist, type EvidenceRow, type PrefillFacts, type StepSuggestion } from "@/lib/guided-prefill";
 import { prisma } from "@/lib/prisma";
@@ -350,13 +351,29 @@ export function enqueueLivePrefill(caseId: string): void {
   if (liveInflight.has(caseId) || Date.now() - started < LIVE_COOLDOWN_MS) return;
   liveInflight.add(caseId);
   liveStartedAt.set(caseId, Date.now());
-  void runLivePrefill(caseId)
-    .catch((error) => {
-      console.error("guided prefill failed", caseId, error instanceof Error ? error.message : "error");
-    })
-    .finally(() => {
-      liveInflight.delete(caseId);
-    });
+  const job = () =>
+    runLivePrefill(caseId)
+      .catch((error) => {
+        console.error("guided prefill failed", caseId, error instanceof Error ? error.message : "error");
+      })
+      .finally(() => {
+        liveInflight.delete(caseId);
+      });
+  runAfterResponse(job);
+}
+
+/**
+ * Live checks must not hold the response. A fetch started inside a request or server action
+ * is tracked by Next, and the action waits for it before it answers, so Start review sat for
+ * about a minute. after() starts the job once the response is sent. Outside a request
+ * (scripts, startup), run it detached as before.
+ */
+function runAfterResponse(job: () => Promise<unknown>): void {
+  try {
+    after(job);
+  } catch {
+    void job();
+  }
 }
 
 export async function runLivePrefill(caseId: string): Promise<void> {

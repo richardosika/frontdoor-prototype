@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StartReviewButton, StartReviewCard } from "@/components/start-review-button";
 import { startGuidedReview } from "@/actions/verification";
 import { deleteSelectedApplications, rerunVerification } from "@/actions/owner";
 import { Banner } from "@/components/banner";
@@ -160,10 +161,8 @@ export default async function ApplicationsPage({
                 <li key={invite.id}>
                   <form action={startGuidedReview}>
                     <input type="hidden" name="inviteRequestId" value={invite.id} />
-                    <button className={`${btn} mb-2`} type="submit">
-                      Start review
-                    </button>
-                    <button className={`${card} block w-full p-4 text-left`} type="submit">
+                    <StartReviewButton className={`${btn} mb-2`} />
+                    <StartReviewCard className={`${card} block w-full p-4 text-left`}>
                       <h2 className="font-serif text-xl font-normal">{invite.name}</h2>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <StatusChip status={standing.status} />
@@ -175,7 +174,7 @@ export default async function ApplicationsPage({
                       <p className="text-xs text-mut">
                         {formatAuditTime(invite.createdAt)} · {personStageLabel(standing.stage)}
                       </p>
-                    </button>
+                    </StartReviewCard>
                   </form>
                   {personId ? (
                     <p className="mt-2 text-sm">
@@ -203,10 +202,8 @@ export default async function ApplicationsPage({
               <div className="min-w-0 flex-1">
               <form action={startGuidedReview}>
                 <input type="hidden" name="applicationId" value={application.id} />
-                <button className={`${btn} mb-2`} type="submit">
-                  Start review
-                </button>
-                <button className={`${card} block w-full p-4 text-left`} type="submit">
+                <StartReviewButton className={`${btn} mb-2`} />
+                <StartReviewCard className={`${card} block w-full p-4 text-left`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <h2 className="font-serif text-xl font-normal">{application.name}</h2>
@@ -232,7 +229,7 @@ export default async function ApplicationsPage({
                       confidence={application.runs[0]?.gradeConfidence}
                     />
                   </div>
-                </button>
+                </StartReviewCard>
               </form>
               <p className="mt-2 flex flex-wrap gap-3 text-sm">
                 {application.crmPeople[0] ? (
