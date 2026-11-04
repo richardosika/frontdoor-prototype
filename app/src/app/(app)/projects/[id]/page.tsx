@@ -29,6 +29,11 @@ export const dynamic = "force-dynamic";
 const h2 = "mb-3 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass";
 const box = `${card} mt-4 p-5 sm:p-6`;
 
+/** Heading case for group titles: first letter of each word, words like "and" or "y" left lower. */
+function titleCase(text: string) {
+  return text.replace(/(^|[\s/(-])(\p{L})(\p{L}*)/gu, (all, lead: string, first: string, rest: string) => (["and", "or", "of", "y", "o", "de", "und", "oder"].includes(first + rest) && lead !== "" ? all : lead + first.toUpperCase() + rest));
+}
+
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; notice?: string }> }) {
   const viewer = await requireUser();
   const { id } = await params;
@@ -251,25 +256,34 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {isOwner && matches.length ? (
         <section className={box} data-testid="project-matches">
           <h2 className={h2}>{tx("Matching members")}</h2>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {matches.map((m) => {
-              const already = project.contacts.some((c) => c.fromId === m.id || c.toId === m.id);
-              return (
-                <li key={m.id} className="flex min-w-0 flex-wrap items-center gap-3 rounded border border-line bg-paper p-3">
-                  <Avatar initials={m.initials} photoId={m.photoId} />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass">{m.name}</Link>
-                    <p className="text-[14px] text-mut" data-testid="member-line">{memberLine(m, tx)}</p>
-                  </div>
-                  {already ? (
-                    <StatusPill status={project.contacts.find((c) => c.fromId === m.id || c.toId === m.id)?.status ?? "PENDING"} />
-                  ) : project.reviewStatus === "APPROVED" ? (
-                    <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} toId={m.id} back={back} />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          {seeking.map((category) => ({ category, members: matches.filter((member) => memberInCategory(member, category)) })).filter((group) => group.members.length).map((group) => (
+            <div key={group.category} className="mt-4 min-w-0 border-l-2 border-brass pl-3 first-of-type:mt-2" data-testid="project-match-group">
+              <h3 className="text-[16px] font-semibold text-forest [overflow-wrap:anywhere]">
+                {titleCase(tx(seekLabel(group.category)))} <span className="font-normal text-mut">· {group.members.length}</span>
+              </h3>
+              <div className="mt-2">
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {group.members.map((m) => {
+                  const already = project.contacts.some((c) => c.fromId === m.id || c.toId === m.id);
+                  return (
+                    <li key={`${group.category}-${m.id}`} className="flex min-w-0 flex-wrap items-center gap-3 rounded border border-line bg-paper p-3">
+                      <Avatar initials={m.initials} photoId={m.photoId} />
+                      <div className="min-w-0 flex-1">
+                        <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass">{m.name}</Link>
+                        <p className="text-[14px] text-mut" data-testid="member-line">{memberLine(m, tx)}</p>
+                      </div>
+                      {already ? (
+                        <StatusPill status={project.contacts.find((c) => c.fromId === m.id || c.toId === m.id)?.status ?? "PENDING"} />
+                      ) : project.reviewStatus === "APPROVED" ? (
+                        <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} toId={m.id} back={back} />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              </div>
+            </div>
+          ))}
         </section>
       ) : null}
 
