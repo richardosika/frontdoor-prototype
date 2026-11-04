@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { serverTx } from "@/lib/i18n/server";
 import { PHOTO_HINTS } from "@/lib/photo-hints";
 import { btnOutline } from "@/components/ui";
@@ -72,7 +73,7 @@ export async function ProfilePhotos({
               {photoId ? (
                 <form action={removeMemberImage} className="mt-2">
                   <input type="hidden" name="imageId" value={photoId} />
-                  <button className={small} type="submit">{tx("Remove photo")}</button>
+                  <SubmitButton className={small}>{tx("Remove photo")}</SubmitButton>
                 </form>
               ) : null}
             </div>
@@ -83,7 +84,7 @@ export async function ProfilePhotos({
               {coverId ? (
                 <form action={removeMemberImage} className="mt-2">
                   <input type="hidden" name="imageId" value={coverId} />
-                  <button className={small} type="submit">{tx("Remove cover image")}</button>
+                  <SubmitButton className={small}>{tx("Remove cover image")}</SubmitButton>
                 </form>
               ) : null}
             </div>
@@ -103,26 +104,26 @@ export async function ProfilePhotos({
                   <form action={saveGalleryCaption} className="flex gap-2">
                     <input type="hidden" name="imageId" value={image.id} />
                     <input name="caption" defaultValue={image.caption} maxLength={200} placeholder={tx("Caption (optional)")} className="min-h-10 min-w-0 flex-1 rounded-sm border border-line bg-paper px-3 text-[16px]" />
-                    <button className={small} type="submit">{tx("Save")}</button>
+                    <SubmitButton className={small} pendingLabel="Saving…">{tx("Save")}</SubmitButton>
                   </form>
                   <div className="flex flex-wrap gap-2">
                     {index > 0 ? (
                       <form action={moveGalleryImage}>
                         <input type="hidden" name="imageId" value={image.id} />
                         <input type="hidden" name="direction" value="up" />
-                        <button className={small} type="submit" aria-label={tx("Move earlier")}>↑ {tx("Earlier")}</button>
+                        <SubmitButton className={small} aria-label={tx("Move earlier")}>↑ {tx("Earlier")}</SubmitButton>
                       </form>
                     ) : null}
                     {index < gallery.length - 1 ? (
                       <form action={moveGalleryImage}>
                         <input type="hidden" name="imageId" value={image.id} />
                         <input type="hidden" name="direction" value="down" />
-                        <button className={small} type="submit" aria-label={tx("Move later")}>↓ {tx("Later")}</button>
+                        <SubmitButton className={small} aria-label={tx("Move later")}>↓ {tx("Later")}</SubmitButton>
                       </form>
                     ) : null}
                     <form action={removeMemberImage}>
                       <input type="hidden" name="imageId" value={image.id} />
-                      <button className={small} type="submit">{tx("Delete")}</button>
+                      <SubmitButton className={small}>{tx("Delete")}</SubmitButton>
                     </form>
                   </div>
                 </div>

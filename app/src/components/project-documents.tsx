@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { FileUploader } from "@/components/file-uploader";
 import { linkProjectDeal, removeProjectDocument, replaceProjectDocument } from "@/actions/projects";
 import { btn, btnOutline, field } from "@/components/ui";
@@ -50,17 +51,17 @@ export async function ProjectDocuments({
                   <input type="hidden" name="documentId" value={doc.id} />
                   <input type="hidden" name="back" value={back} />
                   <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required className="min-w-0 text-[14px]" aria-label={tx("Replace file")} />
-                  <button className={btnOutline} type="submit">
+                  <SubmitButton className={btnOutline}>
                     {tx("Replace file")}
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={removeProjectDocument}>
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="documentId" value={doc.id} />
                   <input type="hidden" name="back" value={back} />
-                  <button className={`${btnOutline} w-full`} type="submit">
+                  <SubmitButton className={`${btnOutline} w-full`}>
                     {tx("Remove")}
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             ) : null}
@@ -92,9 +93,9 @@ export async function ProjectDocuments({
               ))}
             </select>
           </label>
-          <button className={`${btnOutline} self-end`} type="submit">
+          <SubmitButton className={`${btnOutline} self-end`} pendingLabel="Saving…">
             {tx("Save")}
-          </button>
+          </SubmitButton>
         </form>
       ) : null}
     </div>

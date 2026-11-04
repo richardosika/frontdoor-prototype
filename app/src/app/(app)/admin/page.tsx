@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { createInvite, declineInviteRequest, deleteInviteCode, deleteInviteRequest, issueInviteForRequest, reviewVouch } from "@/actions/admin";
 import { Banner } from "@/components/banner";
@@ -227,12 +228,12 @@ export default async function AdminPage({
               </p>
               <form action={reviewVouch} className="mt-2 flex flex-wrap gap-2">
                 <input type="hidden" name="confirmationId" value={vouch.id} />
-                <button className={btnOutline} name="decision" value="REJECTED" type="submit">
+                <SubmitButton className={btnOutline} name="decision" value="REJECTED">
                   Decline
-                </button>
-                <button className={btn} name="decision" value="APPROVED" type="submit">
+                </SubmitButton>
+                <SubmitButton className={btn} name="decision" value="APPROVED">
                   Accept vouch
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}
@@ -260,15 +261,15 @@ export default async function AdminPage({
                   <>
                     <form action={issueInviteForRequest}>
                       <input type="hidden" name="requestId" value={request.id} />
-                      <button className={btn} type="submit">
+                      <SubmitButton className={btn}>
                         Issue code
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={declineInviteRequest}>
                       <input type="hidden" name="requestId" value={request.id} />
-                      <button className={btnOutline} type="submit">
+                      <SubmitButton className={btnOutline}>
                         Decline
-                      </button>
+                      </SubmitButton>
                     </form>
                   </>
                 ) : null}
@@ -304,9 +305,9 @@ export default async function AdminPage({
               <label className={labelCls}>Note</label>
               <input name="note" className={field} placeholder="Optional note" />
             </div>
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               Create code
-            </button>
+            </SubmitButton>
           </form>
         </section>
         <section className={`${card} p-4`}>

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { logoutAction } from "@/actions/auth";
 import { cancelMembership, simulateFailedPayment, simulatePayment, startStripeCheckout } from "@/actions/payments";
@@ -66,9 +67,9 @@ export function PayDues({
             </Link>
             {signedIn ? (
               <form action={logoutAction} className="mt-6">
-                <button className="text-sm underline decoration-brass" type="submit">
+                <SubmitButton className="text-sm underline decoration-brass">
                   Sign out
-                </button>
+                </SubmitButton>
               </form>
             ) : null}
           </>
@@ -129,40 +130,40 @@ export function PayDues({
         {mode === "stripe" ? (
           <form action={startStripeCheckout} className="mt-4">
             <input type="hidden" name="token" value={token} />
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               Continue to Stripe test checkout
-            </button>
+            </SubmitButton>
           </form>
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <form action={simulatePayment}>
               <input type="hidden" name="token" value={token} />
-              <button className={btn} type="submit">
+              <SubmitButton className={btn}>
                 Pay first month {formatMoney(first)} (test)
-              </button>
+              </SubmitButton>
             </form>
             <form action={simulateFailedPayment}>
               <input type="hidden" name="token" value={token} />
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline}>
                 Simulate a failed payment
-              </button>
+              </SubmitButton>
             </form>
           </div>
         )}
         {cancelled ? null : (
           <form action={cancelMembership} className="mt-4">
             <input type="hidden" name="token" value={token} />
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline}>
               Cancel anytime
-            </button>
+            </SubmitButton>
             <p className="mt-2 text-sm text-ink">Month to month. No long-term contract. Cancellation stops the next charge.</p>
           </form>
         )}
         {signedIn ? (
           <form action={logoutAction} className="mt-6">
-            <button className="text-sm underline decoration-brass" type="submit">
+            <SubmitButton className="text-sm underline decoration-brass">
               Sign out
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
           </>

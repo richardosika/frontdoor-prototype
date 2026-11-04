@@ -1,4 +1,5 @@
 "use client";
+import { SubmitButton } from "@/components/submit-button";
 import { useTx } from "@/components/locale-context";
 
 import { useMemo, useState } from "react";
@@ -167,9 +168,9 @@ export function Composer({
         </div>
       ) : null}
       <div className="mt-3 flex justify-end">
-        <button className={btn} type="submit" disabled={structured && choices.length === 0}>
+        <SubmitButton className={btn} disabled={structured && choices.length === 0}>
           {kind === "DEAL" ? "Post raising" : kind === "SEEKING" ? "Post seeking" : "Post"}
-        </button>
+        </SubmitButton>
       </div>
       <div className="mt-2">
         <ModeratorNotice />

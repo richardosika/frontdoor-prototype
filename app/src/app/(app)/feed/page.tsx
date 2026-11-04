@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { requestConnection } from "@/actions/social";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -117,7 +118,7 @@ export default async function FeedPage({
               </div>
               <form action={requestConnection}>
                 <input type="hidden" name="toId" value={p.id} />
-                <button type="submit" className="min-h-11 rounded-sm border border-forest px-3 text-[14px] font-semibold text-forest" data-testid="people-connect">{tx("Connect")}</button>
+                <SubmitButton className="min-h-11 rounded-sm border border-forest px-3 text-[14px] font-semibold text-forest" data-testid="people-connect" pendingLabel="Sending request…">{tx("Connect")}</SubmitButton>
               </form>
             </li>
           ))}

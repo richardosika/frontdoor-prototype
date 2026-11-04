@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { StartReviewButton } from "@/components/start-review-button";
 import { addProspect } from "@/actions/crm";
@@ -189,9 +190,9 @@ export default async function CrmPage({
               <input type="checkbox" name="sendInfo" value="yes" defaultChecked />
               Send the information email
             </label>
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               Add prospect
-            </button>
+            </SubmitButton>
           </form>
         </section>
       </div>

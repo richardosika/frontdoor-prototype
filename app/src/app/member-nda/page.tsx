@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { acceptMemberNda } from "@/actions/member-nda";
 import { Logo } from "@/components/logo";
 import { btn } from "@/components/ui";
@@ -33,9 +34,9 @@ export default async function MemberNdaGate({ searchParams }: { searchParams: Pr
             <span>{tx(MEMBER_NDA_LABEL)}</span>
           </label>
           {params.error ? <p role="alert" className="text-sm font-semibold text-[#9b2c22]">{tx("Check the box to agree to the Member NDA.")}</p> : null}
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             {tx("Agree and continue")}
-          </button>
+          </SubmitButton>
         </form>
       </article>
     </main>

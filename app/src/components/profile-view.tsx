@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { TierBadge } from "@/components/badge";
@@ -136,9 +137,9 @@ export async function ProfileView({
           {isSelf || messagingClosed ? null : intro === "ACCEPTED" || connection === "ACCEPTED" ? (
             <form action={openConversation}>
               <input type="hidden" name="userId" value={member.id} />
-              <button className={btn} type="submit">
+              <SubmitButton className={btn}>
                 {tx("Open messages")}
-              </button>
+              </SubmitButton>
             </form>
           ) : intro === "PENDING" ? (
             <span className={`${btn} pointer-events-none bg-mut`}>{tx("Introduction requested")}</span>
@@ -224,9 +225,9 @@ export async function ProfileView({
             {blockedByViewer ? (
               <form action={unblockMember} className="mt-2">
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={btnOutline} type="submit">
+                <SubmitButton className={btnOutline}>
                   {tx("Unblock")}
-                </button>
+                </SubmitButton>
               </form>
             ) : null}
           </div>
@@ -236,15 +237,15 @@ export async function ProfileView({
               <div className="flex gap-2">
                 <form action={respondIntroduction}>
                   <input type="hidden" name="introductionId" value={introductionId} />
-                  <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+                  <SubmitButton className={btnOutline} name="decision" value="DECLINED">
                     {tx("Decline introduction")}
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={respondIntroduction}>
                   <input type="hidden" name="introductionId" value={introductionId} />
-                  <button className={btn} name="decision" value="ACCEPTED" type="submit">
+                  <SubmitButton className={btn} name="decision" value="ACCEPTED">
                     {tx("Accept introduction")}
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             ) : intro === "PENDING" ? (
@@ -252,9 +253,9 @@ export async function ProfileView({
             ) : intro === "ACCEPTED" || connection === "ACCEPTED" ? (
               <form action={openConversation}>
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={btn} type="submit">
+                <SubmitButton className={btn}>
                   {tx("Open messages")}
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <p className="rounded border border-line bg-cream px-3 py-3 text-[15px] leading-relaxed text-ink" data-testid="contact-rule">
@@ -264,9 +265,9 @@ export async function ProfileView({
             <div className="flex flex-wrap gap-2">
               <form action={blockMember}>
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={btnOutline} type="submit">
+                <SubmitButton className={btnOutline}>
                   {tx("Block")}
-                </button>
+                </SubmitButton>
               </form>
             </div>
             <ReportDialog userId={member.id} label={tx("Report")} />
@@ -347,9 +348,9 @@ export async function ProfileView({
                       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                         <input name="counterpartyName" placeholder={tx("Counterparty name")} className={`${field} text-[16px]`} required />
                         <input name="counterpartyEmail" type="email" placeholder={tx("Counterparty email, used only to match a member")} className={`${field} text-[16px]`} required />
-                        <button className={btnOutline} type="submit">
+                        <SubmitButton className={btnOutline}>
                           {tx("Request vouch")}
-                        </button>
+                        </SubmitButton>
                       </div>
                     </form>
                   </details>

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { setDeliveryMode } from "@/actions/crm";
 import { Banner } from "@/components/banner";
@@ -64,9 +65,9 @@ export default async function AdminSettingsPage({
                 </span>
               </label>
             </fieldset>
-            <button className={btn} type="submit">
+            <SubmitButton className={btn} pendingLabel="Saving…">
               Save delivery mode
-            </button>
+            </SubmitButton>
           </form>
         </section>
 

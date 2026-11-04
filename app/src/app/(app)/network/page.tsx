@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { respondIntroduction } from "@/actions/social";
@@ -58,15 +59,15 @@ export default async function NetworkPage({ searchParams }: { searchParams: Prom
                 <span className="mt-2 flex gap-2">
                   <form action={respondIntroduction}>
                     <input type="hidden" name="introductionId" value={item.id} />
-                    <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+                    <SubmitButton className={btnOutline} name="decision" value="DECLINED">
                       {tx("Decline")}
-                    </button>
+                    </SubmitButton>
                   </form>
                   <form action={respondIntroduction}>
                     <input type="hidden" name="introductionId" value={item.id} />
-                    <button className={btn} name="decision" value="ACCEPTED" type="submit">
+                    <SubmitButton className={btn} name="decision" value="ACCEPTED">
                       {tx("Accept")}
-                    </button>
+                    </SubmitButton>
                   </form>
                 </span>
               </li>

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { saveTemplateVersion, setTemplateStatus } from "@/actions/bids";
 import { Banner } from "@/components/banner";
 import { PageHeader } from "@/components/page-header";
@@ -34,8 +35,8 @@ export default async function BidTemplatesAdmin({ searchParams }: { searchParams
               <td className="p-2">
                 <div className="flex flex-wrap gap-1">
                   <a className={btnOutline} href={`/admin/bid-templates?edit=${t.id}#edit`}>New version</a>
-                  {t.status !== "APPROVED" ? <form action={setTemplateStatus}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="status" value="APPROVED" /><button className={btn}>Approve</button></form> : null}
-                  {t.status === "APPROVED" ? <form action={setTemplateStatus}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="status" value="RETIRED" /><button className={btnOutline}>Retire</button></form> : null}
+                  {t.status !== "APPROVED" ? <form action={setTemplateStatus}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="status" value="APPROVED" /><SubmitButton className={btn}>Approve</SubmitButton></form> : null}
+                  {t.status === "APPROVED" ? <form action={setTemplateStatus}><input type="hidden" name="id" value={t.id} /><input type="hidden" name="status" value="RETIRED" /><SubmitButton className={btnOutline}>Retire</SubmitButton></form> : null}
                 </div>
               </td>
             </tr>
@@ -56,7 +57,7 @@ export default async function BidTemplatesAdmin({ searchParams }: { searchParams
         <label className="mt-3 block"><span className={labelCls}>Fields (JSON: key, label, type money|percent|number|months|date|text|long|checks|yesno|profile, section price|terms|risk|scope, required, perUnit, best low|high|short, options)</span>
           <textarea name="fields" rows={14} className={`${field} font-mono text-[12px]`} defaultValue={edit ? JSON.stringify(parseFields(edit.fields), null, 1) : "[]"} />
         </label>
-        <button className={`${btn} mt-3`}>Save as draft version</button>
+        <SubmitButton className={`${btn} mt-3`} pendingLabel="Saving…">Save as draft version</SubmitButton>
       </form>
     </div>
   );

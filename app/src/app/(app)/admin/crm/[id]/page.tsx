@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { StartReviewButton } from "@/components/start-review-button";
 import { notFound } from "next/navigation";
@@ -127,24 +128,24 @@ export default async function CrmPersonPage({
             <span className={labelCls}>Do-not-contact reason</span>
             <input name="doNotContactReason" className={field} defaultValue={person.doNotContactReason} placeholder="Required when the box is checked" />
           </label>
-          <button className={btn} type="submit">
+          <SubmitButton className={btn} pendingLabel="Saving…">
             Save
-          </button>
+          </SubmitButton>
         </form>
         <form action={sendPersonInfo} className="mt-4">
           <input type="hidden" name="personId" value={person.id} />
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             Send information email
-          </button>
+          </SubmitButton>
         </form>
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Notes</h2>
           <form action={addCrmNote} className="mt-3 grid gap-2">
             <input type="hidden" name="personId" value={person.id} />
             <textarea name="body" className={field} rows={3} placeholder="A note for the file" />
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline}>
               Add note
-            </button>
+            </SubmitButton>
           </form>
           <ul className="mt-3 divide-y divide-line text-sm">
             {person.notes.map((note) => (

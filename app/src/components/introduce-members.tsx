@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { introduceTwoMembers } from "@/actions/member-introductions";
 import { btn, card, field, labelCls } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
@@ -34,7 +35,7 @@ export async function IntroduceMembers({ people }: { people: { id: string; name:
           <span className={labelCls}>{tx("Why they should talk")}</span>
           <textarea name="note" className={`${field} h-20 resize-none`} maxLength={800} required />
         </label>
-        <button type="submit" className={`${btn} sm:col-span-2 sm:justify-self-start`} data-testid="introduce-submit">{tx("Send introduction")}</button>
+        <SubmitButton className={`${btn} sm:col-span-2 sm:justify-self-start`} data-testid="introduce-submit">{tx("Send introduction")}</SubmitButton>
       </form>
     </section>
   );

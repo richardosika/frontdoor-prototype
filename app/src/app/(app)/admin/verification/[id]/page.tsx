@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteVerificationCase } from "@/actions/owner";
@@ -168,9 +169,9 @@ export default async function VerificationCasePage({
           <textarea name="internalNote" className={field} rows={4} defaultValue={record.internalNote} placeholder="Members never see this." />
           <p className="mt-1 text-[11px] text-mut">Admin only. This note is not rendered on profiles or alerts.</p>
         </div>
-        <button className={btn} type="submit">
+        <SubmitButton className={btn} pendingLabel="Saving…">
           Save file
-        </button>
+        </SubmitButton>
       </form>
 
       {record.subject === "MEMBER" ? (
@@ -188,9 +189,9 @@ export default async function VerificationCasePage({
               {record.status === "VERIFIED" ? (
                 <form action={deleteBusinessCard} className="mt-3">
                   <input type="hidden" name="caseId" value={record.id} />
-                  <button className={btnOutline} type="submit">
+                  <SubmitButton className={btnOutline}>
                     Delete business card
-                  </button>
+                  </SubmitButton>
                 </form>
               ) : (
                 <p className="mt-2 text-xs text-mut">Delete is available after this file is marked Verified.</p>
@@ -207,9 +208,9 @@ export default async function VerificationCasePage({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink">Same 8-step review from Applications, People, and Verification files. Step 8 is the decision.</p>
             <form action={`/admin/verification/${record.id}/rerun`} method="post">
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline}>
                 Re-run checks
-              </button>
+              </SubmitButton>
             </form>
           </div>
           <GuidedReview
@@ -248,9 +249,9 @@ export default async function VerificationCasePage({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Project checklist</p>
           <form action={`/admin/verification/${record.id}/rerun`} method="post">
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline}>
               Re-run checks
-            </button>
+            </SubmitButton>
           </form>
         </div>
         {currentCheck ? (
@@ -303,9 +304,9 @@ export default async function VerificationCasePage({
               <input name="evidenceUrl" className={field} defaultValue={currentCheck.evidenceUrl} placeholder="https:// evidence link" />
               <textarea name="note" className={field} rows={6} defaultValue={currentCheck.note} placeholder="What you checked and what the evidence shows" />
               <div className="flex flex-col gap-2 sm:flex-row">
-                <button className={`${btn} min-h-11`} type="submit">
+                <SubmitButton className={`${btn} min-h-11`} pendingLabel="Saving…">
                   Save & next
-                </button>
+                </SubmitButton>
                 {stepIndex > 1 ? (
                   <a className={`${btnOutline} inline-flex min-h-11 items-center justify-center`} href={`/admin/verification/${record.id}?step=${stepIndex - 1}`}>
                     Back
@@ -319,9 +320,9 @@ export default async function VerificationCasePage({
               <p className="font-serif text-xl text-forest">Skip (override)</p>
               <p className="text-sm text-ink">A skip is not a pass. It is written on this file’s audit log.</p>
               <textarea name="skipReason" className={field} rows={2} required minLength={8} placeholder="Why you are skipping this" />
-              <button className={`${btnOutline} min-h-11`} type="submit">
+              <SubmitButton className={`${btnOutline} min-h-11`}>
                 Record skip
-              </button>
+              </SubmitButton>
             </form>
           </>
         ) : (
@@ -351,9 +352,9 @@ export default async function VerificationCasePage({
                 </select>
                 <input name="evidenceUrl" className={field} defaultValue={check.evidenceUrl} placeholder="https:// evidence link" />
                 <textarea name="note" className={field} rows={3} defaultValue={check.note} placeholder="What you checked and what the evidence shows" />
-                <button className={btnOutline} type="submit">
+                <SubmitButton className={btnOutline} pendingLabel="Saving…">
                   Save item
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}

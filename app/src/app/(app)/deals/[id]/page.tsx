@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { formatProjectValue } from "@/lib/project-contact";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { dealRoomRule } from "@/lib/deal-room-rule";
@@ -123,9 +124,9 @@ export default async function DealPage({
             <input type="hidden" name="dealId" value={deal.id} />
             <p className="mb-2">{tx("The sponsor removed you from this room. You can request access again after acknowledging the current NDA.")}</p>
             <NdaCopy html={ndaHtml} />
-            <button className={`${btn} mt-3`} type="submit">
+            <SubmitButton className={`${btn} mt-3`}>
               {tx("Request access again")}
-            </button>
+            </SubmitButton>
           </form>
         ) : mine?.status === "PENDING" ? (
           <div className="mt-4 rounded border border-brass bg-brass-soft p-3 text-sm">
@@ -143,9 +144,9 @@ export default async function DealPage({
               </p>
             ) : null}
             <NdaCopy html={ndaHtml} />
-            <button className={`${btn} mt-3`} type="submit">
+            <SubmitButton className={`${btn} mt-3`}>
               {tx("Request access")}
-            </button>
+            </SubmitButton>
           </form>
         )}
         {isSponsor && post ? (
@@ -154,15 +155,15 @@ export default async function DealPage({
               <input type="hidden" name="postId" value={post.id} />
               <input name="title" defaultValue={post.title || deal.title} className={field} />
               <textarea name="body" defaultValue={post.body} rows={3} className={field} />
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline} pendingLabel="Saving…">
                 {tx("Save post")}
-              </button>
+              </SubmitButton>
             </form>
             <form action={closePost}>
               <input type="hidden" name="postId" value={post.id} />
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline}>
                 {tx("Close post")}
-              </button>
+              </SubmitButton>
             </form>
           </div>
         ) : null}
@@ -171,18 +172,18 @@ export default async function DealPage({
             <input type="hidden" name="postId" value={post.id} />
             <input type="hidden" name="back" value={`/deals/${deal.id}`} />
             <input name="reason" className={field} placeholder={tx("Report this post")} />
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline}>
               {tx("Report")}
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
         {isSponsor ? null : (
           <div className="mt-4 flex gap-2">
             <form action={openConversation}>
               <input type="hidden" name="userId" value={deal.sponsorId} />
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline}>
                 {tx("Message sponsor")}
-              </button>
+              </SubmitButton>
             </form>
           </div>
         )}
@@ -209,15 +210,15 @@ export default async function DealPage({
                     <span className="flex gap-2">
                       <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
-                        <button className={btnOutline} name="decision" value="REJECTED" type="submit">
+                        <SubmitButton className={btnOutline} name="decision" value="REJECTED">
                           {tx("Decline")}
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={isSponsor ? reviewAccess : adminReviewAccess}>
                         <input type="hidden" name="accessId" value={access.id} />
-                        <button className={btn} name="decision" value="APPROVED" type="submit">
+                        <SubmitButton className={btn} name="decision" value="APPROVED">
                           {tx("Approve")}
-                        </button>
+                        </SubmitButton>
                       </form>
                     </span>
                   ) : null}

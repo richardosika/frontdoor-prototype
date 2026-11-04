@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { createSampleApplicants, deleteRecentRecords, deleteTestData, seedMemberNetwork, seedPaymentDueMember } from "@/actions/owner";
 import { CreateTestApplicantForm } from "@/components/create-test-applicant";
 import { Banner } from "@/components/banner";
@@ -34,9 +35,9 @@ export default async function TestConsolePage({
           <p className="mt-2">Delete records from the last N hours removes applications, non-admin members, CRM people, requests to join, and unused referral codes created in that window. Administrators stay. Use it for a probe, not for the seeded samples, unless those samples were created inside the window.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <form action={createSampleApplicants}>
-              <button className={btn} type="submit">
+              <SubmitButton className={btn}>
                 Create sample applicants
-              </button>
+              </SubmitButton>
             </form>
             <form id="delete-test-data" action={deleteTestData} />
             <ConfirmSubmitButton
@@ -67,9 +68,9 @@ export default async function TestConsolePage({
             Adds three is_test members (developer, general contractor, and investor), a published seeking post, a post held for review, a pending introduction, and an accepted thread. Password is cornicio-demo. Delete all test data removes them.
           </p>
           <form action={seedMemberNetwork} className="mt-3">
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               Seed sample members
-            </button>
+            </SubmitButton>
           </form>
         </section>
         <section className={`${card} mt-4 p-4 text-sm text-ink`}>
@@ -78,9 +79,9 @@ export default async function TestConsolePage({
             Adds Gina Paytest, an is_test general contractor already approved with payment due (test.gc.pay@example.com, password cornicio-demo, first month $99.50, then $199 per month). Sign-in stops on the Pay dues page. The button does not charge a card. Delete all test data removes her.
           </p>
           <form action={seedPaymentDueMember} className="mt-3">
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               Seed payment-due member
-            </button>
+            </SubmitButton>
           </form>
         </section>
         <section className={`${card} mt-4 p-4 text-sm text-ink`}>

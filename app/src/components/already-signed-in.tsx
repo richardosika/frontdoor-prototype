@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useEffect, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import { btn, btnOutline } from "@/components/ui";
@@ -12,9 +13,9 @@ export function AlreadySignedInNotice({ name }: { name: string }) {
       <p className="mt-2 font-serif text-xl font-normal leading-snug text-forest">{alreadySignedInNotice(name)}</p>
       <div className="mt-4 flex flex-wrap gap-3">
         <form action={logoutAction}>
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             Sign out
-          </button>
+          </SubmitButton>
         </form>
         <a href="/feed" className={btnOutline}>
           Go to feed

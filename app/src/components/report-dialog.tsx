@@ -1,4 +1,5 @@
 "use client";
+import { SubmitButton } from "@/components/submit-button";
 import { useTx } from "@/components/locale-context";
 
 import { useState } from "react";
@@ -33,9 +34,9 @@ export function ReportDialog({
         <button className={btnOutline} type="button" onClick={() => setOpen(false)}>
           {tx("Cancel")}
         </button>
-        <button className={btn} type="submit">
+        <SubmitButton className={btn}>
           {tx("Send report")}
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );

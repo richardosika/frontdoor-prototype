@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { adminReviewAccess } from "@/actions/deals";
 import { Banner } from "@/components/banner";
@@ -89,15 +90,15 @@ export default async function AdminAccessPage({
                 </Link>
                 <form action={adminReviewAccess}>
                   <input type="hidden" name="accessId" value={access.id} />
-                  <button className={btnOutline} name="decision" value="REJECTED" type="submit">
+                  <SubmitButton className={btnOutline} name="decision" value="REJECTED">
                     Decline
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={adminReviewAccess}>
                   <input type="hidden" name="accessId" value={access.id} />
-                  <button className={btn} name="decision" value="APPROVED" type="submit" disabled={!access.ndaAcknowledged}>
+                  <SubmitButton className={btn} name="decision" value="APPROVED" disabled={!access.ndaAcknowledged}>
                     Approve for {access.deal.sponsor.name}
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             </li>

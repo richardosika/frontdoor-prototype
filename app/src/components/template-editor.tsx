@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { renderTemplate } from "@/lib/email-templates";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -33,9 +34,9 @@ export function TemplateEditor({
           <span className={labelCls}>Body</span>
           <textarea name="body" className={field} rows={16} value={body} onChange={(event) => setBody(event.target.value)} required />
         </label>
-        <button className={btn} type="submit">
+        <SubmitButton className={btn} pendingLabel="Saving…">
           Save version
-        </button>
+        </SubmitButton>
       </form>
       <section className="rounded border border-line bg-cream p-4">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Preview</h2>
@@ -44,9 +45,9 @@ export function TemplateEditor({
       </section>
       <form action={sendTest}>
         <input type="hidden" name="key" value={templateKey} />
-        <button className={btnOutline} type="submit">
+        <SubmitButton className={btnOutline}>
           Send test to the test recipient
-        </button>
+        </SubmitButton>
         <p className="mt-2 text-xs text-mut">Sends the saved version. It lands in the Outbox only.</p>
       </form>
     </div>

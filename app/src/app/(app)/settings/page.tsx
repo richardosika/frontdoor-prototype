@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { DuesCredits } from "@/components/dues-credits";
 import Link from "next/link";
@@ -68,9 +69,9 @@ export default async function SettingsPage({
               </label>
             ))}
           </fieldset>
-          <button className={btn} type="submit">
+          <SubmitButton className={btn} pendingLabel="Saving…">
             {tx("Save notification settings")}
-          </button>
+          </SubmitButton>
         </form>
       </section>
       <section className={`${card} mt-4 p-4`}>
@@ -84,9 +85,9 @@ export default async function SettingsPage({
             <span className={labelCls}>{tx("New password")}</span>
             <input name="next" type="password" className={field} required minLength={8} maxLength={72} autoComplete="new-password" />
           </label>
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             {tx("Change password")}
-          </button>
+          </SubmitButton>
         </form>
       </section>
       <section className={`${card} mt-4 p-4`}>
@@ -98,9 +99,9 @@ export default async function SettingsPage({
         </p>
         <form action={requestAccountDeletion} className="mt-3 grid gap-2">
           <textarea name="note" className={field} rows={2} placeholder={tx("Optional note")} />
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             {tx("Request account deletion")}
-          </button>
+          </SubmitButton>
         </form>
       </section>
     </div>
@@ -202,20 +203,20 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
                   <>
                     <form action={addSimulatedCard}>
                       <input type="hidden" name="role" value={role} />
-                      <button className={btnOutline} type="submit">{method ? tx("Update card") : tx("Add test card")}</button>
+                      <SubmitButton className={btnOutline}>{method ? tx("Update card") : tx("Add test card")}</SubmitButton>
                     </form>
                     {role === "PRIMARY" ? (
                       <form action={addSimulatedCard}>
                         <input type="hidden" name="role" value={role} />
                         <input type="hidden" name="wallet" value="apple_pay" />
-                        <button className={btnOutline} type="submit">{tx("Use Apple Pay (test)")}</button>
+                        <SubmitButton className={btnOutline}>{tx("Use Apple Pay (test)")}</SubmitButton>
                       </form>
                     ) : null}
                   </>
                 )}
                 {role === "BACKUP" && method ? (
                   <form action={removeBackupCard}>
-                    <button className={btnOutline} type="submit">{tx("Remove")}</button>
+                    <SubmitButton className={btnOutline}>{tx("Remove")}</SubmitButton>
                   </form>
                 ) : null}
               </div>
@@ -225,7 +226,7 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
       </ul>
       {primary && backup ? (
         <form action={swapPaymentMethods} className="mt-3">
-          <button className={btnOutline} type="submit">{tx("Make backup the primary card")}</button>
+          <SubmitButton className={btnOutline}>{tx("Make backup the primary card")}</SubmitButton>
         </form>
       ) : null}
 
@@ -237,7 +238,7 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
           </p>
           <p className="mt-1 text-[14px] text-mut">{tx("We email you one week before it resumes. If you take no action, dues resume automatically at the full price of $199 per month.")}</p>
           <form action={resumeMembershipNow} className="mt-2">
-            <button className={btnOutline} type="submit">{tx("Resume now")}</button>
+            <SubmitButton className={btnOutline}>{tx("Resume now")}</SubmitButton>
           </form>
         </div>
       ) : user.cancelRequestedAt ? null : (
@@ -252,7 +253,7 @@ async function BillingSection({ user, tx }: { user: Awaited<ReturnType<typeof re
               ))}
             </select>
           </label>
-          <button className={btnOutline} type="submit">{tx("Pause membership")}</button>
+          <SubmitButton className={btnOutline}>{tx("Pause membership")}</SubmitButton>
           <p className="basis-full text-[14px] text-mut">{tx("No charges while paused. It resumes automatically at $199 per month; we email you a week before.")}</p>
         </form>
       )}

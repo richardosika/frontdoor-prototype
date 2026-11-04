@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { ProfilePhotos } from "@/components/profile-photos";
@@ -87,12 +88,12 @@ export async function VendorProfile({
             {blockedByViewer ? (
               <form action={unblockMember}>
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={`${btnOutline} w-full`} type="submit">{tx("Unblock")}</button>
+                <SubmitButton className={`${btnOutline} w-full`}>{tx("Unblock")}</SubmitButton>
               </form>
             ) : (
               <form action={blockMember}>
                 <input type="hidden" name="userId" value={member.id} />
-                <button className={`${btnOutline} w-full`} type="submit">{tx("Block")}</button>
+                <SubmitButton className={`${btnOutline} w-full`}>{tx("Block")}</SubmitButton>
               </form>
             )}
             <ReportDialog userId={member.id} label={tx("Report")} />
@@ -124,7 +125,7 @@ export async function VendorProfile({
               {canMessage ? (
                 <form action={openConversation}>
                   <input type="hidden" name="userId" value={member.id} />
-                  <button className={btnOutline} type="submit">{tx("Open messages")}</button>
+                  <SubmitButton className={btnOutline}>{tx("Open messages")}</SubmitButton>
                 </form>
               ) : null}
             </>

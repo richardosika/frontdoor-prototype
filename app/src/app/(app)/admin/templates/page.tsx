@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { setDeliveryMode } from "@/actions/crm";
 import { Banner } from "@/components/banner";
@@ -41,9 +42,9 @@ export default async function TemplatesPage({
               <option value="live">Live (not connected)</option>
             </select>
           </label>
-          <button className={btn} type="submit">
+          <SubmitButton className={btn} pendingLabel="Saving…">
             Save flag
-          </button>
+          </SubmitButton>
         </form>
         <ul className="mt-4 space-y-3">
           {templates.map((template) => (

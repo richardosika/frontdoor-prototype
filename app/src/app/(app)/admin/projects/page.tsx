@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { reviewProject } from "@/actions/projects";
 import { Banner } from "@/components/banner";
@@ -96,15 +97,15 @@ export default async function ProjectReviewPage({
                   placeholder="Note to the member. Required for More info needed, optional reason for Decline."
                 />
                 <div className="flex flex-wrap gap-2">
-                  <button className={btn} name="decision" value="APPROVE" type="submit">
+                  <SubmitButton className={btn} name="decision" value="APPROVE">
                     Approve
-                  </button>
-                  <button className={btnOutline} name="decision" value="NEEDS_INFO" type="submit">
+                  </SubmitButton>
+                  <SubmitButton className={btnOutline} name="decision" value="NEEDS_INFO">
                     More info needed
-                  </button>
-                  <button className={btnOutline} name="decision" value="DECLINE" type="submit">
+                  </SubmitButton>
+                  <SubmitButton className={btnOutline} name="decision" value="DECLINE">
                     Decline
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </li>

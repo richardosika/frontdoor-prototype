@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { addContactToCircle, respondProjectContact } from "@/actions/projects";
 import { ReachOut, StatusPill } from "@/components/reach-out";
@@ -69,24 +70,24 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
             <>
               <form action={respondProjectContact}>
                 <input type="hidden" name="contactId" value={row.id} />
-                <button className={btn} name="decision" value="ACCEPTED" type="submit">
+                <SubmitButton className={btn} name="decision" value="ACCEPTED">
                   {tx("Accept")}
-                </button>
+                </SubmitButton>
               </form>
               <form action={respondProjectContact}>
                 <input type="hidden" name="contactId" value={row.id} />
-                <button className={btnOutline} name="decision" value="DECLINED" type="submit">
+                <SubmitButton className={btnOutline} name="decision" value="DECLINED">
                   {tx("Decline")}
-                </button>
+                </SubmitButton>
               </form>
             </>
           ) : null}
           {row.status === "ACCEPTED" && row.ownerIsMe && !row.inCircle ? (
             <form action={addContactToCircle}>
               <input type="hidden" name="contactId" value={row.id} />
-              <button className={btnOutline} type="submit">
+              <SubmitButton className={btnOutline}>
                 {tx("Add to My Circle")}
-              </button>
+              </SubmitButton>
             </form>
           ) : null}
           <Link href={`/members/${row.from.id}`} className="ml-auto text-[14px] font-semibold text-forest underline decoration-brass">

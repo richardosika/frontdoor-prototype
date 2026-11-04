@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { saveReviewStep } from "@/actions/review";
 import { DecisionForm, RevokeApprovalForm, SettleDecision } from "@/components/decision-form";
 import { ExecutiveSummary, GradeMark } from "@/components/grade-summary";
@@ -75,17 +76,17 @@ export function GuidedReview({
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {steps.map((step) => (
             <StepJumpForm key={step.id} applicationId={applicationId} caseId={caseId} stepId={step.id}>
-              <button
+              <SubmitButton
                 className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-sm border px-3 text-xs ${
                   step.id === current.id ? "border-brass bg-forest text-paper" : "border-line bg-cream text-ink"
                 }`}
                 data-review-tab={step.id}
-                type="submit"
+               
               >
                 {step.index}. {step.title}
                 {step.id !== "decision" && step.status === "SKIPPED" ? " · skipped" : ""}
                 {step.id !== "decision" && stepCountsAsPass(step.status) ? " · pass" : ""}
-              </button>
+              </SubmitButton>
             </StepJumpForm>
           ))}
         </div>
@@ -159,15 +160,15 @@ export function GuidedReview({
                   <span className={labelCls}>Note</span>
                   <textarea name="note" className={field} rows={6} defaultValue={displayedNote(step.saved?.note || step.prefill?.note || "", location, person, org)} placeholder="What was found, and what was not" />
                 </label>
-                <button className={`${btn} min-h-11 w-full sm:w-auto`} type="submit">
+                <SubmitButton className={`${btn} min-h-11 w-full sm:w-auto`} pendingLabel="Saving…">
                   Save & next
-                </button>
+                </SubmitButton>
               </StepSaveForm>
               {step.index > 1 ? (
                 <StepJumpForm applicationId={applicationId} caseId={caseId} stepId={previousStepId(step.id)} className="mt-2">
-                  <button className={`${btnOutline} min-h-11 w-full sm:w-auto`} type="submit">
+                  <SubmitButton className={`${btnOutline} min-h-11 w-full sm:w-auto`}>
                     Back
-                  </button>
+                  </SubmitButton>
                 </StepJumpForm>
               ) : null}
               <div className="mt-3">
@@ -302,9 +303,9 @@ function DecisionStep({
         </>
       ) : null}
       <StepJumpForm applicationId={applicationId} caseId={caseId} stepId={previous} className="mt-3">
-        <button className={`${btnOutline} min-h-11`} type="submit">
+        <SubmitButton className={`${btnOutline} min-h-11`}>
           Back
-        </button>
+        </SubmitButton>
       </StepJumpForm>
     </div>
   );

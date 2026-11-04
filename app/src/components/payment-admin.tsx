@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import {
   markPaidManually,
   recordRefund,
@@ -61,30 +62,30 @@ export function PaymentPanel({
         <form action={resendPaymentLink}>
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="back" value={back} />
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             Resend payment link
-          </button>
+          </SubmitButton>
         </form>
         <form action={markPaidManually}>
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="back" value={back} />
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             Mark paid
-          </button>
+          </SubmitButton>
         </form>
         <form action={sendRenewalReminderAction}>
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="back" value={back} />
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             Send full-price reminder
-          </button>
+          </SubmitButton>
         </form>
         <form action={sendFailedPaymentNotice}>
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="back" value={back} />
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             Send failed-payment notice
-          </button>
+          </SubmitButton>
         </form>
       </div>
       <form action={waiveDues} className="mt-3 grid gap-2">
@@ -94,9 +95,9 @@ export function PaymentPanel({
           <span className={labelCls}>Waive or comp dues</span>
           <input name="reason" className={field} placeholder="Reason, required" required minLength={3} />
         </label>
-        <button className={btnOutline} type="submit">
+        <SubmitButton className={btnOutline}>
           Waive dues
-        </button>
+        </SubmitButton>
       </form>
       <form action={recordRefund} className="mt-3 grid gap-2">
         <input type="hidden" name="userId" value={userId} />
@@ -105,9 +106,9 @@ export function PaymentPanel({
           <span className={labelCls}>Refund note</span>
           <input name="note" className={field} placeholder="What was refunded, required" required minLength={3} />
         </label>
-        <button className={btnOutline} type="submit">
+        <SubmitButton className={btnOutline} pendingLabel="Saving…">
           Save refund note
-        </button>
+        </SubmitButton>
       </form>
     </section>
   );

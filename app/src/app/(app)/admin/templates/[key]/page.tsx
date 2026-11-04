@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { notFound } from "next/navigation";
 import { restoreTemplate, saveTemplate, sendTestTemplate } from "@/actions/crm";
 import { Banner } from "@/components/banner";
@@ -61,9 +62,9 @@ export default async function TemplateEditPage({
                 </div>
                 <form action={restoreTemplate}>
                   <input type="hidden" name="versionId" value={version.id} />
-                  <button className={btnOutline} type="submit">
+                  <SubmitButton className={btnOutline}>
                     Restore
-                  </button>
+                  </SubmitButton>
                 </form>
               </li>
             ))}

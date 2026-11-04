@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { serverTx } from "@/lib/i18n/server";
 import { deleteSavedFilter, saveFilter } from "@/actions/filters";
 import { ShareLink } from "@/components/share-link";
@@ -150,9 +151,9 @@ export async function ProjectFilterBar({
           </select>
         </label>
         <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             {tx("Apply filters")}
-          </button>
+          </SubmitButton>
           <a className={btnOutline} href={projectQuery(path, { tab: filters.tab })}>
             {tx("Clear")}
           </a>
@@ -170,9 +171,9 @@ export async function ProjectFilterBar({
               <span className={labelCls}>{tx("Name")}</span>
               <input className={field} name="name" required maxLength={40} placeholder={tx("NJ multifamily equity")} />
             </label>
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline} pendingLabel="Saving…">
               {tx("Save filter")}
-            </button>
+            </SubmitButton>
           </form>
         ) : (
           <p className="mt-2 text-sm text-mut">{tx("Apply a filter, then save it for this page.")}</p>
@@ -188,9 +189,9 @@ export async function ProjectFilterBar({
                   <input type="hidden" name="surface" value={path.slice(1)} />
                   <input type="hidden" name="id" value={item.id} />
                   <input type="hidden" name="query" value={query} />
-                  <button className="min-h-11 px-2 text-xs font-semibold text-mut" type="submit">
+                  <SubmitButton className="min-h-11 px-2 text-xs font-semibold text-mut">
                     {tx("Remove")}
-                  </button>
+                  </SubmitButton>
                 </form>
               </li>
             ))}

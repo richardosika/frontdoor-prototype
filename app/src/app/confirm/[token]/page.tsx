@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { formatProjectValue } from "@/lib/project-contact";
 import { notFound } from "next/navigation";
 import { respondConfirmation } from "@/actions/profile";
@@ -54,12 +55,12 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
               <textarea name="note" className={field} rows={3} placeholder="We closed this together in 2023." />
             </div>
             <div className="flex gap-2">
-              <button className={`${btnOutline} flex-1`} name="decision" value="DECLINED" type="submit">
+              <SubmitButton className={`${btnOutline} flex-1`} name="decision" value="DECLINED">
                 Decline
-              </button>
-              <button className={`${btn} flex-1`} name="decision" value="CONFIRMED" type="submit">
+              </SubmitButton>
+              <SubmitButton className={`${btn} flex-1`} name="decision" value="CONFIRMED">
                 Confirm
-              </button>
+              </SubmitButton>
             </div>
           </form>
         )}

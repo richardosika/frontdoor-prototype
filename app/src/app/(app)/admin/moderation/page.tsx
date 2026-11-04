@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { moderatePost, resolveReport } from "@/actions/admin";
 import { Banner } from "@/components/banner";
@@ -50,15 +51,15 @@ export default async function ModerationPage({
               <div className="mt-2 flex gap-2">
                 <form action={moderatePost}>
                   <input type="hidden" name="postId" value={post.id} />
-                  <button className={btnOutline} name="decision" value="REJECT" type="submit">
+                  <SubmitButton className={btnOutline} name="decision" value="REJECT">
                     Do not publish
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={moderatePost}>
                   <input type="hidden" name="postId" value={post.id} />
-                  <button className={btn} name="decision" value="PUBLISH" type="submit">
+                  <SubmitButton className={btn} name="decision" value="PUBLISH">
                     Publish
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             </li>
@@ -82,9 +83,9 @@ export default async function ModerationPage({
               <p className="text-xs text-mut">{timeAgo(report.createdAt)}</p>
               <form action={resolveReport} className="mt-2">
                 <input type="hidden" name="reportId" value={report.id} />
-                <button className={btnOutline} type="submit">
+                <SubmitButton className={btnOutline}>
                   Close report
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}

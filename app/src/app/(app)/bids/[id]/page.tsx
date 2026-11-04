@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { MoneyInput } from "@/components/money-input";
 import Link from "next/link";
 import { decideBid, saveBid } from "@/actions/bids";
@@ -125,7 +126,7 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
           <form key={d} action={decideBid}>
             <input type="hidden" name="bidId" value={b.id} />
             <input type="hidden" name="decision" value={d} />
-            <button className={d === "AWARDED" ? btn : d === "DECLINED" ? btnGhost : btnOutline} data-testid={`decide-${d}-${b.bidder.id}`}>{tx(d === "SHORTLISTED" ? "Shortlist" : d === "DECLINED" ? "Decline" : "Award")}</button>
+            <SubmitButton className={d === "AWARDED" ? btn : d === "DECLINED" ? btnGhost : btnOutline} data-testid={`decide-${d}-${b.bidder.id}`}>{tx(d === "SHORTLISTED" ? "Shortlist" : d === "DECLINED" ? "Decline" : "Award")}</SubmitButton>
           </form>
         ) : null,
       )}
@@ -289,8 +290,8 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
         <p className="mb-3 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]">{tx("Every field marked * is required by the staff-approved template, so the requester sees your proposal side by side with others. Only the requester can see your numbers.")}</p>
         {editable ? (
           <div className="flex flex-wrap justify-end gap-2">
-            {bid?.status === "SUBMITTED" ? null : <button className={btnOutline} name="intent" value="draft" data-testid="bid-save-draft">{tx("Save draft")}</button>}
-            <button className={btn} name="intent" value="submit" data-testid="bid-submit">{tx(bid?.status === "SUBMITTED" ? "Update proposal" : "Submit proposal")}</button>
+            {bid?.status === "SUBMITTED" ? null : <SubmitButton className={btnOutline} name="intent" value="draft" data-testid="bid-save-draft" pendingLabel="Saving…">{tx("Save draft")}</SubmitButton>}
+            <SubmitButton className={btn} name="intent" value="submit" data-testid="bid-submit">{tx(bid?.status === "SUBMITTED" ? "Update proposal" : "Submit proposal")}</SubmitButton>
           </div>
         ) : null}
       </form>

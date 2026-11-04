@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
@@ -255,9 +256,9 @@ export default async function ApplicationDetailPage({
           <form action={saveInternalNote} className="mt-3 space-y-2">
             <input type="hidden" name="applicationId" value={application.id} />
             <textarea name="internalNote" className={field} rows={3} defaultValue={application.internalNote} />
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline} pendingLabel="Saving…">
               Save note
-            </button>
+            </SubmitButton>
           </form>
         </section>
         <section className={`${card} mt-4 p-4`}>

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { NOT_STAFF_WHERE } from "@/lib/recommendations";
 import { staffNameSet } from "@/lib/project-contact-db";
 import Link from "next/link";
@@ -143,7 +144,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <form action={updateProjectFacts} className="mt-2 grid gap-3">
               <input type="hidden" name="projectId" value={project.id} />
               <ProjectFactsFields roleFacts={project.roleFacts} />
-              <button className={`${btn} justify-self-start`} type="submit">{tx("Save details")}</button>
+              <SubmitButton className={`${btn} justify-self-start`} pendingLabel="Saving…">{tx("Save details")}</SubmitButton>
             </form>
           </details>
         ) : null}
@@ -178,7 +179,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 </label>
               ))}
             </div>
-            <button className={`${btn} justify-self-start`} type="submit">{tx("Save")}</button>
+            <SubmitButton className={`${btn} justify-self-start`} pendingLabel="Saving…">{tx("Save")}</SubmitButton>
           </form>
         ) : (
           <>
@@ -197,7 +198,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <input type="hidden" name="projectId" value={project.id} />
                   <input type="hidden" name="back" value={back} />
                   <textarea name="note" maxLength={500} rows={3} className={`${field} text-[16px]`} placeholder={tx("Short note to the owner (optional)")} />
-                  <button className={`${btn} justify-self-start`} type="submit" data-testid="project-contact-button">{tx("Contact about this project")}</button>
+                  <SubmitButton className={`${btn} justify-self-start`} data-testid="project-contact-button">{tx("Contact about this project")}</SubmitButton>
                 </form>
               ) : (
                 <p className="text-[15px] text-mut" data-testid="project-no-contact">{tx("This project is not seeking your category, so contact is not open.")}</p>
@@ -235,7 +236,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           <input type="hidden" name="contactId" value={c.id} />
                           <input type="hidden" name="decision" value={decision} />
                           <input type="hidden" name="back" value={back} />
-                          <button className={decision === "ACCEPTED" ? btn : btnOutline} type="submit">{decision === "ACCEPTED" ? tx("Accept") : tx("Decline")}</button>
+                          <SubmitButton className={decision === "ACCEPTED" ? btn : btnOutline}>{decision === "ACCEPTED" ? tx("Accept") : tx("Decline")}</SubmitButton>
                         </form>
                       ))}
                     </div>
@@ -308,7 +309,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <span className="text-[16px] text-ink">
               {tx("Share with My Circle")}: <b>{project.shareWithCircle ? tx("On") : tx("Off")}</b>
             </span>
-            <button className={btnOutline} type="submit">{project.shareWithCircle ? tx("Stop sharing") : tx("Share with My Circle")}</button>
+            <SubmitButton className={btnOutline}>{project.shareWithCircle ? tx("Stop sharing") : tx("Share with My Circle")}</SubmitButton>
           </form>
           <p className="mt-3 text-[15px] text-ink">
             {tx("Linked deal room")}:{" "}

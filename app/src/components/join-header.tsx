@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { setLanguage } from "@/actions/language";
 import { Logo } from "@/components/logo";
@@ -12,17 +13,17 @@ export function JoinHeader({ locale }: { locale: Locale }) {
       <div className="flex flex-wrap items-center gap-3">
         <form action={setLanguage} className="flex flex-wrap gap-1" data-testid="join-language-picker" aria-label={phrase(locale, "Language")}>
           {LOCALES.map((item) => (
-            <button
+            <SubmitButton
               key={item.id}
               name="locale"
               value={item.id}
-              type="submit"
+             
               lang={item.id}
               aria-pressed={item.id === locale}
               className={`min-h-9 rounded-sm border px-2 text-[12px] font-semibold ${item.id === locale ? "border-brass bg-brass text-forest" : "border-paper/40 text-paper hover:border-brass"}`}
             >
               {item.label}
-            </button>
+            </SubmitButton>
           ))}
         </form>
         <Link href="/login" className="text-xs font-semibold uppercase tracking-[0.12em] text-brass">{phrase(locale, "Sign in")}</Link>

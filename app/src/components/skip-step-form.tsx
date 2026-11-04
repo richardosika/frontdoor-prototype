@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { saveReviewStep } from "@/actions/review";
 import { StepSaveForm } from "@/components/step-save-form";
@@ -27,9 +28,9 @@ export function SkipStepForm({ applicationId, caseId, stepId }: { applicationId:
         <textarea name="skipReason" className={field} rows={3} required minLength={8} placeholder="Why you are skipping this" />
       </label>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <button className={`${btn} min-h-11`} type="submit">
+        <SubmitButton className={`${btn} min-h-11`}>
           Record skip
-        </button>
+        </SubmitButton>
         <button className={`${btnOutline} min-h-11`} type="button" onClick={() => setOpen(false)}>
           Cancel
         </button>

@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+
 import { useState } from "react";
 import { adminLoginAction, loginAction } from "@/actions/auth";
 import { btn, field, labelCls } from "@/components/ui";
@@ -30,9 +32,9 @@ export function LoginForm({ next, portal = "member" }: { next?: string; portal?:
         <label className={labelCls}>Password</label>
         <input className={field} name="password" type="password" autoComplete="current-password" required />
       </div>
-      <button className={`${btn} w-full`} disabled={pending} type="submit">
+      <SubmitButton className={`${btn} w-full`} disabled={pending} pendingLabel="Signing in…">
         Sign in
-      </button>
+      </SubmitButton>
     </form>
   );
 }

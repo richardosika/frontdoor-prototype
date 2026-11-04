@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { memberLine } from "@/lib/member-line";
 import { openConversation } from "@/actions/social";
@@ -54,9 +55,9 @@ export async function MyCircleList({ people }: { people: Circle }) {
             ) : (
               <form action={openConversation}>
                 <input type="hidden" name="userId" value={person.id} />
-                <button className={`${btn} w-full`} type="submit">
+                <SubmitButton className={`${btn} w-full`}>
                   {tx("Send a message")}
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>

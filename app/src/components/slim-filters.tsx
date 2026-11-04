@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { btn, field } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
@@ -44,9 +45,9 @@ export async function SlimFilterBar({ path, filters, anchor }: { path: string; f
         </select>
       </label>
       <div className="col-span-2 flex items-center gap-2 sm:col-span-1">
-        <button className={`${btn} flex-1 sm:flex-none`} type="submit">
+        <SubmitButton className={`${btn} flex-1 sm:flex-none`}>
           {tx("Apply")}
-        </button>
+        </SubmitButton>
         {active ? (
           <Link href={`${path}${anchor ? `#${anchor}` : ""}`} className="text-[14px] font-semibold text-forest underline decoration-brass">
             {tx("Clear")}

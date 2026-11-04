@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { StatusPill } from "@/components/reach-out";
@@ -144,7 +145,7 @@ export async function DealChecklist({
                   ))}
                 </select>
                 <input name="dueDate" type="date" className={`${field} text-[16px]`} aria-label={tx("Due date")} />
-                <button className={btn} type="submit">{tx("Add item")}</button>
+                <SubmitButton className={btn}>{tx("Add item")}</SubmitButton>
               </form>
             </details>
           ) : null}
@@ -244,7 +245,7 @@ export async function DealChecklist({
                                     </select>
                                   </>
                                 ) : null}
-                                <button className={`${btn} sm:col-span-2 sm:justify-self-start`} type="submit">{tx("Save")}</button>
+                                <SubmitButton className={`${btn} sm:col-span-2 sm:justify-self-start`} pendingLabel="Saving…">{tx("Save")}</SubmitButton>
                               </form>
                             ) : null}
                             {canEdit ? (
@@ -254,7 +255,7 @@ export async function DealChecklist({
                                 <label className="flex items-center gap-2 text-[14px]">
                                   <input type="checkbox" name="markDone" className="h-5 w-5 accent-[#1F3A2E]" /> {tx("Mark done")}
                                 </label>
-                                <button className={`${btnOutline} justify-self-start`} type="submit">{item.fileName ? tx("Replace file") : tx("Attach a file")}</button>
+                                <SubmitButton className={`${btnOutline} justify-self-start`}>{item.fileName ? tx("Replace file") : tx("Attach a file")}</SubmitButton>
                               </form>
                             ) : null}
                             <div className="border-t border-line pt-3">
@@ -269,13 +270,13 @@ export async function DealChecklist({
                               <form action={commentChecklistItem} className="mt-2 flex flex-col gap-2 sm:flex-row">
                                 <input type="hidden" name="itemId" value={item.id} />
                                 <input name="body" className={`${field} text-[16px]`} placeholder={tx("Add a comment")} required />
-                                <button className={btnOutline} type="submit">{tx("Comment")}</button>
+                                <SubmitButton className={btnOutline}>{tx("Comment")}</SubmitButton>
                               </form>
                             </div>
                             {manage ? (
                               <form action={removeChecklistItem} className="border-t border-line pt-3">
                                 <input type="hidden" name="itemId" value={item.id} />
-                                <button className="min-h-10 text-[14px] text-[#A2412C] underline" type="submit">{tx("Remove item")}</button>
+                                <SubmitButton className="min-h-10 text-[14px] text-[#A2412C] underline">{tx("Remove item")}</SubmitButton>
                               </form>
                             ) : null}
                           </div>
@@ -311,7 +312,7 @@ export async function DealChecklist({
                                               {tx("About")}: <b className="text-ink">{project.name}</b>. {tx("This adds the category to what the project is seeking.")}
                                             </p>
                                             <textarea name="note" rows={2} maxLength={500} className={`${field} text-[16px]`} placeholder={tx("Add a short note (optional)")} />
-                                            <button className={btn} type="submit">{tx("Send request")}</button>
+                                            <SubmitButton className={btn} pendingLabel="Sending request…">{tx("Send request")}</SubmitButton>
                                           </form>
                                         </details>
                                       )}

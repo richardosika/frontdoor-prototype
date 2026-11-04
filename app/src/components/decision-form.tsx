@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { reviewApplication, revokeApproval } from "@/actions/admin";
 import { DECISION_ACK_KEY, DECISION_DIALOG_ID, DECISION_MEMORY_KEY, publishDecisionDialog } from "@/lib/decision-dialog";
@@ -211,9 +212,9 @@ export function DecisionForm({
         <button className={`${btn} min-h-12 w-full sm:w-auto`} type="button" data-decision-open="APPROVED" onClick={() => openPending("APPROVED")}>
           Approve
         </button>
-        <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="NEEDS_INFO" type="submit">
+        <SubmitButton className={`${btnOutline} min-h-12 w-full sm:w-auto`} name="decision" value="NEEDS_INFO">
           Request more info
-        </button>
+        </SubmitButton>
         <button className={`${btnOutline} min-h-12 w-full sm:w-auto`} type="button" data-decision-open="DECLINED" onClick={() => openPending("DECLINED")}>
           Decline
         </button>
@@ -289,9 +290,9 @@ export function RevokeApprovalForm({ applicationId, caseId }: { applicationId: s
       ) : null}
       <label className={labelCls}>Reason</label>
       <textarea name="reason" className={field} rows={3} placeholder="Private. Logged on this file. Not shown to the applicant." />
-      <button className={`${btnOutline} min-h-12 w-full border-[#7A2E2E] text-[#7A2E2E] sm:w-auto`} type="submit">
+      <SubmitButton className={`${btnOutline} min-h-12 w-full border-[#7A2E2E] text-[#7A2E2E] sm:w-auto`}>
         Revoke approval
-      </button>
+      </SubmitButton>
       {open ? (
         <ConfirmModal
           title="Confirm revoke"

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { saveProfile } from "@/actions/profile";
 import { MoneyInput } from "@/components/money-input";
 import { INSURANCE_TYPES, normalizeCoverage } from "@/lib/insurance";
@@ -216,9 +217,9 @@ export async function ProfileEditor({
         <span className={labelCls}>{t("profile.card")}</span>
         <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-[15px]" />
       </label>
-      <button className={btn} type="submit">
+      <SubmitButton className={btn}>
         {t("profile.save")}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { PLAN_ACCEPT } from "@/lib/bid-plans";
 import Link from "next/link";
 import { createBidRequest } from "@/actions/bids";
@@ -118,7 +119,7 @@ export default async function NewBidRequest({ searchParams }: { searchParams: Pr
           <p className="mt-2 text-[13px] text-mut">{tx("Units and SF let the comparison normalize prices per unit and per SF.")}</p>
         </section>
         <div className="mt-4 flex justify-end">
-          <button className={btn} type="submit" data-testid="send-bid-request">{tx("Send request")}</button>
+          <SubmitButton className={btn} data-testid="send-bid-request" pendingLabel="Sending request…">{tx("Send request")}</SubmitButton>
         </div>
       </form>
     </div>

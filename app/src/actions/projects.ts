@@ -217,9 +217,11 @@ export async function contactAboutProject(formData: FormData) {
   await prisma.projectContact.create({
     data: { projectId, fromId: user.id, toId: to.id, category: decision.category, note },
   });
-  await notify(to.id, { title: "Project contact request", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: "/feed#ledger-outreach" });
+  // Answer the tap at once: the in-app notice and the email go out after the response.
+  const base = to.notifyIntros ? await appBaseUrl() : "";
+  after(async () => {
+  await notify(to.id, { title: "Project contact request", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: "/feed#ledger-outreach" }).catch(() => null);
   if (to.notifyIntros) {
-    const base = await appBaseUrl();
     const mail = projectContactEmail({
       locale: isLocale(to.locale) ? to.locale : "en",
       link: `${base}/feed#ledger-outreach`,
@@ -232,8 +234,9 @@ export async function contactAboutProject(formData: FormData) {
       note,
       profileLink: `${base}/members/${user.id}`,
     });
-    await sendEmail({ to: to.email, subject: mail.subject, text: mail.text });
+    await sendEmail({ to: to.email, subject: mail.subject, text: mail.text }).catch(() => null);
   }
+  });
   refresh();
   revalidatePath(`/members/${project.userId}`);
   go(back, "notice", "Contact request sent.");

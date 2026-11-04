@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,17 +26,17 @@ function LanguagePicker({ locale, label }: { locale: Locale; label: string }) {
       <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.16em] text-mut">{label}</p>
       <div className="grid grid-cols-2 gap-1">
         {LOCALES.map((item) => (
-          <button
+          <SubmitButton
             key={item.id}
             name="locale"
             value={item.id}
-            type="submit"
+           
             lang={item.id}
             aria-pressed={item.id === locale}
             className={`min-h-9 rounded-sm border px-2 text-left font-sans text-[13px] ${item.id === locale ? "border-brass bg-forest text-paper" : "border-line bg-paper text-forest hover:bg-cream"}`}
           >
             {item.label}
-          </button>
+          </SubmitButton>
         ))}
       </div>
     </form>
@@ -138,9 +139,9 @@ export function Shell({
                 {t("menu.settings")}
               </Link>
               <form action={logoutAction} className="border-t border-line">
-                <button role="menuitem" className="min-h-11 w-full px-3 text-left font-sans text-sm font-semibold hover:bg-cream" type="submit">
+                <SubmitButton role="menuitem" className="min-h-11 w-full px-3 text-left font-sans text-sm font-semibold hover:bg-cream">
                   {t("menu.signOut")}
-                </button>
+                </SubmitButton>
               </form>
               <LanguagePicker locale={locale} label={t("menu.language")} />
             </div>

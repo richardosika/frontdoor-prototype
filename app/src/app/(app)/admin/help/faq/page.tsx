@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { createHelpArticle, saveHelpArticle } from "@/actions/help-admin";
 import { Banner } from "@/components/banner";
 import { MobileTitle, PageHeader } from "@/components/page-header";
@@ -39,9 +40,9 @@ export default async function AdminHelpFaqPage({
             Answer
           </label>
           <textarea id="new-body" name="body" className={`${field} min-h-28`} required />
-          <button className={btn} type="submit">
+          <SubmitButton className={btn}>
             Add article
-          </button>
+          </SubmitButton>
         </form>
         <ul className="mt-4 space-y-4">
           {articles.map((article) => (
@@ -60,9 +61,9 @@ export default async function AdminHelpFaqPage({
                   <input type="checkbox" name="published" value="yes" defaultChecked={article.published} />
                   Published
                 </label>
-                <button className={btn} type="submit">
+                <SubmitButton className={btn} pendingLabel="Saving…">
                   Save
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}

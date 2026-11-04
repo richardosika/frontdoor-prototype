@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import type { MemberRole } from "@prisma/client";
 import { DealChecklist } from "@/components/deal-checklist";
@@ -118,9 +119,9 @@ export default async function DealRoomPage({
                     <form action={removeParticipant}>
                       <input type="hidden" name="dealId" value={deal.id} />
                       <input type="hidden" name="requesterId" value={person.id} />
-                      <button className={btnOutline} type="submit">
+                      <SubmitButton className={btnOutline}>
                         {tx("Remove")}
-                      </button>
+                      </SubmitButton>
                     </form>
                   ) : null}
                 </span>
@@ -174,9 +175,9 @@ export default async function DealRoomPage({
               <label className={labelCls}>{tx("Note")}</label>
               <input name="note" className={field} placeholder={tx("What this file is for")} />
             </div>
-            <button className={btnOutline} type="submit">
+            <SubmitButton className={btnOutline}>
               {tx("List document")}
-            </button>
+            </SubmitButton>
           </form>
         </section>
 
@@ -205,9 +206,9 @@ export default async function DealRoomPage({
                   <input type="hidden" name="dealId" value={deal.id} />
                   <input type="hidden" name="parentId" value={question.id} />
                   <input name="body" className={field} placeholder={tx("Reply")} required />
-                  <button className={btn} type="submit">
+                  <SubmitButton className={btn} pendingLabel="Sending…">
                     {tx("Reply")}
-                  </button>
+                  </SubmitButton>
                 </form>
               </li>
             ))}
@@ -216,9 +217,9 @@ export default async function DealRoomPage({
             <input type="hidden" name="dealId" value={deal.id} />
             <label className={labelCls}>{tx("Ask the room")}</label>
             <textarea name="body" className={field} rows={3} placeholder={tx("A question for the sponsor or the other approved members")} required />
-            <button className={btn} type="submit">
+            <SubmitButton className={btn}>
               {tx("Post question")}
-            </button>
+            </SubmitButton>
             <ModeratorNotice />
           </form>
         </section>

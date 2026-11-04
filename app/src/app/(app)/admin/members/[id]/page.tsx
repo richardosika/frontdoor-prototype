@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { removeMember, setMemberStatus } from "@/actions/owner";
@@ -64,17 +65,17 @@ export default async function AdminMemberPage({
                 <form action={setMemberStatus}>
                   <input type="hidden" name="userId" value={member.id} />
                   <input type="hidden" name="status" value="DISABLED" />
-                  <button className={btnOutline} type="submit">
+                  <SubmitButton className={btnOutline}>
                     Suspend
-                  </button>
+                  </SubmitButton>
                 </form>
               ) : (
                 <form action={setMemberStatus}>
                   <input type="hidden" name="userId" value={member.id} />
                   <input type="hidden" name="status" value="ACTIVE" />
-                  <button className={btn} type="submit">
+                  <SubmitButton className={btn}>
                     Reinstate
-                  </button>
+                  </SubmitButton>
                 </form>
               )}
               <form id={`remove-member-${member.id}`} action={removeMember}>

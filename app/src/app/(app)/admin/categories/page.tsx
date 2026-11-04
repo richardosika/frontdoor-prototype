@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { coverageSummary, normalizeCoverage } from "@/lib/insurance";
 import Link from "next/link";
 import { reviewMemberCategory } from "@/actions/category-review";
@@ -74,8 +75,8 @@ export default async function CategoryReviewPage({ searchParams }: { searchParam
                   ) : null}
                   <input name="note" maxLength={400} className={`${field} mt-2`} placeholder="Note to the member (optional)" />
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button className={btn} name="decision" value="approve" type="submit">Approve</button>
-                    <button className={btnOutline} name="decision" value="decline" type="submit">Decline</button>
+                    <SubmitButton className={btn} name="decision" value="approve">Approve</SubmitButton>
+                    <SubmitButton className={btnOutline} name="decision" value="decline">Decline</SubmitButton>
                   </div>
                 </form>
               ))}

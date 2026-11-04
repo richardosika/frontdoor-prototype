@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { logoutAction } from "@/actions/auth";
 import { Logo } from "@/components/logo";
 import { btnOutline } from "@/components/ui";
@@ -20,9 +21,9 @@ export default function SuspendedPage() {
           if you need help.
         </p>
         <form action={logoutAction} className="mt-6">
-          <button className={btnOutline} type="submit">
+          <SubmitButton className={btnOutline}>
             Sign out
-          </button>
+          </SubmitButton>
         </form>
       </article>
     </main>
