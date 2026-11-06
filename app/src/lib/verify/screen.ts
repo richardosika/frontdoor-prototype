@@ -3,8 +3,8 @@ import { registrableHost } from "@/lib/verify/host";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
 import { cityPhrase, googleNewsUrl, instagramCompanyTag, judgeHeadline, newsSearchQueries, queryCity, socialSearchQuery } from "@/lib/verify/news";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
-import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, personHit, surnameForSearch } from "@/lib/verify/public-match";
-import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultTexts, wikipediaRestResultTexts } from "@/lib/verify/web-search";
+import { alternatePersonNames, brandAliases, distinctiveCompanyTokens, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, hostMatchesOrgLetters, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, orgLettersLabel, parsePersonName, personHit, surnameForSearch } from "@/lib/verify/public-match";
+import { braveResultBlocks, gdeltResultTexts, isLinkedInDirectory, mojeekResultBlocks, wikidataSearchResultPages, wikipediaRestResultPages } from "@/lib/verify/web-search";
 
 const COULD_NOT_CHECK = "Couldn't check for free.";
 const SEARCH_RETRY_MS = 400;
@@ -72,15 +72,23 @@ export function scorePublicText(
   const name = hit === "match";
   const company = mentionsCompany(text, facts.org, facts.name);
   const alias = company ? "" : mentionsBrandAlias(text, facts.aliases || []);
-  const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org);
+  const departure = name && company && text.trim().length <= 500 && leftTheCompany(text, facts.org, facts.name);
   const currentName = name && !departure;
   const city = cityPhrase(facts.location).toLowerCase();
   const cityHit = city.length >= 4 && hay.includes(city);
+  const surname = surnameForSearch(facts.name);
+  const possessiveSurname = Boolean(
+    !currentName &&
+      company &&
+      surname &&
+      text.trim().length <= 240 &&
+      new RegExp(`(?<![A-Za-z])${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}['’]s\\b`, "i").test(text),
+  );
   let confidence: MatchConfidence = "none";
   if (currentName && company) confidence = "high";
   else if ((currentName && cityHit) || (company && cityHit)) confidence = "medium";
-  else if (currentName || company || suffixMismatch || alias) confidence = "low";
-  return { name: currentName, company, city: cityHit, confidence, suffixMismatch, departure, alias: alias || undefined };
+  else if (currentName || company || suffixMismatch || alias || possessiveSurname) confidence = "low";
+  return { name: currentName || possessiveSurname, company, city: cityHit, confidence, suffixMismatch, departure, alias: alias || undefined };
 }
 
 export function emptyScore(): MatchScore {
@@ -107,7 +115,7 @@ export function isScriptRenderedShell(raw: string, text: string): boolean {
 
 /** HTTP 200 can still be an Imperva or Cloudflare challenge. That is not page content. */
 export function isBotChallenge(text: string): boolean {
-  if (/_Incapsula_Resource|cf-chl|challenge-platform|<title>\s*Just a moment|Attention Required!\s*\|\s*Cloudflare|Access Denied[\s\S]{0,120}Reference\s*#/i.test(text)) {
+  if (/_Incapsula_Resource|cf-chl|challenge-platform|<title>\s*Just a moment|Attention Required!\s*\|\s*Cloudflare|Access Denied[\s\S]{0,120}Reference\s*#|sgcaptcha|vercel security checkpoint|http-equiv=["']refresh["'][^>]*sgcaptcha/i.test(text)) {
     return true;
   }
   // A Next/React/Angular shell already has its own unreadability message.
@@ -462,8 +470,15 @@ export function linkedinCompanyFollow(url: string, html: string): string {
 }
 
 function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string; corroborates: boolean; companyOnly?: boolean; reviewFlag?: boolean } {
-  const companyWord = attempt.score.alias && !attempt.score.company ? `alias (${attempt.score.alias})` : attempt.score.company ? "yes" : "no";
-  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${companyWord}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${attempt.score.confidence}.`;
+  const socialMiss = (attempt.key === "screen-youtube" || attempt.key === "screen-tiktok") && !attempt.score.name && attempt.outcome === "not-found";
+  const companyWord = socialMiss
+    ? "no"
+    : attempt.score.alias && !attempt.score.company
+      ? `alias (${attempt.score.alias})`
+      : attempt.score.company
+        ? "yes"
+        : "no";
+  const scoreLine = `Name: ${attempt.score.name ? "yes" : "no"}. Company: ${companyWord}. City: ${attempt.score.city ? "yes" : "no"}. Confidence: ${socialMiss ? "none" : attempt.score.confidence}.`;
   if (attempt.outcome === "dead") {
     return {
       status: "FAIL",
@@ -487,7 +502,7 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
   }
   const redirectNote = attempt.redirectedTo ? `The site redirected to ${attempt.redirectedTo}.` : "";
   if (attempt.outcome === "not-found") {
-    const lead = /same source as /.test(attempt.detail)
+    const lead = /Tried /.test(attempt.detail) || /same source as /.test(attempt.detail)
       ? attempt.detail
       : attempt.detail === "no match found"
         ? "no match found"
@@ -536,12 +551,13 @@ function findingFor(attempt: Attempt): { status: EvidenceStatus; finding: string
     };
   }
   if (attempt.key === "screen-news" && attempt.headlineKind && attempt.headlineKind !== "none") {
-    const companyLevel = attempt.foreclosureOnly || (attempt.headlineKind === "civil" && !attempt.score.name);
+    const companyLevel = attempt.foreclosureOnly || ((attempt.headlineKind === "civil" || attempt.headlineKind === "hard") && !attempt.score.name);
     if (companyLevel) {
+      const label = attempt.headlineKind === "hard" ? "Company-level crime headline." : "Company-level litigation headline.";
       return {
         status: "INCONCLUSIVE",
         corroborates: false,
-        finding: `Searched: ${attempt.searched}. Company-level litigation headline. ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
+        finding: `Searched: ${attempt.searched}. ${label} ${attempt.detail} ${scoreLine}`.replace(/\s+/g, " ").trim(),
       };
     }
     return {
@@ -621,6 +637,27 @@ async function pull(
     return await fetchText(url, init);
   } catch (error) {
     return { ok: false, status: 0, text: "", failure: classifyFetchError(error) };
+  }
+}
+
+/** One search engine cannot hold the rest. A hang becomes a timed-out source, not a dropped step. */
+export const SEARCH_SOURCE_MS = 7000;
+
+async function pullWithin(
+  fetchText: FetchText,
+  url: string,
+  ms = SEARCH_SOURCE_MS,
+): Promise<{ ok: boolean; status: number; text: string; url?: string; failure?: "nxdomain" | "timeout" | "network" }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pull(fetchText, url),
+      new Promise<{ ok: false; status: 0; text: ""; failure: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ ok: false, status: 0, text: "", failure: "timeout" }), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -834,6 +871,92 @@ export function completeScreenRows(present: CheckOutput[]): CheckOutput[] {
   return [...present, ...dropped];
 }
 
+function onOwnRegistrable(href: string, website: string): boolean {
+  try {
+    const page = registrableHost(new URL(href).hostname);
+    const own = registrableHost(new URL(website).hostname);
+    return Boolean(page) && page === own;
+  } catch {
+    return false;
+  }
+}
+
+function ownSiteResultRows(html: string): { href: string; text: string }[] {
+  const bing = [...html.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((block) => ({
+    href: unwrapResultUrl(block[0].match(/href\s*=\s*"([^"]+)"/i)?.[1] || ""),
+    text: visible(block[0]),
+  }));
+  if (bing.length) return bing.filter((row) => row.href);
+  const liteRows = [...html.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)].map((row) => row[0]);
+  const lite: { href: string; text: string }[] = [];
+  for (let index = 0; index < liteRows.length; index += 1) {
+    const link = /<a\b[^>]*class="[^"]*result-link[^"]*"[^>]*href\s*=\s*"([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(liteRows[index] || "");
+    if (!link) continue;
+    const snippet = /class="[^"]*result-snippet[^"]*"[^>]*>([\s\S]*?)<\/t[dr]/i.exec(liteRows[index + 1] || "")?.[1] || "";
+    const href = unwrapResultUrl(link[1] || "");
+    if (href) lite.push({ href, text: visible(`${link[2]} ${snippet}`) });
+  }
+  if (lite.length) return lite;
+  const anchors = [...html.matchAll(/<a\b[^>]*class="[^"]*result__(?:a|snippet)[^"]*"[^>]*>[\s\S]*?<\/a>/gi)].map((block) => block[0]);
+  const htmlRows: { href: string; text: string }[] = [];
+  for (let index = 0; index < anchors.length; index += 1) {
+    if (!/result__a/i.test(anchors[index] || "")) continue;
+    const href = unwrapResultUrl(anchors[index]?.match(/href\s*=\s*"([^"]+)"/i)?.[1] || "");
+    const snippet = anchors[index + 1] && /result__snippet/i.test(anchors[index + 1] || "") ? anchors[index + 1] : "";
+    if (href) htmlRows.push({ href, text: visible(`${anchors[index]} ${snippet}`) });
+  }
+  return htmlRows;
+}
+
+/** One site:domain search per name, at most two names. A lookalike host does not count. A page that ignores site: is not an answer. */
+async function searchOwnSitePerson(
+  fetchText: FetchText,
+  website: string,
+  person: string,
+): Promise<{ kind: "hit"; url: string } | { kind: "empty" } | { kind: "down" }> {
+  let domain = "";
+  try {
+    domain = registrableHost(new URL(website).hostname);
+  } catch {
+    return { kind: "down" };
+  }
+  if (!domain) return { kind: "down" };
+  const parsed = parsePersonName(person);
+  const surname = parsed?.surname || "";
+  const typed = parsed?.given[0] || "";
+  const formals = formalGivenNames(person);
+  const givens = [...new Set(formals.length ? [...formals, typed] : [typed])].filter(Boolean).slice(0, 2);
+  if (!givens.length || !surname) return { kind: "down" };
+  let sawEmpty = false;
+  for (const given of givens) {
+    const query = `site:${domain} "${given} ${surname}"`;
+    const targets = [
+      `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`,
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+    ];
+    for (const url of targets) {
+      let response = await pull(fetchText, url);
+      if (url.includes("lite.duckduckgo.com") && response.status === 202) {
+        await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+        response = await pull(fetchText, url);
+      }
+      if (response.status < 200 || response.status >= 300 || response.status === 202 || isBotChallenge(response.text)) continue;
+      const rows = ownSiteResultRows(response.text);
+      if (!rows.length) {
+        sawEmpty = true;
+        continue;
+      }
+      const own = rows.filter((row) => onOwnRegistrable(row.href, website));
+      if (!own.length) continue;
+      sawEmpty = true;
+      const named = own.find((row) => personHit(row.text, person) === "match");
+      if (named) return { kind: "hit", url: named.href };
+    }
+  }
+  return sawEmpty ? { kind: "empty" } : { kind: "down" };
+}
+
 export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchText, sink?: CheckOutput[]): Promise<CheckOutput[]> {
   const person = facts.applicantName || facts.name;
   const searchOrg = stripQaOrg(facts.org || "");
@@ -852,6 +975,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   let website = facts.website.trim();
   if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
   const ownHost = applicantHost(website);
+  const webSearchPromise = startWebSearch();
   const flush = () => {
     while (flushed < attempts.length) {
       const row = toCheck(attempts[flushed], ownHost);
@@ -862,18 +986,47 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   };
   const pages: { url: string; text: string; raw: string }[] = [];
   if (!website) {
-    attempts.push({
-      key: "website",
-      platform: "Company website",
-      searched: "the website field on the application",
-      url: "",
-      outcome: "missing",
-      score: emptyScore(),
-      detail: "No company website was on the application.",
-      selfReported: true,
-    });
+    const letters = orgLettersLabel(searchOrg);
+    const guess = letters.length >= 4 && letters.length <= 48 ? `https://www.${letters}.com` : "";
+    let discovered = false;
+    if (guess && hostMatchesOrgLetters(new URL(guess).hostname, searchOrg)) {
+      const home = await pull(fetchText, guess);
+      if (home.status >= 200 && home.status < 400 && !isBotChallenge(home.text)) {
+        const score = scorePublicText(visible(home.text), { ...queryFacts, org: searchOrg }, { ownFirm: true });
+        if (score.name && score.company) {
+          discovered = true;
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: "no website was on the application",
+            url: guess,
+            outcome: "found",
+            score,
+            detail: "Discovered company site (not on the application)",
+            selfReported: true,
+          });
+        }
+      }
+    }
+    if (!discovered) {
+      attempts.push({
+        key: "website",
+        platform: "Company website",
+        searched: "the website field on the application",
+        url: "",
+        outcome: "missing",
+        score: emptyScore(),
+        detail: "No company website was on the application.",
+        selfReported: true,
+      });
+    }
   } else {
     let home = await pull(fetchText, website);
+    if (home.status === 403) {
+      await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
+      const again = await pull(fetchText, website);
+      if (again.status !== 403) home = again;
+    }
     let homeUrl = website;
     if (home.status === 0 && home.failure !== "nxdomain") {
       const alt = withWww(website);
@@ -924,6 +1077,57 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           detail: "a page on the company site",
           selfReported: true,
         });
+      } else if (/sgcaptcha|vercel security checkpoint/i.test(home.text)) {
+        attempts.push(
+          blockedAttempt(
+            "website",
+            "Company website",
+            website,
+            homeUrl,
+            "the site blocked automated access (bot challenge). blocked by a bot challenge",
+          ),
+        );
+      } else if (!renamed && blockedBySite) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search (the site blocked a direct fetch)",
+            selfReported: true,
+          });
+        } else if (found.kind === "empty") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: emptyScore(),
+            detail: "Own-site search returned no page naming this person.",
+            selfReported: true,
+          });
+        } else {
+          const blocked =
+            home.status === 403
+              ? "blocked the check (403). blocked by site (403) — not checkable for free; ask applicant for a team-page URL"
+              : home.status === 405
+                ? "blocked the check (405). blocked by site, ask applicant for a team-page URL"
+                : "blocked by site, ask applicant for a team-page URL";
+          attempts.push(
+            blockedAttempt(
+              "website",
+              "Company website",
+              website,
+              redirectedTo || homeUrl,
+              `${blocked}. Own-site search did not complete; site blocked a direct fetch.${renamed}`,
+            ),
+          );
+        }
       } else {
         const detail =
           home.status === 403
@@ -1038,6 +1242,45 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           redirectedTo,
           aliasOnly: true,
         });
+      } else if (best && !best.score.name) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else if (best.score.confidence !== "none" && !(best.score.alias && !best.score.company)) {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: best.url,
+            outcome: "found",
+            score: best.score,
+            detail: "a page on the company site",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: best.score,
+            detail: "the company site responded",
+            selfReported: true,
+            redirectedTo,
+          });
+        }
       } else if (best && best.score.confidence !== "none" && !(best.score.alias && !best.score.company)) {
         attempts.push({
           key: "website",
@@ -1050,6 +1293,33 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           selfReported: true,
           redirectedTo,
         });
+      } else if (!best?.score.name) {
+        const found = await searchOwnSitePerson(fetchText, website, person);
+        if (found.kind === "hit") {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: found.url,
+            outcome: "found",
+            score: { name: true, company: true, city: false, confidence: "high" },
+            detail: "Own-site page found by search",
+            selfReported: true,
+            redirectedTo,
+          });
+        } else {
+          attempts.push({
+            key: "website",
+            platform: "Company website",
+            searched: website,
+            url: homeUrl,
+            outcome: "not-found",
+            score: best?.score || emptyScore(),
+            detail: "the company site responded",
+            selfReported: true,
+            redirectedTo,
+          });
+        }
       } else {
         attempts.push({
           key: "website",
@@ -1351,11 +1621,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   }
   flush();
 
+  async function startWebSearch() {
   const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searched)}`;
   const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searched)}`;
   const ddgSnippetsFrom = (html: string) =>
     [...html.matchAll(/<a\b[^>]*class="(?:result__(?:a|snippet)|result-link)"[^>]*>[\s\S]*?<\/a>/gi)].map((match) => snippetFrom(match[0]));
-  const [ddgFirst, bing] = await Promise.all([pull(fetchText, ddgUrl), pull(fetchText, bingUrl)]);
+  const [ddgFirst, bing] = await Promise.all([pullWithin(fetchText, ddgUrl), pullWithin(fetchText, bingUrl)]);
   type SearchSnippet = { text: string; hrefs: string[] };
   type SearchEngine = { name: string; url: string; note: string; snippets: SearchSnippet[] };
   const httpHrefs = (item: SearchSnippet) => item.hrefs.filter((href) => /^https?:\/\//i.test(href));
@@ -1369,13 +1640,27 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     if (!hrefs.length) return true;
     return hrefs.some((href) => !hostIsApplicant(href, ownHost));
   };
-  const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[]): string => {
+  const surname = surnameForSearch(person).toLowerCase();
+  const companyOnly = !parsePersonName(person)?.given.length;
+  const companyAnchors = distinctiveCompanyTokens(searchOrg);
+  const containsWord = (text: string, token: string) => {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![A-Za-z0-9-])${escaped}(?![A-Za-z0-9-])`, "i").test(text);
+  };
+  // A page that never says the surname did not answer the quoted query. Quotes were ignored.
+  const snippetAnswers = (item: SearchSnippet) => {
+    if (companyOnly) return companyAnchors.some((token) => containsWord(item.text, token));
+    return Boolean(surname) && containsWord(item.text, surname);
+  };
+  const engineNote = (status: number, text: string, url: string, snippets: SearchSnippet[], failure?: string): string => {
+    if (status === 0 || failure === "timeout" || failure === "network") return failure === "network" ? "network error" : "timed out";
     const challenge =
       status === 202 ||
       (/challenge|captcha/i.test(text.slice(0, 2500)) && !/result__a|result-link|b_algo|class="result"/i.test(text));
     if (challenge) return "challenge page";
     if (accessBlocked(status, text, url) || isBotChallenge(text)) return "blocked";
     if (!snippets.length) return "no results";
+    if (!snippets.some(snippetAnswers)) return "unrelated results";
     const named = snippets.filter(namesBothSnippet);
     if (!named.length) return "no name and company";
     if (named.some(independentSnippet)) return "result";
@@ -1383,9 +1668,9 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
   };
   const engines: SearchEngine[] = [];
   const ddgSnippets = ddgSnippetsFrom(ddgFirst.text);
-  engines.push({ name: "DuckDuckGo", url: ddgUrl, snippets: ddgSnippets, note: engineNote(ddgFirst.status, ddgFirst.text, ddgUrl, ddgSnippets) });
+  engines.push({ name: "DuckDuckGo", url: ddgUrl, snippets: ddgSnippets, note: engineNote(ddgFirst.status, ddgFirst.text, ddgUrl, ddgSnippets, ddgFirst.failure) });
   const bingSnippets = [...bing.text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0]));
-  engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets) });
+  engines.push({ name: "Bing", url: bingUrl, snippets: bingSnippets, note: engineNote(bing.status, bing.text, bingUrl, bingSnippets, bing.failure) });
   if (!engines.some((engine) => engine.note === "result")) {
     const loose = [person, searchOrg].filter(Boolean).join(" ");
     const extras: { name: string; url: string; parse: (text: string) => SearchSnippet[]; delay?: boolean }[] = [];
@@ -1411,12 +1696,12 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       {
         name: "Wikipedia",
         url: `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(searched)}&limit=8`,
-        parse: (text) => wikipediaRestResultTexts(text).map((text) => ({ text, hrefs: [] })),
+        parse: (text) => wikipediaRestResultPages(text).map((row) => ({ text: row.text, hrefs: row.href ? [row.href] : [] })),
       },
       {
         name: "Wikidata",
         url: `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(searched)}&language=en&format=json&limit=8`,
-        parse: (text) => wikidataSearchResultTexts(text).map((text) => ({ text, hrefs: [] })),
+        parse: (text) => wikidataSearchResultPages(text).map((row) => ({ text: row.text, hrefs: row.href ? [row.href] : [] })),
       },
       {
         name: "GDELT",
@@ -1427,12 +1712,78 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
     const pulled = await Promise.all(
       extras.map(async (job) => {
         if (job.delay) await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS));
-        const response = await pull(fetchText, job.url);
+        const response = await pullWithin(fetchText, job.url);
         const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
-        return { name: job.name, url: job.url, snippets, note: engineNote(response.status, response.text, job.url, snippets) };
+        return { name: job.name, url: job.url, snippets, note: engineNote(response.status, response.text, job.url, snippets, response.failure) };
       }),
     );
     engines.push(...pulled);
+  }
+  const failedNote = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page" || note === "unrelated results";
+  const hardFailure = (note: string) => note === "timed out" || note === "network error" || note === "blocked" || note === "challenge page";
+  const cleanAnswer = (note: string) => note === "no results" || note === "no name and company" || note === "result" || note === "own site";
+  const usablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
+  if (!usablePage && engines.some((engine) => failedNote(engine.note))) {
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
+    const retryJobs: { name: string; url: string; parse: (text: string) => SearchSnippet[] }[] = [
+      {
+        name: "Bing",
+        url: bingUrl,
+        parse: (text) => [...text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0])),
+      },
+      {
+        name: "DuckDuckGo lite",
+        url: `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent([person, searchOrg].filter(Boolean).join(" ") || searched)}`,
+        parse: (text) => ddgSnippetsFrom(text),
+      },
+    ];
+    for (const job of retryJobs) {
+      const response = await pullWithin(fetchText, job.url);
+      const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
+      const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : value === "unrelated results" ? 2 : 3);
+      const existing = engines.find((engine) => engine.name === job.name);
+      if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
+      else if (rank(note) < rank(existing.note)) {
+        existing.snippets = snippets;
+        existing.note = note;
+        existing.url = job.url;
+      }
+    }
+  }
+  const formal = formalGivenName(person);
+  const missedBoth = !engines.some((engine) => engine.note === "result" || engine.note === "own site");
+  if (missedBoth && formal) {
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_RETRY_MS * 2));
+    const parsed = parsePersonName(person);
+    const formalPerson = parsed ? [formal, ...parsed.given.slice(1), parsed.surname].filter(Boolean).join(" ") : person;
+    const formalSearched = [formalPerson, searchOrg, place].filter(Boolean).map((part) => `"${part}"`).join(" ");
+    const loose = [formalPerson, searchOrg].filter(Boolean).join(" ");
+    const nicknameJobs: { name: string; url: string; parse: (text: string) => SearchSnippet[] }[] = [
+      {
+        name: "Bing",
+        url: `https://www.bing.com/search?q=${encodeURIComponent(formalSearched)}`,
+        parse: (text) => [...text.matchAll(/<li[^>]*class="[^"]*b_algo[^"]*"[\s\S]*?<\/li>/gi)].map((match) => snippetFrom(match[0])),
+      },
+      {
+        name: "DuckDuckGo lite",
+        url: `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(loose)}`,
+        parse: (text) => ddgSnippetsFrom(text),
+      },
+    ];
+    for (const job of nicknameJobs) {
+      const response = await pullWithin(fetchText, job.url);
+      const snippets = response.status >= 200 && response.status < 300 ? job.parse(response.text) : [];
+      const note = engineNote(response.status, response.text, job.url, snippets, response.failure);
+      const rank = (value: string) => (value === "result" || value === "own site" ? 0 : value === "no name and company" ? 1 : value === "unrelated results" ? 2 : 3);
+      const existing = engines.find((engine) => engine.name === job.name);
+      if (!existing) engines.push({ name: job.name, url: job.url, snippets, note });
+      else if (rank(note) <= rank(existing.note)) {
+        existing.snippets = snippets;
+        existing.note = note;
+        existing.url = job.url;
+      }
+    }
   }
   const tried = engines.map((engine) => `${engine.name} (${engine.note})`).join(", ");
   const order = ["DuckDuckGo", "DuckDuckGo lite", "Bing", "Brave", "Mojeek", "Wikipedia", "Wikidata", "GDELT"];
@@ -1441,13 +1792,21 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       .map((name) => engines.find((engine) => engine.name === name && engine.note === note))
       .find((engine): engine is SearchEngine => Boolean(engine));
   const hitEngine = engineNamed("result") || engineNamed("own site");
-  const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked");
+  const sawUsablePage = engines.some((engine) => engine.note === "no name and company" || engine.note === "result" || engine.note === "own site");
+  const sawClean = engines.some((engine) => cleanAnswer(engine.note));
+  const sawIgnored = engines.some((engine) => engine.note === "unrelated results");
+  const sawHardFailure = engines.some((engine) => hardFailure(engine.note));
+  const sawFailure = engines.some((engine) => failedNote(engine.note));
+  const allBlocked = engines.every((engine) => engine.note === "challenge page" || engine.note === "blocked" || engine.note === "timed out" || engine.note === "network error");
   const ddgChallenge = engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "challenge page");
+  const allTimedOut = engines.every((engine) => engine.note === "timed out" || engine.note === "network error");
   const ddgBlocked = !engines.some((engine) => engine.name.startsWith("DuckDuckGo") && engine.note === "result");
   if (!hitEngine && allBlocked) {
-    const closing = ddgChallenge
-      ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
-      : "Web search is not checkable for free.";
+    const closing = allTimedOut
+      ? "Not checked. Not a pass."
+      : ddgChallenge
+        ? "DuckDuckGo returned a challenge page and is not checkable for free. Search blocked."
+        : "Web search is not checkable for free.";
     attempts.push(
       blockedAttempt(
         "screen-web",
@@ -1455,6 +1814,26 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         searched,
         ddgUrl,
         `All free search sources blocked. Tried ${tried}. ${closing}`.replace(/\s+/g, " ").trim(),
+      ),
+    );
+  } else if (!hitEngine && !sawClean && sawIgnored && sawHardFailure && !sawUsablePage) {
+    attempts.push(
+      blockedAttempt(
+        "screen-web",
+        "Web search",
+        searched,
+        ddgBlocked ? bingUrl : ddgUrl,
+        `Search did not complete. Not checked. Not a pass. Tried ${tried}.`.replace(/\s+/g, " ").trim(),
+      ),
+    );
+  } else if (!hitEngine && !sawClean && sawFailure) {
+    attempts.push(
+      blockedAttempt(
+        "screen-web",
+        "Web search",
+        searched,
+        ddgBlocked ? bingUrl : ddgUrl,
+        `Search did not complete. Not checked. Not a pass. Tried ${tried}.`.replace(/\s+/g, " ").trim(),
       ),
     );
   } else if (!hitEngine) {
@@ -1465,7 +1844,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
       url: ddgBlocked ? bingUrl : ddgUrl,
       outcome: "not-found",
       score: emptyScore(),
-      detail: `Tried ${tried}. No free search source returned a page naming both.`,
+      detail: `Tried ${tried}. Not found. No free search source returned a page naming both.`,
     });
   } else {
     const independentHit = hitEngine.note === "result";
@@ -1499,7 +1878,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: `Tried ${tried}. No free search source returned a page naming both.`,
+        detail: `Tried ${tried}. Not found. No free search source returned a page naming both.`,
       });
     }
   }
@@ -1543,17 +1922,7 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: screenWeb?.url || ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: "The only web search hit was the applicant's own site.",
-      });
-    } else if (alreadyCredited) {
-      attempts.push({
-        key: "web-footprint",
-        platform: "Web search",
-        searched,
-        url: alreadyCredited.url,
-        outcome: "not-found",
-        score: emptyScore(),
-        detail: `same source as ${alreadyCredited.key}`,
+        detail: `Tried ${tried}. The only web search hit was the applicant's own site.`,
       });
     } else if (attempts.some((item) => item.key === "screen-web" && item.outcome === "blocked")) {
       const web = attempts.find((item) => item.key === "screen-web");
@@ -1563,9 +1932,19 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
           "Web search",
           searched,
           ddgUrl,
-          web?.detail || "Public web search is not checkable for free.",
+          web?.detail || "Public web search was unavailable. Not checked. Not a pass.",
         ),
       );
+    } else if (alreadyCredited && alreadyCredited.key !== "screen-youtube" && alreadyCredited.key !== "screen-tiktok") {
+      attempts.push({
+        key: "web-footprint",
+        platform: "Web search",
+        searched,
+        url: alreadyCredited.url,
+        outcome: "not-found",
+        score: emptyScore(),
+        detail: `same source as ${alreadyCredited.key}`,
+      });
     } else {
       attempts.push({
         key: "web-footprint",
@@ -1574,11 +1953,39 @@ export async function runPublicScreen(facts: ApplicantFacts, fetchText: FetchTex
         url: ddgBlocked ? bingUrl : ddgUrl,
         outcome: "not-found",
         score: emptyScore(),
-        detail: "no free page named both this person and this company",
+        detail: screenWeb?.detail && /Tried /.test(screenWeb.detail) ? screenWeb.detail : `Tried ${tried}. Not found. No free search source returned a page naming both.`,
       });
     }
   }
+  flush();
+  }
 
+  await webSearchPromise;
+  const missingSite = attempts.find((item) => item.key === "website" && item.outcome === "missing");
+  if (missingSite) {
+    const hrefs = attempts.flatMap((item) => `${item.url || ""} ${item.linkedUrl || ""} ${item.moreUrls || ""}`.split(/\s+/));
+    const hostUrl = hrefs.find((href) => {
+      try {
+        return /^https?:/i.test(href) && hostMatchesOrgLetters(new URL(href).hostname, searchOrg);
+      } catch {
+        return false;
+      }
+    });
+    if (hostUrl) {
+      const page = await pull(fetchText, hostUrl);
+      if (page.status >= 200 && page.status < 400 && !isBotChallenge(page.text)) {
+        const score = scorePublicText(visible(page.text), { ...queryFacts, org: searchOrg }, { ownFirm: true });
+        if (score.name && score.company) {
+          missingSite.outcome = "found";
+          missingSite.url = hostUrl;
+          missingSite.score = score;
+          missingSite.detail = "Discovered company site (not on the application)";
+          const row = produced.find((item) => item.key === "website");
+          if (row) Object.assign(row, toCheck(missingSite, ownHost));
+        }
+      }
+    }
+  }
   flush();
   return produced;
 }
