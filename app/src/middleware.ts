@@ -4,8 +4,17 @@ import { authConfig } from "@/auth.config";
 import { moderationDenial } from "@/lib/messaging";
 import { adminEntryRedirect, loggedInPublicRedirect } from "@/lib/session-gate";
 import {
+  GATE_COOKIE,
+  GATE_COOKIE_MAX_AGE,
+  GATE_FORM_PATH,
   ROBOTS_TAG,
-  basicAuthorizationMatches,
+  basicAuthorizationUser,
+  gateCookieMatches,
+  gateCookieValue,
+  gateLocale,
+  gatePageHtml,
+  gatePasswordFor,
+  matchGateLogin,
   parseExtraGateUsers,
   siteGateChallengeHeaders,
   siteGateConfigured,
@@ -29,9 +38,38 @@ function redirectPublic(req: NextRequest, pathname: string) {
   return withRobots(NextResponse.redirect(publicAbsoluteUrl(pathname, req.headers)));
 }
 
-function siteGateDenied() {
-  const headers = siteGateChallengeHeaders();
-  return new NextResponse("Authentication required.", { status: 401, headers });
+/** Phones get the gate as a page with a form instead of the browser pop-up (Nov 6, Julia's iPhone). */
+const MOBILE_UA = /iPhone|iPad|iPod|Android.*Mobile|Mobile Safari/i;
+
+function gateNext(req: NextRequest): string {
+  const raw = req.nextUrl.searchParams.get("next") || "";
+  if (req.nextUrl.pathname === GATE_FORM_PATH) return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/login";
+  return `${req.nextUrl.pathname}${req.nextUrl.search}`;
+}
+
+function gatePage(req: NextRequest, input: { next: string; failed: boolean; locale?: string | null; challenge: boolean }) {
+  const locale = gateLocale(input.locale || req.cookies.get("pf_lang")?.value, req.headers.get("accept-language"));
+  const headers: Record<string, string> = input.challenge
+    ? { ...siteGateChallengeHeaders(), "content-type": "text/html; charset=utf-8" }
+    : { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "X-Robots-Tag": ROBOTS_TAG };
+  return new NextResponse(gatePageHtml({ locale, next: input.next, failed: input.failed }), { status: input.challenge ? 401 : 200, headers });
+}
+
+function siteGateDenied(req: NextRequest) {
+  const mobile = MOBILE_UA.test(req.headers.get("user-agent") || "");
+  const accept = req.headers.get("accept") || "";
+  const document = req.method === "GET" && accept.includes("text/html") && !req.headers.get("rsc") && !req.headers.get("next-action");
+  if (mobile && document) return gatePage(req, { next: gateNext(req), failed: false, challenge: false });
+  if (mobile) {
+    return new NextResponse("Authentication required.", { status: 401, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "X-Robots-Tag": ROBOTS_TAG } });
+  }
+  // Desktop keeps the pop-up; Cancel shows the same page with the form.
+  return gatePage(req, { next: gateNext(req), failed: false, challenge: true });
+}
+
+function withGateCookie(response: NextResponse, value: string) {
+  response.cookies.set(GATE_COOKIE, value, { path: "/", maxAge: GATE_COOKIE_MAX_AGE, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+  return response;
 }
 
 const withSession = auth(async (req) => {
@@ -82,17 +120,45 @@ const withSession = auth(async (req) => {
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const path = req.nextUrl.pathname;
   const gatePassword = process.env.SITE_GATE_PASSWORD;
+  let newGateCookie: string | null = null;
   if (siteGateConfigured(gatePassword) && !siteGateExempt(path)) {
-    const allowed = await basicAuthorizationMatches(
-      req.headers.get("authorization"),
-      gatePassword,
-      parseExtraGateUsers(process.env.SITE_GATE_EXTRA_USERS),
-    );
-    if (!allowed) return siteGateDenied();
+    const extraUsers = parseExtraGateUsers(process.env.SITE_GATE_EXTRA_USERS);
+    const cookieOk = await gateCookieMatches(req.cookies.get(GATE_COOKIE)?.value, gatePassword, extraUsers);
+    const basicUser = cookieOk ? null : await basicAuthorizationUser(req.headers.get("authorization"), gatePassword, extraUsers);
+    if (path === GATE_FORM_PATH) {
+      const lang = req.nextUrl.searchParams.get("lang");
+      if (req.method === "POST") {
+        const form = await req.formData().catch(() => null);
+        const next = String(form?.get("next") || "/login");
+        const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/login";
+        const formLang = String(form?.get("lang") || "");
+        const user = await matchGateLogin(String(form?.get("username") || ""), String(form?.get("password") || ""), gatePassword, extraUsers);
+        const userPassword = user ? gatePasswordFor(user, gatePassword, extraUsers) : null;
+        console.log(`SITE_GATE_FORM result=${user ? "ok" : "rejected"} ua=${MOBILE_UA.test(req.headers.get("user-agent") || "") ? "mobile" : "desktop"}`);
+        if (!user || !userPassword) return gatePage(req, { next: safe, failed: true, locale: formLang, challenge: false });
+        return withGateCookie(withRobots(NextResponse.redirect(publicAbsoluteUrl(safe, req.headers), 303)), await gateCookieValue(user, userPassword));
+      }
+      if (cookieOk || basicUser) return withRobots(NextResponse.redirect(publicAbsoluteUrl(gateNext(req), req.headers)));
+      return gatePage(req, { next: gateNext(req), failed: false, locale: lang, challenge: false });
+    }
+    if (!cookieOk && !basicUser) return siteGateDenied(req);
+    if (basicUser) {
+      const userPassword = gatePasswordFor(basicUser, gatePassword, extraUsers);
+      if (userPassword) newGateCookie = await gateCookieValue(basicUser, userPassword);
+    }
   }
-  if (skipsMemberSession(path)) return withRobots(NextResponse.next());
+  if (skipsMemberSession(path)) {
+    const passthrough = withRobots(NextResponse.next());
+    return newGateCookie ? withGateCookie(passthrough, newGateCookie) : passthrough;
+  }
   const response = await withSession(req, event);
-  if (response) response.headers.set("X-Robots-Tag", ROBOTS_TAG);
+  if (response) {
+    response.headers.set("X-Robots-Tag", ROBOTS_TAG);
+    if (newGateCookie) {
+      const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+      response.headers.append("Set-Cookie", `${GATE_COOKIE}=${newGateCookie}; Path=/; Max-Age=${GATE_COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax${secure}`);
+    }
+  }
   return response;
 }
 

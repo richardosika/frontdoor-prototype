@@ -86,3 +86,26 @@ describe("site gate", () => {
     expect(parseExtraGateUsers(undefined)).toEqual([]);
   });
 });
+
+describe("site gate on phones (Nov 6)", () => {
+  it("forgives capitals, spaces and an email in the username, and stray spaces in the password", async () => {
+    const extra = [{ username: "julia", password: "j-secret-123" }];
+    const { matchGateLogin, gateCookieValue, gateCookieMatches, gatePageHtml } = await import("@/lib/site-gate");
+    expect(await matchGateLogin("Julia", "j-secret-123", "shared-pass", extra)).toBe("julia");
+    expect(await matchGateLogin(" julia@buildpro-cs.com ", "j-secret-123 ", "shared-pass", extra)).toBe("julia");
+    expect(await matchGateLogin("julia", "shared-pass", "shared-pass", extra)).toBeNull();
+    expect(await matchGateLogin("someone", "j-secret-123", "shared-pass", extra)).toBeNull();
+    expect(await matchGateLogin("julia", "", "shared-pass", extra)).toBeNull();
+    const cookie = await gateCookieValue("julia", "j-secret-123");
+    expect(cookie).not.toContain("j-secret-123");
+    expect(await gateCookieMatches(cookie, "shared-pass", extra)).toBe(true);
+    expect(await gateCookieMatches(cookie, "shared-pass", [{ username: "julia", password: "changed" }])).toBe(false);
+    expect(await gateCookieMatches(`${cookie}0`, "shared-pass", extra)).toBe(false);
+    expect(await gateCookieMatches("privatefloor.abc", "shared-pass", extra)).toBe(false);
+    const html = gatePageHtml({ locale: "ja", next: "/login?x=<b>", failed: true });
+    expect(html).toContain('lang="ja"');
+    expect(html).toContain("gate-error");
+    expect(html).not.toContain("<b>");
+    for (const word of ["invite", "founding member", "limited"]) expect(html.toLowerCase()).not.toContain(word);
+  });
+});
