@@ -180,6 +180,12 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       insuranceInfo: member.insuranceInfo,
       insuranceCoverage: normalizeCoverage(member.insuranceCoverage),
       specialties: member.specialties,
+      // Nov 6 Subcontractors: shown on the sub's profile (license number is in licenses).
+      trades: member.trades,
+      metros: member.metros,
+      unionShop: member.unionShop,
+      prevailingWage: member.prevailingWage,
+      bondingCapacity: member.bondingCapacity,
       // Private rates and terms only ever go back to the member themself.
       privateTerms: viewerId === memberId ? member.privateTerms : "",
       createdAt: member.createdAt,

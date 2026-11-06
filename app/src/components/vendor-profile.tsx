@@ -87,7 +87,8 @@ export async function VendorProfile({
         ["Union shop", yn(member.unionShop)],
         ["Prevailing-wage work", yn(member.prevailingWage)],
         ["Bonding capacity", member.bondingCapacity ?? ""],
-        ["Certificate of insurance", coiOnFile ? tx("On file") : ""],
+        // When the viewer can open it, the link below replaces the "On file" line.
+        ["Certificate of insurance", coiOnFile && !viewerCanOpenCoi ? tx("On file") : ""],
       ]
     : [];
   const facts = [
