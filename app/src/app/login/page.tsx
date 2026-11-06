@@ -9,11 +9,12 @@ import { phrase } from "@/lib/i18n/phrases";
 import { LoginForm } from "@/components/login-form";
 import { Logo } from "@/components/logo";
 import { BRAND } from "@/lib/brand";
+import { signInErrorFromCode } from "@/lib/sign-in-fallback";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const locale = await currentLocale();
@@ -41,7 +42,7 @@ export default async function LoginPage({
         <h1 className="font-serif text-2xl font-normal">{tx("Sign in to {name}").replace("{name}", BRAND.name)}</h1>
         <p className="mb-4 mt-1 text-sm text-ink">{tx("Approved members only. Applications under review cannot sign in yet.")}</p>
         <LocaleProvider locale={locale}>
-          <LoginForm next={params.next} />
+          <LoginForm next={params.next} initialError={signInErrorFromCode(params.error)} />
         </LocaleProvider>
         <p className="mt-4 text-center text-sm text-mut">
           <Link className="inline-flex min-h-11 items-center font-semibold text-brass" href="/#request-to-join">{tx("Request to join")}</Link>

@@ -2,20 +2,40 @@
 
 import { SubmitButton } from "@/components/submit-button";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { adminLoginAction, loginAction } from "@/actions/auth";
+import { SIGN_IN_FALLBACK_PATH } from "@/lib/sign-in-fallback";
 import { btn, field, labelCls } from "@/components/ui";
 import { useTx } from "@/components/locale-context";
 
-export function LoginForm({ next, portal = "member" }: { next?: string; portal?: "member" | "admin" }) {
-  const [error, setError] = useState("");
+export function LoginForm({ next, portal = "member", initialError = "" }: { next?: string; portal?: "member" | "admin"; initialError?: string }) {
+  const [error, setError] = useState(initialError);
+  const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
   const tx = useTx();
 
   async function onSubmit(formData: FormData) {
     setPending(true);
     setError("");
-    const result = portal === "admin" ? await adminLoginAction(formData) : await loginAction(formData);
+    let result: { error: string } | void;
+    try {
+      result = portal === "admin" ? await adminLoginAction(formData) : await loginAction(formData);
+    } catch (thrown) {
+      // Redirects after a good sign-in are Next.js control flow: let them through.
+      if (thrown && typeof thrown === "object" && "digest" in thrown && String((thrown as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")) throw thrown;
+      // The page is from an older build (site updated while it was open) or the call failed: post the same form the
+      // plain way instead of reloading to an empty page. Fields are still filled in, so nothing has to be retyped.
+      const form = formRef.current;
+      if (form) {
+        form.action = SIGN_IN_FALLBACK_PATH;
+        form.method = "post";
+        HTMLFormElement.prototype.submit.call(form);
+        return;
+      }
+      setError("Something went wrong loading this page.");
+      setPending(false);
+      return;
+    }
     if (result?.error) {
       setError(result.error);
       setPending(false);
@@ -23,8 +43,9 @@ export function LoginForm({ next, portal = "member" }: { next?: string; portal?:
   }
 
   return (
-    <form action={onSubmit} className="space-y-3">
+    <form ref={formRef} action={onSubmit} className="space-y-3">
       {portal === "member" ? <input type="hidden" name="next" value={next || "/feed"} /> : null}
+      <input type="hidden" name="portal" value={portal} />
       {error ? <p className="text-sm text-brass">{tx(error)}</p> : null}
       <div>
         <label className={labelCls}>{tx("Email")}</label>

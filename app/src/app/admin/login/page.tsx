@@ -3,11 +3,13 @@ import { auth } from "@/auth";
 import { LoginForm } from "@/components/login-form";
 import { Logo } from "@/components/logo";
 import { memberLoginHref } from "@/lib/session-gate";
+import { signInErrorFromCode } from "@/lib/sign-in-fallback";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminLoginPage() {
+export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await auth();
+  const params = await searchParams;
   return (
     <main className="min-h-dvh bg-cream md:wash md:flex md:items-center md:justify-center md:px-4 md:py-10">
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-paper text-forest md:min-h-0 md:rounded md:shadow-[0_30px_80px_rgba(0,0,0,.35)]">
@@ -19,7 +21,7 @@ export default async function AdminLoginPage() {
           <p className="mb-4 mt-1 text-sm text-ink">
             Richard Osika signs in here. The browser prompt before this page is the site gate, username privatefloor.
           </p>
-          <LoginForm portal="admin" />
+          <LoginForm portal="admin" initialError={signInErrorFromCode(params.error)} />
           <p className="mt-4 text-center text-sm text-mut">
             <Link className="inline-flex min-h-11 items-center text-brass" href={memberLoginHref(Boolean(session?.user))}>
               Member sign in
