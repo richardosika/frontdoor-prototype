@@ -41,7 +41,7 @@ describe("#26 no open feed", () => {
 
 describe("#27 / #28 navigation", () => {
   it("developers get Find your team and no Network; others get Opportunities and My Circle", () => {
-    expect(memberNav("DEVELOPER").map((t) => t.label)).toEqual(["Ledger", "Find your team", "Messages", "Bids", "Profile"]);
+    expect(memberNav("DEVELOPER").map((t) => t.label)).toEqual(["Ledger", "My Projects", "Find your team", "Messages", "Bids", "Profile"]);
     expect(memberNav("GENERAL_CONTRACTOR").map((t) => t.label)).toEqual(["Ledger", "Opportunities", "My Circle", "Messages", "Bids", "Profile"]);
   });
   it("nobody lists the whole membership on Network; the full directory stays in admin", () => {

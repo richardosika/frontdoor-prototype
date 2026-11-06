@@ -33,7 +33,8 @@ const DAY = 24 * 60 * 60 * 1000;
 function backPath(formData: FormData): string {
   const back = String(formData.get("back") || "/profile");
   if (/^\/projects\/[A-Za-z0-9_-]+$/.test(back)) return back;
-  return back === "/feed" ? "/feed" : "/profile";
+  // Nov 6: developers add and manage projects on My Projects (/projects).
+  return back === "/feed" || back === "/projects" ? back : "/profile";
 }
 
 function go(back: string, key: "error" | "notice", text: string): never {
@@ -44,6 +45,7 @@ function refresh() {
   revalidatePath("/projects/[id]", "page");
   revalidatePath("/profile");
   revalidatePath("/feed");
+  revalidatePath("/projects");
   revalidatePath("/admin/projects");
 }
 
@@ -90,8 +92,8 @@ export async function addProject(formData: FormData) {
     await notifyAdmins({ title: "Project to review", body: `${user.name} submitted ${value.name}.`, href: "/admin/projects" }).catch(() => null);
   });
   refresh();
-  // #35: back to the Ledger with a thank-you card.
-  redirect(`/feed?submitted=${project.id}`);
+  // #35: back to the Ledger (or My Projects, where it was added) with a thank-you card.
+  redirect(`${back === "/projects" ? "/projects" : "/feed"}?submitted=${project.id}`);
 }
 
 /** Edit a project that is pending review or came back for more information. Saving sends it back to review. */
@@ -220,11 +222,13 @@ export async function contactAboutProject(formData: FormData) {
   // Answer the tap at once: the in-app notice and the email go out after the response.
   const base = to.notifyIntros ? await appBaseUrl() : "";
   after(async () => {
-  await notify(to.id, { title: "Project contact request", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: "/feed#ledger-outreach" }).catch(() => null);
+  // Nov 6: the project owner reviews interest on My Projects; anyone else answers from the Ledger.
+  const reviewPath = to.id === project.userId ? `/projects/${project.id}#interest` : "/feed#ledger-outreach";
+  await notify(to.id, { title: "Project contact request", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: reviewPath }).catch(() => null);
   if (to.notifyIntros) {
     const mail = projectContactEmail({
       locale: isLocale(to.locale) ? to.locale : "en",
-      link: `${base}/feed#ledger-outreach`,
+      link: `${base}${reviewPath}`,
       fromName: user.name,
       fromOrg: user.org,
       fromRole: roleShort(roleLabel(user.role)),
@@ -247,7 +251,8 @@ export async function respondProjectContact(formData: FormData) {
   const user = await requireUser();
   const contactId = String(formData.get("contactId") || "");
   const decision = String(formData.get("decision") || "");
-  const respondBack = /^\/projects\/[A-Za-z0-9_-]+$/.test(String(formData.get("back") || "")) ? String(formData.get("back")) : "/feed";
+  const rawRespondBack = String(formData.get("back") || "");
+  const respondBack = /^\/projects(\/[A-Za-z0-9_-]+)?$/.test(rawRespondBack) ? rawRespondBack : "/feed";
   if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect(respondBack);
   const contact = await prisma.projectContact.findUnique({ where: { id: contactId }, include: { from: true, project: true } });
   if (!contact || contact.toId !== user.id || contact.status !== "PENDING") redirect("/feed");

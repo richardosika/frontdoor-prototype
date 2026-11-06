@@ -18,11 +18,12 @@ import { LOCALES, translator, type Locale } from "@/lib/i18n/messages";
 import { memberNav } from "@/lib/member-reach";
 import { roleLabel, roleShort } from "@/lib/roles";
 
-const ICONS: Record<string, string> = { "/feed": "⌂", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺", "/bids": "▤" };
+const ICONS: Record<string, string> = { "/feed": "⌂", "/projects": "▦", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺", "/bids": "▤" };
 
 function active(pathname: string, href: string) {
   if (href === "/feed") return pathname.startsWith("/feed");
   if (href === "/profile") return pathname.startsWith("/profile") || pathname.startsWith("/members");
+  if (href === "/projects") return pathname === "/projects" || pathname.startsWith("/projects/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -35,6 +36,7 @@ export function Shell({
   unread,
   alerts,
   referrals = 0,
+  interestWaiting = 0,
   locale = "en",
   children,
 }: {
@@ -42,6 +44,8 @@ export function Shell({
   unread: number;
   alerts: number;
   referrals?: number;
+  /** Nov 6: interest requests waiting on the developer's projects (My Projects badge). */
+  interestWaiting?: number;
   locale?: Locale;
   children: React.ReactNode;
 }) {
@@ -141,6 +145,9 @@ export function Shell({
                 <span className="hidden lg:inline">{tab.text}</span>
                 {tab.href === "/messages" && unread > 0 ? (
                   <span className="ml-auto hidden rounded-sm bg-brass px-1.5 text-[10px] font-sans font-bold lg:inline">{unread}</span>
+                ) : null}
+                {tab.href === "/projects" && interestWaiting > 0 ? (
+                  <span className="absolute right-1 top-1 rounded-sm bg-[#A2412C] px-1 text-[9px] font-sans font-bold text-paper lg:static lg:ml-auto lg:px-1.5 lg:text-[10px]" data-testid="nav-projects-badge" title={phrase(locale, "Interest requests")}>{interestWaiting}</span>
                 ) : null}
               </Link>
             );
@@ -262,6 +269,9 @@ export function Shell({
               {tab.text}
               {tab.href === "/messages" && unread > 0 ? (
                 <span className="absolute right-[18%] top-0 rounded-sm bg-brass px-1 text-[9px] font-sans font-bold text-paper">{unread}</span>
+              ) : null}
+              {tab.href === "/projects" && interestWaiting > 0 ? (
+                <span className="absolute right-[18%] top-0 rounded-sm bg-[#A2412C] px-1 text-[9px] font-sans font-bold text-paper" data-testid="tab-projects-badge">{interestWaiting}</span>
               ) : null}
             </Link>
           );

@@ -1,5 +1,6 @@
 "use client";
 
+import { sortByShownLabel } from "@/lib/category-sort";
 import { useState } from "react";
 import { confirmApplicationCode, sendApplicationCode } from "@/actions/apply";
 import { btn, field, labelCls } from "@/components/ui";
@@ -121,7 +122,7 @@ export function RequestInviteForm({ onSubmitted }: { onSubmitted: (firstName: st
       <div>
         <label className={labelCls}>Role</label>
         <select name="role" className={field} defaultValue="DEVELOPER">
-          {ROLES.map((role) => (
+          {sortByShownLabel(ROLES, (role) => role.label, "en", (role) => role.id).map((role) => (
             <option key={role.id} value={role.id}>
               {role.label}
             </option>

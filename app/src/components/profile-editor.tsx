@@ -1,5 +1,6 @@
 import { SubmitButton } from "@/components/submit-button";
 import { saveProfile } from "@/actions/profile";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { MoneyInput } from "@/components/money-input";
 import { INSURANCE_TYPES, normalizeCoverage } from "@/lib/insurance";
 import { btn } from "@/components/ui";
@@ -114,7 +115,7 @@ export async function ProfileEditor({
           {phrase(locale, "Staff review each new category (licensed ones against public records) before it counts. Add the license or credential for it below.")}
         </p>
         <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-          {SEEK_CATEGORIES.map((category) => {
+          {sortByShownLabel(SEEK_CATEGORIES, (category) => phrase(locale, category.label), locale, (category) => category.id).map((category) => {
             const primary = categoryForRole(member.role) === category.id;
             const pending = parseSeeking(member.pendingCategories ?? "").includes(category.id);
             return (

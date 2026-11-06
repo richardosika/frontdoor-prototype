@@ -1,6 +1,7 @@
 import { addProject, resubmitProject } from "@/actions/projects";
 import { btn, field, labelCls } from "@/components/ui";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { MoneyInput } from "@/components/money-input";
 import { PROJECT_ASSET_CLASSES, SEEK_CATEGORIES, US_STATES, parseSeeking, reviewLabel } from "@/lib/project-contact";
 import { PROJECT_ROLE_LABELS } from "@/lib/project-roles";
@@ -28,7 +29,7 @@ const big = `${field} text-[16px]`;
 const label = `${labelCls} text-[12px]`;
 
 /** The project form, used on the profile and on the Ledger. New and edited projects go to staff review. */
-export async function ProjectForm({ back, project, pastWork = false }: { back: "/profile" | "/feed"; project?: EditableProject; pastWork?: boolean }) {
+export async function ProjectForm({ back, project, pastWork = false }: { back: "/profile" | "/feed" | "/projects"; project?: EditableProject; pastWork?: boolean }) {
   const tx = await serverTx();
   const seeking = new Set(parseSeeking(project?.seeking ?? ""));
   const id = project ? `p-${project.id}` : `new-${back.slice(1)}`;
@@ -107,7 +108,7 @@ export async function ProjectForm({ back, project, pastWork = false }: { back: "
           {tx("Only members in the categories you check can contact you about this project. Leave all unchecked if you are not seeking anyone.")}
         </p>
         <div className="grid gap-1 rounded border border-line bg-paper p-3 sm:grid-cols-2">
-          {SEEK_CATEGORIES.map((item) => (
+          {sortByShownLabel(SEEK_CATEGORIES, (item) => tx(item.label), await currentLocale(), (item) => item.id).map((item) => (
             <label key={item.id} htmlFor={`${id}-${item.id}`} className="flex min-h-11 items-center gap-2 text-[15px] text-ink">
               <input id={`${id}-${item.id}`} type="checkbox" name="seeking" value={item.id} defaultChecked={seeking.has(item.id)} className="h-5 w-5 accent-forest" />
               {tx(item.label)}

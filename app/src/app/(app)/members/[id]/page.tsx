@@ -7,6 +7,7 @@ import { ReferralRecognition } from "@/components/referral-recognition";
 import { ProfileView } from "@/components/profile-view";
 import { requireUser } from "@/lib/current-user";
 import { loadMemberProfile } from "@/lib/member-profile";
+import { loadMyCircle } from "@/lib/ledger-projects";
 import { appBaseUrl } from "@/lib/url";
 import { isDeveloperRole } from "@/lib/member-reach";
 import { VendorProfile } from "@/components/vendor-profile";
@@ -26,7 +27,7 @@ export default async function MemberPage({
   const { id } = await params;
   const query = await searchParams;
   const tx = await serverTx();
-  const [loaded, linkOrigin] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl()]);
+  const [loaded, linkOrigin, circle] = await Promise.all([loadMemberProfile(user.id, id), appBaseUrl(), user.id === id ? Promise.resolve([]) : loadMyCircle(user)]);
   if (!loaded) notFound();
   // #44: count developer profile views (one per developer, member and day) for the member's results strip.
   if (user.role === "DEVELOPER" && user.id !== loaded.member.id && !user.isAdmin) {
@@ -65,6 +66,7 @@ export default async function MemberPage({
           blockedByViewer={loaded.blockedByViewer}
           blockedByThem={loaded.blockedByThem}
           reviewed
+          inCircle={circle.some((person) => person.id === loaded.member.id)}
         />
       ) : (
       <ProfileView

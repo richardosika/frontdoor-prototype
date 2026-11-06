@@ -6,7 +6,7 @@ import { ReportDialog } from "@/components/report-dialog";
 import { ReachOut, StatusPill, type ReachProject } from "@/components/reach-out";
 import { btnOutline } from "@/components/ui";
 import { openConversation } from "@/actions/social";
-import { BlockButton, UnblockButton } from "@/components/block-controls";
+import { BlockButton, RemoveFromCircleButton, UnblockButton } from "@/components/block-controls";
 import { coverageSummary, type Coverage } from "@/lib/insurance";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { roleProfile } from "@/lib/role-profile";
@@ -49,6 +49,7 @@ export async function VendorProfile({
   blockedByViewer,
   blockedByThem,
   reviewed,
+  inCircle = false,
 }: {
   member: Member;
   projects: PastProject[];
@@ -58,6 +59,8 @@ export async function VendorProfile({
   blockedByViewer: boolean;
   blockedByThem: boolean;
   reviewed: boolean;
+  /** Nov 6: this member is in the viewer's My Circle, so the ⋯ menu offers Remove (without blocking). */
+  inCircle?: boolean;
 }) {
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -85,7 +88,8 @@ export async function VendorProfile({
           <summary aria-label={tx("More")} className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full bg-paper/90 text-xl leading-none text-forest shadow [&::-webkit-details-marker]:hidden">
             ⋯
           </summary>
-          <div className="absolute right-0 mt-2 grid w-64 gap-2 rounded border border-line bg-paper p-3 shadow-lg">
+          <div className="absolute right-0 mt-2 grid w-72 max-w-[calc(100vw-2rem)] gap-2 rounded border border-line bg-paper p-3 shadow-lg">
+            {inCircle && !blockedByViewer ? <RemoveFromCircleButton userId={member.id} name={member.name} className={`${btnOutline} w-full`} /> : null}
             {blockedByViewer ? (
               <UnblockButton userId={member.id} className={`${btnOutline} w-full`} />
             ) : (

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { SubmitButton } from "@/components/submit-button";
 import { useTx } from "@/components/locale-context";
-import { blockMember, unblockMember } from "@/actions/social";
+import { blockMember, removeFromCircle, unblockMember } from "@/actions/social";
 import { btn, btnOutline, field } from "@/components/ui";
 
 /** Nov 5: blocking asks for a reason (sent to the Private Floor administrators); you stay on the same screen. */
@@ -49,6 +49,35 @@ export function UnblockButton({ userId, conversationId, className = btnOutline }
       <SubmitButton className={className} pendingLabel="Unblocking…" data-testid="unblock-submit">
         {tx("Unblock")}
       </SubmitButton>
+    </form>
+  );
+}
+
+/** Nov 6: Remove from My Circle in the profile ⋯ menu, next to Block and Report. Not a block; they are not told. */
+export function RemoveFromCircleButton({ userId, name, className = btnOutline }: { userId: string; name: string; className?: string }) {
+  const tx = useTx();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button type="button" className={className} onClick={() => setOpen(true)} data-testid="circle-remove-open">
+        {tx("Remove from My Circle")}
+      </button>
+    );
+  }
+  return (
+    <form action={removeFromCircle} className="grid w-full min-w-[16rem] gap-2 rounded border border-line bg-cream p-3 text-left" data-testid="circle-remove-form">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="back" value={pathname} />
+      <p className="text-[14px] text-ink">{tx("{name} leaves your circle. This is not a block and they are not told. To stop all contact, block them from their profile instead.").replace("{name}", name)}</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={btnOutline} onClick={() => setOpen(false)}>
+          {tx("Cancel")}
+        </button>
+        <SubmitButton className={btn} pendingLabel="Removing…" data-testid="circle-remove-confirm">
+          {tx("Remove")}
+        </SubmitButton>
+      </div>
     </form>
   );
 }

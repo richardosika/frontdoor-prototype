@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import { Shell } from "@/components/shell";
+import { ActionDonePopup } from "@/components/report-sent";
+import { isDeveloperRole } from "@/lib/member-reach";
 import { requireUser } from "@/lib/current-user";
 import { enforceMemberNda } from "@/lib/member-nda-gate";
 import { prisma } from "@/lib/prisma";
@@ -25,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : [user.id];
     for (const id of ids) await billingSweep(id).catch(() => console.error("Could not run the billing sweep"));
   }
-  const [unread, alerts] = await Promise.all([
+  const [unread, alerts, interestWaiting] = await Promise.all([
     prisma.message.count({
       where: {
         readAt: null,
@@ -34,6 +37,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       },
     }),
     prisma.notification.count({ where: { ...memberAlertWhere(user.id), readAt: null } }),
+    // Nov 6: interest requests waiting on the developer's own projects, for the My Projects badge.
+    isDeveloperRole(user.role)
+      ? prisma.projectContact.count({ where: { toId: user.id, status: "PENDING", project: { userId: user.id } } })
+      : Promise.resolve(0),
   ]);
   // #43: referrals left, for the sidebar badge.
   const { referralsLeft } = await import("@/lib/referrals");
@@ -44,9 +51,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       unread={unread}
       alerts={alerts}
       referrals={referrals}
+      interestWaiting={interestWaiting}
       locale={await currentLocale()}
     >
       {children}
+      <Suspense fallback={null}>
+        <ActionDonePopup />
+      </Suspense>
     </Shell>
   );
 }

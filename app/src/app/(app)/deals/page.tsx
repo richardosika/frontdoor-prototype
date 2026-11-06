@@ -134,7 +134,7 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
               {tx("Waiting for staff review")}: {team.pending.map((project) => project.name).join(", ")}
             </p>
           ) : null}
-          <Link href="/feed#ledger-add-project" className={`${btn} mt-4`}>
+          <Link href="/projects?add=1#add-project" className={`${btn} mt-4`}>
             {tx("Add a project")}
           </Link>
         </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
-import { useTx } from "@/components/locale-context";
+import { useLocale, useTx } from "@/components/locale-context";
+import { sortByShownLabel } from "@/lib/category-sort";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkJoinEmail, submitJoinApplication } from "@/actions/join";
@@ -118,6 +119,9 @@ export function JoinApplication({
   const [cardName, setCardName] = useState("");
   const [issue, setIssue] = useState<FieldIssue>(null);
   const tx = useTx();
+  const locale = useLocale();
+  // Nov 6: categories A–Z in the language shown, Other Deal Professionals last.
+  const sortedRoles = sortByShownLabel(JOIN_ROLES, (role) => tx(role.label), locale, (role) => role.id);
 
   function patch(partial: Partial<JoinProfile>) {
     setProfile((current) => ({ ...current, ...partial }));
@@ -242,7 +246,7 @@ export function JoinApplication({
             <label className="sm:col-span-2" data-field="role">
               <span className={labelCls}>{tx("Role")}{RQ}</span>
               <select className={field} value={profile.role} onChange={(event) => patch({ role: event.target.value })}>
-                {JOIN_ROLES.map((role) => (
+                {sortedRoles.map((role) => (
                   <option key={role.id} value={role.id}>{tx(role.label)}</option>
                 ))}
               </select>
@@ -252,7 +256,7 @@ export function JoinApplication({
               <legend className={labelCls}>{tx("Other categories you also cover (optional)")}</legend>
               <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
                 {/* Nov 5: the same category names as the Role drop-down; each maps to the matching project category. */}
-                {JOIN_ROLES.filter((role) => role.id !== profile.role && categoryForRole(role.id) && categoryForRole(role.id) !== categoryForRole(profile.role)).map((role) => {
+                {sortedRoles.filter((role) => role.id !== profile.role && categoryForRole(role.id) && categoryForRole(role.id) !== categoryForRole(profile.role)).map((role) => {
                   const cat = categoryForRole(role.id)!;
                   const picked = (profile.extraCategories ?? []).includes(cat);
                   return (

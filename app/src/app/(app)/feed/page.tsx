@@ -78,7 +78,7 @@ export default async function FeedPage({
     ? []
     : [
         newOpps ? { n: newOpps, text: tx(newOpps === 1 ? "new opportunity" : "new opportunities"), href: "#ledger-seeking" } : null,
-        pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: developer ? "#ledger-my-projects" : "#ledger-my-work" } : null,
+        pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: developer ? "/projects#interest" : "#ledger-my-work" } : null,
         unreadCount ? { n: unreadCount, text: tx(unreadCount === 1 ? "unread message" : "unread messages"), href: "/messages" } : null,
       ].filter((x): x is { n: number; text: string; href: string } => Boolean(x));
   const side = myWork ? await loadSidePanels(user, myWork.active) : null;

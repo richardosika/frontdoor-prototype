@@ -7,7 +7,7 @@ import type { MemberRole } from "@prisma/client";
 import { matchesSlimFilters, type SlimFilters } from "@/lib/member-reach";
 
 /** Everything the role-aware top of the Ledger needs: my projects, who they seek, outreach, and projects seeking me. */
-export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number; hideDismissed?: boolean } = {}) {
+export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number; hideDismissed?: boolean; receivedLimit?: number } = {}) {
   const limit = options.limit ?? 6;
   const keep = (project: { asset: string; state: string; location: string; valueLabel: string }) => !options.filters || matchesSlimFilters(project, options.filters);
   const myCategories = memberCategories(user);
@@ -30,8 +30,9 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
         project: { select: { id: true, name: true, userId: true, asset: true, location: true, city: true, state: true, year: true, seeking: true } },
         from: { select: { id: true, name: true, role: true, org: true, location: true } },
       },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      // Nov 6: requests still waiting come first so none is cut off by the limit.
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      take: options.receivedLimit ?? 20,
     }),
     prisma.trackProject.findMany({
       where: {

@@ -1,5 +1,6 @@
 import { SubmitButton } from "@/components/submit-button";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { deleteSavedFilter, saveFilter } from "@/actions/filters";
 import { ShareLink } from "@/components/share-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
@@ -27,6 +28,7 @@ export async function ProjectFilterBar({
   saved: { id: string; name: string; query: string }[];
 }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const directory = path === "/network";
   const href = projectQuery(path, filters);
   const query = queryString(filters);
@@ -120,7 +122,7 @@ export async function ProjectFilterBar({
           <span className={labelCls}>{tx(directory ? "Role" : "Role of poster")}</span>
           <select className={field} name="role" defaultValue={filters.role || ""}>
             <option value="">{tx("Any")}</option>
-            {ROLES.map((item) => (
+            {sortByShownLabel(ROLES, (item) => tx(roleShort(item.label)), locale, (item) => item.id).map((item) => (
               <option key={item.id} value={item.id}>
                 {tx(roleShort(item.label))}
               </option>

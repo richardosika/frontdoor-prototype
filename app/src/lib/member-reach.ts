@@ -30,6 +30,8 @@ export function memberNav(role: string | null | undefined): { href: string; labe
   if (isDeveloperRole(role)) {
     return [
       { href: "/feed", label: "Ledger", test: "tab-feed" },
+      // Nov 6: projects get their own section (add, manage, review interest); the Ledger keeps an overview.
+      { href: "/projects", label: "My Projects", test: "tab-projects" },
       { href: "/deals", label: "Find your team", test: "tab-deals" },
       { href: "/messages", label: "Messages", test: "tab-messages" },
       // Nov 5: Bids is a sidebar item (it was an "Open Bids" bar on the Ledger). On phones it sits in the More menu.
@@ -119,10 +121,10 @@ export function gettingStarted(input: {
     return sequential([
       { id: "nda", label: "Accept the Member NDA", href: "/member-nda", done: input.ndaAccepted },
       { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
-      { id: "project", label: "Add your first project", href: "/feed#ledger-add-project", done: input.projectCount > 0 },
-      { id: "seeking", label: "Choose who you're seeking", href: "/feed#ledger-my-projects", done: input.seekingSet },
+      { id: "project", label: "Add your first project", href: "/projects?add=1#add-project", done: input.projectCount > 0 },
+      { id: "seeking", label: "Choose who you're seeking", href: "/projects", done: input.seekingSet },
       // #36: done only when an approved project seeks someone and nothing newer is still waiting for staff.
-      { id: "approved", label: "Submit and get approved by staff", href: "/feed#ledger-my-projects", done: input.approvedProject && !input.projectPending, waiting: Boolean(input.projectPending) },
+      { id: "approved", label: "Submit and get approved by staff", href: "/projects", done: input.approvedProject && !input.projectPending, waiting: Boolean(input.projectPending) },
       { id: "reach", label: "Reach out to a member on your team", href: "/deals", done: input.outreachSent > 0 },
     ]);
   }

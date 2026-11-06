@@ -300,7 +300,7 @@ export async function reportMember(formData: FormData) {
   });
   revalidatePath("/admin/moderation");
   revalidatePath("/admin/reports");
-  redirect(`${back}?reported=1`);
+  redirect(`${back}?done=reported`);
 }
 
 export async function reportPost(formData: FormData) {
@@ -333,7 +333,7 @@ export async function reportPost(formData: FormData) {
     href: "/admin/moderation",
   });
   revalidatePath("/admin/moderation");
-  redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
+  redirect(`${back}${back.includes("?") ? "&" : "?"}done=reported`);
 }
 
 /** Only same-site paths are accepted as a place to return to. */
@@ -365,7 +365,7 @@ export async function blockMember(formData: FormData) {
   revalidatePath("/messages");
   revalidatePath(`/members/${blockedId}`);
   revalidatePath("/admin/reports");
-  redirect(`${back}?notice=${encodeURIComponent("Member blocked")}`);
+  redirect(`${back}${back.includes("?") ? "&" : "?"}done=blocked`);
 }
 
 export async function unblockMember(formData: FormData) {
@@ -376,7 +376,7 @@ export async function unblockMember(formData: FormData) {
   await prisma.block.deleteMany({ where: { blockerId: user.id, blockedId } });
   revalidatePath("/messages");
   revalidatePath(`/members/${blockedId}`);
-  redirect(`${back}?notice=${encodeURIComponent("Member unblocked")}`);
+  redirect(`${back}${back.includes("?") ? "&" : "?"}done=unblocked`);
 }
 
 /** Nov 5: take someone out of My Circle without blocking them. They are not told; messaging rules still apply. */
@@ -392,5 +392,6 @@ export async function removeFromCircle(formData: FormData) {
   revalidatePath("/network");
   revalidatePath("/deals");
   revalidatePath("/feed");
-  redirect(`${back}${back.includes("?") ? "&" : "?"}notice=${encodeURIComponent("Removed from My Circle. They were not blocked or told.")}`)
+  revalidatePath(`/members/${otherId}`);
+  redirect(`${back}${back.includes("?") ? "&" : "?"}done=removed`);
 }

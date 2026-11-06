@@ -23,6 +23,7 @@ import { projectPageView } from "@/lib/project-page";
 import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryMemberWhere, memberCategories, memberInCategory, formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
 import { canRequestBids } from "@/lib/bids";
+import { sortByShownLabel } from "@/lib/category-sort";
 
 export const dynamic = "force-dynamic";
 
@@ -86,12 +87,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         })
       ).filter(eligibleForDirectory).filter((member) => !staffNames.has(member.name.trim().toLowerCase())).filter((member) => seeking.some((id) => memberInCategory(member, id)))
     : [];
+  const waitingHere = project.contacts.filter((c) => c.toId === viewer.id && c.status === "PENDING").length;
   const ownDeals = isOwner ? await prisma.deal.findMany({ where: { sponsorId: viewer.id }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }) : [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-10 pt-3 md:px-8 md:pt-6" data-testid={`project-page-${view}`}>
-      <Link href={isOwner ? "/feed" : `/members/${project.userId}`} className="inline-flex min-h-11 items-center font-sans text-[15px] text-forest underline decoration-brass">
-        ‹ {isOwner ? tx("Ledger") : project.user.name}
+      <Link href={isOwner ? (viewer.role === "DEVELOPER" ? "/projects" : "/feed") : `/members/${project.userId}`} className="inline-flex min-h-11 items-center font-sans text-[15px] text-forest underline decoration-brass">
+        ‹ {isOwner ? (viewer.role === "DEVELOPER" ? tx("My Projects") : tx("Ledger")) : project.user.name}
       </Link>
       {query.error || query.notice ? (
         <div className="mt-2">
@@ -168,6 +170,56 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         ) : null}
       </section>
 
+      {isOwner ? (
+        <section id="interest" className={`${box} scroll-mt-20 ${waitingHere ? "border-brass" : ""}`} data-testid="project-interest">
+          <h2 className={h2}>{tx("Interest requests")} <span className="text-mut">({waitingHere} {tx("waiting")})</span></h2>
+          <p className="-mt-1 mb-3 text-[15px] text-ink">{tx("Members who expressed interest in this project. Accept to connect and open messages, or decline. They get an email with your decision.")}</p>
+          {project.contacts.length === 0 ? <p className="text-[15px] text-mut">{tx("No contact requests yet.")}</p> : null}
+          <ul className="grid gap-2">
+            {[...project.contacts].sort((a, b) => Number(b.toId === viewer.id && b.status === "PENDING") - Number(a.toId === viewer.id && a.status === "PENDING")).map((c) => {
+              const incoming = c.toId === viewer.id;
+              const other = incoming ? c.from : c.to;
+              return (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 rounded border border-line bg-paper p-3">
+                  <Avatar initials={other.initials} photoId={other.photoId} />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/members/${other.id}`} className="font-semibold text-forest underline decoration-brass">{other.name}</Link>
+                    <p className="text-[14px] text-mut">
+                      {memberLine(other, tx)}
+                    </p>
+                    <p className="text-[13px] text-mut">
+                      {incoming ? tx("Received") : tx("Sent")} · {tx(statusLabel(c.status))}
+                    </p>
+                    {c.note ? <p className="mt-1 text-[15px] text-ink">“{c.note}”</p> : null}
+                  </div>
+                  {incoming && c.status === "PENDING" ? (
+                    <div className="flex gap-2">
+                      {(["ACCEPTED", "DECLINED"] as const).map((decision) => (
+                        <form key={decision} action={respondProjectContact}>
+                          <input type="hidden" name="contactId" value={c.id} />
+                          <input type="hidden" name="decision" value={decision} />
+                          <input type="hidden" name="back" value={back} />
+                          <SubmitButton className={decision === "ACCEPTED" ? btn : btnOutline} data-testid={decision === "ACCEPTED" ? "interest-accept" : "interest-decline"}>{decision === "ACCEPTED" ? tx("Accept") : tx("Decline")}</SubmitButton>
+                        </form>
+                      ))}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Nov 6: after expressing interest, the member sees where it went and what happens next. */}
+      {!isOwner && myContact && myContact.fromId === viewer.id ? (
+        <section className={box} data-testid="project-my-interest">
+          <h2 className={h2}>{tx("Your interest")}</h2>
+          <p className="text-[16px] leading-relaxed text-ink">
+            <b>{tx(statusLabel(myContact.status))}</b> · {tx("Sent to {name}, who listed this project. You get an email when they accept or decline.").replace("{name}", `${project.user.name}${project.user.org ? ` (${project.user.org})` : ""}`)}
+          </p>
+        </section>
+      ) : null}
       {project.reviewStatus === "APPROVED" && !viewer.isAdmin && canRequestBids({ viewerId: viewer.id, ownerId: project.userId, audience }) ? (
         <ProjectBids projectId={project.id} viewerId={viewer.id} tx={tx} />
       ) : null}
@@ -181,7 +233,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <input type="hidden" name="projectId" value={project.id} />
             <input type="hidden" name="back" value={back} />
             <div className="grid gap-2 sm:grid-cols-2">
-              {SEEK_CATEGORIES.map((item) => (
+              {sortByShownLabel(SEEK_CATEGORIES, (item) => tx(item.label), locale, (item) => item.id).map((item) => (
                 <label key={item.id} className="flex min-h-11 items-center gap-2 rounded-sm border border-line bg-paper px-3 text-[15px]">
                   <input type="checkbox" name="seeking" value={item.id} defaultChecked={seeking.includes(item.id)} className="h-5 w-5" />
                   {tx(item.label)}
@@ -218,46 +270,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </section>
       )}
 
-      {isOwner ? (
-        <section className={box} data-testid="project-interest">
-          <h2 className={h2}>{tx("Who's interested")}</h2>
-          {project.contacts.length === 0 ? <p className="text-[15px] text-mut">{tx("No contact requests yet.")}</p> : null}
-          <ul className="grid gap-2">
-            {project.contacts.map((c) => {
-              const incoming = c.toId === viewer.id;
-              const other = incoming ? c.from : c.to;
-              return (
-                <li key={c.id} className="flex flex-wrap items-center gap-3 rounded border border-line bg-paper p-3">
-                  <Avatar initials={other.initials} photoId={other.photoId} />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/members/${other.id}`} className="font-semibold text-forest underline decoration-brass">{other.name}</Link>
-                    <p className="text-[14px] text-mut">
-                      {memberLine(other, tx)}
-                    </p>
-                    <p className="text-[13px] text-mut">
-                      {incoming ? tx("Received") : tx("Sent")} · {tx(statusLabel(c.status))}
-                    </p>
-                    {c.note ? <p className="mt-1 text-[15px] text-ink">“{c.note}”</p> : null}
-                  </div>
-                  {incoming && c.status === "PENDING" ? (
-                    <div className="flex gap-2">
-                      {(["ACCEPTED", "DECLINED"] as const).map((decision) => (
-                        <form key={decision} action={respondProjectContact}>
-                          <input type="hidden" name="contactId" value={c.id} />
-                          <input type="hidden" name="decision" value={decision} />
-                          <input type="hidden" name="back" value={back} />
-                          <SubmitButton className={decision === "ACCEPTED" ? btn : btnOutline}>{decision === "ACCEPTED" ? tx("Accept") : tx("Decline")}</SubmitButton>
-                        </form>
-                      ))}
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-
       {isOwner && matches.length ? (
         <section className={box} data-testid="project-matches">
           <h2 className={h2}>{tx("Matching members")}</h2>
@@ -277,7 +289,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                         <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass">{m.name}</Link>
                         <p className="text-[14px] text-mut" data-testid="member-line">{memberLine(m, tx)}</p>
                       </div>
-                      {already ? (
+                      {already && project.contacts.some((c) => c.fromId === m.id && c.status === "PENDING") ? (
+                        <a href="#interest" className="inline-flex min-h-9 items-center rounded-full border border-[#A2412C] px-3 text-[13px] font-semibold text-[#A2412C]" data-testid="match-review-interest">{tx("Review interest")}</a>
+                      ) : already ? (
                         <StatusPill status={project.contacts.find((c) => c.fromId === m.id || c.toId === m.id)?.status ?? "PENDING"} />
                       ) : project.reviewStatus === "APPROVED" ? (
                         <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} toId={m.id} back={back} />

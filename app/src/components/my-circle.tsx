@@ -62,7 +62,7 @@ export async function MyCircleList({ people, back = "/network" }: { people: Circ
             )}
             {/* Nov 5: remove without blocking, with a confirm step. */}
             <details className="text-[14px]" data-testid="circle-remove">
-              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-semibold text-mut underline decoration-line [&::-webkit-details-marker]:hidden">{tx("Remove from My Circle")}</summary>
+              <summary className={`${btnOutline} w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden`} data-testid="circle-remove-open">{tx("Remove from My Circle")}</summary>
               <form action={removeFromCircle} className="mt-1 grid gap-2 rounded border border-line bg-cream p-3">
                 <input type="hidden" name="userId" value={person.id} />
                 <input type="hidden" name="back" value={back} />

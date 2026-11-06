@@ -27,11 +27,13 @@ function statusWord(status: string) {
   return "Pending";
 }
 
-export async function LedgerProjects({ data, role, filters, myWork, results, dismissAction }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null; dismissAction?: (formData: FormData) => Promise<void> }) {
+export async function LedgerProjects({ data, role, filters, myWork, results, dismissAction, variant = "ledger", openAdd = false }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null; dismissAction?: (formData: FormData) => Promise<void>; /** Nov 6: "myProjects" is the developer's My Projects page; the Ledger keeps an overview card. */ variant?: "ledger" | "myProjects"; openAdd?: boolean }) {
   const developer = isDeveloperRole(role);
   const tx = await serverTx();
   const locale = await currentLocale();
   const ownerFirst = role === "DEVELOPER" || data.myProjects.length > 0;
+  const onMyProjects = variant === "myProjects";
+  const respondBack = onMyProjects ? "/projects" : "/feed";
 
   type Received = Data["received"][number];
   const requestCard = (row: Received, showProject: boolean) => {
@@ -70,13 +72,15 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
             <>
               <form action={respondProjectContact}>
                 <input type="hidden" name="contactId" value={row.id} />
-                <SubmitButton className={btn} name="decision" value="ACCEPTED">
+                <input type="hidden" name="back" value={respondBack} />
+                <SubmitButton className={btn} name="decision" value="ACCEPTED" data-testid="interest-accept">
                   {tx("Accept")}
                 </SubmitButton>
               </form>
               <form action={respondProjectContact}>
                 <input type="hidden" name="contactId" value={row.id} />
-                <SubmitButton className={btnOutline} name="decision" value="DECLINED">
+                <input type="hidden" name="back" value={respondBack} />
+                <SubmitButton className={btnOutline} name="decision" value="DECLINED" data-testid="interest-decline">
                   {tx("Decline")}
                 </SubmitButton>
               </form>
@@ -102,12 +106,12 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
   const mine = (
     <section id="ledger-my-projects" className="grid scroll-mt-20 gap-3" data-testid="ledger-my-projects" key="mine">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className={h2}>{tx("My projects")}</h2>
+        <h2 className={h2}>{onMyProjects ? tx("Your projects") : tx("My projects")}</h2>
       </div>
-      <details id="ledger-add-project" className="scroll-mt-20" data-testid="ledger-add-project">
+      <details id={onMyProjects ? "add-project" : "ledger-add-project"} className="scroll-mt-20" data-testid="ledger-add-project" open={openAdd || undefined}>
         <summary className={`${btn} w-full cursor-pointer list-none sm:w-auto [&::-webkit-details-marker]:hidden`}>+ {tx("Add a project")}</summary>
         <div className="mt-3 rounded border border-line bg-cream p-4 md:p-5">
-          <ProjectForm back="/feed" />
+          <ProjectForm back={onMyProjects ? "/projects" : "/feed"} />
         </div>
       </details>
       {data.myProjects.length === 0 ? <p className={`${box} text-[16px] text-mut`}>{tx("No projects listed yet.")}</p> : null}
@@ -123,7 +127,14 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
                 </Link>
                 <p className="mt-0.5 text-[15px] text-mut">{[tx(project.asset), projectLocation(project) || project.location, String(project.year)].filter(Boolean).join(" · ")}</p>
               </div>
-              <ReviewChip status={project.reviewStatus} />
+              <div className="flex flex-wrap items-center gap-2">
+                {incoming.some((row) => row.status === "PENDING") ? (
+                  <a href={onMyProjects ? "#interest" : `/projects/${project.id}#interest`} className="inline-flex min-h-9 items-center rounded-full border border-[#A2412C] bg-paper px-3 text-[13px] font-semibold text-[#A2412C]" data-testid="project-waiting-chip">
+                    {incoming.filter((row) => row.status === "PENDING").length} {tx(incoming.filter((row) => row.status === "PENDING").length === 1 ? "interest request waiting" : "interest requests waiting")}
+                  </a>
+                ) : null}
+                <ReviewChip status={project.reviewStatus} />
+              </div>
             </header>
             {project.reviewStatus === "NEEDS_INFO" ? (
               <div className="mt-3 rounded border border-brass bg-cream px-3 py-2 text-[15px] text-ink">
@@ -173,10 +184,10 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
                 ))}
               </div>
             )}
-            {incoming.length ? (
+            {(onMyProjects ? incoming.filter((row) => row.status !== "PENDING") : incoming).length ? (
               <div className="mt-3 rounded border border-brass/60 bg-paper px-3" data-testid="project-requests">
-                <p className="pt-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-brass">{tx("Requests received")}</p>
-                <ul>{incoming.map((row) => requestCard(row, false))}</ul>
+                <p className="pt-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-brass">{onMyProjects ? tx("Interest requests answered") : tx("Requests received")}</p>
+                <ul>{(onMyProjects ? incoming.filter((row) => row.status !== "PENDING") : incoming).map((row) => requestCard(row, false))}</ul>
               </div>
             ) : null}
           </article>
@@ -430,11 +441,65 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
       </p>
     </section>
   ) : null;
-  const order = myWork
-    ? [headline, opportunities, work, resultsStrip, circleShared]
-    : ownerFirst
-      ? [mine, outreach, seekingMe, circleShared]
-      : [seekingMe, outreach, mine, circleShared];
+  // Nov 6: developers manage projects on My Projects; the Ledger keeps a highlights card that links there.
+  const myIdsAll = new Set(data.myProjects.map((project) => project.id));
+  const waiting = data.received.filter((row) => row.status === "PENDING" && myIdsAll.has(row.project.id));
+  const interest = onMyProjects ? (
+    <section id="interest" className={`${box} scroll-mt-20 ${waiting.length ? "border-brass" : ""}`} data-testid="interest-requests" key="interest">
+      <h2 className={h2}>{tx("Interest requests")} <span className="text-mut">({waiting.length})</span></h2>
+      <p className="mt-1 text-[15px] text-ink">{tx("Members who expressed interest in your projects. Accept to connect and open messages, or decline. They get an email with your decision.")}</p>
+      {waiting.length === 0 ? <p className="mt-2 text-[15px] text-mut" data-testid="interest-none">{tx("No interest requests waiting.")}</p> : null}
+      <ul className="mt-1">{waiting.map((row) => requestCard(row, true))}</ul>
+    </section>
+  ) : null;
+  const approvedCount = data.myProjects.filter((project) => project.reviewStatus === "APPROVED").length;
+  const overview = (
+    <section id="ledger-my-projects" className={`${box} scroll-mt-20`} data-testid="ledger-projects-overview" key="overview">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className={h2}>{tx("My Projects")}</h2>
+        <Link href="/projects" className="inline-flex min-h-11 items-center text-[15px] font-semibold text-forest underline decoration-brass" data-testid="overview-open">{tx("Open My Projects")} ›</Link>
+      </div>
+      <p className="mt-1 text-[15px] text-ink" data-testid="overview-stats">
+        <b>{data.myProjects.length}</b> {tx(data.myProjects.length === 1 ? "project" : "projects")} · <b>{approvedCount}</b> {tx("approved")} · <b>{data.myProjects.length - approvedCount}</b> {tx("in review")}
+      </p>
+      {waiting.length ? (
+        <Link href="/projects#interest" className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded border border-[#A2412C] bg-paper px-3 py-2 text-[15px] font-semibold text-[#A2412C]" data-testid="overview-waiting">
+          <span>{waiting.length} {tx(waiting.length === 1 ? "interest request waiting" : "interest requests waiting")}</span>
+          <span className="whitespace-nowrap">{tx("Review")} ›</span>
+        </Link>
+      ) : null}
+      {data.myProjects.length === 0 ? <p className="mt-2 text-[15px] text-mut">{tx("No projects listed yet.")}</p> : null}
+      <ul className="mt-2">
+        {data.myProjects.slice(0, 3).map((project) => {
+          const n = waiting.filter((row) => row.project.id === project.id).length;
+          return (
+            <li key={project.id} className="flex min-w-0 flex-wrap items-center gap-2 border-t border-line py-2 first:border-t-0" data-testid="overview-project">
+              <span className="min-w-0 flex-1">
+                <Link href={`/projects/${project.id}`} className="font-semibold text-forest underline decoration-brass underline-offset-2 [overflow-wrap:anywhere]">{project.name}</Link>
+                <span className="block text-[14px] text-mut">{[tx(project.asset), projectLocation(project) || project.location, String(project.year)].filter(Boolean).join(" · ")}</span>
+                {project.seekingIds.length ? <span className="block text-[14px] text-ink">{tx("Seeking")}: {project.seekingIds.map((id) => tx(seekLabel(id))).join(", ")}</span> : null}
+              </span>
+              {n ? <span className="rounded-full border border-[#A2412C] px-2 py-0.5 text-[12px] font-semibold text-[#A2412C]">{n} {tx("waiting")}</span> : null}
+              <ReviewChip status={project.reviewStatus} />
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href="/projects?add=1#add-project" className={btn} data-testid="overview-add">+ {tx("Add a project")}</Link>
+        <Link href="/projects" className={btnOutline}>{tx("Open My Projects")}</Link>
+      </div>
+    </section>
+  );
+  const order = onMyProjects
+    ? [interest, mine]
+    : myWork
+      ? [headline, opportunities, work, resultsStrip, circleShared]
+      : developer
+        ? [overview, outreach, circleShared]
+        : ownerFirst
+          ? [mine, outreach, seekingMe, circleShared]
+          : [seekingMe, outreach, mine, circleShared];
   return (
     <div className="mb-6 grid gap-4" data-testid="ledger-projects">
       {order}
