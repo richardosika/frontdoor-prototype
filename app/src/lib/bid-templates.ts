@@ -239,5 +239,11 @@ export const SUBCONTRACTOR_TEMPLATE: TemplateSeed = T("SUBCONTRACTOR", "Subcontr
   f("crew", "Crew size / manpower", "text", "terms", opt),
 ], "Lump sum");
 
+/** Nov 5: Other Deal Professionals, a general services proposal. */
+export const OTHER_PROFESSIONAL_TEMPLATE: TemplateSeed = T("OTHER_PROFESSIONAL", "Other Deal Professionals", [
+  f("scope", "Scope of work", "long", "scope"),
+  f("feeBasis", "Fee basis", "text", "price"),
+], "Total fee", { perUnit: false });
+
 /** All templates seeded and approved at launch. */
-export const ALL_TEMPLATE_SEEDS: TemplateSeed[] = [...BID_TEMPLATE_SEEDS, SUBCONTRACTOR_TEMPLATE];
+export const ALL_TEMPLATE_SEEDS: TemplateSeed[] = [...BID_TEMPLATE_SEEDS, SUBCONTRACTOR_TEMPLATE, OTHER_PROFESSIONAL_TEMPLATE];

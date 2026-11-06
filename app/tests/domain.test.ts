@@ -58,11 +58,14 @@ describe("brand", () => {
 });
 
 describe("roles", () => {
-  it("lists the 25 deal-team roles (16 from the brief plus 9 from #41)", () => {
-    expect(ROLES).toHaveLength(25);
-    expect(ROLE_IDS).toHaveLength(25);
-    expect(ROLES.slice(0, 16).map((role) => role.label)).toEqual(BRIEF_LABELS.map((label) => (label.startsWith("Insurance") ? "Insurance (builder's risk, liability)" : label)));
-    expect(ROLES.slice(16).map((role) => role.id)).toEqual(["SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING"]);
+  it("lists the 27 deal-team roles (16 from the brief, 9 from #41, Subcontractors and Other Deal Professionals from Nov 5)", () => {
+    expect(ROLES).toHaveLength(27);
+    expect(ROLE_IDS).toHaveLength(27);
+    expect(BRIEF_LABELS).toHaveLength(16);
+    // Nov 5: one set of category names everywhere, plural Title Case, matching the public Who it's for page.
+    expect(ROLES.slice(0, 16).map((role) => role.category)).toEqual(["Developers", "LPs & Investors", "Family Offices", "Lenders & Debt Funds", "Mortgage Brokers", "General Contractors", "Architects", "Real Estate Attorneys", "Securities Attorneys", "Zoning & Land Use Attorneys", "Insurers", "Real Estate Brokers", "Appraisers", "Property Managers", "Accountants & Cost Segregation", "1031 Exchange Intermediaries"]);
+    expect(ROLES.slice(25).map((role) => role.category)).toEqual(["Subcontractors", "Other Deal Professionals"]);
+    expect(ROLES.slice(16, 25).map((role) => role.id)).toEqual(["SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING"]);
     expect(new Set(ROLES.map((role) => role.group)).size).toBeGreaterThan(1);
   });
 });
@@ -371,6 +374,6 @@ describe("network and verification", () => {
 
   it("builds initials and role labels", () => {
     expect(initialsFromName("Marcus Hale")).toBe("MH");
-    expect(roleLabel("LENDER")).toBe("Lender / Debt Fund");
+    expect(roleLabel("LENDER")).toBe("Lender & Debt Fund");
   });
 });

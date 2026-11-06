@@ -220,7 +220,7 @@ describe("project form", () => {
     }
     expect(US_STATES.length).toBe(52);
     expect(PROJECT_ROLE_LABELS).toContain("General Contractor");
-    expect(PROJECT_ROLE_LABELS).toContain("Lender / Debt Fund");
+    expect(PROJECT_ROLE_LABELS).toContain("Lender & Debt Fund");
     expect(formatProjectValue("24000000")).toBe("$24,000,000");
     expect(formatProjectValue("$24M")).toBe("$24,000,000");
   });

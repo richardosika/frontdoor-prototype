@@ -40,7 +40,7 @@ import {
   type JoinState,
 } from "@/lib/join-form";
 import { US_STATES } from "@/lib/member-network";
-import { SEEK_CATEGORIES, categoryForRole } from "@/lib/project-contact";
+import { categoryForRole } from "@/lib/project-contact";
 import { publicStatusPath } from "@/lib/public-status";
 
 const RQ = <span className="text-[#9b2c22]"> *</span>;
@@ -251,19 +251,21 @@ export function JoinApplication({
             <fieldset className="sm:col-span-2" data-testid="join-extra-categories">
               <legend className={labelCls}>{tx("Other categories you also cover (optional)")}</legend>
               <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                {SEEK_CATEGORIES.filter((item) => item.id !== categoryForRole(profile.role)).map((item) => {
-                  const picked = (profile.extraCategories ?? []).includes(item.id);
+                {/* Nov 5: the same category names as the Role drop-down; each maps to the matching project category. */}
+                {JOIN_ROLES.filter((role) => role.id !== profile.role && categoryForRole(role.id) && categoryForRole(role.id) !== categoryForRole(profile.role)).map((role) => {
+                  const cat = categoryForRole(role.id)!;
+                  const picked = (profile.extraCategories ?? []).includes(cat);
                   return (
-                    <label key={item.id} className="flex min-h-11 items-center gap-3 text-[15px]">
+                    <label key={role.id} className="flex min-h-11 items-center gap-3 text-[15px]">
                       <input
                         type="checkbox"
                         className="h-5 w-5 shrink-0 accent-[#1F3A2E]"
                         checked={picked}
                         onChange={() =>
-                          patch({ extraCategories: picked ? (profile.extraCategories ?? []).filter((id) => id !== item.id) : [...(profile.extraCategories ?? []), item.id] })
+                          patch({ extraCategories: picked ? (profile.extraCategories ?? []).filter((id) => id !== cat) : [...(profile.extraCategories ?? []), cat] })
                         }
                       />
-                      <span>{tx(item.label)}</span>
+                      <span>{tx(role.label)}</span>
                     </label>
                   );
                 })}

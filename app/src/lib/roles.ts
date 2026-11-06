@@ -28,13 +28,18 @@ export const ROLE_IDS = [
   "PERMIT_EXPEDITER",
   "MEP_ENGINEER",
   "SURETY_BONDING",
+  "SUBCONTRACTOR",
+  "OTHER_PROFESSIONAL",
 ] as const;
 
 export type RoleId = (typeof ROLE_IDS)[number];
 
 export type RoleDef = {
   id: RoleId;
+  /** A person's role, singular (e.g. on a member badge). Same words as the category name. */
   label: string;
+  /** Nov 5: the category name, plural Title Case, identical on the join form, the public site and everywhere else. */
+  category: string;
   group: RoleGroup;
   blurb: string;
   credentialLabel: string;
@@ -49,6 +54,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "DEVELOPER",
     label: "Developer",
+    category: "Developers",
     group: "Capital",
     blurb: "Raising capital or seeking partners",
     credentialLabel: CARD,
@@ -57,7 +63,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "INVESTOR_PE",
-    label: "Investor / Private Equity",
+    label: "LP & Investor",
+    category: "LPs & Investors",
     group: "Capital",
     blurb: "Accredited individual, fund, or PE firm",
     credentialLabel: CARD,
@@ -67,6 +74,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "FAMILY_OFFICE",
     label: "Family Office",
+    category: "Family Offices",
     group: "Capital",
     blurb: "Private capital investing directly",
     credentialLabel: CARD,
@@ -75,7 +83,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "LENDER",
-    label: "Lender / Debt Fund",
+    label: "Lender & Debt Fund",
+    category: "Lenders & Debt Funds",
     group: "Capital",
     blurb: "Bridge, construction, and permanent debt",
     credentialLabel: CARD,
@@ -85,6 +94,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "MORTGAGE_BROKER",
     label: "Mortgage Broker",
+    category: "Mortgage Brokers",
     group: "Capital",
     blurb: "Places loans for borrowers",
     credentialLabel: CARD,
@@ -94,6 +104,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "GENERAL_CONTRACTOR",
     label: "General Contractor",
+    category: "General Contractors",
     group: "Build and Design",
     blurb: "Builds the project",
     credentialLabel: CARD,
@@ -102,7 +113,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "ARCHITECT_ENGINEER",
-    label: "Architect / Engineer",
+    label: "Architect",
+    category: "Architects",
     group: "Build and Design",
     blurb: "Design, entitlements, and engineering",
     credentialLabel: CARD,
@@ -112,6 +124,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "RE_ATTORNEY",
     label: "Real Estate Attorney",
+    category: "Real Estate Attorneys",
     group: "Legal",
     blurb: "Closings, leases, and transactions",
     credentialLabel: CARD,
@@ -121,6 +134,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "SECURITIES_ATTORNEY",
     label: "Securities Attorney",
+    category: "Securities Attorneys",
     group: "Legal",
     blurb: "Offerings, fund formation, compliance",
     credentialLabel: CARD,
@@ -129,7 +143,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "ZONING_ATTORNEY",
-    label: "Zoning / Land Use Attorney",
+    label: "Zoning & Land Use Attorney",
+    category: "Zoning & Land Use Attorneys",
     group: "Legal",
     blurb: "Entitlements, variances, land use",
     credentialLabel: CARD,
@@ -138,7 +153,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "INSURANCE",
-    label: "Insurance (builder's risk, liability)",
+    label: "Insurer",
+    category: "Insurers",
     group: "Insurance",
     blurb: "Builder's risk, liability, and project coverage",
     credentialLabel: CARD,
@@ -147,7 +163,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "BROKER",
-    label: "Broker",
+    label: "Real Estate Broker",
+    category: "Real Estate Brokers",
     group: "Services",
     blurb: "Sales, leasing, and capital advisory",
     credentialLabel: CARD,
@@ -157,6 +174,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "APPRAISER",
     label: "Appraiser",
+    category: "Appraisers",
     group: "Services",
     blurb: "Valuation and appraisal reports",
     credentialLabel: CARD,
@@ -166,6 +184,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "PROPERTY_MANAGER",
     label: "Property Manager",
+    category: "Property Managers",
     group: "Services",
     blurb: "Operations and asset management",
     credentialLabel: CARD,
@@ -174,7 +193,8 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "ACCOUNTANT",
-    label: "Accountant / Cost Seg",
+    label: "Accountant & Cost Segregation",
+    category: "Accountants & Cost Segregation",
     group: "Services",
     blurb: "Tax, audit, and cost segregation",
     credentialLabel: CARD,
@@ -184,6 +204,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "EXCHANGE_1031",
     label: "1031 Exchange Intermediary",
+    category: "1031 Exchange Intermediaries",
     group: "Services",
     blurb: "Qualified intermediary for exchanges",
     credentialLabel: CARD,
@@ -193,6 +214,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "SURVEYOR",
     label: "Surveyor",
+    category: "Surveyors",
     group: "Build and Design",
     blurb: "Boundary, topographic, and ALTA surveys",
     credentialLabel: CARD,
@@ -202,6 +224,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "TITLE_COMPANY",
     label: "Title Company",
+    category: "Title Companies",
     group: "Services",
     blurb: "Title search, commitments, and closings",
     credentialLabel: CARD,
@@ -211,6 +234,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "ENVIRONMENTAL_CONSULTANT",
     label: "Environmental Consultant",
+    category: "Environmental Consultants",
     group: "Build and Design",
     blurb: "Phase I / II site assessments and remediation",
     credentialLabel: CARD,
@@ -220,6 +244,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "GEOTECH_ENGINEER",
     label: "Geotechnical Engineer",
+    category: "Geotechnical Engineers",
     group: "Build and Design",
     blurb: "Soil borings, foundations, and site reports",
     credentialLabel: CARD,
@@ -229,6 +254,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "CIVIL_ENGINEER",
     label: "Civil Engineer",
+    category: "Civil Engineers",
     group: "Build and Design",
     blurb: "Site plans, grading, drainage, and utilities",
     credentialLabel: CARD,
@@ -238,6 +264,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "STRUCTURAL_ENGINEER",
     label: "Structural Engineer",
+    category: "Structural Engineers",
     group: "Build and Design",
     blurb: "Structural design and inspections",
     credentialLabel: CARD,
@@ -247,6 +274,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "PERMIT_EXPEDITER",
     label: "Permit Expediter",
+    category: "Permit Expediters",
     group: "Build and Design",
     blurb: "Building permits and municipal approvals",
     credentialLabel: CARD,
@@ -256,6 +284,7 @@ export const ROLES: RoleDef[] = [
   {
     id: "MEP_ENGINEER",
     label: "MEP Engineer",
+    category: "MEP Engineers",
     group: "Build and Design",
     blurb: "Mechanical, electrical, and plumbing design",
     credentialLabel: CARD,
@@ -264,14 +293,40 @@ export const ROLES: RoleDef[] = [
   },
   {
     id: "SURETY_BONDING",
-    label: "Surety / Bonding",
+    label: "Surety & Bonding",
+    category: "Sureties & Bonding",
     group: "Insurance",
     blurb: "Performance, payment, and bid bonds",
     credentialLabel: CARD,
     credentialPlaceholder: CARD_PLACEHOLDER,
     check: "Surety producer records and carrier appointments",
   },
+  {
+    id: "SUBCONTRACTOR",
+    label: "Subcontractor",
+    category: "Subcontractors",
+    group: "Build and Design",
+    blurb: "Trade work for general contractors and developers",
+    credentialLabel: CARD,
+    credentialPlaceholder: CARD_PLACEHOLDER,
+    check: "Contractor registration, insurance, and trade records",
+  },
+  {
+    id: "OTHER_PROFESSIONAL",
+    label: "Other Deal Professional",
+    category: "Other Deal Professionals",
+    group: "Services",
+    blurb: "Another role on a real estate deal team",
+    credentialLabel: CARD,
+    credentialPlaceholder: CARD_PLACEHOLDER,
+    check: "Business records",
+  },
 ];
+
+/** Nov 5: the category name (plural Title Case) for a role id. */
+export function roleCategory(id: string | null | undefined): string {
+  return roleById(id)?.category ?? "Other Deal Professionals";
+}
 
 export function roleById(id: string | null | undefined): RoleDef | undefined {
   return ROLES.find((role) => role.id === id);

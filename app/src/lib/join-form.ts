@@ -1,6 +1,14 @@
 import { MEMBER_NDA_ERROR } from "@/lib/member-nda-copy";
 import { MEMBER_RISK_ERROR } from "@/lib/member-risk";
-import { isRoleId, type RoleId } from "@/lib/roles";
+import { isRoleId, roleById, type RoleId } from "@/lib/roles";
+
+/** Order of the join drop-down, matching the public Who it's for page. */
+const JOIN_ORDER: RoleId[] = [
+  "DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE", "LENDER", "MORTGAGE_BROKER", "GENERAL_CONTRACTOR", "SUBCONTRACTOR", "BROKER",
+  "RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER",
+  "MEP_ENGINEER", "GEOTECH_ENGINEER", "ENVIRONMENTAL_CONSULTANT", "SURVEYOR", "PERMIT_EXPEDITER", "INSURANCE", "SURETY_BONDING",
+  "TITLE_COMPANY", "APPRAISER", "PROPERTY_MANAGER", "ACCOUNTANT", "EXCHANGE_1031", "OTHER_PROFESSIONAL",
+];
 import { US_STATES } from "@/lib/member-network";
 import { validateAddress, validatePersonName } from "@/lib/person-fields";
 
@@ -42,31 +50,8 @@ export const LINK_KINDS = [
 export const DEAL_SIZES = ["Under $5M", "$5M – $25M", "$25M – $100M", "$100M+"] as const;
 export const DEAL_COUNTS = ["1–5", "6–15", "16–40", "40+"] as const;
 
-export const JOIN_ROLES: { id: RoleId; label: string }[] = [
-  { id: "DEVELOPER", label: "Developer" },
-  { id: "GENERAL_CONTRACTOR", label: "General contractor" },
-  { id: "BROKER", label: "Broker" },
-  { id: "RE_ATTORNEY", label: "Attorney / advisor" },
-  { id: "INVESTOR_PE", label: "Investor / LP" },
-  { id: "FAMILY_OFFICE", label: "Family office" },
-  { id: "LENDER", label: "Lender" },
-  { id: "INSURANCE", label: "Insurance (broker / agent / carrier)" },
-  { id: "MORTGAGE_BROKER", label: "Mortgage Broker" },
-  { id: "ARCHITECT_ENGINEER", label: "Architect / Engineer" },
-  { id: "APPRAISER", label: "Appraiser" },
-  { id: "PROPERTY_MANAGER", label: "Property Manager" },
-  { id: "ACCOUNTANT", label: "Accountant / Cost Seg" },
-  { id: "EXCHANGE_1031", label: "1031 Exchange Intermediary" },
-  { id: "SURVEYOR", label: "Surveyor" },
-  { id: "TITLE_COMPANY", label: "Title Company" },
-  { id: "ENVIRONMENTAL_CONSULTANT", label: "Environmental Consultant" },
-  { id: "GEOTECH_ENGINEER", label: "Geotechnical Engineer" },
-  { id: "CIVIL_ENGINEER", label: "Civil Engineer" },
-  { id: "STRUCTURAL_ENGINEER", label: "Structural Engineer" },
-  { id: "PERMIT_EXPEDITER", label: "Permit Expediter" },
-  { id: "MEP_ENGINEER", label: "MEP Engineer" },
-  { id: "SURETY_BONDING", label: "Surety / Bonding" },
-];
+/** Nov 5: the join drop-down lists every category, with the same names as the public Who it's for page. */
+export const JOIN_ROLES: { id: RoleId; label: string }[] = JOIN_ORDER.map((id) => ({ id, label: roleById(id)!.category }));
 
 export function joinRoleLabel(id: string): string {
   return JOIN_ROLES.find((role) => role.id === id)?.label ?? id;

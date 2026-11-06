@@ -7,36 +7,24 @@ import { formatUsd } from "@/lib/money";
  * to members in a category the project seeks. A project seeking nothing cannot be contacted. Members already in
  * each other's circle can message without a project.
  */
-import type { RoleId } from "@/lib/roles";
+import { roleById, type RoleId } from "@/lib/roles";
 import { moneyDigits } from "@/lib/money";
 
 export type SeekCategory = { id: string; label: string; roles: RoleId[] };
 
 /** What a project can seek, and which member roles answer each one. */
 export const SEEK_CATEGORIES: SeekCategory[] = [
-  { id: "FINANCING", label: "Financing (lenders, mortgage brokers)", roles: ["LENDER", "MORTGAGE_BROKER"] },
-  { id: "EQUITY", label: "Equity (investors, LPs, family offices)", roles: ["INVESTOR_PE", "FAMILY_OFFICE"] },
-  { id: "DEVELOPMENT_PARTNER", label: "Development partner", roles: ["DEVELOPER"] },
-  { id: "GENERAL_CONTRACTOR", label: "General contractor", roles: ["GENERAL_CONTRACTOR"] },
-  { id: "ARCHITECT_ENGINEER", label: "Architect / Engineer", roles: ["ARCHITECT_ENGINEER"] },
-  { id: "RE_ATTORNEY", label: "Real estate attorney", roles: ["RE_ATTORNEY"] },
-  { id: "SECURITIES_ATTORNEY", label: "Securities attorney", roles: ["SECURITIES_ATTORNEY"] },
-  { id: "ZONING_ATTORNEY", label: "Zoning / land use attorney", roles: ["ZONING_ATTORNEY"] },
-  { id: "INSURANCE", label: "Insurance", roles: ["INSURANCE"] },
-  { id: "SURETY_BONDING", label: "Surety / bonding", roles: ["SURETY_BONDING"] },
-  { id: "BROKER", label: "Broker", roles: ["BROKER"] },
-  { id: "APPRAISER", label: "Appraiser", roles: ["APPRAISER"] },
-  { id: "PROPERTY_MANAGER", label: "Property manager", roles: ["PROPERTY_MANAGER"] },
-  { id: "ACCOUNTANT", label: "Accountant / Cost seg", roles: ["ACCOUNTANT"] },
-  { id: "EXCHANGE_1031", label: "1031 exchange", roles: ["EXCHANGE_1031"] },
-  { id: "SURVEYOR", label: "Surveyor", roles: ["SURVEYOR"] },
-  { id: "TITLE_COMPANY", label: "Title company", roles: ["TITLE_COMPANY"] },
-  { id: "ENVIRONMENTAL_CONSULTANT", label: "Environmental consultant", roles: ["ENVIRONMENTAL_CONSULTANT"] },
-  { id: "GEOTECH_ENGINEER", label: "Geotechnical engineer", roles: ["GEOTECH_ENGINEER"] },
-  { id: "CIVIL_ENGINEER", label: "Civil engineer", roles: ["CIVIL_ENGINEER"] },
-  { id: "STRUCTURAL_ENGINEER", label: "Structural engineer", roles: ["STRUCTURAL_ENGINEER"] },
-  { id: "PERMIT_EXPEDITER", label: "Permit expediter", roles: ["PERMIT_EXPEDITER"] },
-  { id: "MEP_ENGINEER", label: "MEP engineer", roles: ["MEP_ENGINEER"] },
+  { id: "FINANCING", label: "Financing (Lenders & Debt Funds, Mortgage Brokers)", roles: ["LENDER", "MORTGAGE_BROKER"] },
+  { id: "EQUITY", label: "Equity (LPs & Investors, Family Offices)", roles: ["INVESTOR_PE", "FAMILY_OFFICE"] },
+  { id: "DEVELOPMENT_PARTNER", label: "Development Partners", roles: ["DEVELOPER"] },
+  ...(
+    [
+      "GENERAL_CONTRACTOR", "SUBCONTRACTOR", "BROKER", "RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER",
+      "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "GEOTECH_ENGINEER", "ENVIRONMENTAL_CONSULTANT", "SURVEYOR",
+      "PERMIT_EXPEDITER", "INSURANCE", "SURETY_BONDING", "TITLE_COMPANY", "APPRAISER", "PROPERTY_MANAGER", "ACCOUNTANT",
+      "EXCHANGE_1031", "OTHER_PROFESSIONAL",
+    ] as RoleId[]
+  ).map((id) => ({ id, label: roleById(id)!.category, roles: [id] })),
 ];
 
 const BY_ID = new Map(SEEK_CATEGORIES.map((item) => [item.id, item]));
@@ -290,9 +278,9 @@ export function formatProjectValue(value: string, locale = "en"): string {
 const NEED_CATEGORIES: Record<string, string[]> = {
   equity: ["EQUITY"],
   debt: ["FINANCING"],
-  gc: ["GENERAL_CONTRACTOR"],
+  gc: ["GENERAL_CONTRACTOR", "SUBCONTRACTOR"],
   broker: ["BROKER", "FINANCING"],
-  advisory: ["RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "INSURANCE", "ACCOUNTANT", "APPRAISER", "PROPERTY_MANAGER", "EXCHANGE_1031", "SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING"],
+  advisory: ["RE_ATTORNEY", "SECURITIES_ATTORNEY", "ZONING_ATTORNEY", "ARCHITECT_ENGINEER", "INSURANCE", "ACCOUNTANT", "APPRAISER", "PROPERTY_MANAGER", "EXCHANGE_1031", "SURVEYOR", "TITLE_COMPANY", "ENVIRONMENTAL_CONSULTANT", "GEOTECH_ENGINEER", "CIVIL_ENGINEER", "STRUCTURAL_ENGINEER", "PERMIT_EXPEDITER", "MEP_ENGINEER", "SURETY_BONDING", "OTHER_PROFESSIONAL"],
 };
 
 /**
@@ -340,6 +328,19 @@ export function projectAudienceIds(input: {
 export type DocumentChange = "added" | "replaced" | "removed";
 
 /** Fix known misspellings in stored project roles (for example "Devloper"). Data is also corrected by migration. */
+/** Nov 5: role names saved on projects before the category names were unified. */
+const LEGACY_ROLE_NAMES: Record<string, string> = {
+  "Investor / Private Equity": "LP & Investor",
+  "Lender / Debt Fund": "Lender & Debt Fund",
+  "Architect / Engineer": "Architect",
+  "Zoning / Land Use Attorney": "Zoning & Land Use Attorney",
+  "Insurance (builder's risk, liability)": "Insurer",
+  Broker: "Real Estate Broker",
+  "Accountant / Cost Seg": "Accountant & Cost Segregation",
+  "Surety / Bonding": "Surety & Bonding",
+};
+
 export function fixRoleTypos(role: string): string {
-  return role.replace(/\bdevloper\b/gi, (m) => (m[0] === "d" ? "developer" : "Developer"));
+  const fixed = role.replace(/\bdevloper\b/gi, (m) => (m[0] === "d" ? "developer" : "Developer"));
+  return LEGACY_ROLE_NAMES[fixed] ?? fixed;
 }

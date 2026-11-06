@@ -42,7 +42,7 @@ describe("recommendations: staff and specific reasons", () => {
     const viewer = { ...dev, location: "Austin, TX", projects: [{ name: "Bayou", asset: "Multifamily", city: "Houston", state: "TX", reviewStatus: "APPROVED", seeking: ["FINANCING"] }] };
     const lender = { id: "l", role: "LENDER", location: "Dallas, TX", markets: "", assetClasses: "", extraCategories: "" };
     const line = reasonLine(viewer, lender)!;
-    expect(formatReason(line, (s) => s)).toBe("Lender / Debt Fund active in TX, matches your Houston project");
+    expect(formatReason(line, (s) => s)).toBe("Lender & Debt Fund active in TX, matches your Houston project");
   });
   it("developer who builds multifamily in NJ, where the viewer has a project in review", () => {
     const viewer = { id: "v", role: "GENERAL_CONTRACTOR", location: "Miami, FL", markets: "", assetClasses: "", extraCategories: "", seeking: [], projects: [{ name: "Elm", asset: "Multifamily", city: "Newark", state: "NJ", reviewStatus: "PENDING_REVIEW", seeking: [] }] };
@@ -52,7 +52,7 @@ describe("recommendations: staff and specific reasons", () => {
   it("open bid request in their category; no data means no reason", () => {
     const gc = { id: "g", role: "GENERAL_CONTRACTOR", location: "Miami, FL", markets: "", assetClasses: "", extraCategories: "", seeking: [] };
     const d = { id: "d", role: "DEVELOPER", location: "Austin, TX", markets: "", assetClasses: "", extraCategories: "", projects: [{ name: "Maple", asset: "Office", city: "Austin", state: "TX", reviewStatus: "APPROVED", seeking: [], bidCategories: ["GENERAL_CONTRACTOR"] }] };
-    expect(formatReason(reasonLine(gc, d)!, (s) => s)).toBe("Open bid request in Austin for General contractor");
+    expect(formatReason(reasonLine(gc, d)!, (s) => s)).toBe("Open bid request in Austin for General Contractors");
     expect(reasonLine(gc, { ...d, projects: [], location: "Boston, MA" })).toBeNull();
   });
   it("translates placeholders", () => {

@@ -1,3 +1,4 @@
+import { ROLES } from "@/lib/roles";
 import { monthlyDuesCents, duesLabel, offerLabel } from "@/lib/dues";
 
 export type AttentionCounts = {
@@ -69,6 +70,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
     label: "Moderation",
     links: [
       { href: "/admin/moderation", label: "Moderation queue" },
+      { href: "/admin/reports", label: "Reports" },
       { href: "/admin/projects", label: "Project review" },
       { href: "/admin/bid-templates", label: "Bid templates" },
       { href: "/admin/bids", label: "Bids (read-only)" },
@@ -105,31 +107,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
 
 export const COMMAND_CENTER = { href: "/admin", label: "Command center" } as const;
 
-const DUES_ROWS: { role: string; label: string }[] = [
-  { role: "DEVELOPER", label: "Developer" },
-  { role: "INVESTOR_PE", label: "Investor / LP" },
-  { role: "FAMILY_OFFICE", label: "Family office" },
-  { role: "LENDER", label: "Lender" },
-  { role: "GENERAL_CONTRACTOR", label: "General contractor" },
-  { role: "BROKER", label: "Broker" },
-  { role: "MORTGAGE_BROKER", label: "Mortgage broker" },
-  { role: "RE_ATTORNEY", label: "Attorney / advisor" },
-  { role: "INSURANCE", label: "Insurance" },
-  { role: "ARCHITECT_ENGINEER", label: "Architect / Engineer" },
-  { role: "APPRAISER", label: "Appraiser" },
-  { role: "PROPERTY_MANAGER", label: "Property Manager" },
-  { role: "ACCOUNTANT", label: "Accountant / Cost Seg" },
-  { role: "EXCHANGE_1031", label: "1031 Exchange Intermediary" },
-  { role: "SURVEYOR", label: "Surveyor" },
-  { role: "TITLE_COMPANY", label: "Title Company" },
-  { role: "ENVIRONMENTAL_CONSULTANT", label: "Environmental Consultant" },
-  { role: "GEOTECH_ENGINEER", label: "Geotechnical Engineer" },
-  { role: "CIVIL_ENGINEER", label: "Civil Engineer" },
-  { role: "STRUCTURAL_ENGINEER", label: "Structural Engineer" },
-  { role: "PERMIT_EXPEDITER", label: "Permit Expediter" },
-  { role: "MEP_ENGINEER", label: "MEP Engineer" },
-  { role: "SURETY_BONDING", label: "Surety / Bonding" },
-];
+const DUES_ROWS: { role: string; label: string }[] = ROLES.map((r) => ({ role: r.id, label: r.category }));
 
 export function duesSchedule(): { role: string; label: string; cents: number; text: string }[] {
   return DUES_ROWS.map((row) => {

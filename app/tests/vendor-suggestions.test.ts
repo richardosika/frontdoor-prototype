@@ -118,7 +118,7 @@ describe("demand by category", () => {
       { category: "MEP_ENGINEER", location: "Houston, TX", status: "DECLINED" },
       { category: "TITLE_COMPANY", location: "Denver, CO", status: "IN_REVIEW" },
     ]);
-    expect(rows[0]).toMatchObject({ label: "MEP engineer", area: "Texas", count: 2 });
+    expect(rows[0]).toMatchObject({ label: "MEP Engineers", area: "Texas", count: 2 });
     expect(rows).toHaveLength(2);
   });
 });

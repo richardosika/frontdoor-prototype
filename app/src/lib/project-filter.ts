@@ -76,6 +76,7 @@ const ADVISORY_ROLES = new Set([
   "PERMIT_EXPEDITER",
   "MEP_ENGINEER",
   "SURETY_BONDING",
+  "OTHER_PROFESSIONAL",
 ]);
 
 const INTENT_NEED: Record<string, string> = {

@@ -33,6 +33,8 @@ enum MemberRole {
   PERMIT_EXPEDITER
   MEP_ENGINEER
   SURETY_BONDING
+  SUBCONTRACTOR
+  OTHER_PROFESSIONAL
 }
 
 enum VerificationTier {
@@ -737,6 +739,8 @@ model Block {
   blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
   blockedId String
   blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  /// Nov 5: why the member blocked; shown to admins in Reports.
+  reason    String   @default("")
   createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
@@ -1193,6 +1197,9 @@ model BidRequest {
   units       Int?
   squareFeet  Int?
   basisNote   String         @default("")
+  /// Nov 5: requested schedule (start, milestones, completion) and the scope of work.
+  schedule    String         @default("")
+  scopeOfWork String         @default("")
   /// OPEN, AWARDED or CLOSED.
   status      String         @default("OPEN")
   isSample    Boolean        @default(false)
@@ -1200,9 +1207,45 @@ model BidRequest {
   recipients  BidRecipient[]
   bids        Bid[]
   plans       BidPlan[]
+  asked       BidQuestion[]
 
   @@index([projectId])
   @@index([requesterId])
+}
+
+/// Nov 5: a bidder (e.g. a general contractor) asks the requester (the developer) a question; the requester answers.
+model BidQuestion {
+  id         String     @id @default(cuid())
+  requestId  String
+  request    BidRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  askerId    String
+  question   String
+  answer     String     @default("")
+  answeredAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([requestId])
+  @@index([askerId])
+}
+
+/// Nov 5: a member dismissed an opportunity from the Ledger (it stays in Opportunities).
+model LedgerDismissal {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+/// Nov 5: a member removed someone from My Circle without blocking them.
+model CircleRemoval {
+  id        String   @id @default(cuid())
+  userId    String
+  removedId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, removedId])
 }
 
 model BidRecipient {
