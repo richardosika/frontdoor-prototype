@@ -474,7 +474,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
           const n = waiting.filter((row) => row.project.id === project.id).length;
           return (
             <li key={project.id} className="flex min-w-0 flex-wrap items-center gap-2 border-t border-line py-2 first:border-t-0" data-testid="overview-project">
-              <span className="min-w-0 flex-1">
+              <span className="min-w-0 flex-1 basis-64">
                 <Link href={`/projects/${project.id}`} className="font-semibold text-forest underline decoration-brass underline-offset-2 [overflow-wrap:anywhere]">{project.name}</Link>
                 <span className="block text-[14px] text-mut">{[tx(project.asset), projectLocation(project) || project.location, String(project.year)].filter(Boolean).join(" · ")}</span>
                 {project.seekingIds.length ? <span className="block text-[14px] text-ink">{tx("Seeking")}: {project.seekingIds.map((id) => tx(seekLabel(id))).join(", ")}</span> : null}
