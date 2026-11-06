@@ -25,7 +25,7 @@ function lines(profile: Partial<JoinProfile>): { label: string; value: string }[
     { label: "Deals in 3 years", value: profile.dealCount || "" },
     { label: "Projects", value: projects.join(" | ") },
     { label: "States", value: states.join(" | ") },
-    { label: "Specialties", value: list(profile.specialties) },
+    { label: profile.role === "SUBCONTRACTOR" ? "Trades" : "Specialties", value: list(profile.specialties) },
     { label: "Lender types", value: list(profile.lenderTypes) },
     { label: "Loan types", value: list(profile.loanTypes) },
     { label: "Loan size", value: profile.loanSize || "" },

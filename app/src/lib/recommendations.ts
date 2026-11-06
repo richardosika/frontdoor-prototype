@@ -5,6 +5,7 @@
 import { memberCategories, parseSeeking, seekLabel } from "@/lib/project-contact";
 import { isDeveloperRole } from "@/lib/member-reach";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { isGeneralContractor, isSubcontractor, parseTrades, tradeLabel } from "@/lib/trades";
 
 export type RecProject = { name: string; asset: string; city: string; state: string; location?: string; reviewStatus: string; seeking: string[]; bidCategories?: string[] };
 
@@ -15,6 +16,8 @@ export type RecMember = {
   markets: string;
   assetClasses: string;
   extraCategories?: string;
+  /** Nov 6: a subcontractor's trade ids. */
+  trades?: string;
   email?: string;
   isAdmin?: boolean;
   name?: string;
@@ -81,6 +84,13 @@ function sharedAsset(a: string[], b: string[]): string {
 
 const roleText = (role: string) => roleShort(roleLabel(role));
 
+/** Nov 6: which way a GC / subcontractor pair runs, or null. */
+export function gcSubPair(viewer: RecMember, other: RecMember): "sub-sees-gc" | "gc-sees-sub" | null {
+  if (isSubcontractor(viewer) && isGeneralContractor(other) && !isSubcontractor(other)) return "sub-sees-gc";
+  if (isGeneralContractor(viewer) && isSubcontractor(other) && !isGeneralContractor(other)) return "gc-sees-sub";
+  return null;
+}
+
 /** The single most specific reason, or null. Never invents data: every value comes from a field. */
 export function reasonLine(viewer: RecMember & { seeking: string[] }, other: RecMember): ReasonLine | null {
   const vProjects = (viewer.projects ?? []).filter(OPEN);
@@ -104,6 +114,19 @@ export function reasonLine(viewer: RecMember & { seeking: string[] }, other: Rec
     if (bidCat && place) return { key: "Open bid request in {place} for {category}", vars: { place, category: seekLabel(bidCat) }, t: ["category"] };
     const cat = myCats.find((c) => p.seeking.includes(c));
     if (cat && place) return { key: "Open {project} project in {place} seeks {category}", vars: { project: p.asset || p.name, place, category: seekLabel(cat) }, t: ["project", "category"] };
+  }
+  // Nov 6: subcontractors and general contractors are matched with each other first, by area.
+  const pair = gcSubPair(viewer, other);
+  if (pair) {
+    const place = placeMatch(other, cityOf(viewer.location), stateOf(viewer.location)) || sharedAsset(split(viewer.markets), split(other.markets));
+    if (pair === "sub-sees-gc") {
+      if (place) return { key: "General contractor active in {place}, where you work", vars: { place }, t: [] };
+      return { key: "General contractor who hires trade subcontractors", vars: {}, t: [] };
+    }
+    const trade = parseTrades(other.trades ?? "")[0];
+    if (trade && place) return { key: "{trade} subcontractor active in {place}", vars: { trade: tradeLabel(trade), place }, t: ["trade"] };
+    if (trade) return { key: "{trade} subcontractor", vars: { trade: tradeLabel(trade) }, t: ["trade"] };
+    if (place) return { key: "Subcontractor active in {place}", vars: { place }, t: [] };
   }
   // 3. A developer who builds the asset type of my project, in its area.
   if (isDeveloperRole(other.role)) {
@@ -149,6 +172,7 @@ export function recommendReasons(viewer: RecMember & { seeking: string[] }, othe
   const sought = theirCategories.find((c) => viewer.seeking.includes(c));
   if (sought) reasons.push({ kind: "category", text: "Your projects seek", value: seekLabel(sought) });
   else if (!isDeveloperRole(viewer.role) && isDeveloperRole(other.role)) reasons.push({ kind: "category", text: "Developer", value: "" });
+  if (!sought && gcSubPair(viewer, other)) reasons.push({ kind: "category", text: "General contractor and subcontractor", value: "" });
   const vTypes = new Set(split(viewer.assetClasses).map((a) => a.toLowerCase()));
   const sharedType = split(other.assetClasses).find((a) => vTypes.has(a.toLowerCase()));
   if (sharedType) reasons.push({ kind: "projectType", text: "Same project type", value: sharedType });
@@ -164,7 +188,8 @@ export function recommend(viewer: RecMember & { seeking: string[] }, others: Rec
     .map((other) => {
       const reasons = recommendReasons(viewer, other);
       const line = reasonLine(viewer, other);
-      return { id: other.id, reasons, line, score: reasons.reduce((sum, r) => sum + WEIGHT[r.kind], 0) + (line ? 1 : 0) };
+      // Nov 6: a GC for a sub (or a sub for a GC) ranks ahead of developers and others with the same reasons.
+      return { id: other.id, reasons, line, score: reasons.reduce((sum, r) => sum + WEIGHT[r.kind], 0) + (line ? 1 : 0) + (gcSubPair(viewer, other) ? 1 : 0) };
     })
     .filter((row) => row.score >= 3 && row.line)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))

@@ -67,6 +67,7 @@ export const ROLE_PROFILES: Record<string, Partial<RoleProfile>> = {
   SURVEYOR: { credential: "Land surveyor license", credentialHint: "State and number", size: "Typical site size", sizeHint: "e.g. 1 to 50 acres", specialties: "Survey types", specialtiesHint: "e.g. ALTA, boundary, topographic, as-built", insurance: true, credentialRequired: true },
   TITLE_COMPANY: { credential: "Title producer license", credentialHint: "State and number; underwriters", size: "Typical transaction size", specialties: "Services", specialtiesHint: "e.g. commercial title, escrow, closings", credentialRequired: true },
   ENVIRONMENTAL_CONSULTANT: { credential: "Licenses and certifications", credentialHint: "e.g. NJ LSRP number", size: "Typical site size", specialties: "Services", specialtiesHint: "e.g. Phase I, Phase II, remediation, asbestos", insurance: true, credentialRequired: true },
+  SUBCONTRACTOR: { credential: "Contractor license", credentialHint: "State, type and number", size: "Typical job size", sizeHint: "e.g. $50K to $2M", specialties: "Trades", specialtiesHint: "", insurance: true, credentialRequired: true, portfolio: "Add a past job to show your work" },
   PERMIT_EXPEDITER: { credential: "Registrations", credentialHint: "Municipal registrations if any", size: "Typical project size", specialties: "Jurisdictions", specialtiesHint: "e.g. Montclair, Newark, Jersey City" },
 };
 

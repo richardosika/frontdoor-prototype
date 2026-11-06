@@ -1,3 +1,4 @@
+import { subMatchesPackage } from "@/lib/trades";
 /** Bid plans: construction drawings on a bid request, and who may open a general-contractor request without being picked. */
 export const PLAN_MAX_BYTES = 25 * 1024 * 1024;
 export const PLAN_MAX_FILES = 5;
@@ -29,14 +30,29 @@ export function isOpenToGcs(templateCategory: string): boolean {
   return templateCategory === "GENERAL_CONTRACTOR";
 }
 
+export type OpenViewer = { id: string; role: string; status: string; paymentStatus: string; extraCategories?: string | null; trades?: string; markets?: string; location?: string };
+
+/**
+ * Who may open a bid request.
+ * Nov 6: subcontractors never bid on a full general-contractor request (the GC template), even if picked.
+ * A GC's trade bid package is open to any active, paid-up subcontractor with that trade who serves one of its states.
+ */
 export function canOpenRequest(input: {
-  viewer: { id: string; role: string; status: string; paymentStatus: string };
+  viewer: OpenViewer;
   requesterId: string;
   recipientIds: string[];
   templateCategory: string;
+  trade?: string;
+  serviceStates?: string;
 }): "requester" | "recipient" | "open" | null {
   if (input.requesterId === input.viewer.id) return "requester";
+  if (isOpenToGcs(input.templateCategory) && input.viewer.role === "SUBCONTRACTOR") return null;
   if (input.recipientIds.includes(input.viewer.id)) return "recipient";
   if (isOpenToGcs(input.templateCategory) && isVerifiedGc(input.viewer)) return "open";
+  if (input.trade && isActivePaid(input.viewer) && subMatchesPackage({ role: input.viewer.role, extraCategories: input.viewer.extraCategories, trades: input.viewer.trades ?? "", markets: input.viewer.markets ?? "", location: input.viewer.location ?? "" }, { trade: input.trade, serviceStates: input.serviceStates ?? "" })) return "open";
   return null;
+}
+
+function isActivePaid(user: { status: string; paymentStatus: string }): boolean {
+  return user.status === "ACTIVE" && ["PAID", "WAIVED", "NOT_REQUIRED"].includes(user.paymentStatus);
 }

@@ -1,4 +1,5 @@
 "use server";
+import { subProfileFromJoin } from "@/lib/trades";
 
 import { categoryForRole, serializeSeeking } from "@/lib/project-contact";
 import { randomBytes } from "node:crypto";
@@ -230,6 +231,8 @@ export async function reviewApplication(formData: FormData) {
       ),
       org: application.org,
       location: application.location,
+      // Nov 6: a subcontractor's trades, states and license from the join form carry onto the profile.
+      ...(application.role === "SUBCONTRACTOR" ? subProfileFromJoin(application.joinProfile) : {}),
       credentialNote: card && !card.deletedAt ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
       bio: "",
       phone: application.phone,

@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { BID_PDF_MAX, canDecide, canEditBid, cleanQuestions, isPdf, missingFields, parseFields, readBidValues, ANSWER_MAX } from "@/lib/bids";
 import { bidAccess, bidNotice, estimateCopy, parseQuestions } from "@/lib/bids-db";
 import type { BidField } from "@/lib/bid-templates";
-import { PLAN_MAX_BYTES, PLAN_MAX_FILES, canOpenRequest, isOpenToGcs, planType, safePlanName } from "@/lib/bid-plans";
+import { isGeneralContractor, isTrade, statesFrom, tradeLabel } from "@/lib/trades";
+import { matchingSubs } from "@/lib/trades-db";
+import { PLAN_MAX_BYTES, PLAN_MAX_FILES, canOpenRequest, isOpenToGcs, planType, safePlanName, type OpenViewer } from "@/lib/bid-plans";
 
 function go(path: string, key: "error" | "notice", text: string): never {
   redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(text)}`);
@@ -30,7 +32,13 @@ export async function createBidRequest(formData: FormData) {
   const dueRaw = String(formData.get("dueAt") || "");
   const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? new Date(`${dueRaw}T17:00:00-05:00`) : null;
   if (!dueAt || dueAt.getTime() < Date.now()) go(back, "error", "Pick a due date in the future.");
-  const recipients = [...new Set(formData.getAll("recipient").map(String))].filter((id) => access.allowed.has(id));
+  let recipients = [...new Set(formData.getAll("recipient").map(String))].filter((id) => access.allowed.has(id));
+  // Nov 6: subcontractors do not bid on full general-contractor requests; they get trade bid packages from GCs.
+  if (isOpenToGcs(template.category) && recipients.length) {
+    const subs = await prisma.user.findMany({ where: { id: { in: recipients }, role: "SUBCONTRACTOR" }, select: { id: true } });
+    const drop = new Set(subs.map((u) => u.id));
+    recipients = recipients.filter((id) => !drop.has(id));
+  }
   // General-contractor requests are open to every verified GC, so picking members is optional there.
   if (!recipients.length && !isOpenToGcs(template.category)) go(back, "error", "Select at least one member to send this request to.");
   const planFiles = formData.getAll("plans").filter((f): f is File => f instanceof File && f.size > 0);
@@ -86,13 +94,13 @@ export async function createBidRequest(formData: FormData) {
   go(`/bids/${request.id}`, "notice", "Request sent.");
 }
 
-async function loadForBidder(requestId: string, user: { id: string; role: string; status: string; paymentStatus: string }) {
+async function loadForBidder(requestId: string, user: OpenViewer) {
   const req = await prisma.bidRequest.findUnique({
     where: { id: requestId },
     include: { template: true, project: { select: { name: true } }, requester: { select: { id: true, email: true, locale: true, name: true } }, bids: { where: { bidderId: user.id } }, recipients: { select: { memberId: true } } },
   });
   if (!req) return null;
-  const access = canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category });
+  const access = canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category, trade: req.trade, serviceStates: req.serviceStates });
   if (access !== "recipient" && access !== "open") return null;
   // An open request: a verified GC who bids joins the recipients so the request shows on their Bids page.
   if (access === "open") await prisma.bidRecipient.upsert({ where: { requestId_memberId: { requestId, memberId: user.id } }, update: {}, create: { requestId, memberId: user.id } });
@@ -246,4 +254,63 @@ export async function answerBidQuestion(formData: FormData) {
   if (asker) await bidNotice(asker, "answered", { name: user.name, project: q.request.project.name }, `/bids/${q.requestId}#bid-qa`);
   refresh();
   go(back, "notice", "Answer sent.");
+}
+
+/**
+ * Nov 6: a general contractor on a project posts a trade bid package (trade, scope, schedule, plans, due date, states).
+ * Only subcontractors with that trade who serve one of those states are matched, alerted and may bid (Subcontractor template).
+ */
+export async function createTradePackage(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") || "");
+  const back = `/bids/trade/new?project=${encodeURIComponent(projectId)}`;
+  if (!isGeneralContractor(user)) go("/bids", "error", "Only general contractors can post trade bid packages.");
+  const access = await bidAccess(projectId, user.id);
+  if (!access) go("/bids", "error", "You can request bids only on projects you own or are active on.");
+  const template = await prisma.bidTemplate.findFirst({ where: { category: "SUBCONTRACTOR", status: "APPROVED" }, orderBy: { version: "desc" } });
+  if (!template) go(back, "error", "Choose an approved template.");
+  const trade = String(formData.get("trade") || "");
+  if (!isTrade(trade)) go(back, "error", "Choose a trade.");
+  const states = statesFrom(formData.getAll("serviceStates").map(String).join(","));
+  if (!states.length) go(back, "error", "Pick at least one state for this package.");
+  const dueRaw = String(formData.get("dueAt") || "");
+  const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? new Date(`${dueRaw}T17:00:00-05:00`) : null;
+  if (!dueAt || dueAt.getTime() < Date.now()) go(back, "error", "Pick a due date in the future.");
+  const scopeOfWork = String(formData.get("scopeOfWork") || "").trim().slice(0, 4000);
+  const schedule = String(formData.get("schedule") || "").trim().slice(0, 2000);
+  if (scopeOfWork.length < 10) go(back, "error", "Describe the scope of work.");
+  if (schedule.length < 3) go(back, "error", "Add the schedule.");
+  const planFiles = formData.getAll("plans").filter((f): f is File => f instanceof File && f.size > 0);
+  if (planFiles.length > PLAN_MAX_FILES) go(back, "error", "Attach up to 5 plan files.");
+  const plans: { fileName: string; contentType: string; sizeBytes: number; bytes: Uint8Array<ArrayBuffer> }[] = [];
+  for (const file of planFiles) {
+    if (file.size > PLAN_MAX_BYTES) go(back, "error", "Each plan file can be up to 25 MB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const contentType = planType(file.name, bytes);
+    if (!contentType) go(back, "error", "Plans must be PDF, DWG, PNG, JPG or WebP files.");
+    plans.push({ fileName: safePlanName(file.name), contentType, sizeBytes: file.size, bytes });
+  }
+  const serviceStates = states.join(",");
+  const subs = await matchingSubs({ trade, serviceStates }, [user.id]);
+  const request = await prisma.bidRequest.create({
+    data: {
+      projectId,
+      requesterId: user.id,
+      templateId: template.id,
+      title: `${tradeLabel(trade)} · ${access.project.name}`,
+      dueAt,
+      scopeOfWork,
+      schedule,
+      trade,
+      serviceStates,
+      basisNote: String(formData.get("basisNote") || "").trim().slice(0, 300),
+      recipients: { create: subs.map((s) => ({ memberId: s.id })) },
+      plans: { create: plans },
+    },
+  });
+  for (const s of subs) {
+    await bidNotice(s, "trade", { name: user.name, project: access.project.name, due: dueLabel(dueAt), trade: tradeLabel(trade) }, `/bids/${request.id}`).catch(() => null);
+  }
+  refresh();
+  go(`/bids/${request.id}`, "notice", "Trade bid package posted. Matching subcontractors were notified.");
 }

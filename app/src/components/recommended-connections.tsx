@@ -11,7 +11,7 @@ import { roleLabel, roleShort } from "@/lib/roles";
 /** Recommended connections with the reason for each, from location, profession or category, and project type. */
 export async function RecommendedConnections({ user: viewer }: { user: { id: string } }) {
   const tx = await serverTx();
-  const user = await prisma.user.findUnique({ where: { id: viewer.id }, select: { id: true, role: true, location: true, markets: true, assetClasses: true, extraCategories: true } });
+  const user = await prisma.user.findUnique({ where: { id: viewer.id }, select: { id: true, role: true, location: true, markets: true, assetClasses: true, extraCategories: true, trades: true } });
   if (!user) return null;
   const projectSelect = { name: true, asset: true, city: true, state: true, location: true, reviewStatus: true, seeking: true, bidRequests: { where: { status: "OPEN" }, select: { template: { select: { category: true } } } } } as const;
   type Row = { name: string; asset: string; city: string; state: string; location: string; reviewStatus: string; seeking: string; bidRequests: { template: { category: string } }[] };
@@ -21,7 +21,7 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
     circleIds(user.id),
     prisma.user.findMany({
       where: { status: "ACTIVE", ...NOT_STAFF_WHERE, id: { not: user.id }, paymentStatus: { in: ["PAID", "WAIVED", "NOT_REQUIRED"] } },
-      select: { id: true, name: true, initials: true, photoId: true, role: true, org: true, location: true, markets: true, assetClasses: true, extraCategories: true, email: true, isAdmin: true, projects: { where: { reviewStatus: "APPROVED" }, select: projectSelect } },
+      select: { id: true, name: true, initials: true, photoId: true, role: true, org: true, location: true, markets: true, assetClasses: true, extraCategories: true, trades: true, email: true, isAdmin: true, projects: { where: { reviewStatus: "APPROVED" }, select: projectSelect } },
       take: 400,
       orderBy: { createdAt: "desc" },
     }),

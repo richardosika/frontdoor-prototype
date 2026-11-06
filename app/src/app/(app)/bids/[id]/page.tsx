@@ -10,6 +10,7 @@ import { bestPerRow, canDecide, canEditBid, numeric, parseFields, parseJson, per
 import { parseQuestions, profileFacts } from "@/lib/bids-db";
 import { requireUser } from "@/lib/current-user";
 import { canOpenRequest } from "@/lib/bid-plans";
+import { tradeLabel } from "@/lib/trades";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 
@@ -47,7 +48,7 @@ export default async function BidRequestPage({ params, searchParams }: { params:
   if (!req) return <NotAvailable tx={tx} />;
   const isRequester = req.requesterId === user.id;
   // General-contractor requests are open: any verified GC can view the plans and bid without being picked.
-  const isRecipient = !isRequester && canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category }) !== null;
+  const isRecipient = !isRequester && canOpenRequest({ viewer: user, requesterId: req.requesterId, recipientIds: req.recipients.map((r) => r.memberId), templateCategory: req.template.category, trade: req.trade, serviceStates: req.serviceStates }) !== null;
   // Staff: read-only view of the comparison and PDFs. No actions on behalf of members.
   const isStaff = !isRequester && !isRecipient && user.isAdmin;
   if (!isRequester && !isRecipient && !isStaff) return <NotAvailable tx={tx} />;
@@ -58,6 +59,12 @@ export default async function BidRequestPage({ params, searchParams }: { params:
     <>
       <Link href={isStaff ? "/admin/bids" : isRequester ? `/projects/${req.project.id}` : "/bids"} className="inline-flex min-h-11 items-center text-[15px] text-forest underline decoration-brass">‹ {isStaff ? "Admin · Bids" : isRequester ? req.project.name : tx("Bids")}</Link>
       {isStaff ? <p className="mt-2 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]" data-testid="staff-readonly">Staff view · read-only. Requested by {req.requester.name} ({req.requester.org}). Members cannot see each other&apos;s bids; staff cannot act for them here.</p> : null}
+      {req.trade ? (
+        <p className="mt-2 rounded border border-brass/60 bg-cream px-3 py-2 text-[15px] text-forest" data-testid="trade-package-info">
+          <b>{tx("Trade bid package")}</b> · {tx(tradeLabel(req.trade))} · {tx("Service area")}: {req.serviceStates.split(",").filter(Boolean).join(", ")}
+          {isRequester ? <span className="block text-[14px] text-mut">{tx("Sent to matching subcontractors")}: {req.recipients.length}</span> : null}
+        </p>
+      ) : null}
       <PlansList plans={req.plans} tx={tx} />
       {q.error || q.notice ? <div className="mt-2"><Banner error={q.error ? tx(q.error) : undefined} notice={q.notice ? tx(q.notice) : undefined} /></div> : null}
     </>

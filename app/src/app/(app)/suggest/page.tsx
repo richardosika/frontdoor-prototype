@@ -12,7 +12,8 @@ import { syncSuggestionsQuietly } from "@/lib/vendor-suggestions-db";
 export const dynamic = "force-dynamic";
 
 /** Suggest a vendor: private suggestions; every vendor is personally reviewed and verified before joining. */
-export default async function SuggestVendorPage() {
+export default async function SuggestVendorPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
+  const q = await searchParams;
   const tx = await serverTx();
   const locale = await currentLocale();
   const user = await requireUser();
@@ -35,7 +36,7 @@ export default async function SuggestVendorPage() {
               {tx("A suggestion is not a membership. Your suggestions are private: other members never see who you suggested, and the vendor only sees your name if you allow it below.")}
             </p>
           </div>
-          <SuggestVendorForm categories={suggestionCategories()} />
+          <SuggestVendorForm categories={suggestionCategories()} initialCategory={suggestionCategories().some((c) => c.id === q.category) ? q.category : ""} />
         </section>
         <section className={`${card} p-4 shadow-[0_8px_24px_rgba(31,58,46,0.08)] sm:p-7`} data-testid="your-suggestions">
           <h2 className="font-serif text-[26px] font-medium text-forest">{tx("Your suggestions")}</h2>

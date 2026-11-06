@@ -1,4 +1,5 @@
 import { SubmitButton } from "@/components/submit-button";
+import { SubAdminPanel } from "@/components/sub-admin-panel";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deleteOneApplication, rerunVerification, saveInternalNote } from "@/actions/owner";
@@ -180,6 +181,7 @@ export default async function ApplicationDetailPage({
             </p>
           ) : null}
           <JoinProfileReview profile={application.joinProfile} />
+          <SubAdminPanel userId={application.userId} applicationId={application.id} />
           <p>
             <b>Submitted:</b> {formatAuditTime(application.createdAt)}
           </p>

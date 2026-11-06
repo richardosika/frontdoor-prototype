@@ -23,6 +23,7 @@ import { projectPageView } from "@/lib/project-page";
 import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryMemberWhere, memberCategories, memberInCategory, formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
 import { canRequestBids } from "@/lib/bids";
+import { isGeneralContractor, parseTrades, tradeLabel } from "@/lib/trades";
 import { sortByShownLabel } from "@/lib/category-sort";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +82,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     ? (
         await prisma.user.findMany({
           where: { status: "ACTIVE", ...NOT_STAFF_WHERE, id: { not: project.userId }, ...(categoryMemberWhere(seeking) as object) },
-          select: { id: true, name: true, initials: true, photoId: true, role: true, extraCategories: true, org: true, location: true, status: true, paymentStatus: true },
+          select: { id: true, name: true, initials: true, photoId: true, role: true, extraCategories: true, org: true, location: true, status: true, paymentStatus: true, trades: true },
           orderBy: { name: "asc" },
           take: 24,
         })
@@ -221,7 +222,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </section>
       ) : null}
       {project.reviewStatus === "APPROVED" && !viewer.isAdmin && canRequestBids({ viewerId: viewer.id, ownerId: project.userId, audience }) ? (
-        <ProjectBids projectId={project.id} viewerId={viewer.id} tx={tx} />
+        <ProjectBids projectId={project.id} viewerId={viewer.id} tx={tx} isGc={isGeneralContractor(viewer)} />
       ) : null}
 
       {/* Nov 5: members other than developers see no "looking for" list; once they have contacted, the section is gone. */}
@@ -288,6 +289,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                       <div className="min-w-0 flex-1">
                         <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass">{m.name}</Link>
                         <p className="text-[14px] text-mut" data-testid="member-line">{memberLine(m, tx)}</p>
+                        {m.role === "SUBCONTRACTOR" && m.trades ? <p className="text-[13px] text-forest [overflow-wrap:anywhere]" data-testid="member-trades">{parseTrades(m.trades).map((t) => tx(tradeLabel(t))).join(", ")}</p> : null}
                       </div>
                       {already && project.contacts.some((c) => c.fromId === m.id && c.status === "PENDING") ? (
                         <a href="#interest" className="inline-flex min-h-9 items-center rounded-full border border-[#A2412C] px-3 text-[13px] font-semibold text-[#A2412C]" data-testid="match-review-interest">{tx("Review interest")}</a>
@@ -393,11 +395,11 @@ function ProjectNotAvailable({ tx }: { tx: (text: string) => string }) {
 }
 
 /** #51: Request bids from members already on this project; the requester's own requests on it. */
-async function ProjectBids({ projectId, viewerId, tx }: { projectId: string; viewerId: string; tx: (s: string) => string }) {
+async function ProjectBids({ projectId, viewerId, tx, isGc = false }: { projectId: string; viewerId: string; tx: (s: string) => string; isGc?: boolean }) {
   const mine = await prisma.bidRequest.findMany({
     where: { projectId, requesterId: viewerId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, status: true, template: { select: { name: true } }, _count: { select: { recipients: true } }, bids: { where: { status: { not: "DRAFT" } }, select: { id: true } } },
+    select: { id: true, status: true, trade: true, template: { select: { name: true } }, _count: { select: { recipients: true } }, bids: { where: { status: { not: "DRAFT" } }, select: { id: true } } },
   });
   return (
     <section className={box} data-testid="project-bids">
@@ -406,13 +408,17 @@ async function ProjectBids({ projectId, viewerId, tx }: { projectId: string; vie
           <h2 className={h2}>{tx("Bids")}</h2>
           <p className="text-[15px] text-ink">{tx("Ask members already on this project for proposals on a standard form, then compare them side by side.")}</p>
         </div>
-        <Link href={`/bids/new?project=${projectId}`} className={btn} data-testid="request-bids">{tx("Request bids")}</Link>
+        <span className="flex flex-wrap gap-2">
+          <Link href={`/bids/new?project=${projectId}`} className={btn} data-testid="request-bids">{tx("Request bids")}</Link>
+          {isGc ? <Link href={`/bids/trade/new?project=${projectId}`} className={btnOutline} data-testid="post-trade-package-link">{tx("Post a trade bid package")}</Link> : null}
+        </span>
       </div>
+      {isGc ? <p className="mt-2 text-[14px] text-mut">{tx("Trade bid packages go only to subcontractors in that trade who serve the project's area.")}</p> : null}
       {mine.length ? (
         <ul className="mt-3">
           {mine.map((r) => (
             <li key={r.id} className="border-t border-line py-2">
-              <Link href={`/bids/${r.id}`} className="text-[15px] font-semibold text-forest underline decoration-brass">{tx(r.template.name)}</Link>
+              <Link href={`/bids/${r.id}`} className="text-[15px] font-semibold text-forest underline decoration-brass">{r.trade ? `${tx(tradeLabel(r.trade))} · ${tx("Trade bid package")}` : tx(r.template.name)}</Link>
               <span className="ml-2 text-[14px] text-mut">{r.bids.length} {tx("of")} {r._count.recipients} {tx("received")} · {tx(r.status === "OPEN" ? "Open" : r.status === "AWARDED" ? "Awarded" : "Closed")}</span>
             </li>
           ))}

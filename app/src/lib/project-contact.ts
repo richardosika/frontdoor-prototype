@@ -53,6 +53,16 @@ export function memberCategories(member: CategoryMember): string[] {
   return primary ? [primary, ...extra] : extra;
 }
 
+/**
+ * Nov 6: the categories whose projects a member may see and express interest in. A subcontractor also answers
+ * developer projects that seek a General Contractor, so subs can show early interest in the trade work.
+ * Subcontractors still never bid on the full general-contractor request.
+ */
+export function interestCategories(member: CategoryMember): string[] {
+  const cats = memberCategories(member);
+  return cats.includes("SUBCONTRACTOR") && !cats.includes("GENERAL_CONTRACTOR") ? [...cats, "GENERAL_CONTRACTOR"] : cats;
+}
+
 export function memberInCategory(member: CategoryMember, category: string): boolean {
   return memberCategories(member).includes(category);
 }
@@ -111,7 +121,9 @@ export function canContactAboutProject(input: { project: ContactProject; from: C
   const ownerReceives = project.userId === to.id;
   if (!ownerSends && !ownerReceives) return { ok: false, reason: CONTACT_REASONS.notOwner };
   const other = ownerSends ? to : from;
-  const category = memberCategories(other).find((id) => seeking.includes(id));
+  // Nov 6: a subcontractor may express interest in a project seeking a General Contractor (recorded as Subcontractors).
+  const direct = memberCategories(other).find((id) => seeking.includes(id));
+  const category = direct ?? (!ownerSends && interestCategories(other).some((id) => seeking.includes(id)) ? "SUBCONTRACTOR" : undefined);
   if (!category) {
     return { ok: false, reason: ownerSends ? CONTACT_REASONS.recipientCategory : CONTACT_REASONS.wrongCategory };
   }

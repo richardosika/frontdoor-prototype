@@ -9,6 +9,7 @@ import { Banner } from "@/components/banner";
 import { ExecutiveSummary } from "@/components/grade-summary";
 import { GuidedReview } from "@/components/guided-review";
 import { PageHeader } from "@/components/page-header";
+import { SubAdminPanel } from "@/components/sub-admin-panel";
 import { btn, btnOutline, card, field, labelCls } from "@/components/ui";
 import { requireVerificationAdmin } from "@/lib/current-user";
 import { publicEvidenceHref } from "@/lib/evidence-link";
@@ -132,6 +133,7 @@ export default async function VerificationCasePage({
       <div className="mt-3">
         <Banner error={query.error} notice={query.notice} />
       </div>
+      {record.subject === "MEMBER" ? <SubAdminPanel userId={record.userId} applicationId={record.applicationId} /> : null}
       <p className="mt-3 text-sm text-ink">
         {ADMIN_INTROS.verification} {record.subject === "MEMBER"
           ? "File status follows the decision on step 8. The member badge appears only when the status is Verified and every confirmed step is a pass. A suggestion is not a pass. Could not verify is not a pass."

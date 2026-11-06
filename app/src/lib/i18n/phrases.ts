@@ -7,6 +7,7 @@ import { NETWORK_PHRASES } from "@/lib/i18n/network-phrases";
 import { CATEGORY_PHRASES } from "@/lib/i18n/category-phrases";
 import { NOV5_PHRASES } from "@/lib/i18n/nov5-phrases";
 import { NOV6_PHRASES } from "@/lib/i18n/nov6-phrases";
+import { SUB_PHRASES } from "@/lib/i18n/sub-phrases";
 
 const P: Record<string, readonly [string, string, string]> = {
   "Who viewed you": ["Quién vio su perfil", "Wer Sie angesehen hat", "プロフィールを見た人"],
@@ -1086,6 +1087,7 @@ const P: Record<string, readonly [string, string, string]> = {
 for (const [k, v] of Object.entries(CATEGORY_PHRASES)) P[k] = v;
 for (const [k, v] of Object.entries(NOV5_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(NOV6_PHRASES)) if (!P[k]) P[k] = v;
+for (const [k, v] of Object.entries(SUB_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(BID_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(JOIN_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(VENDOR_PHRASES)) if (!P[k]) P[k] = v;

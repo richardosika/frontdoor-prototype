@@ -395,7 +395,7 @@ export function JoinApplication({
             {specialty ? (
               <div className="mt-3">
                 <p className={labelCls}>{tx(specialty.label)}{RQ}</p>
-                <ChipSet options={specialty.options} value={profile.specialties} onChange={(specialties) => patch({ specialties })} />
+                <ChipSet options={profile.role === "SUBCONTRACTOR" ? sortByShownLabel(specialty.options, (o) => tx(o), locale, (o) => (o === "Other Trades" ? "OTHER" : o)) : specialty.options} value={profile.specialties} onChange={(specialties) => patch({ specialties })} />
               </div>
             ) : null}
             {kind === "lender" ? (

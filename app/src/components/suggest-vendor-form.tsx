@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitVendorSuggestion } from "@/actions/vendor-suggestions";
-import { useTx } from "@/components/locale-context";
+import { useLocale, useTx } from "@/components/locale-context";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { btn, field } from "@/components/ui";
 import { RELATIONS, RELATION_LABEL, type Relation } from "@/lib/vendor-suggestions";
 
 const label = "mb-1.5 block font-sans text-[12px] font-semibold text-forest";
 
-export function SuggestVendorForm({ categories }: { categories: { id: string; label: string }[] }) {
+export function SuggestVendorForm({ categories, initialCategory = "" }: { categories: { id: string; label: string }[]; initialCategory?: string }) {
   const tx = useTx();
+  const locale = useLocale();
   const router = useRouter();
   const [relation, setRelation] = useState<Relation>("WORKED");
   const [nameOk, setNameOk] = useState(true);
@@ -57,9 +59,9 @@ export function SuggestVendorForm({ categories }: { categories: { id: string; la
       </div>
       <div>
         <label className={label} htmlFor="sv-category">{tx("Category")}</label>
-        <select id="sv-category" name="category" className={field} required defaultValue="">
+        <select id="sv-category" name="category" className={field} required defaultValue={initialCategory}>
           <option value="" disabled>{tx("Choose a category")}</option>
-          {categories.map((c) => (
+          {sortByShownLabel(categories, (c) => tx(c.label), locale, (c) => c.id).map((c) => (
             <option key={c.id} value={c.id}>{tx(c.label)}</option>
           ))}
         </select>

@@ -215,6 +215,15 @@ model User {
   insuranceCoverage      Json             @default("[]")
   /// Overnight: role-specific list (loan types, practice areas, coverage lines, services).
   specialties            String           @default("")
+  /// Nov 6 Subcontractors: trade ids (src/lib/trades.ts), metros served, union shop and prevailing wage ("yes"/"no"/""),
+  /// contractor license number and state, optional bonding capacity. Collected and shown only; not graded.
+  trades                 String           @default("")
+  metros                 String           @default("")
+  unionShop              String           @default("")
+  prevailingWage         String           @default("")
+  licenseNumber          String           @default("")
+  licenseState           String           @default("")
+  bondingCapacity        String           @default("")
   /// Overnight: rates and terms note, never shown to other members.
   privateTerms           String           @default("")
   checklistDone          String           @default("")
@@ -285,6 +294,7 @@ model User {
   reportsReceived         Report[]               @relation("ReportsReceived")
   moderationEvents        ModerationEvent[]
   businessCard            BusinessCard?
+  insuranceCertificate    InsuranceCertificate?
   legalAcceptances        LegalAcceptance[]
   applicationDecisions    ApplicationDecision[]  @relation("DecisionActor")
   paymentEvents           PaymentEvent[]
@@ -1200,6 +1210,9 @@ model BidRequest {
   /// Nov 5: requested schedule (start, milestones, completion) and the scope of work.
   schedule    String         @default("")
   scopeOfWork String         @default("")
+  /// Nov 6: a GC's trade bid package. trade is a trade id; serviceStates the two-letter states it covers. Empty for other requests.
+  trade         String       @default("")
+  serviceStates String       @default("")
   /// OPEN, AWARDED or CLOSED.
   status      String         @default("OPEN")
   isSample    Boolean        @default(false)
@@ -1354,3 +1367,16 @@ model MemberIntroduction {
   @@index([memberAId])
   @@index([memberBId])
 }
+
+/// Nov 6 Subcontractors: the sub's certificate of insurance. Seen by the member and Private Floor staff only.
+model InsuranceCertificate {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  bytes       Bytes
+  uploadedAt  DateTime @default(now())
+}
+

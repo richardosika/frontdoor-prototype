@@ -10,6 +10,8 @@ import { BlockButton, RemoveFromCircleButton, UnblockButton } from "@/components
 import { coverageSummary, type Coverage } from "@/lib/insurance";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { roleProfile } from "@/lib/role-profile";
+import { prisma } from "@/lib/prisma";
+import { parseTrades, tradeLabel } from "@/lib/trades";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { fixRoleTypos, formatProjectValue, projectLocation } from "@/lib/project-contact";
 
@@ -34,6 +36,11 @@ type Member = {
   insuranceInfo?: string;
   insuranceCoverage?: Coverage[];
   specialties?: string;
+  trades?: string;
+  metros?: string;
+  unionShop?: string;
+  prevailingWage?: string;
+  bondingCapacity?: string;
 };
 type PastProject = { id: string; name: string; asset: string; location: string; city: string; state: string; year: number; valueLabel: string; role: string; detailsVisible: boolean; reviewStatus: string };
 
@@ -67,8 +74,22 @@ export async function VendorProfile({
   const closed = blockedByViewer || blockedByThem;
   const type = tx(roleShort(roleLabel(member.role)));
   const rp = roleProfile(member.role);
+  // Nov 6 Subcontractors: trades in the viewer's language, metros, union / prevailing wage, bonding, COI on file.
+  const isSub = member.role === "SUBCONTRACTOR";
+  const coiOnFile = isSub ? Boolean(await prisma.insuranceCertificate.findUnique({ where: { userId: member.id }, select: { id: true } })) : false;
+  const yn = (v?: string) => (v === "yes" ? tx("Yes") : v === "no" ? tx("No") : "");
+  const subFacts = isSub
+    ? [
+        ["Metro areas served", member.metros ?? ""],
+        ["Union shop", yn(member.unionShop)],
+        ["Prevailing-wage work", yn(member.prevailingWage)],
+        ["Bonding capacity", member.bondingCapacity ?? ""],
+        ["Certificate of insurance", coiOnFile ? tx("On file") : ""],
+      ]
+    : [];
   const facts = [
-    [rp.specialties, member.specialties ?? ""],
+    [rp.specialties, isSub ? parseTrades(member.trades).map((t) => tx(tradeLabel(t))).join(", ") : member.specialties ?? ""],
+    ...subFacts,
     ["Markets", member.markets],
     ["Asset classes", member.assetClasses],
     ["Years in business", member.yearsInBusiness ?? ""],

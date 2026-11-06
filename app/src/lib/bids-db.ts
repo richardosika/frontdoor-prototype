@@ -1,6 +1,8 @@
 import type { BidField } from "@/lib/bid-templates";
 import { isVerifiedGc } from "@/lib/bid-plans";
 import { prisma } from "@/lib/prisma";
+import { isSubcontractor } from "@/lib/trades";
+import { openPackagesFor } from "@/lib/trades-db";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { allowedRecipients, canRequestBids, parseJson } from "@/lib/bids";
 import { coverageSummary, normalizeCoverage } from "@/lib/insurance";
@@ -45,9 +47,10 @@ export async function ensureBidTemplates() {
   }
 }
 
-export type BidMailKind = "request" | "submitted" | "shortlisted" | "awarded" | "notSelected" | "declined" | "question" | "answered";
+export type BidMailKind = "trade" | "request" | "submitted" | "shortlisted" | "awarded" | "notSelected" | "declined" | "question" | "answered";
 
 const COPY: Record<BidMailKind, { subject: string; body: string }> = {
+  trade: { subject: "New trade bid package: {trade} · {project}", body: "{name} posted a {trade} bid package on {project}. Bids are due {due}. It reached you because you list this trade and serve this area." },
   request: { subject: "New request for a proposal: {project}", body: "{name} asked you for a proposal on {project}. Proposals are due {due}. Only members already on this project can see this request." },
   submitted: { subject: "Proposal received: {project}", body: "{name} submitted a proposal on {project}. Open the comparison to review it side by side." },
   shortlisted: { subject: "You're on the shortlist: {project}", body: "{name} shortlisted your proposal on {project}. They may reach out with questions." },
@@ -81,9 +84,10 @@ export async function estimateCopy(to: { id: string; email: string; locale: stri
 const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 
 /** Alert + branded email (test mode: the Outbox delivers only to the test recipient). */
-export async function bidNotice(to: { id: string; email: string; locale: string }, kind: BidMailKind, vars: { name: string; project: string; due?: string }, href: string) {
+export async function bidNotice(to: { id: string; email: string; locale: string }, kind: BidMailKind, vars: { name: string; project: string; due?: string; trade?: string }, href: string) {
   const locale = isLocale(to.locale) ? to.locale : "en";
   const c = COPY[kind];
+  if (vars.trade) vars = { ...vars, trade: phrase(locale, vars.trade) };
   const subject = fill(phrase(locale, c.subject), vars as Record<string, string>);
   const body = fill(phrase(locale, c.body), vars as Record<string, string>);
   await notify(to.id, { title: subject, body, href });
@@ -119,7 +123,7 @@ export async function loadBidsHome(userId: string) {
     }),
   ]);
   // General-contractor requests are open to every verified GC.
-  const viewer = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true, paymentStatus: true } });
+  const viewer = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, status: true, paymentStatus: true, extraCategories: true, trades: true, markets: true, location: true } });
   const receivedIds = new Set(received.map((r) => r.request.id));
   const open = viewer && isVerifiedGc(viewer)
     ? (
@@ -136,9 +140,13 @@ export async function loadBidsHome(userId: string) {
         })
       ).filter((r) => !receivedIds.has(r.id))
     : [];
+  // Nov 6: trade bid packages open to this subcontractor (their trade, their area) that they were not sent directly.
+  const trade = viewer && viewer.status === "ACTIVE" && ["PAID", "WAIVED", "NOT_REQUIRED"].includes(viewer.paymentStatus) && isSubcontractor(viewer)
+    ? (await openPackagesFor(viewer)).filter((r) => !receivedIds.has(r.id))
+    : [];
   const toDo = received.filter((r) => !r.request.bids.length || r.request.bids[0].status === "DRAFT");
   const sent = received.filter((r) => r.request.bids.length && r.request.bids[0].status !== "DRAFT");
-  return { toDo, sent, requested, open };
+  return { toDo, sent, requested, open, trade };
 }
 
 export function parseQuestions(json: string): string[] {

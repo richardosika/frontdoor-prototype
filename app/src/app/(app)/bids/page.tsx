@@ -5,6 +5,7 @@ import { SampleTag, StatusPill, h2 } from "@/components/bids-ui";
 import { card } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { loadBidsHome } from "@/lib/bids-db";
+import { isGeneralContractor, isSubcontractor, tradeLabel } from "@/lib/trades";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,9 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
   const tx = await serverTx();
   const locale = await currentLocale();
   const q = await searchParams;
-  const { toDo, sent, requested, open } = await loadBidsHome(user.id);
+  const { toDo, sent, requested, open, trade } = await loadBidsHome(user.id);
+  const gc = isGeneralContractor(user);
+  const sub = isSubcontractor(user);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" });
   const row = "flex flex-wrap items-start justify-between gap-2 border-b border-line py-3 last:border-0";
   return (
@@ -32,7 +35,7 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
             <li key={r.id} className={row}>
               <Link href={`/bids/${r.request.id}`} className="min-w-0">
                 <span className="block font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{r.request.project.name}</span>
-                <span className="block text-[14px] text-mut">{r.request.requester.name} · {r.request.requester.org} · {tx(r.request.template.name)} · {tx("Due")} {date.format(r.request.dueAt)}</span>
+                <span className="block text-[14px] text-mut">{r.request.requester.name} · {r.request.requester.org} · {r.request.trade ? tx(tradeLabel(r.request.trade)) : tx(r.request.template.name)} · {tx("Due")} {date.format(r.request.dueAt)}</span>
               </Link>
               <span className="flex items-center gap-2">{r.request.isSample ? <SampleTag tx={tx} /> : null}<StatusPill status={r.request.status !== "OPEN" ? "CLOSED" : r.request.bids[0] ? "DRAFT" : "NEW"} tx={tx} /></span>
             </li>
@@ -55,6 +58,31 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {sub ? (
+        <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bids-trade-packages">
+          <h2 className={h2}>{tx("Trade bid packages for you")} · {trade.length}</h2>
+          <p className="mb-2 text-[14px] text-mut">{tx("General contractors' trade bid packages in your trades and the states you serve. Set your trades and states on your profile.")}</p>
+          {trade.length === 0 ? <p className="text-[15px] text-mut">{tx("No open trade bid packages for you right now.")}</p> : null}
+          <ul>
+            {trade.map((r) => (
+              <li key={r.id} className={row}>
+                <Link href={`/bids/${r.id}`} className="min-w-0">
+                  <span className="block font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{tx(tradeLabel(r.trade))} · {r.project.name}</span>
+                  <span className="block text-[14px] text-mut">{r.requester.name} · {r.requester.org} · {r.project.location} · {tx("Due")} {date.format(r.dueAt)}</span>
+                </Link>
+                <StatusPill status="NEW" tx={tx} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {gc ? (
+        <p className="mt-4 rounded border border-line bg-cream px-4 py-3 text-[15px] text-ink" data-testid="bids-gc-trade-hint">
+          {tx("Need subcontractors? Open a project you're on and choose Post a trade bid package. Only subs in that trade and area are matched.")}{" "}
+          <Link href="/suggest?category=SUBCONTRACTOR" className="font-semibold text-forest underline decoration-brass">{tx("Suggest a subcontractor")}</Link>
+        </p>
       ) : null}
 
       <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bids-sent">

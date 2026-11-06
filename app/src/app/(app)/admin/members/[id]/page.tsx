@@ -6,6 +6,7 @@ import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { DemoChip } from "@/components/status-chip";
 import { PaymentPanel } from "@/components/payment-admin";
+import { SubAdminPanel } from "@/components/sub-admin-panel";
 import { ConfirmSubmitButton } from "@/components/run-and-reload";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { btn, btnOutline, card } from "@/components/ui";
@@ -108,6 +109,7 @@ export default async function AdminMemberPage({
           refundNote={member.refundNote}
           back={`/admin/members/${member.id}`}
         />
+        <SubAdminPanel userId={member.id} />
         <section className={`${card} mt-4 p-4`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">Legal acceptances</h2>
           {member.legalAcceptances.length === 0 ? <p className="mt-2 text-sm text-mut">None recorded on this account.</p> : null}

@@ -1,4 +1,6 @@
 "use server";
+import { COI_MAX_BYTES, coiType, parseTrades, tradeLabel, yesNo } from "@/lib/trades";
+import { US_STATES } from "@/lib/member-network";
 import { coverageFromForm } from "@/lib/insurance";
 
 import { applyCategoryPicks } from "@/lib/category-review";
@@ -44,9 +46,36 @@ export async function saveProfile(formData: FormData) {
   const picks = formData.has("profileCategoriesShown")
     ? applyCategoryPicks({ role: user.role, approved: user.extraCategories, pending: user.pendingCategories, picked: formData.getAll("extraCategories").map(String) })
     : null;
+  // Nov 6 Subcontractors: trades, metros, union / prevailing wage, license, bonding, certificate of insurance.
+  let sub: Record<string, string> = {};
+  if (user.role === "SUBCONTRACTOR" && formData.has("subFieldsShown")) {
+    const trades = parseTrades(formData.getAll("trades").map(String));
+    const licenseState = String(formData.get("licenseState") || "").trim().toUpperCase().slice(0, 2);
+    const licenseNumber = String(formData.get("licenseNumber") || "").trim().slice(0, 80);
+    sub = {
+      trades: trades.join(","),
+      specialties: trades.map(tradeLabel).join(", "),
+      metros: String(formData.get("metros") || "").trim().slice(0, 300),
+      unionShop: yesNo(formData.get("unionShop")),
+      prevailingWage: yesNo(formData.get("prevailingWage")),
+      licenseState: (US_STATES as readonly string[]).includes(licenseState) ? licenseState : "",
+      licenseNumber,
+      bondingCapacity: String(formData.get("bondingCapacity") || "").trim().slice(0, 120),
+    };
+    sub.licenses = [sub.licenseState, licenseNumber].filter(Boolean).join(" ");
+    const coi = formData.get("coi");
+    if (coi instanceof File && coi.size > 0) {
+      if (coi.size > COI_MAX_BYTES) redirect(`/profile?error=${encodeURIComponent("Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG).")}`);
+      const bytes = new Uint8Array(await coi.arrayBuffer());
+      const contentType = coiType(bytes);
+      if (!contentType) redirect(`/profile?error=${encodeURIComponent("Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG).")}`);
+      const data = { fileName: coi.name.replace(/[^\w .()-]/g, "_").slice(0, 160) || "certificate-of-insurance", contentType, sizeBytes: bytes.byteLength, bytes: Buffer.from(bytes), uploadedAt: new Date() };
+      await prisma.insuranceCertificate.upsert({ where: { userId: user.id }, update: data, create: { ...data, userId: user.id } });
+    }
+  }
   await prisma.user.update({
     where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location },
+    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location, ...sub },
   });
   if (picks?.added.length) {
     await notifyAdmins({

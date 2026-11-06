@@ -1,6 +1,7 @@
 import { MEMBER_NDA_ERROR } from "@/lib/member-nda-copy";
 import { MEMBER_RISK_ERROR } from "@/lib/member-risk";
 import { isRoleId, roleById, type RoleId } from "@/lib/roles";
+import { TRADES } from "@/lib/trades";
 
 /** Order of the join drop-down, matching the public Who it's for page. */
 const JOIN_ORDER: RoleId[] = [
@@ -119,6 +120,8 @@ export function showsProjects(role: string): boolean {
 }
 
 export function showsStateList(role: string): boolean {
+  // Nov 6: subcontractors list the states they are licensed in and work in, with the license number.
+  if (role === "SUBCONTRACTOR") return true;
   const kind = pageKind(role);
   return kind === "gc" || kind === "licensed" || kind === "attorney";
 }
@@ -197,6 +200,8 @@ export const COVERAGE_TYPES = [
 ];
 
 export const ROLE_SPECIALTIES: Partial<Record<RoleId, { label: string; options: string[] }>> = {
+  // Nov 6: subcontractors pick their trades on the join form (same list as the profile).
+  SUBCONTRACTOR: { label: "Trades", options: TRADES.map((t) => t.label) },
   MORTGAGE_BROKER: {
     label: "Loan focus",
     options: ["Residential purchase", "Refinance", "Construction", "Bridge", "DSCR / rental", "Commercial", "SBA", "Other"],
@@ -410,7 +415,7 @@ export function pageTwoErrors(profile: JoinProfile): string[] {
   if (kind === "investor" && profile.investorTypes.length < 1) errors.push("Pick at least one investor type.");
   if (profile.role === "INSURANCE" && profile.coverageTypes.length < 1) errors.push("Pick at least one coverage type.");
   const specialty = ROLE_SPECIALTIES[profile.role as RoleId];
-  if (specialty && profile.specialties.length < 1) errors.push(`Pick at least one ${specialty.label.toLowerCase()} option.`);
+  if (specialty && profile.specialties.length < 1) errors.push(profile.role === "SUBCONTRACTOR" ? "Pick at least one trade." : `Pick at least one ${specialty.label.toLowerCase()} option.`);
   return errors;
 }
 

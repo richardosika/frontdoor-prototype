@@ -1,7 +1,7 @@
 import { factScore } from "@/lib/project-facts";
 import { LISTED_PAYMENT_STATUSES } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
-import { categoryMemberWhere, memberCategories, memberInCategory, parseSeeking } from "@/lib/project-contact";
+import { categoryMemberWhere, interestCategories, memberCategories, memberInCategory, parseSeeking } from "@/lib/project-contact";
 import { circleIds } from "@/lib/project-contact-db";
 import type { MemberRole } from "@prisma/client";
 import { matchesSlimFilters, type SlimFilters } from "@/lib/member-reach";
@@ -79,7 +79,9 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   }));
 
   // #42: the category of mine each project seeks (first match in my order), so multi-category members see every match.
-  const matchOf = (project: { seeking: string }) => myCategories.find((id) => parseSeeking(project.seeking).includes(id)) ?? null;
+  // Nov 6: subcontractors also see developer projects seeking a General Contractor (interest only, no full GC bid).
+  const interestCats = interestCategories(user);
+  const matchOf = (project: { seeking: string }) => myCategories.find((id) => parseSeeking(project.seeking).includes(id)) ?? interestCats.find((id) => parseSeeking(project.seeking).includes(id)) ?? null;
   const seekingMe = myCategories.length
     ? others
         // #44: only developer projects seek people; a non-developer's past work never matches.

@@ -1,5 +1,6 @@
 import { SubmitButton } from "@/components/submit-button";
 import { saveProfile } from "@/actions/profile";
+import { SubProfileFields } from "@/components/sub-profile-fields";
 import { sortByShownLabel } from "@/lib/category-sort";
 import { MoneyInput } from "@/components/money-input";
 import { INSURANCE_TYPES, normalizeCoverage } from "@/lib/insurance";
@@ -24,6 +25,7 @@ export async function ProfileEditor({
   member,
 }: {
   member: {
+    id?: string;
     bio: string;
     website: string;
     location: string;
@@ -139,6 +141,7 @@ export async function ProfileEditor({
           })}
         </div>
       </fieldset>
+      {member.role === "SUBCONTRACTOR" && member.id ? <SubProfileFields userId={member.id} /> : null}
       {member.role !== "DEVELOPER" ? (
         <label data-testid="profile-services">
           <span className={labelCls}>{phrase(locale, "About my services")}</span>
@@ -156,15 +159,15 @@ export async function ProfileEditor({
             <span className={labelCls}>{phrase(locale, rp.size)}</span>
             <input name="typicalJobSize" defaultValue={member.typicalJobSize ?? ""} maxLength={80} className={field} placeholder={phrase(locale, rp.sizeHint)} />
           </label>
-          <label className="sm:col-span-2">
+          {member.role === "SUBCONTRACTOR" ? null : <label className="sm:col-span-2">
             <span className={labelCls}>{phrase(locale, rp.specialties)}</span>
             <input name="specialties" defaultValue={member.specialties ?? ""} maxLength={300} className={field} placeholder={rp.specialtiesHint ? phrase(locale, rp.specialtiesHint) : undefined} />
-          </label>
-          <label className="sm:col-span-2" data-testid="profile-credential">
+          </label>}
+          {member.role === "SUBCONTRACTOR" ? null : <label className="sm:col-span-2" data-testid="profile-credential">
             <span className={labelCls}>{phrase(locale, rp.credential)}{rp.credentialRequired ? " *" : ""}</span>
             <textarea name="licenses" defaultValue={member.licenses ?? ""} rows={2} maxLength={400} className={field} placeholder={rp.credentialHint ? phrase(locale, rp.credentialHint) : undefined} />
             {rp.credentialRequired ? <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Needed to finish Getting started. Staff check it against public records.")}</span> : null}
-          </label>
+          </label>}
           <fieldset className="sm:col-span-2" data-testid="profile-insurance">
             <legend className={labelCls}>{phrase(locale, "Insurance")}</legend>
             <p className="mb-3 font-sans text-[14px] text-mut">{phrase(locale, "Check each coverage you carry and add the limit. Optional. Shown on your profile to developers.")}</p>
