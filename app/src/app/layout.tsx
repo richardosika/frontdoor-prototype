@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // The help chat remounts (blank) whenever the signed-in person changes.
   const viewer = (await auth().catch(() => null))?.user?.id ?? "guest";
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className={`${sans.variable} ${serif.variable} bg-cream font-sans text-forest antialiased`}>
         {children}
         <LocaleProvider locale={locale}>

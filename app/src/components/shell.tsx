@@ -12,36 +12,13 @@ import { DecisionDialogHost } from "@/components/decision-dialog-host";
 import { Logo } from "@/components/logo";
 import { LocaleProvider } from "@/components/locale-context";
 import { tierLabel } from "@/lib/format";
-import { setLanguage } from "@/actions/language";
+import { LanguagePicker } from "@/components/language-picker";
 import { phrase } from "@/lib/i18n/phrases";
 import { LOCALES, translator, type Locale } from "@/lib/i18n/messages";
 import { memberNav } from "@/lib/member-reach";
 import { roleLabel, roleShort } from "@/lib/roles";
 
-const ICONS: Record<string, string> = { "/feed": "⌂", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺" };
-
-function LanguagePicker({ locale, label }: { locale: Locale; label: string }) {
-  return (
-    <form action={setLanguage} className="border-t border-line px-3 py-2" data-testid="language-picker">
-      <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.16em] text-mut">{label}</p>
-      <div className="grid grid-cols-2 gap-1">
-        {LOCALES.map((item) => (
-          <SubmitButton
-            key={item.id}
-            name="locale"
-            value={item.id}
-           
-            lang={item.id}
-            aria-pressed={item.id === locale}
-            className={`min-h-9 rounded-sm border px-2 text-left font-sans text-[13px] ${item.id === locale ? "border-brass bg-forest text-paper" : "border-line bg-paper text-forest hover:bg-cream"}`}
-          >
-            {item.label}
-          </SubmitButton>
-        ))}
-      </div>
-    </form>
-  );
-}
+const ICONS: Record<string, string> = { "/feed": "⌂", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺", "/bids": "▤" };
 
 function active(pathname: string, href: string) {
   if (href === "/feed") return pathname.startsWith("/feed");
@@ -272,7 +249,7 @@ export function Shell({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper px-1 pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom,0px))] md:hidden">
-        {TABS.map((tab) => {
+        {TABS.filter((tab) => !tab.sidebarOnly).map((tab) => {
           const on = active(pathname, tab.href);
           return (
             <Link
@@ -310,6 +287,11 @@ export function Shell({
             <Link href="/settings" className="mt-3 flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {t("menu.settings")}
             </Link>
+            {TABS.filter((tab) => tab.sidebarOnly).map((tab) => (
+              <Link key={tab.href} href={tab.href} data-testid={`menu-${tab.test}`} className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
+                {tab.text}
+              </Link>
+            ))}
             <Link href="/alerts" className="flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {t("nav.alerts")}
               {alerts > 0 ? <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{alerts}</span> : null}
