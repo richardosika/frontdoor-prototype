@@ -1,3 +1,5 @@
+import { startLocked } from "@/lib/start-gate";
+import { StartLocked } from "@/components/start-locked";
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { ProjectFacts } from "@/components/project-facts";
@@ -40,6 +42,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const notice = typeof params.notice === "string" ? params.notice : undefined;
   if (isDeveloperRole(user.role)) return <FindYourTeam user={user} error={error} notice={notice} />;
 
+  if (await startLocked(user)) {
+    return (
+      <div className="mx-auto max-w-[980px] px-4 pb-8 pt-3 md:pt-6 lg:px-8" data-testid="opportunities">
+        <PageHeader title={tx("Opportunities for you")} />
+        <StartLocked />
+      </div>
+    );
+  }
   const filters = readSlimFilters(params);
   const data = await loadLedgerProjects(user, { filters, limit: 200 });
   const active = Boolean(filters.asset || filters.state || filters.size);
@@ -193,7 +203,7 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
       ))}
       <section id="my-circle" className="mt-8 scroll-mt-20">
         <h2 className="mb-3 font-serif text-[26px]">{tx("My Circle")}</h2>
-        <MyCircleList people={circle} />
+        <MyCircleList people={circle} back="/deals#my-circle" />
         <RecommendedConnections user={user} />
         <IntroduceMembers people={circle.map((p) => ({ id: p.id, name: p.name, org: p.org }))} />
       </section>

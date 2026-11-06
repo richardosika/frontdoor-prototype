@@ -64,7 +64,8 @@ export async function alertProjectSeekers(projectId: string, onlyCategories?: st
   if (!categories.length) return 0;
   const people = (
     await prisma.user.findMany({
-      where: { id: { not: project.userId }, status: "ACTIVE", ...NOT_STAFF_WHERE, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, ...(categoryMemberWhere(categories) as object) },
+      // Nov 5: members the owner blocked are not alerted about the owner's projects.
+      where: { id: { not: project.userId }, status: "ACTIVE", ...NOT_STAFF_WHERE, paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, blocksReceived: { none: { blockerId: project.userId } }, ...(categoryMemberWhere(categories) as object) },
       select: { id: true, email: true, locale: true, notifyMatches: true, role: true, extraCategories: true },
     })
   ).filter((person) => categories.some((id) => memberInCategory(person, id)));

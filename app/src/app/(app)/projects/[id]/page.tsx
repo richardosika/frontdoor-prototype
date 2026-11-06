@@ -56,6 +56,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     },
   });
   if (!project || (project.user.status !== "ACTIVE" && !viewer.isAdmin)) return <ProjectNotAvailable tx={tx} />;
+  // Nov 5: a member the owner blocked does not see the owner's projects.
+  if (!viewer.isAdmin && project.userId !== viewer.id && (await prisma.block.count({ where: { blockerId: project.userId, blockedId: viewer.id } }))) return <ProjectNotAvailable tx={tx} />;
   const ownerCircle = await circleIds(project.userId);
   const view = projectPageView(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle: ownerCircle.has(viewer.id), role: viewer.role, extraCategories: viewer.extraCategories });
   // #25: not sought and not in the owner's circle: nothing about the project is shown.
@@ -170,8 +172,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <ProjectBids projectId={project.id} viewerId={viewer.id} tx={tx} />
       ) : null}
 
+      {/* Nov 5: members other than developers see no "looking for" list; once they have contacted, the section is gone. */}
+      {!isOwner && !viewer.isAdmin && viewer.role !== "DEVELOPER" && myContact ? null : (
       <section className={box} data-testid="project-seeking">
-        <h2 className={h2}>{isOwner ? tx("What you're looking for") : tx("What this project is looking for")}</h2>
+        <h2 className={h2}>{isOwner ? tx("What you're looking for") : viewer.role === "DEVELOPER" || viewer.isAdmin ? tx("What this project is looking for") : tx("Contact about this project")}</h2>
         {isOwner ? (
           <form action={updateProjectSeeking} className="grid gap-3">
             <input type="hidden" name="projectId" value={project.id} />
@@ -188,13 +192,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </form>
         ) : (
           <>
-            <ul className="flex flex-wrap gap-2">
+            {viewer.role === "DEVELOPER" || viewer.isAdmin ? <ul className="flex flex-wrap gap-2">
               {seeking.map((cat) => (
                 <li key={cat} className={`rounded-sm border px-3 py-1.5 text-[15px] ${cat === myCategory ? "border-forest bg-forest text-paper" : "border-brass/60 bg-cream text-forest"}`}>
                   {tx(seekLabel(cat))}
                 </li>
               ))}
-            </ul>
+            </ul> : null}
             <div className="mt-4" data-testid="project-contact-area">
               {myContact ? (
                 <p className="text-[15px] text-ink">{tx("Contact request")}: <b>{tx(statusLabel(myContact.status))}</b></p>
@@ -212,6 +216,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </>
         )}
       </section>
+      )}
 
       {isOwner ? (
         <section className={box} data-testid="project-interest">

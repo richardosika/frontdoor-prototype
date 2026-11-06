@@ -1,7 +1,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import { MoneyInput } from "@/components/money-input";
 import Link from "next/link";
-import { decideBid, saveBid } from "@/actions/bids";
+import { answerBidQuestion, askBidQuestion, decideBid, saveBid } from "@/actions/bids";
 import { Banner } from "@/components/banner";
 import { SECTIONS, SampleTag, StatusPill, h2, money, showValue } from "@/components/bids-ui";
 import { btn, btnGhost, btnOutline, card, field, labelCls } from "@/components/ui";
@@ -146,6 +146,7 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
         <StatusPill status={req.status} tx={tx} />
       </p>
       {questions.length ? <p className="mt-2 text-[14px] text-ink">{questions.map((qq, i) => `Q${i + 1} · ${qq}`).join("  ·  ")}</p> : null}
+      <ScopeSchedule req={req} tx={tx} />
       {bids.length === 0 ? <section className={`${card} mt-4 p-5 text-[15px] text-mut`}>{tx("No proposals yet. You'll get an alert and an email as each one arrives.")}</section> : null}
       {bids.length ? (
         <>
@@ -203,13 +204,14 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
           <p className="mt-3 text-[13px] text-mut">{tx("Each proposal is private between you and that bidder. Award moves the project to Active for the winner; the others get a polite note.")}</p>
         </>
       ) : null}
+      <BidQA requestId={req.id} viewerId="" isRequester={!readOnly} readOnly={readOnly} tx={tx} locale={locale} />
     </div>
   );
 }
 
 async function BidForm({ req, fields, questions, userId, tx, locale, due, head }: { req: Req; fields: BidField[]; questions: string[]; userId: string; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
   const [bid, me] = await Promise.all([
-    prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true } }),
+    prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true, submittedAt: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { insuranceCoverage: true, insuranceInfo: true, credentialNote: true } }),
   ]);
   const values = parseJson<Record<string, unknown>>(bid?.values ?? "{}", {});
@@ -246,6 +248,8 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
         {bid ? <StatusPill status={bid.status} tx={tx} /> : null}
       </p>
       {req.units || req.squareFeet || req.basisNote ? <p className="mt-2 text-[14px] text-ink">{tx("Project basis")}: {[req.basisNote, req.units ? `${req.units} ${tx("units")}` : "", req.squareFeet ? `${req.squareFeet.toLocaleString("en-US")} ${tx("gross SF")}` : ""].filter(Boolean).join(" · ")}</p> : null}
+      <ScopeSchedule req={req} tx={tx} />
+      {bid && bid.status !== "DRAFT" ? <EstimateCopy fields={fields} values={values} submittedAt={bid.submittedAt} tx={tx} locale={locale} /> : null}
       {!editable ? <p className="mt-3 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]">{tx(bid && bid.status !== "DRAFT" && bid.status !== "SUBMITTED" ? "The requester has made a decision on your proposal." : "This request is closed for changes.")}</p> : null}
       <form action={saveBid} className="mt-4">
         <input type="hidden" name="requestId" value={req.id} />
@@ -266,17 +270,7 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
             </section>
           );
         })}
-        {questions.length ? (
-          <section className={`${card} mb-4 p-4 sm:p-5`}>
-            <h2 className={h2}>{tx("Questions from the requester")}</h2>
-            {questions.map((qq, i) => (
-              <label key={i} className="mb-3 block">
-                <span className="mb-1 block text-[15px] font-semibold text-forest">Q{i + 1} · {qq} *</span>
-                <textarea name={`a${i + 1}`} defaultValue={answers[i] ?? ""} maxLength={500} rows={2} disabled={!editable} className={field} />
-              </label>
-            ))}
-          </section>
-        ) : null}
+        {/* Nov 5: the requester's custom questions are no longer asked here; use Questions and answers below. */}
         <section className={`${card} mb-4 p-4 sm:p-5`}>
           <h2 className={h2}>{tx("Attach your full bid (PDF, optional)")}</h2>
           {bid?.pdfName ? (
@@ -295,8 +289,93 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
           </div>
         ) : null}
       </form>
+      <BidQA requestId={req.id} viewerId={userId} isRequester={false} readOnly={false} tx={tx} locale={locale} />
     </div>
   );
 }
 
 
+
+/** Nov 5: scope of work and schedule set by the requester, shown to everyone on the request. */
+function ScopeSchedule({ req, tx }: { req: { scopeOfWork: string; schedule: string }; tx: Tx }) {
+  if (!req.scopeOfWork && !req.schedule) return null;
+  return (
+    <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bid-scope">
+      {req.scopeOfWork ? (
+        <>
+          <h2 className={h2}>{tx("Scope of work")}</h2>
+          <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink [overflow-wrap:anywhere]">{req.scopeOfWork}</p>
+        </>
+      ) : null}
+      {req.schedule ? (
+        <>
+          <h2 className={`${h2} ${req.scopeOfWork ? "mt-4" : ""}`}>{tx("Schedule")}</h2>
+          <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink [overflow-wrap:anywhere]">{req.schedule}</p>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+/** Nov 5: questions from a bidder (e.g. a general contractor) to the developer, and the answers. */
+async function BidQA({ requestId, viewerId, isRequester, readOnly, tx, locale }: { requestId: string; viewerId: string; isRequester: boolean; readOnly: boolean; tx: Tx; locale: string }) {
+  const rows = await prisma.bidQuestion.findMany({ where: { requestId, ...(isRequester || readOnly ? {} : { askerId: viewerId }) }, orderBy: { createdAt: "asc" } });
+  const askers = isRequester || readOnly ? await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.askerId))] } }, select: { id: true, name: true, org: true } }) : [];
+  const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" });
+  return (
+    <section id="bid-qa" className={`${card} mt-4 scroll-mt-20 p-4 sm:p-5`} data-testid="bid-qa">
+      <h2 className={h2}>{tx("Questions and answers")}</h2>
+      <p className="mb-3 text-[14px] text-mut">{isRequester ? tx("Bidders' questions to you. Each answer goes only to the bidder who asked.") : tx("Ask the developer about the scope, schedule or plans. Only you and the developer see your questions.")}</p>
+      {rows.length === 0 ? <p className="text-[15px] text-mut">{tx("No questions yet.")}</p> : null}
+      <ul className="grid gap-3">
+        {rows.map((r) => {
+          const who = askers.find((a) => a.id === r.askerId);
+          return (
+            <li key={r.id} className="rounded border border-line bg-paper p-3" data-testid="bid-qa-item">
+              <p className="text-[13px] text-mut">{who ? `${who.name}${who.org ? ` · ${who.org}` : ""} · ` : ""}{fmt.format(r.createdAt)}</p>
+              <p className="mt-1 whitespace-pre-line text-[15px] font-semibold text-forest [overflow-wrap:anywhere]">{r.question}</p>
+              {r.answer ? (
+                <p className="mt-2 whitespace-pre-line border-l-2 border-brass pl-3 text-[15px] text-ink [overflow-wrap:anywhere]"><b>{tx("Answer")}:</b> {r.answer}</p>
+              ) : isRequester && !readOnly ? (
+                <form action={answerBidQuestion} className="mt-2 grid gap-2">
+                  <input type="hidden" name="questionId" value={r.id} />
+                  <textarea name="answer" required maxLength={2000} rows={2} className={field} placeholder={tx("Your answer")} />
+                  <SubmitButton className={`${btn} justify-self-start`} pendingLabel="Sending…" data-testid="bid-qa-answer">{tx("Send answer")}</SubmitButton>
+                </form>
+              ) : (
+                <p className="mt-2 text-[14px] italic text-mut">{tx("Waiting for an answer")}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {!isRequester && !readOnly ? (
+        <form action={askBidQuestion} className="mt-3 grid gap-2">
+          <input type="hidden" name="requestId" value={requestId} />
+          <textarea name="question" required minLength={3} maxLength={1000} rows={3} className={field} placeholder={tx("Your question for the developer")} />
+          <SubmitButton className={`${btnOutline} justify-self-start`} pendingLabel="Sending…" data-testid="bid-qa-ask">{tx("Ask the developer")}</SubmitButton>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
+/** Nov 5: once submitted, the bidder sees a copy of the estimate they sent. */
+function EstimateCopy({ fields, values, submittedAt, tx, locale }: { fields: BidField[]; values: Record<string, unknown>; submittedAt: Date | null; tx: Tx; locale: string }) {
+  const rows = fields.filter((f) => f.type !== "profile").map((f) => ({ f, text: showValue(f, values[f.key], locale, tx) })).filter((r) => r.text);
+  return (
+    <section className={`${card} mt-4 border-brass p-4 sm:p-5`} data-testid="bid-estimate-copy">
+      <h2 className={h2}>{tx("Copy of your submitted estimate")}</h2>
+      {submittedAt ? <p className="mb-2 text-[13px] text-mut">{tx("Submitted")} {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(submittedAt)} ET</p> : null}
+      <dl className="grid gap-x-6 sm:grid-cols-2">
+        {rows.map(({ f, text }) => (
+          <div key={f.key} className="flex justify-between gap-3 border-b border-line py-1.5 text-[14px]">
+            <dt className="text-mut">{tx(f.label)}</dt>
+            <dd className="text-right text-forest [overflow-wrap:anywhere]">{text}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[13px] text-mut">{tx("We also emailed you this copy.")}</p>
+    </section>
+  );
+}

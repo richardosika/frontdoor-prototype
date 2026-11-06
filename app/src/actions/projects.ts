@@ -257,6 +257,27 @@ export async function respondProjectContact(formData: FormData) {
     body: `${user.name}: ${contact.project.name}`,
     href: "/feed",
   });
+  // Nov 5: email the member the developer's decision (branded layout; test mode delivers to the test recipient).
+  {
+    const { phrase } = await import("@/lib/i18n/phrases");
+    const locale = isLocale(contact.from.locale) ? contact.from.locale : "en";
+    const p = (text: string) => phrase(locale, text);
+    const fill = (text: string) => text.replace("{name}", user.name).replace("{project}", contact.project.name);
+    const accepted = decision === "ACCEPTED";
+    const base = await appBaseUrl();
+    await sendEmail({
+      to: contact.from.email,
+      subject: fill(p(accepted ? "{name} accepted your interest in {project}" : "Update on your interest in {project}")),
+      text: [
+        fill(p(accepted
+          ? "Good news. {name} accepted your interest in {project}. You are now connected: the project details are open to you and you can message {name} inside Private Floor."
+          : "Thank you for your interest in {project}. {name} will not be moving forward with your request this time. New projects seeking your category will keep appearing in Opportunities.")),
+        "",
+        p(accepted ? "Open the project" : "See your opportunities"),
+        accepted ? `${base}/projects/${contact.project.id}` : `${base}/deals`,
+      ].join("\n"),
+    }).catch(() => null);
+  }
   if (decision === "ACCEPTED") {
     const sent = await deliverPortalMessage({
       from: contact.from,

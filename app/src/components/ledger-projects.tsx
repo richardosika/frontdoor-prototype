@@ -27,7 +27,7 @@ function statusWord(status: string) {
   return "Pending";
 }
 
-export async function LedgerProjects({ data, role, filters, myWork, results }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null }) {
+export async function LedgerProjects({ data, role, filters, myWork, results, dismissAction }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null; dismissAction?: (formData: FormData) => Promise<void> }) {
   const developer = isDeveloperRole(role);
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -284,7 +284,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
   const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
   const work = myWork ? (
     <section id="ledger-my-work" className={`${box} scroll-mt-20`} data-testid="ledger-my-work" key="work">
-      <h2 className={h2}>{tx("My work right now")}</h2>
+      <h2 className={h2}>{tx("Active Pipeline")}</h2>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="min-w-0" data-testid="my-work-active">
           <p className="text-[15px] font-semibold text-forest">{tx("Active")} <span className="text-mut">({myWork.active.length})</span></p>
@@ -386,8 +386,16 @@ export async function LedgerProjects({ data, role, filters, myWork, results }: {
           const isNew = now - at <= 7 * 86400000;
           const soon = closes >= 0 && closes <= 14 * 86400000;
           return (
-            <li key={project.id} className="flex min-w-0 flex-col rounded border border-line border-t-[4px] border-t-brass bg-paper p-4 md:p-5" data-testid="opportunity-card">
-              <div className="flex flex-wrap gap-2">
+            <li key={project.id} className="relative flex min-w-0 flex-col rounded border border-line border-t-[4px] border-t-brass bg-paper p-4 md:p-5" data-testid="opportunity-card">
+              {dismissAction ? (
+                <form action={dismissAction} className="absolute right-1 top-1">
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <SubmitButton aria-label={tx("Not interested: remove from my Ledger")} title={tx("Not interested: remove from my Ledger")} className="grid h-11 w-11 place-items-center rounded-full text-[22px] leading-none text-mut hover:bg-cream hover:text-forest" pendingLabel="…" data-testid="opportunity-dismiss">
+                    ×
+                  </SubmitButton>
+                </form>
+              ) : null}
+              <div className="flex flex-wrap gap-2 pr-10">
                 {isNew ? <span className="rounded-full bg-brass px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-paper" data-testid="tag-new">{tx("New")}</span> : null}
                 {soon ? <span className="rounded-full bg-[#A2412C] px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white" data-testid="tag-closes-soon">{tx("Closes soon")}</span> : null}
                 {project.matchedCategory ? <span className="rounded-full border border-brass px-2.5 py-0.5 text-[12px] text-forest">{tx(seekLabel(project.matchedCategory))}</span> : null}

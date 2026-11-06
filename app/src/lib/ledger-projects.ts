@@ -7,12 +7,15 @@ import type { MemberRole } from "@prisma/client";
 import { matchesSlimFilters, type SlimFilters } from "@/lib/member-reach";
 
 /** Everything the role-aware top of the Ledger needs: my projects, who they seek, outreach, and projects seeking me. */
-export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number } = {}) {
+export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number; hideDismissed?: boolean } = {}) {
   const limit = options.limit ?? 6;
   const keep = (project: { asset: string; state: string; location: string; valueLabel: string }) => !options.filters || matchesSlimFilters(project, options.filters);
   const myCategories = memberCategories(user);
   const myCategory = myCategories[0] ?? null;
   const circle = await circleIds(user.id);
+  const dismissed = options.hideDismissed
+    ? new Set((await prisma.ledgerDismissal.findMany({ where: { userId: user.id }, select: { projectId: true } })).map((row) => row.projectId))
+    : new Set<string>();
   const [mine, sent, received, others] = await Promise.all([
     prisma.trackProject.findMany({ where: { userId: user.id }, orderBy: [{ submittedAt: "desc" }] }),
     prisma.projectContact.findMany({
@@ -34,7 +37,8 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
       where: {
         userId: { not: user.id },
         reviewStatus: "APPROVED",
-        user: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] } },
+        // Nov 5: a member blocked by the owner does not see the owner's projects.
+        user: { status: "ACTIVE", paymentStatus: { in: [...LISTED_PAYMENT_STATUSES] }, blocksMade: { none: { blockedId: user.id } } },
       },
       include: { user: { select: { id: true, name: true, org: true, role: true, location: true } } },
       orderBy: { submittedAt: "desc" },
@@ -78,7 +82,7 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   const seekingMe = myCategories.length
     ? others
         // #44: only developer projects seek people; a non-developer's past work never matches.
-        .filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && keep(project))
+        .filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && keep(project) && !dismissed.has(project.id))
         // Overnight: projects that give this member type the facts it needs come first, then newest.
         .sort((a, b) => factScore(matchOf(b)!, b) - factScore(matchOf(a)!, a))
         .slice(0, limit)
@@ -182,6 +186,9 @@ export async function loadMyCircle(user: { id: string }) {
   };
   for (const row of contacts) add(row.fromId === user.id ? row.toId : row.fromId).set(row.project.id, row.project.name);
   for (const row of connections) add(row.fromId === user.id ? row.toId : row.fromId);
+  // Nov 5: people this member removed from My Circle (without blocking) stay out of it.
+  const removed = await prisma.circleRemoval.findMany({ where: { userId: user.id }, select: { removedId: true } });
+  for (const row of removed) shared.delete(row.removedId);
   const ids = [...shared.keys()];
   if (ids.length === 0) return [];
   const people = await prisma.user.findMany({

@@ -5,7 +5,8 @@ import { ProfilePhotos } from "@/components/profile-photos";
 import { ReportDialog } from "@/components/report-dialog";
 import { ReachOut, StatusPill, type ReachProject } from "@/components/reach-out";
 import { btnOutline } from "@/components/ui";
-import { blockMember, openConversation, unblockMember } from "@/actions/social";
+import { openConversation } from "@/actions/social";
+import { BlockButton, UnblockButton } from "@/components/block-controls";
 import { coverageSummary, type Coverage } from "@/lib/insurance";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { roleProfile } from "@/lib/role-profile";
@@ -86,15 +87,9 @@ export async function VendorProfile({
           </summary>
           <div className="absolute right-0 mt-2 grid w-64 gap-2 rounded border border-line bg-paper p-3 shadow-lg">
             {blockedByViewer ? (
-              <form action={unblockMember}>
-                <input type="hidden" name="userId" value={member.id} />
-                <SubmitButton className={`${btnOutline} w-full`}>{tx("Unblock")}</SubmitButton>
-              </form>
+              <UnblockButton userId={member.id} className={`${btnOutline} w-full`} />
             ) : (
-              <form action={blockMember}>
-                <input type="hidden" name="userId" value={member.id} />
-                <SubmitButton className={`${btnOutline} w-full`}>{tx("Block")}</SubmitButton>
-              </form>
+              <BlockButton userId={member.id} className={`${btnOutline} w-full`} />
             )}
             <ReportDialog userId={member.id} label={tx("Report")} />
           </div>

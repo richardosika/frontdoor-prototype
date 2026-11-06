@@ -8,7 +8,8 @@ import { CopyLink } from "@/components/copy-link";
 import { btn, btnOutline, field, labelCls } from "@/components/ui";
 import { requestConfirmation } from "@/actions/profile";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
-import { blockMember, openConversation, respondIntroduction, unblockMember } from "@/actions/social";
+import { openConversation, respondIntroduction } from "@/actions/social";
+import { BlockButton, UnblockButton } from "@/components/block-controls";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ReportDialog } from "@/components/report-dialog";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -223,12 +224,7 @@ export async function ProfileView({
           <div className="mt-4 rounded border border-line bg-cream px-3 py-3 text-sm text-ink">
             {tx("Messaging is closed between these members.")}
             {blockedByViewer ? (
-              <form action={unblockMember} className="mt-2">
-                <input type="hidden" name="userId" value={member.id} />
-                <SubmitButton className={btnOutline}>
-                  {tx("Unblock")}
-                </SubmitButton>
-              </form>
+              <div className="mt-2"><UnblockButton userId={member.id} /></div>
             ) : null}
           </div>
         ) : (
@@ -263,12 +259,7 @@ export async function ProfileView({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <form action={blockMember}>
-                <input type="hidden" name="userId" value={member.id} />
-                <SubmitButton className={btnOutline}>
-                  {tx("Block")}
-                </SubmitButton>
-              </form>
+              <BlockButton userId={member.id} />
             </div>
             <ReportDialog userId={member.id} label={tx("Report")} />
           </div>

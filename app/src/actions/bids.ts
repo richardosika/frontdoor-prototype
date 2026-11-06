@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin, requireUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { BID_PDF_MAX, canDecide, canEditBid, cleanQuestions, isPdf, missingFields, parseFields, readBidValues, ANSWER_MAX } from "@/lib/bids";
-import { bidAccess, bidNotice, parseQuestions } from "@/lib/bids-db";
+import { bidAccess, bidNotice, estimateCopy, parseQuestions } from "@/lib/bids-db";
 import type { BidField } from "@/lib/bid-templates";
 import { PLAN_MAX_BYTES, PLAN_MAX_FILES, canOpenRequest, isOpenToGcs, planType, safePlanName } from "@/lib/bid-plans";
 
@@ -44,6 +44,10 @@ export async function createBidRequest(formData: FormData) {
     plans.push({ fileName: safePlanName(file.name), contentType, sizeBytes: file.size, bytes });
   }
   const questions = cleanQuestions(formData.getAll("question"));
+  const scopeOfWork = String(formData.get("scopeOfWork") || "").trim().slice(0, 4000);
+  const schedule = String(formData.get("schedule") || "").trim().slice(0, 2000);
+  if (scopeOfWork.length < 10) go(back, "error", "Describe the scope of work.");
+  if (schedule.length < 3) go(back, "error", "Add the schedule.");
   const int = (k: string) => {
     const n = Number(String(formData.get(k) || "").replace(/[,\s]/g, ""));
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
@@ -59,6 +63,8 @@ export async function createBidRequest(formData: FormData) {
       units: int("units"),
       squareFeet: int("squareFeet"),
       basisNote: String(formData.get("basisNote") || "").trim().slice(0, 300),
+      scopeOfWork,
+      schedule,
       recipients: { create: recipients.map((memberId) => ({ memberId })) },
       plans: { create: plans },
     },
@@ -116,7 +122,8 @@ export async function saveBid(formData: FormData) {
     Object.assign(pdf, { pdfName: file.name.replace(/[^\w .()-]/g, "_").slice(0, 160) || "bid.pdf", pdfSize: file.size, pdfBytes: bytes });
   }
   if (submit) {
-    const missing = missingFields(fields, values, questions, answers);
+    // Nov 5: requester questions are no longer shown to bidders, so they are not required.
+    const missing = missingFields(fields, values, [], []);
     if (missing.length) {
       await prisma.bid.upsert({
         where: { requestId_bidderId: { requestId, bidderId: user.id } },
@@ -133,7 +140,11 @@ export async function saveBid(formData: FormData) {
     update: { values: JSON.stringify(values), answers: JSON.stringify(answers), status, ...(submit ? { submittedAt: new Date() } : {}), ...pdf },
     create: { requestId, bidderId: user.id, values: JSON.stringify(values), answers: JSON.stringify(answers), status, ...(submit ? { submittedAt: new Date() } : {}), ...pdf },
   });
-  if (submit) await bidNotice(req.requester, "submitted", { name: user.name, project: req.project.name }, `/bids/${requestId}`);
+  if (submit) {
+    await bidNotice(req.requester, "submitted", { name: user.name, project: req.project.name }, `/bids/${requestId}`);
+    // Nov 5: the bidder gets a copy of the estimate they submitted.
+    await estimateCopy({ id: user.id, email: user.email, locale: user.locale, name: user.name }, req.project.name, fields, values, `/bids/${requestId}`).catch(() => null);
+  }
   refresh();
   go(back, "notice", submit ? "Proposal submitted." : "Draft saved.");
 }
@@ -203,4 +214,36 @@ export async function setTemplateStatus(formData: FormData) {
   } else await prisma.bidTemplate.update({ where: { id: t.id }, data: { status } });
   revalidatePath("/admin/bid-templates");
   go("/admin/bid-templates", "notice", status === "APPROVED" ? "Template approved." : "Template retired.");
+}
+
+/** Nov 5: a bidder asks the requester (the developer) a question about the request. */
+export async function askBidQuestion(formData: FormData) {
+  const user = await requireUser();
+  const requestId = String(formData.get("requestId") || "");
+  const back = `/bids/${requestId}`;
+  const question = String(formData.get("question") || "").trim().slice(0, 1000);
+  const req = await loadForBidder(requestId, user);
+  if (!req) go("/bids", "error", "This request is not available.");
+  if (question.length < 3) go(`${back}#bid-qa`, "error", "Write your question first.");
+  const recent = await prisma.bidQuestion.count({ where: { askerId: user.id, createdAt: { gte: new Date(Date.now() - 86400000) } } });
+  if (recent >= 30) go(`${back}#bid-qa`, "error", "You have asked many questions today. Try again tomorrow.");
+  await prisma.bidQuestion.create({ data: { requestId, askerId: user.id, question } });
+  await bidNotice(req.requester, "question", { name: user.name, project: req.project.name }, `${back}#bid-qa`);
+  refresh();
+  go(`${back}#bid-qa`, "notice", "Question sent to the developer.");
+}
+
+/** Nov 5: the requester answers a bidder's question. Only the bidder who asked and the requester see it. */
+export async function answerBidQuestion(formData: FormData) {
+  const user = await requireUser();
+  const q = await prisma.bidQuestion.findUnique({ where: { id: String(formData.get("questionId") || "") }, include: { request: { include: { project: { select: { name: true } } } } } });
+  if (!q || q.request.requesterId !== user.id) go("/bids", "error", "This request is not available.");
+  const back = `/bids/${q.requestId}#bid-qa`;
+  const answer = String(formData.get("answer") || "").trim().slice(0, 2000);
+  if (answer.length < 1) go(back, "error", "Write your answer first.");
+  await prisma.bidQuestion.update({ where: { id: q.id }, data: { answer, answeredAt: new Date() } });
+  const asker = await prisma.user.findUnique({ where: { id: q.askerId }, select: { id: true, email: true, locale: true } });
+  if (asker) await bidNotice(asker, "answered", { name: user.name, project: q.request.project.name }, `/bids/${q.requestId}#bid-qa`);
+  refresh();
+  go(back, "notice", "Answer sent.");
 }

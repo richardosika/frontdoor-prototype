@@ -2,7 +2,8 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useTx } from "@/components/locale-context";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { ReportSentPopup } from "@/components/report-sent";
 import { reportMember } from "@/actions/social";
 import { btn, btnOutline, field } from "@/components/ui";
 
@@ -17,11 +18,19 @@ export function ReportDialog({
 }) {
   const tx = useTx();
   const [open, setOpen] = useState(false);
+  const popup = (
+    <Suspense fallback={null}>
+      <ReportSentPopup />
+    </Suspense>
+  );
   if (!open) {
     return (
-      <button className={btnOutline} type="button" onClick={() => setOpen(true)}>
-        {label}
-      </button>
+      <>
+        <button className={btnOutline} type="button" onClick={() => setOpen(true)}>
+          {label}
+        </button>
+        {popup}
+      </>
     );
   }
   return (
@@ -34,7 +43,7 @@ export function ReportDialog({
         <button className={btnOutline} type="button" onClick={() => setOpen(false)}>
           {tx("Cancel")}
         </button>
-        <SubmitButton className={btn}>
+        <SubmitButton className={btn} pendingLabel="Sending…">
           {tx("Send report")}
         </SubmitButton>
       </div>

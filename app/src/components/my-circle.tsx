@@ -1,7 +1,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { memberLine } from "@/lib/member-line";
-import { openConversation } from "@/actions/social";
+import { openConversation, removeFromCircle } from "@/actions/social";
 import { Avatar } from "@/components/avatar";
 import { btn, btnOutline } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
@@ -11,7 +11,7 @@ import { roleLabel, roleShort } from "@/lib/roles";
 type Circle = Awaited<ReturnType<typeof loadMyCircle>>;
 
 /** #28: only people connected through a project, with their shared projects and a way into messages. */
-export async function MyCircleList({ people }: { people: Circle }) {
+export async function MyCircleList({ people, back = "/network" }: { people: Circle; back?: string }) {
   const tx = await serverTx();
   if (people.length === 0) {
     return (
@@ -47,7 +47,7 @@ export async function MyCircleList({ people }: { people: Circle }) {
           ) : (
             <p className="mt-1 text-[14px] text-mut">{tx("None yet.")}</p>
           )}
-          <div className="mt-3">
+          <div className="mt-3 grid gap-2">
             {person.conversationId ? (
               <Link href={`/messages/${person.conversationId}`} className={`${btnOutline} w-full`}>
                 {tx("Open messages")}
@@ -60,6 +60,16 @@ export async function MyCircleList({ people }: { people: Circle }) {
                 </SubmitButton>
               </form>
             )}
+            {/* Nov 5: remove without blocking, with a confirm step. */}
+            <details className="text-[14px]" data-testid="circle-remove">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-semibold text-mut underline decoration-line [&::-webkit-details-marker]:hidden">{tx("Remove from My Circle")}</summary>
+              <form action={removeFromCircle} className="mt-1 grid gap-2 rounded border border-line bg-cream p-3">
+                <input type="hidden" name="userId" value={person.id} />
+                <input type="hidden" name="back" value={back} />
+                <p className="text-ink">{tx("{name} leaves your circle. This is not a block and they are not told. To stop all contact, block them from their profile instead.").replace("{name}", person.name)}</p>
+                <SubmitButton className={btnOutline} pendingLabel="Removing…" data-testid="circle-remove-confirm">{tx("Remove")}</SubmitButton>
+              </form>
+            </details>
           </div>
         </li>
       ))}

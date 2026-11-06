@@ -8,7 +8,8 @@ import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
-import { BidsStrip } from "@/components/bids-strip";
+import { dismissLedgerProject } from "@/actions/feed";
+import { Avatar } from "@/components/avatar";
 import { loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
@@ -43,7 +44,7 @@ export default async function FeedPage({
   const [application, outreachSent, ledgerProjects, circle] = await Promise.all([
     prisma.application.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     prisma.projectContact.count({ where: { fromId: user.id } }),
-    loadLedgerProjects(user, { filters, limit: isDeveloperRole(user.role) ? 6 : 8 }),
+    loadLedgerProjects(user, { filters, limit: isDeveloperRole(user.role) ? 6 : 8, hideDismissed: true }),
     loadMyCircle(user),
   ]);
   const mine = ledgerProjects.myProjects;
@@ -63,14 +64,30 @@ export default async function FeedPage({
     noMatches: !isDeveloperRole(user.role) && ledgerProjects.allSeeking.length === 0,
   });
 
+  // Nov 5: members other than developers see opportunities, connections and the side panels only once every
+  // Getting started step before the first outreach is done (outreach needs the opportunities, so it stays open).
+  const locked = !developer && checklist.some((item) => item.id !== "reach" && !item.done);
   const myWork = isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou);
+  const [unreadCount, pendingRequests] = await Promise.all([
+    prisma.message.count({ where: { readAt: null, senderId: { not: user.id }, conversation: { OR: [{ userAId: user.id }, { userBId: user.id }] } } }),
+    prisma.projectContact.count({ where: { toId: user.id, status: "PENDING" } }),
+  ]);
+  const weekAgo = Date.now() - 7 * 86400000;
+  const newOpps = ledgerProjects.seekingMe.filter((p) => !p.status && (p.reviewedAt ?? p.submittedAt).getTime() >= weekAgo).length;
+  const whatsNew = locked
+    ? []
+    : [
+        newOpps ? { n: newOpps, text: tx(newOpps === 1 ? "new opportunity" : "new opportunities"), href: "#ledger-seeking" } : null,
+        pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: developer ? "#ledger-my-projects" : "#ledger-my-work" } : null,
+        unreadCount ? { n: unreadCount, text: tx(unreadCount === 1 ? "unread message" : "unread messages"), href: "/messages" } : null,
+      ].filter((x): x is { n: number; text: string; href: string } => Boolean(x));
   const side = myWork ? await loadSidePanels(user, myWork.active) : null;
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "America/New_York" });
   const dayFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
   const panel = "rounded border border-line bg-paper p-5";
   const panelH = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brass";
   // #45: under My Circle for everyone but developers.
-  const sidePanels = side ? (
+  const sidePanels = side && !locked ? (
     <>
       <div className={panel} data-testid="ledger-viewed-you">
         <h2 className={panelH}>{tx("Who viewed your profile")}</h2>
@@ -152,13 +169,31 @@ export default async function FeedPage({
       </div>
     </>
   ) : null;
-  const circlePanel = (
+  // Nov 5: My Circle, explained in one line, with the people in it and what you can do there.
+  const circlePanel = locked ? null : (
     <div className="rounded border border-line bg-paper p-5" data-testid="ledger-circle">
       <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("My Circle")}</h2>
-      <p className="mt-1 text-[14px] text-mut">{circle.length === 1 ? t("ledger.connection") : t("ledger.connections", { count: circle.length })}</p>
-      <p className="mt-2 text-[14px] leading-relaxed text-ink">{tx("People connected to you through a project.")}</p>
-      <Link href={developer ? "/deals#my-circle" : "/network"} className="mt-3 inline-block text-[14px] font-semibold text-forest underline decoration-brass">
-        {tx("Open My Circle")}
+      <p className="mt-1 font-serif text-[20px] leading-snug text-forest">{circle.length === 1 ? t("ledger.connection") : t("ledger.connections", { count: circle.length })}</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-ink">{tx("Your circle is the members you have worked with: someone joins when a contact about a project is accepted. You can message people in your circle at any time.")}</p>
+      {circle.length ? (
+        <ul className="mt-3 grid gap-2" data-testid="ledger-circle-people">
+          {circle.slice(0, 3).map((person) => (
+            <li key={person.id}>
+              <Link href={`/members/${person.id}`} className="flex min-h-11 items-center gap-3">
+                <Avatar initials={person.initials} photoId={person.photoId ?? ""} size="sm" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[15px] font-semibold text-forest">{person.name}</span>
+                  <span className="block truncate text-[13px] text-mut">{tx(roleShort(roleLabel(person.role)))}{person.org ? ` · ${person.org}` : ""}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-[14px] text-mut">{tx("No one yet. Express interest in an opportunity; when the developer accepts, you are connected.")}</p>
+      )}
+      <Link href={developer ? "/deals#my-circle" : "/network"} className="mt-3 inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">
+        {circle.length ? tx("See everyone, message or remove") : tx("Open My Circle")} ›
       </Link>
     </div>
   );
@@ -173,9 +208,24 @@ export default async function FeedPage({
     <div className="mx-auto grid max-w-[1240px] gap-8 px-4 pb-8 pt-4 md:pt-8 lg:grid-cols-[minmax(0,800px)_340px] lg:px-10">
       <section className="min-w-0">
         <JoinEntryBanner name={user.name} />
-        <header className="mb-6 border-b-[3px] border-double border-brass pb-4">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-brass">{BRAND.name}</p>
-          <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">{t("ledger.title")}</h1>
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b-[3px] border-double border-brass pb-4">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-brass">{BRAND.name}</p>
+            <h1 className="mt-1 font-serif text-[40px] font-normal italic leading-tight tracking-wide md:text-[52px]">{t("ledger.title")}</h1>
+          </div>
+          {/* Nov 5: what is new since the member last looked, top right. */}
+          {whatsNew.length ? (
+            <div className="rounded border border-brass bg-paper px-3 py-2 text-[14px]" data-testid="ledger-whats-new">
+              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-brass"><span aria-hidden className="inline-block h-2 w-2 rounded-full bg-[#A2412C]" />{tx("New")}</p>
+              <ul>
+                {whatsNew.map((item) => (
+                  <li key={item.href}>
+                    <a href={item.href} className="inline-flex min-h-9 items-center text-forest underline decoration-brass"><b className="mr-1">{item.n}</b> {item.text}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </header>
         <Banner error={error ? tx(error) : undefined} notice={notice ? tx(notice) : undefined} />
         {submitted ? (
@@ -198,10 +248,17 @@ export default async function FeedPage({
         {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
         <GettingStarted items={checklist} category={ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")} />
         {note}
-        <BidsStrip userId={user.id} />
-        <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
-          results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
-        />
+        {locked ? (
+          <section className="mb-6 rounded border border-forest bg-forest p-4 text-paper md:p-5" data-testid="ledger-locked">
+            <h2 className="font-serif text-[22px] leading-snug md:text-[26px]">{tx("Finish Getting started to open your Ledger")}</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-sand md:text-[16px]">{tx("Opportunities, your circle and who viewed your profile stay hidden until each Getting started step above is done. This keeps every member on Private Floor fully reviewed and complete.")}</p>
+          </section>
+        ) : (
+          <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
+            results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
+            dismissAction={dismissLedgerProject}
+          />
+        )}
         {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
           <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")} ({checklist.length} / {checklist.length})
             {checklist.find((item) => item.note) ? <span className="block text-forest" data-testid="start-note-reach">{tx(checklist.find((item) => item.note)!.note!).replace("{category}", ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}</span> : null}

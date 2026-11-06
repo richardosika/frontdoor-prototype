@@ -615,7 +615,8 @@ export async function resolveReport(formData: FormData) {
   const admin = await requireAdmin();
   const reportId = String(formData.get("reportId") || "");
   const report = await prisma.report.findUnique({ where: { id: reportId } });
-  if (!report || report.status !== "OPEN") redirect("/admin/moderation");
+  const back = String(formData.get("back") || "") === "/admin/reports" ? "/admin/reports" : "/admin/moderation";
+  if (!report || report.status !== "OPEN") redirect(back);
   await prisma.report.update({ where: { id: report.id }, data: { status: "RESOLVED" } });
   await prisma.moderationEvent.create({
     data: {
@@ -625,7 +626,8 @@ export async function resolveReport(formData: FormData) {
     },
   });
   revalidatePath("/admin/moderation");
-  redirect("/admin/moderation?notice=Report+closed");
+  revalidatePath("/admin/reports");
+  redirect(`${back}?notice=Report+closed`);
 }
 
 export async function deleteInviteRequest(formData: FormData) {

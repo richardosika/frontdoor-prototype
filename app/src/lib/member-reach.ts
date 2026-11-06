@@ -26,12 +26,14 @@ export function isDeveloperRole(role: string | null | undefined): boolean {
 }
 
 /** Navigation for the member: developers get "Find your team" and no separate Network; others get Opportunities and My Circle. */
-export function memberNav(role: string | null | undefined): { href: string; label: string; test: string }[] {
+export function memberNav(role: string | null | undefined): { href: string; label: string; test: string; sidebarOnly?: boolean }[] {
   if (isDeveloperRole(role)) {
     return [
       { href: "/feed", label: "Ledger", test: "tab-feed" },
       { href: "/deals", label: "Find your team", test: "tab-deals" },
       { href: "/messages", label: "Messages", test: "tab-messages" },
+      // Nov 5: Bids is a sidebar item (it was an "Open Bids" bar on the Ledger). On phones it sits in the More menu.
+      { href: "/bids", label: "Bids", test: "tab-bids", sidebarOnly: true },
       { href: "/profile", label: "Profile", test: "tab-profile" },
     ];
   }
@@ -40,6 +42,7 @@ export function memberNav(role: string | null | undefined): { href: string; labe
     { href: "/deals", label: "Opportunities", test: "tab-deals" },
     { href: "/network", label: "My Circle", test: "tab-network" },
     { href: "/messages", label: "Messages", test: "tab-messages" },
+    { href: "/bids", label: "Bids", test: "tab-bids", sidebarOnly: true },
     { href: "/profile", label: "Profile", test: "tab-profile" },
   ];
 }

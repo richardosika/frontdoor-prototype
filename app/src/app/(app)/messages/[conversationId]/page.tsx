@@ -3,7 +3,8 @@ import { serverTx } from "@/lib/i18n/server";
 import { memberLine } from "@/lib/member-line";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { blockMember, sendMessage, unblockMember } from "@/actions/social";
+import { sendMessage } from "@/actions/social";
+import { BlockButton, UnblockButton } from "@/components/block-controls";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
@@ -24,7 +25,7 @@ export default async function ThreadPage({
   searchParams,
 }: {
   params: Promise<{ conversationId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const tx = await serverTx();
   const user = await requireUser();
@@ -80,26 +81,14 @@ export default async function ThreadPage({
           </div>
           <div className="ml-auto flex gap-2">
             {blockedByViewer ? (
-              <form action={unblockMember}>
-                <input type="hidden" name="userId" value={other.id} />
-                <input type="hidden" name="conversationId" value={conversation.id} />
-                <SubmitButton className={btn}>
-                  {tx("Unblock")}
-                </SubmitButton>
-              </form>
+              <UnblockButton userId={other.id} conversationId={conversation.id} className={btn} />
             ) : (
-              <form action={blockMember}>
-                <input type="hidden" name="userId" value={other.id} />
-                <input type="hidden" name="conversationId" value={conversation.id} />
-                <SubmitButton className={btn}>
-                  {tx("Block")}
-                </SubmitButton>
-              </form>
+              <BlockButton userId={other.id} conversationId={conversation.id} className={btn} />
             )}
           </div>
         </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
-          <Banner error={query.error} />
+          <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
           {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">Say hello to {other.name}.</p> : null}
           {conversation.messages.map((message) => {
             if (isRenderedSystemNotice(message.kind, message.body)) {

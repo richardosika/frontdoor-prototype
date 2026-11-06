@@ -92,15 +92,17 @@ export default async function NewBidRequest({ searchParams }: { searchParams: Pr
           </label>
         </section>
 
-        <section className={`${card} mt-4 p-4 sm:p-5`}>
-          <h2 className={h2}>3 · {tx("Custom questions (up to 3)")}</h2>
-          {Array.from({ length: MAX_QUESTIONS }, (_, i) => (
-            <label key={i} className="mb-3 block">
-              <span className={labelCls}>Q{i + 1} {i === 2 ? `· ${tx("optional")}` : ""}</span>
-              <input name="question" maxLength={500} className={field} placeholder={i === 0 ? tx("Can you hold pricing through closing?") : ""} />
-            </label>
-          ))}
-          <p className="text-[13px] text-mut">{tx("Short answer, 500 characters max")}</p>
+        {/* Nov 5: custom requester questions removed; bidders ask the developer instead (Questions and answers). */}
+        <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bid-scope-schedule">
+          <h2 className={h2}>3 · {tx("Scope of work and schedule")}</h2>
+          <label className="mb-3 block">
+            <span className={labelCls}>{tx("Scope of work")} *</span>
+            <textarea name="scopeOfWork" required minLength={10} maxLength={4000} rows={5} className={field} placeholder={tx("What the bid must cover: trades, inclusions, exclusions, allowances.")} />
+          </label>
+          <label className="block">
+            <span className={labelCls}>{tx("Schedule")} *</span>
+            <textarea name="schedule" required minLength={3} maxLength={2000} rows={3} className={field} placeholder={tx("Expected start, key milestones and completion.")} />
+          </label>
         </section>
 
         <section className={`${card} mt-4 p-4 sm:p-5`} data-testid="bid-plans-upload">

@@ -1,3 +1,4 @@
+import type { BidField } from "@/lib/bid-templates";
 import { isVerifiedGc } from "@/lib/bid-plans";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
@@ -44,16 +45,38 @@ export async function ensureBidTemplates() {
   }
 }
 
-export type BidMailKind = "request" | "submitted" | "shortlisted" | "awarded" | "notSelected" | "declined";
+export type BidMailKind = "request" | "submitted" | "shortlisted" | "awarded" | "notSelected" | "declined" | "question" | "answered";
 
 const COPY: Record<BidMailKind, { subject: string; body: string }> = {
   request: { subject: "New request for a proposal: {project}", body: "{name} asked you for a proposal on {project}. Proposals are due {due}. Only members already on this project can see this request." },
   submitted: { subject: "Proposal received: {project}", body: "{name} submitted a proposal on {project}. Open the comparison to review it side by side." },
   shortlisted: { subject: "You're on the shortlist: {project}", body: "{name} shortlisted your proposal on {project}. They may reach out with questions." },
-  awarded: { subject: "Your proposal was selected: {project}", body: "Congratulations. {name} selected your proposal on {project}. The project now shows as Active in My work right now." },
+  awarded: { subject: "Your proposal was selected: {project}", body: "Congratulations. {name} selected your proposal on {project}. The project now shows as Active in your Active Pipeline." },
   notSelected: { subject: "Update on your proposal: {project}", body: "Thank you for your proposal on {project}. {name} has chosen another proposal this time. We appreciate the care you put into it and hope to see you on the next one." },
   declined: { subject: "Update on your proposal: {project}", body: "Thank you for your proposal on {project}. {name} will not be moving forward with it. We appreciate your time." },
+  question: { subject: "New question on your bid request: {project}", body: "{name} asked a question about your bid request on {project}. Open the request to answer it." },
+  answered: { subject: "Your question was answered: {project}", body: "{name} answered your question about the bid request on {project}." },
 };
+
+/** Nov 5: a copy of the estimate the bidder just submitted, as an alert and a branded email. */
+export async function estimateCopy(to: { id: string; email: string; locale: string; name: string }, project: string, fields: BidField[], values: Record<string, unknown>, href: string) {
+  const locale = isLocale(to.locale) ? to.locale : "en";
+  const p = (s: string) => phrase(locale, s);
+  const lines = fields
+    .filter((f) => f.type !== "profile")
+    .map((f) => {
+      const v = values[f.key];
+      const shown = Array.isArray(v) ? v.map((x) => p(String(x))).join(", ") : v === undefined || v === null ? "" : String(v);
+      if (!shown.trim()) return "";
+      const money = f.type === "money" && /^\d+(\.\d+)?$/.test(shown) ? `$${Number(shown).toLocaleString("en-US")}` : shown;
+      return `${p(f.label)}: ${f.type === "yesno" ? p(shown === "yes" ? "Yes" : "No") : money}`;
+    })
+    .filter(Boolean);
+  const subject = fill(p("Copy of your estimate: {project}"), { project });
+  const body = fill(p("Here is a copy of the estimate you submitted on {project}. Only the requester can see your numbers."), { project });
+  await notify(to.id, { title: subject, body, href });
+  await sendEmail({ to: to.email, subject, text: `${body}\n\n${lines.join("\n")}\n\n${p("Open in Private Floor")}\n${await appBaseUrl()}${href}` });
+}
 
 const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 

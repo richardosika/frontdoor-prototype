@@ -216,3 +216,18 @@ export async function addComment(formData: FormData) {
   await prisma.comment.create({ data: { postId, authorId: user.id, body } });
   revalidatePath("/feed");
 }
+
+/** Nov 5: hide an opportunity from the Ledger. It stays listed in Opportunities. */
+export async function dismissLedgerProject(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") || "");
+  if (projectId) {
+    await prisma.ledgerDismissal.upsert({
+      where: { userId_projectId: { userId: user.id, projectId } },
+      update: {},
+      create: { userId: user.id, projectId },
+    });
+  }
+  revalidatePath("/feed");
+  redirect("/feed?notice=" + encodeURIComponent("Removed from your Ledger. It is still listed in Opportunities.") + "#ledger-seeking");
+}

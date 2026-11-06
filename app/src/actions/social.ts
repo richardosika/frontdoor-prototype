@@ -295,11 +295,12 @@ export async function reportMember(formData: FormData) {
   });
   await notifyAdmins({
     title: "Member report",
-    body: "A member filed a report. Open message review.",
-    href: "/admin/moderation",
+    body: `${user.name} reported ${target.name}. Open Reports.`,
+    href: "/admin/reports",
   });
   revalidatePath("/admin/moderation");
-  redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
+  revalidatePath("/admin/reports");
+  redirect(`${back}?reported=1`);
 }
 
 export async function reportPost(formData: FormData) {
@@ -335,26 +336,61 @@ export async function reportPost(formData: FormData) {
   redirect(`${back}?notice=Report+sent+to+a+Private+Floor+administrator`);
 }
 
+/** Only same-site paths are accepted as a place to return to. */
+function safeBack(value: FormDataEntryValue | null, fallback: string): string {
+  const back = String(value || "");
+  return back.startsWith("/") && !back.startsWith("//") ? back : fallback;
+}
+
+/** Nov 5: block with a reason; the reason goes to the administrators (Admin · Reports). The screen does not change. */
 export async function blockMember(formData: FormData) {
   const user = await requireUser();
   const blockedId = String(formData.get("userId") || "");
   const conversationId = String(formData.get("conversationId") || "");
+  const back = safeBack(formData.get("back"), conversationId ? `/messages/${conversationId}` : `/members/${blockedId}`);
+  const reason = String(formData.get("reason") || "").trim().slice(0, 500);
   if (!blockedId || blockedId === user.id) redirect("/messages");
+  if (reason.length < 3) redirect(`${back}?error=${encodeURIComponent("Add a short reason for blocking.")}`);
+  const target = await prisma.user.findUnique({ where: { id: blockedId }, select: { id: true, name: true } });
+  if (!target) redirect("/messages");
   await prisma.block.upsert({
     where: { blockerId_blockedId: { blockerId: user.id, blockedId } },
-    update: {},
-    create: { blockerId: user.id, blockedId },
+    update: { reason },
+    create: { blockerId: user.id, blockedId, reason },
   });
+  await prisma.moderationEvent.create({
+    data: { actorId: user.id, action: "BLOCK", conversationId, summary: `${user.name} blocked ${target.name}.` },
+  }).catch(() => null);
+  await notifyAdmins({ title: "Member blocked", body: `${user.name} blocked ${target.name}. Open Reports for the reason.`, href: "/admin/reports" }).catch(() => null);
   revalidatePath("/messages");
   revalidatePath(`/members/${blockedId}`);
-  redirect(conversationId ? `/messages/${conversationId}` : `/members/${blockedId}?notice=Member+blocked`);
+  revalidatePath("/admin/reports");
+  redirect(`${back}?notice=${encodeURIComponent("Member blocked")}`);
 }
 
 export async function unblockMember(formData: FormData) {
   const user = await requireUser();
   const blockedId = String(formData.get("userId") || "");
+  const conversationId = String(formData.get("conversationId") || "");
+  const back = safeBack(formData.get("back"), conversationId ? `/messages/${conversationId}` : `/members/${blockedId}`);
   await prisma.block.deleteMany({ where: { blockerId: user.id, blockedId } });
   revalidatePath("/messages");
   revalidatePath(`/members/${blockedId}`);
-  redirect(`/members/${blockedId}?notice=Member+unblocked`);
+  redirect(`${back}?notice=${encodeURIComponent("Member unblocked")}`);
+}
+
+/** Nov 5: take someone out of My Circle without blocking them. They are not told; messaging rules still apply. */
+export async function removeFromCircle(formData: FormData) {
+  const user = await requireUser();
+  const otherId = String(formData.get("userId") || "");
+  const back = safeBack(formData.get("back"), "/network");
+  if (!otherId || otherId === user.id) redirect(back);
+  await prisma.$transaction([
+    prisma.circleRemoval.upsert({ where: { userId_removedId: { userId: user.id, removedId: otherId } }, update: {}, create: { userId: user.id, removedId: otherId } }),
+    prisma.connection.deleteMany({ where: { OR: [{ fromId: user.id, toId: otherId }, { fromId: otherId, toId: user.id }] } }),
+  ]);
+  revalidatePath("/network");
+  revalidatePath("/deals");
+  revalidatePath("/feed");
+  redirect(`${back}${back.includes("?") ? "&" : "?"}notice=${encodeURIComponent("Removed from My Circle. They were not blocked or told.")}`)
 }
