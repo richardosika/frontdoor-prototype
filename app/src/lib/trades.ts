@@ -77,6 +77,21 @@ export function isGeneralContractor(member: { role: string | null | undefined; e
   return memberCategories(member).includes("GENERAL_CONTRACTOR");
 }
 
+/**
+ * Nov 6 (Richard Osika): who may open a subcontractor's certificate of insurance.
+ * The sub, staff, and approved active general contractor members. Everyone else gets not found.
+ */
+export function canOpenInsuranceCertificate(
+  viewer: { id: string; isAdmin?: boolean | null; status?: string | null; paymentStatus?: string | null; role: string | null | undefined; extraCategories?: string | null },
+  owner: { id: string; role: string | null | undefined; extraCategories?: string | null },
+): boolean {
+  if (viewer.id === owner.id) return true;
+  if (viewer.isAdmin) return true;
+  if (viewer.status !== "ACTIVE") return false;
+  if (!["PAID", "WAIVED", "NOT_REQUIRED"].includes(String(viewer.paymentStatus || ""))) return false;
+  return isGeneralContractor(viewer) && isSubcontractor(owner);
+}
+
 export type SubForMatch = { id?: string; role: string; extraCategories?: string | null; trades: string; markets: string; location: string };
 export type PackageForMatch = { trade: string; serviceStates: string };
 

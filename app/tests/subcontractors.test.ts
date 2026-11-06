@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TRADES, parseTrades, sortedTrades, statesFrom, subMatchesPackage, subProfileFromJoin, coiType } from "@/lib/trades";
+import { TRADES, parseTrades, sortedTrades, statesFrom, subMatchesPackage, subProfileFromJoin, coiType, canOpenInsuranceCertificate } from "@/lib/trades";
 import { canOpenRequest } from "@/lib/bid-plans";
 import { canContactAboutProject, interestCategories } from "@/lib/project-contact";
 import { projectAccessible } from "@/lib/member-reach";
@@ -74,5 +74,24 @@ describe("Nov 6 subcontractors", () => {
       for (const t of v) expect(t.trim(), k).not.toBe("");
       for (const t of [k, ...v]) expect(/invite|founding member|limited/i.test(t), k).toBe(false);
     }
+  });
+});
+
+describe("insurance certificate access (Nov 6, Richard Osika)", () => {
+  const sub = { id: "s1", role: "SUBCONTRACTOR", extraCategories: "" };
+  const gc = { id: "g1", role: "GENERAL_CONTRACTOR", extraCategories: "", status: "ACTIVE", paymentStatus: "PAID" };
+  it("lets the sub, staff and approved active GCs open it", () => {
+    expect(canOpenInsuranceCertificate({ ...sub }, sub)).toBe(true);
+    expect(canOpenInsuranceCertificate({ id: "a1", role: "DEVELOPER", isAdmin: true }, sub)).toBe(true);
+    expect(canOpenInsuranceCertificate(gc, sub)).toBe(true);
+    expect(canOpenInsuranceCertificate({ ...gc, paymentStatus: "WAIVED" }, sub)).toBe(true);
+    expect(canOpenInsuranceCertificate({ ...gc, role: "INSURER", extraCategories: "GENERAL_CONTRACTOR" }, sub)).toBe(true);
+  });
+  it("refuses other roles, inactive or unpaid GCs, and non-sub owners", () => {
+    expect(canOpenInsuranceCertificate({ ...gc, role: "DEVELOPER" }, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate({ ...gc, id: "s2", role: "SUBCONTRACTOR" }, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate({ ...gc, status: "SUSPENDED" }, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate({ ...gc, paymentStatus: "UNPAID" }, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate(gc, { id: "x", role: "ARCHITECT_ENGINEER", extraCategories: "" })).toBe(false);
   });
 });

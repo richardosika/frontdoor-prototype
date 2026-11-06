@@ -83,7 +83,7 @@ export async function SubProfileFields({ userId }: { userId: string }) {
           </span>
         ) : null}
         <input name="coi" type="file" accept="application/pdf,image/jpeg,image/png" className="block w-full text-[15px] file:mr-3 file:min-h-11 file:rounded-sm file:border file:border-forest file:bg-paper file:px-4 file:font-semibold file:text-forest" data-testid="sub-coi-input" />
-        <span className="mt-1 block font-sans text-[14px] text-mut">{tx("PDF, JPG or PNG up to 10 MB. Only you and Private Floor staff can open it; members see that it is on file.")}</span>
+        <span className="mt-1 block font-sans text-[14px] text-mut">{tx("PDF, JPG or PNG up to 10 MB. Only you, Private Floor staff and general contractor members can open it; other members see that it is on file.")}</span>
       </label>
       <label>
         <span className={labelCls}>{tx("Bonding capacity (optional)")}</span>

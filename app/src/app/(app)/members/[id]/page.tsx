@@ -11,6 +11,7 @@ import { loadMyCircle } from "@/lib/ledger-projects";
 import { appBaseUrl } from "@/lib/url";
 import { isDeveloperRole } from "@/lib/member-reach";
 import { VendorProfile } from "@/components/vendor-profile";
+import { canOpenInsuranceCertificate } from "@/lib/trades";
 import { prisma } from "@/lib/prisma";
 import { canContactAboutProject, memberCategories } from "@/lib/project-contact";
 
@@ -67,6 +68,7 @@ export default async function MemberPage({
           blockedByThem={loaded.blockedByThem}
           reviewed
           inCircle={circle.some((person) => person.id === loaded.member.id)}
+          viewerCanOpenCoi={canOpenInsuranceCertificate(user, loaded.member)}
         />
       ) : (
       <ProfileView

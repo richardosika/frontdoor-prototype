@@ -57,6 +57,7 @@ export async function VendorProfile({
   blockedByThem,
   reviewed,
   inCircle = false,
+  viewerCanOpenCoi = false,
 }: {
   member: Member;
   projects: PastProject[];
@@ -68,6 +69,8 @@ export async function VendorProfile({
   reviewed: boolean;
   /** Nov 6: this member is in the viewer's My Circle, so the ⋯ menu offers Remove (without blocking). */
   inCircle?: boolean;
+  /** Nov 6: the viewer is an approved active general contractor, so the sub's certificate of insurance opens for them. */
+  viewerCanOpenCoi?: boolean;
 }) {
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -173,6 +176,16 @@ export async function VendorProfile({
                 <dd className="mt-0.5 text-[16px] text-ink [overflow-wrap:anywhere]">{value}</dd>
               </div>
             ))}
+            {coiOnFile && viewerCanOpenCoi ? (
+              <div className="min-w-0 sm:col-span-2" data-testid="vendor-coi">
+                <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mut">{tx("Certificate of insurance")}</dt>
+                <dd className="mt-0.5">
+                  <a href={`/api/insurance-certificates/${member.id}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[16px] font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]" data-testid="vendor-coi-link">
+                    {tx("View insurance certificate")}
+                  </a>
+                </dd>
+              </div>
+            ) : null}
             {member.website ? (
               <div className="min-w-0">
                 <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mut">{tx("Website")}</dt>
