@@ -46,6 +46,21 @@ export function adminLoginTrace(input: {
   if (line.includes("@")) throw new Error("Login trace contained an address");
   return line;
 }
+/**
+ * Nov 6 (Julia, iPhone): once the tester gate is open on a device, the first page is the member sign-in. Testers then
+ * put the gate login (a username such as "julia", not an email) in the member Email box. The box used type=email, so
+ * iPhone blocked the tap with "Enter an email address" and nothing reached the server. The box is now plain text and a
+ * value without "@" gets this message instead.
+ */
+export const NOT_AN_EMAIL_SIGN_IN_ERROR =
+  "This is the member sign-in, and it needs your member email (like you@firm.com), not the tester gate username. The gate step is already done on this device.";
+
+/** True when the member Email box holds something that cannot be an email (for example a gate username). */
+export function looksLikeGateUsername(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
 export const PENDING_APPROVAL_ERROR = "Your application is under review. You can sign in after Richard Osika approves it.";
 export const DECLINED_APPLICATION_ERROR = "This application was not approved.";
 export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact connect@privatefloorclub.com if you need help.";

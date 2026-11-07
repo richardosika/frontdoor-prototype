@@ -41,6 +41,11 @@ export default async function LoginPage({
         </LocaleProvider>
         <h1 className="font-serif text-2xl font-normal">{tx("Sign in to {name}").replace("{name}", BRAND.name)}</h1>
         <p className="mb-4 mt-1 text-sm text-ink">{tx("Approved members only. Applications under review cannot sign in yet.")}</p>
+        {process.env.SITE_GATE_PASSWORD ? (
+          <p className="mb-4 rounded border border-line bg-cream px-3 py-2 text-sm text-ink" data-testid="login-gate-done">
+            {tx("Test site: the tester gate is already open on this device. Sign in here with your member email and password, not the gate login.")}
+          </p>
+        ) : null}
         <LocaleProvider locale={locale}>
           <LoginForm next={params.next} initialError={signInErrorFromCode(params.error)} />
         </LocaleProvider>

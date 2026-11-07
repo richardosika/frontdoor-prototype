@@ -8,7 +8,7 @@ import { HELP_COOKIE } from "@/lib/help/store";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DECLINED_APPLICATION_STATUSES, OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, GENERIC_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, GENERIC_SIGN_IN_ERROR, looksLikeGateUsername, NOT_AN_EMAIL_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
 
 function safeNext(value: string): string {
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "/feed";
@@ -20,12 +20,18 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   const password = String(formData.get("password") || "");
   const next = safeNext(String(formData.get("next") || "/feed"));
 
+  if (looksLikeGateUsername(email)) {
+    console.log("MEMBER_SIGN_IN result=not_email");
+    return { error: NOT_AN_EMAIL_SIGN_IN_ERROR };
+  }
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   if (user?.isAdmin) {
     if (password) await bcrypt.compare(password, user.passwordHash);
+    console.log("MEMBER_SIGN_IN result=rejected");
     return { error: GENERIC_SIGN_IN_ERROR };
   }
-  const memberPasswordMatches = user ? await bcrypt.compare(password, user.passwordHash) : false;
+  // Pasted passwords often carry a trailing space; the credentials check already ignores end spaces, so this one does too.
+  const memberPasswordMatches = user ? await passwordMatchesAccount(password, user.passwordHash) : false;
   let pendingApplicationPasswordMatches = false;
   let declinedApplicationPasswordMatches = false;
   if (!user && email && password) {
@@ -33,7 +39,7 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
       where: { email, status: { in: [...OPEN_APPLICATION_STATUSES, ...DECLINED_APPLICATION_STATUSES] } },
       orderBy: { createdAt: "desc" },
     });
-    if (application && (await bcrypt.compare(password, application.passwordHash))) {
+    if (application && (await passwordMatchesAccount(password, application.passwordHash))) {
       const declined = (DECLINED_APPLICATION_STATUSES as readonly string[]).includes(application.status);
       declinedApplicationPasswordMatches = declined;
       pendingApplicationPasswordMatches = !declined;
@@ -47,11 +53,15 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
     pendingApplicationPasswordMatches,
     declinedApplicationPasswordMatches,
   });
-  if (failure) return { error: failure };
+  if (failure) {
+    console.log(`MEMBER_SIGN_IN result=rejected found=${user ? 1 : 0} compare=${memberPasswordMatches ? 1 : 0}`);
+    return { error: failure };
+  }
 
   try {
     await resetHelpChat();
-    await signIn("credentials", { email, password, portal: "member", redirectTo: next });
+    console.log("MEMBER_SIGN_IN result=ok");
+    await signIn("credentials", { email, password: password.trim(), portal: "member", redirectTo: next });
   } catch (error) {
     if (error instanceof CredentialsSignin || (error instanceof AuthError && error.type === "CredentialsSignin")) {
       return { error: GENERIC_SIGN_IN_ERROR };

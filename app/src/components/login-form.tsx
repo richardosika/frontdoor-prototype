@@ -49,7 +49,9 @@ export function LoginForm({ next, portal = "member", initialError = "" }: { next
       {error ? <p className="text-sm text-brass">{tx(error)}</p> : null}
       <div>
         <label className={labelCls}>{tx("Email")}</label>
-        <input className={field} name="email" type="email" autoComplete="username" required placeholder="you@firm.com" />
+        {/* Plain text, not type=email: iPhone blocked the tap with its own "Enter an email address" bubble, so a tester who
+            typed the gate username never saw our explanation (Nov 6, Julia). The server checks the address instead. */}
+        <input className={field} name="email" type="text" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required placeholder="you@firm.com" />
       </div>
       <div>
         <label className={labelCls}>{tx("Password")}</label>

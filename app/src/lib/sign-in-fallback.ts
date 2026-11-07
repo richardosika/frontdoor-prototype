@@ -1,4 +1,4 @@
-import { DECLINED_APPLICATION_ERROR, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, PENDING_APPROVAL_ERROR } from "@/lib/sign-in";
+import { DECLINED_APPLICATION_ERROR, GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, NOT_AN_EMAIL_SIGN_IN_ERROR, PENDING_APPROVAL_ERROR } from "@/lib/sign-in";
 
 /**
  * Nov 6 (Julia, phone): a sign-in page left open across a site update posts to a server action the new build no longer
@@ -13,6 +13,7 @@ const CODES: Record<string, string> = {
   pending: PENDING_APPROVAL_ERROR,
   declined: DECLINED_APPLICATION_ERROR,
   inactive: INACTIVE_ACCOUNT_ERROR,
+  "not-email": NOT_AN_EMAIL_SIGN_IN_ERROR,
 };
 
 export function signInErrorCode(message: string): string {
