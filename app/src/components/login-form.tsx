@@ -12,6 +12,8 @@ export function LoginForm({ next, portal = "member", initialError = "" }: { next
   const [error, setError] = useState(initialError);
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
+  // React clears a form after its action runs; keep the email so an error does not wipe what the member typed.
+  const [email, setEmail] = useState("");
   const tx = useTx();
 
   async function onSubmit(formData: FormData) {
@@ -51,7 +53,7 @@ export function LoginForm({ next, portal = "member", initialError = "" }: { next
         <label className={labelCls}>{tx("Email")}</label>
         {/* Plain text, not type=email: iPhone blocked the tap with its own "Enter an email address" bubble, so a tester who
             typed the gate username never saw our explanation (Nov 6, Julia). The server checks the address instead. */}
-        <input className={field} name="email" type="text" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required placeholder="you@firm.com" />
+        <input className={field} name="email" type="text" value={email} onChange={(event) => setEmail(event.target.value)} inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required placeholder="you@firm.com" />
       </div>
       <div>
         <label className={labelCls}>{tx("Password")}</label>
