@@ -14,6 +14,7 @@ import { annualDuesCents } from "@/lib/dues";
 import { duplicateJoinMessage } from "@/lib/invite-request";
 import {
   emptyProfile,
+  joinErrorField,
   joinRoleLabel,
   locationLine,
   pageOneErrors,
@@ -51,7 +52,23 @@ export async function checkJoinEmail(emailRaw: string): Promise<{ ok: true } | {
   };
 }
 
+/** Nov 7 (Stephanie, phone): join attempts left no trace in the logs. One line per try, no name, email or file. */
 export async function submitJoinApplication(
+  formData: FormData,
+): Promise<{ ok: true; statusToken: string } | { ok: false; error: string }> {
+  const upload = formData.get("businessCard");
+  const cardBytes = upload instanceof File ? upload.size : 0;
+  try {
+    const result = await submitJoinApplicationChecked(formData);
+    console.log(`JOIN_SUBMIT result=${result.ok ? "ok" : `error field=${joinErrorField(result.error)}`} card_kb=${Math.round(cardBytes / 1024)}`);
+    return result;
+  } catch (error) {
+    console.error(`JOIN_SUBMIT result=exception card_kb=${Math.round(cardBytes / 1024)}`);
+    throw error;
+  }
+}
+
+async function submitJoinApplicationChecked(
   formData: FormData,
 ): Promise<{ ok: true; statusToken: string } | { ok: false; error: string }> {
   const raw = String(formData.get("profile") || "");

@@ -43,6 +43,7 @@ import {
 import { US_STATES } from "@/lib/member-network";
 import { categoryForRole } from "@/lib/project-contact";
 import { publicStatusPath } from "@/lib/public-status";
+import { CARD_LIMIT_BYTES, CARD_TOO_BIG_ERROR, cardNeedsShrink, shrinkCardImage } from "@/lib/card-shrink";
 
 const RQ = <span className="text-[#9b2c22]"> *</span>;
 
@@ -117,6 +118,9 @@ export function JoinApplication({
   const [riskError, setRiskError] = useState(false);
   const [ndaError, setNdaError] = useState(false);
   const [cardName, setCardName] = useState("");
+  // The card that is actually sent: a smaller copy of a large phone photo, or the original file.
+  const [cardFile, setCardFile] = useState<File | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
   const [issue, setIssue] = useState<FieldIssue>(null);
   const tx = useTx();
   const locale = useLocale();
@@ -173,6 +177,8 @@ export function JoinApplication({
     setRiskError(profile.acceptMemberRisk !== true);
     setNdaError(profile.acceptMemberNda !== true);
     const issues = pageTwoErrors(profile);
+    if (cardBusy) return;
+    if (cardFile && cardFile.size > CARD_LIMIT_BYTES) issues.push(CARD_TOO_BIG_ERROR);
     if (issues.length) {
       showIssue(issues[0]);
       return;
@@ -182,6 +188,7 @@ export function JoinApplication({
     setIssue(null);
     const data = new FormData(event.currentTarget);
     data.set("profile", JSON.stringify(profile));
+    if (cardFile) data.set("businessCard", cardFile, cardFile.name);
     let result: Awaited<ReturnType<typeof submitJoinApplication>>;
     try {
       result = await submitJoinApplication(data);
@@ -481,12 +488,39 @@ export function JoinApplication({
             <input className={field} inputMode="url" placeholder="example.com/article" value={profile.press[1]} onChange={(event) => patch({ press: [profile.press[0] || "", event.target.value] })} />
           </div>
           <h2 className="mt-6 font-serif text-2xl font-normal">{tx("Business card or email signature (optional)")}</h2>
-          <label className="mt-2 block rounded border border-dashed border-line bg-paper p-4 text-center text-sm text-mut">
+          <label className="mt-2 block rounded border border-dashed border-line bg-paper p-4 text-center text-sm text-mut" data-field="businessCard">
             {tx("Upload a business card or company email signature")}
-            <input name="businessCard" type="file" accept="image/jpeg,image/png,application/pdf" className="mt-2 block w-full text-sm" onChange={(event) => setCardName(event.target.files?.[0]?.name || "")} />
+            <input
+              name="businessCard"
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              className="mt-2 block w-full text-sm"
+              data-testid="join-card-input"
+              onChange={async (event) => {
+                const picked = event.target.files?.[0] || null;
+                setCardName(picked?.name || "");
+                setCardFile(picked);
+                if (issue?.key === "businessCard") {
+                  setIssue(null);
+                  setError("");
+                }
+                if (!picked) return;
+                if (cardNeedsShrink(picked)) {
+                  setCardBusy(true);
+                  const smaller = await shrinkCardImage(picked);
+                  setCardBusy(false);
+                  if (smaller) {
+                    setCardFile(smaller);
+                    return;
+                  }
+                }
+                if (picked.size > CARD_LIMIT_BYTES) showIssue(CARD_TOO_BIG_ERROR);
+              }}
+            />
           </label>
+          <FieldError name="businessCard" />
           <p className="mt-2 text-sm font-semibold italic text-brass">{tx("Highly encouraged")}</p>
-          {cardName ? <p className="text-sm">{cardName}</p> : null}
+          {cardName ? <p className="text-sm" data-testid="join-card-name">{cardBusy ? tx("Preparing your photo…") : cardName}</p> : null}
           <h2 className="mt-6 font-serif text-2xl font-normal">{tx("Professional reference (optional)")}</h2>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <Field label="Name" value={profile.referenceName} onChange={(value) => patch({ referenceName: value })} />

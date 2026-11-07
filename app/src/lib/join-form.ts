@@ -108,6 +108,7 @@ export function joinErrorField(message: string): string {
     [/property type/, "propertyTypes"],
     [/password/, "password"],
     [/agreement boxes/, "acceptTerms"],
+    [/business card/, "businessCard"],
   ];
   if (message === MEMBER_RISK_ERROR) return "acceptMemberRisk";
   if (message === MEMBER_NDA_ERROR) return "acceptMemberNda";
