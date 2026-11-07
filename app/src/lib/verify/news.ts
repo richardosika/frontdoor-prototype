@@ -1,6 +1,6 @@
 import { formatEtDate } from "@/lib/format";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { brandAliases, companyPhraseTokens, companySearchTerm, domainBrand, domainMatchesOrgStem, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companyPhraseTokens, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, formalGivenNames, headlineNamesFirm, isCommonQueryStem, isDistinctiveCompanyToken, isGenericFirmToken, isIndustryQueryWord, isOrdinaryDictionaryWord, isSearchTermGeneric, isShortBrandToken, isStandaloneGenericQueryToken, leftTheCompany, mentionsBrandAlias, mentionsCompany, mentionsPerson, parsePersonName, personHit, personSearchSpellings, personSpan, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import { isQueryEcho, providerAttemptState } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput, EvidenceStatus } from "@/lib/verify/types";
@@ -157,14 +157,21 @@ export function personCompanyQuery(person: string, companyTerm: string): string 
   }
   // The firm name is the person's name. Do not quote "Adam Leitman Bailey" a second time.
   if (words.length && words.every((word) => seen.has(bareToken(word)))) return null;
+  // "plaza" alone is every plaza. Keep "plaza construction". "ocean" alone is every ocean. Keep "ocean bank".
+  if (words.some((word) => isCommonQueryStem(bareToken(word))) && words.some((word) => isIndustryQueryWord(bareToken(word)))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
   const kept = words.filter((word) => {
     const token = bareToken(word);
     return token.length >= 2 && !seen.has(token);
   });
   const distinctive = kept.filter((word) => {
     const token = bareToken(word);
-    return isDistinctiveCompanyToken(token) && !isStandaloneGenericQueryToken(token);
+    return isDistinctiveCompanyToken(token) && !isSearchTermGeneric(token);
   });
+  if (distinctive.length === 1 && words.length >= 2 && (isOrdinaryDictionaryWord(bareToken(distinctive[0])) || isCommonQueryStem(bareToken(distinctive[0])))) {
+    return `"${cleanedPerson}" "${words.join(" ")}"`;
+  }
   if (distinctive.length) return `"${cleanedPerson}" "${distinctive.join(" ")}"`;
   // "building" alone is not the firm. Keep the whole name, including a short token and the surname.
   if (words.length >= 2) return `"${cleanedPerson}" "${words.join(" ")}"`;
@@ -205,7 +212,23 @@ export function newsSearchQueries(facts: ApplicantFacts, aliases: string[] = [])
   const personQuery = personCompanyQuery(person, term);
   if (personQuery) queries.push(personQuery);
   else if (person || company) queries.push(`"${person || company}"`);
-  if (last && normalizeName(last) !== normalizeName(person)) {
+  for (const spelling of personSearchSpellings(facts.applicantName)) {
+    if (spelling.toLowerCase() === person.toLowerCase()) continue;
+    const accented = personCompanyQuery(spelling, term);
+    if (accented && !queries.includes(accented)) queries.push(accented);
+  }
+  const parsedPerson = parsePersonName(facts.applicantName);
+  for (const formal of formalGivenNames(facts.applicantName)) {
+    if (!parsedPerson) continue;
+    const full = [formal, ...parsedPerson.given.slice(1), parsedPerson.surname].join(" ");
+    const formalQuery = personCompanyQuery(full, term);
+    if (formalQuery && !queries.includes(formalQuery)) queries.push(formalQuery);
+  }
+  const commonSurname = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
+  if (last && commonSurname.has(last.toLowerCase())) {
+    const token = distinctiveCompanyTokens(company).find((word) => isDistinctiveCompanyToken(word));
+    if (person && token) queries.push(`"${person}" "${token}"`);
+  } else if (last && normalizeName(last) !== normalizeName(person)) {
     const lastQuery = personCompanyQuery(last, term);
     if (lastQuery) queries.push(lastQuery);
   }
@@ -422,7 +445,122 @@ export async function newsChecks(facts: ApplicantFacts, fetchText: FetchText, no
     providers.push({ name: provider.name, state: provider.state });
     collected.push(...provider.items);
   }
-  return classifyNews(facts, collected, providers, now);
+  const enriched = await attachCompanyNearPerson(facts, collected, fetchText);
+  const classified = classifyNews(facts, enriched, providers, now);
+  const reputation = await reputationalStories(facts, enriched, fetchText, now);
+  return [...classified, ...reputation];
+}
+
+const REPUTATION_WORD = /\b(epstein|lawsuits?|indicted|frauds?|charged|arrested)\b/i;
+
+/** A headline with a risk word that does not itself name the person. The body has to name them. */
+export function reputationalHeadline(title: string, person: string): boolean {
+  return REPUTATION_WORD.test(title) && !mentionsPerson(title, person);
+}
+
+async function reputationalStories(facts: ApplicantFacts, items: NewsItem[], fetchText: FetchText, now: Date): Promise<CheckOutput[]> {
+  const person = facts.applicantName.trim();
+  const org = stripQaOrg((facts.org || facts.name).trim());
+  if (!person) return [];
+  const targets = items.filter((item) => item.url && publisherArticleUrl(item.url) && reputationalHeadline(item.title, person)).slice(0, 2);
+  const rows: CheckOutput[] = [];
+  for (const item of targets) {
+    try {
+      const response = await fetchText(publisherArticleUrl(item.url));
+      if (!response.ok || !response.text || !mentionsPerson(response.text, person)) continue;
+      rows.push({
+        key: "news-reputation",
+        status: "INCONCLUSIVE",
+        weight: 0,
+        corroborates: false,
+        finding: `Reputational story names this person - review. ${item.title}. This is a mention for a reviewer, not a finding of wrongdoing, and it does not change the score.`,
+        source: "News",
+        url: publisherArticleUrl(item.url),
+        ranAt: now.toISOString(),
+      });
+    } catch {
+      // A failed article fetch adds no attention item.
+    }
+  }
+  return rows;
+}
+
+const COMMON_SURNAMES = new Set(["march", "may", "june", "august", "day", "price", "rose", "young", "king", "black"]);
+
+/** The company name sits within about 300 characters of the person's full name. */
+export function companyNearPerson(text: string, person: string, org: string, limit = 300): boolean {
+  const hit = personSpan(text, person);
+  if (!hit) return false;
+  const window = text.slice(Math.max(0, hit.index - limit), hit.index + hit.length + limit);
+  return mentionsCompany(window, org, person);
+}
+
+function isGoogleNewsUrl(value: string): boolean {
+  try {
+    return /(^|\.)news\.google\.com$/i.test(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Bing News redirect links unwrap to the publisher. A Google News redirect is not an article. */
+export function publisherArticleUrl(value: string): string {
+  const direct = value.trim();
+  if (!direct || isGoogleNewsUrl(direct)) return "";
+  return direct;
+}
+
+async function attachCompanyNearPerson(facts: ApplicantFacts, items: NewsItem[], fetchText: FetchText): Promise<NewsItem[]> {
+  const person = facts.applicantName.trim();
+  const org = stripQaOrg((facts.org || facts.name).trim());
+  if (!person || !org) return items;
+  const factsForJudge = { name: person, applicantName: person, org, location: facts.location, website: facts.website };
+  const surname = surnameForSearch(person);
+  const surnameOnly = Boolean(surname) && !COMMON_SURNAMES.has(surname.toLowerCase());
+  const targets = items.filter((item) => {
+    if (!item.url) return false;
+    const judged = judgeHeadline(item.title, factsForJudge);
+    if (judged.person && !judged.company) return true;
+    if (surnameOnly && new RegExp(`${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+rebrands\\s+as\\b`, "i").test(item.title) && judged.company) return true;
+    if (!surnameOnly || judged.person || !judged.company) return false;
+    return new RegExp(`(?<![A-Za-z])${surname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z])`, "i").test(item.title);
+  });
+  const ordered = [...targets.filter((item) => publisherArticleUrl(item.url)), ...targets.filter((item) => isGoogleNewsUrl(item.url))].slice(0, 2);
+  if (!ordered.length) return items;
+  const fetched = new Map<string, { body: string; url: string }>();
+  let fetches = 0;
+  let lookedUp = false;
+  for (const item of ordered) {
+    if (fetches >= 2) break;
+    let url = publisherArticleUrl(item.url);
+    if (!url && isGoogleNewsUrl(item.url) && !lookedUp && fetches < 2) {
+      lookedUp = true;
+      fetches += 1;
+      try {
+        const lookup = await fetchText(bingNewsUrl(`"${item.title}"`));
+        const match = lookup.ok ? parseRssItems(lookup.text, "Bing News").find((row) => normalizeName(row.title) === normalizeName(item.title)) : undefined;
+        url = match ? publisherArticleUrl(match.url) : "";
+      } catch {
+        url = "";
+      }
+    }
+    if (!url || fetches >= 2) continue;
+    fetches += 1;
+    try {
+      const response = await fetchText(url);
+      if (response.ok && response.text && companyNearPerson(response.text, person, org)) fetched.set(item.url, { body: response.text, url });
+    } catch {
+      // A failed article fetch leaves the headline inconclusive.
+    }
+  }
+  if (!fetched.size) return items;
+  return items.map((item) => {
+    const found = fetched.get(item.url);
+    if (!found) return item;
+    const hit = personSpan(found.body, person);
+    const window = hit ? found.body.slice(Math.max(0, hit.index - 300), hit.index + hit.length + 300) : "";
+    return window ? { ...item, snippet: `${item.snippet} ${window}`.replace(/\s+/g, " ").trim(), url: found.url } : item;
+  });
 }
 
 function newsSummary(
@@ -476,14 +614,6 @@ function newsSummary(
       finding: `Negative coverage names this person with the company or city near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
     };
   }
-  if (companyHard) {
-    return {
-      ...base,
-      status: "FAIL",
-      reviewFlag: true,
-      finding: `Negative coverage names this company near fraud, sanctions, or a criminal charge. Possible match, needs review. This is not an automatic decline. ${feeds}`.trim(),
-    };
-  }
   if (personNamedCivil) {
     return {
       ...base,
@@ -502,15 +632,22 @@ function newsSummary(
   }
   if (aligned) {
     const neutralItem = items.find((item) => item.tone === "neutral" && item.person && item.company && !item.departed);
-    const lawsuitNote = companyLitigation
-      ? "Company-level litigation headline is an attention item only and does not replace the stories that name this person and this company."
-      : "";
+    const lawsuitNote = [companyLitigation ? "Company-level litigation headline is an attention item only and does not replace the stories that name this person and this company." : "", companyHard ? "Company-level crime headline names the company and not this person. It is an attention item and does not cap the grade." : ""]
+      .filter(Boolean)
+      .join(" ");
     return {
       ...base,
       status: "PASS",
       corroborates: true,
       url: neutralItem?.url || evidenceUrl,
       finding: `Neutral coverage names this person and company. ${lawsuitNote} ${neutralItem?.title || ""} Query-echo headlines were ignored. ${feeds}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  if (companyHard) {
+    return {
+      ...base,
+      status: "INCONCLUSIVE",
+      finding: `Company-level crime headline. A fraud, sanctions, or criminal term names the company and not this person. The company may be the location or the victim. This is an attention item and does not cap the grade. ${feeds}`.trim(),
     };
   }
   if (companyLitigation) {
@@ -565,6 +702,7 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
   const personHard = item.kind === "hard" && item.person && (item.company || item.location);
   const personNamedCivil = item.kind === "civil" && item.person && (item.company || item.location) && !item.foreclosureOnly;
   const companyCivil = (item.kind === "civil" && !item.person) || item.foreclosureOnly;
+  const companyHard = item.kind === "hard" && !item.person && item.company;
   const status: EvidenceStatus = personHard || personNamedCivil ? "FAIL" : "INCONCLUSIVE";
   const date = item.publishedAt ? formatEtDate(new Date(item.publishedAt)) : "date not listed";
   const label = item.suffixMismatch
@@ -577,9 +715,11 @@ function newsStory(item: Classified, ranAt: string): CheckOutput {
           ? "Negative"
           : personNamedCivil
             ? "Civil, names applicant"
-            : companyCivil
-              ? "Company litigation"
-              : "Neutral";
+            : companyHard
+              ? "Company crime"
+              : companyCivil
+                ? "Company litigation"
+                : "Neutral";
   const outlet = item.source || hostOf(item.url);
   return {
     key: "news-story",
@@ -609,6 +749,7 @@ export function ordinaryResults(text: string): boolean {
 
 /** A plaintiff-firm solicitation about the company. It is not a charge against the person. */
 export function plaintiffSolicitation(text: string): boolean {
+  if (/\bclass action\s+(?:leaders|partners|practice|group|team)\b/i.test(text)) return false;
   return /lead plaintiff deadline|securities fraud class action|\bclass action\b/i.test(text);
 }
 
@@ -672,7 +813,7 @@ export function judgeHeadline(
     person,
     company,
     location: textHasLocation(text, facts.location),
-    departed: person && company && leftTheCompany(text, companyName),
+    departed: person && company && leftTheCompany(text, companyName, personName),
     suffixMismatch: hit === "suffix-mismatch",
     foreclosureOnly: kind === "civil" && foreclosureOnly(text),
     aliasOnly: Boolean(alias),
@@ -845,7 +986,7 @@ function textHasCompany(text: string, org: string, person = ""): boolean {
   const phrase = companyPhraseTokens(org);
   const distinctive = phrase.filter((token) => isDistinctiveCompanyToken(token));
   if (phrase.length === 1 && distinctive.length === 1 && SOLE_PLACE.has(distinctive[0])) return false;
-  return mentionsCompany(text, org, person);
+  return headlineNamesFirm(text, org, person);
 }
 
 function textHasLocation(text: string, location: string): boolean {

@@ -1,5 +1,21 @@
-import { normalizeRegistryName, registryNameLiterals } from "@/lib/verify/ny-registry";
+import { normalizeRegistryName, registryExactWhere, registryNameIsGenericOnly, registryNameWhere, registryQualifierMatch, relatedBrandNames } from "@/lib/verify/ny-registry";
+import { domainBrand, isGenericFirmToken } from "@/lib/verify/public-match";
+import { statedUsState } from "@/lib/verify/address";
 import type { CheckOutput } from "@/lib/verify/types";
+
+const REGISTRY_EXTRA = new Set(["construction", "builders", "development", "properties", "group", "company", "companies", "co"]);
+
+/** "Hensel Phelps Construction Co." is Hensel Phelps plus an industry word, when the domain agrees. */
+function registryNameExtends(listed: string, org: string, website: string): boolean {
+  const orgTokens = normalizeRegistryName(org).split(/\s+/).filter(Boolean);
+  const listedTokens = normalizeRegistryName(listed).split(/\s+/).filter(Boolean);
+  if (!orgTokens.length || listedTokens.length <= orgTokens.length) return false;
+  if (listedTokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) return false;
+  const extra = listedTokens.slice(orgTokens.length);
+  if (!extra.length || !extra.every((token) => REGISTRY_EXTRA.has(token))) return false;
+  const stem = domainBrand(website);
+  return Boolean(stem) && stem === orgTokens.join("");
+}
 
 /**
  * Official open-data portals that answered a keyless request from this server.
@@ -83,13 +99,23 @@ export function registryPortal(state: string): RegistryPortal | undefined {
   return FREE_REGISTRIES.find((portal) => portal.state === state.toUpperCase());
 }
 
-export function socrataRegistryUrl(portal: RegistryPortal, org: string): string {
-  const names = registryNameLiterals(org).map((name) => `'${name.replace(/'/g, "''")}'`);
+function registryDatasetUrl(dataset: string, select: string, where: string, orderField = ""): string {
   const params = new URLSearchParams();
-  params.set("$select", [portal.nameField, portal.statusField].filter(Boolean).join(","));
-  params.set("$limit", names.length ? "10" : "0");
-  if (names.length) params.set("$where", `upper(${portal.nameField}) in(${names.join(",")})`);
-  return `${portal.dataset}?${params.toString()}`;
+  params.set("$select", select);
+  params.set("$limit", where ? "50" : "0");
+  if (where) params.set("$where", where);
+  if (where && orderField) params.set("$order", `length(${orderField})`);
+  return `${dataset}?${params.toString()}`;
+}
+
+export function socrataExactUrl(portal: RegistryPortal, org: string): string {
+  const select = [portal.nameField, portal.statusField].filter(Boolean).join(",");
+  return registryDatasetUrl(portal.dataset, select, registryExactWhere(portal.nameField, org));
+}
+
+export function socrataRegistryUrl(portal: RegistryPortal, org: string): string {
+  const select = [portal.nameField, portal.statusField].filter(Boolean).join(",");
+  return registryDatasetUrl(portal.dataset, select, registryNameWhere(portal.nameField, org), portal.nameField);
 }
 
 function statusIsActive(status: string): boolean {
@@ -102,6 +128,8 @@ export function assessStateRegistry(
   portal: RegistryPortal,
   org: string,
   response: { ok: boolean; status: number; text: string },
+  website = "",
+  domainResolves = true,
 ): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates"> {
   const url = portal.portalUrl;
   if (!org.trim()) {
@@ -134,6 +162,14 @@ export function assessStateRegistry(
     };
   }
   const want = normalizeRegistryName(org);
+  if (registryNameIsGenericOnly(org)) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      url,
+      finding: `${portal.label} responded. The name is too generic to match for free. This is not a pass.`,
+    };
+  }
   const hits = rows.filter((row) => normalizeRegistryName(String(row[portal.nameField] || "")) === want && want);
   const active = hits.find((row) => !portal.statusField || statusIsActive(String(row[portal.statusField] || "")));
   if (active) {
@@ -153,10 +189,104 @@ export function assessStateRegistry(
       finding: `${portal.label} has this exact name, but not in an active status. This is not a pass.`,
     };
   }
+  const extended = website
+    ? rows.find((row) => {
+        const listed = String(row[portal.nameField] || "");
+        return registryNameExtends(listed, org, website) && (!portal.statusField || statusIsActive(String(row[portal.statusField] || "")));
+      })
+    : undefined;
+  if (extended) {
+    const listed = String(extended[portal.nameField] || org);
+    return {
+      status: "PASS",
+      corroborates: false,
+      url,
+      finding: `${portal.label} lists ${listed}. That shows a company by this name exists. It does not tie a person to the firm.`,
+    };
+  }
+  const qualified = rows.find((row) => registryQualifierMatch(String(row[portal.nameField] || ""), org, website, domainResolves));
+  if (qualified && (!portal.statusField || statusIsActive(String(qualified[portal.statusField] || "")))) {
+    const listed = String(qualified[portal.nameField] || org);
+    return {
+      status: "PASS",
+      corroborates: false,
+      url,
+      finding: `${portal.label} lists ${listed}. That shows a company by this name exists. It does not tie a person to the firm.`,
+    };
+  }
   return {
     status: "INCONCLUSIVE",
     corroborates: false,
     url,
-    finding: `${portal.label} responded. No entity uses this exact name. A similar name is not a match, and this is not a pass.`,
+    finding: `${portal.label} responded. No entity uses this exact name. A similar name is not a match, and this is not a pass.${(() => {
+      const related = relatedBrandNames(
+        rows.map((row) => String(row[portal.nameField] || "")),
+        org,
+      );
+      return related.length ? ` Related names a reviewer can check: ${related.join("; ")}. This is not a pass and adds no points.` : "";
+    })()}`,
+  };
+}
+
+/** Keyless FDIC BankFind search. The first distinctive word is enough to retrieve the charter name. */
+export function fdicBankFindUrl(org: string): string {
+  const tokens = normalizeRegistryName(org)
+    .split(/\s+/)
+    .filter((token) => token && !isGenericFirmToken(token));
+  const term = tokens[0] || normalizeRegistryName(org).split(/\s+/)[0] || org.trim();
+  const params = new URLSearchParams({
+    filters: "ACTIVE:1",
+    search: `NAME:${term}`,
+    fields: "NAME,NAMEHCR,WEBADDR,CITY,STALP,ACTIVE",
+    limit: "25",
+  });
+  return `https://api.fdic.gov/banks/institutions?${params.toString()}`;
+}
+
+type FdicInstitution = { NAME?: string; NAMEHCR?: string; WEBADDR?: string; CITY?: string; STALP?: string; ACTIVE?: number | string };
+
+/** An active BankFind row whose normalized name is the applicant's bank. No person tie. */
+export function assessFdicBank(
+  org: string,
+  location: string,
+  response: { ok: boolean; status: number; text: string },
+): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag"> | null {
+  if (!response.ok || !response.text.trim()) return null;
+  let rows: FdicInstitution[] = [];
+  try {
+    const parsed = JSON.parse(response.text) as { data?: { data?: FdicInstitution }[] };
+    rows = Array.isArray(parsed.data) ? parsed.data.map((row) => row?.data || {}) : [];
+  } catch {
+    return null;
+  }
+  if (registryNameIsGenericOnly(org)) return null;
+  const want = normalizeRegistryName(org);
+  const active = rows.filter((row) => Number(row.ACTIVE) === 1);
+  const hit = active.find((row) => {
+    const name = normalizeRegistryName(String(row.NAME || ""));
+    const holding = normalizeRegistryName(String(row.NAMEHCR || ""));
+    return (name && name === want) || (holding && holding === want);
+  });
+  if (!hit) return null;
+  const state = String(hit.STALP || "").trim().toUpperCase();
+  const place = [String(hit.CITY || "").trim(), state].filter(Boolean).join(" ");
+  const listed = String(hit.NAME || org);
+  const holding = String(hit.NAMEHCR || "").trim();
+  const url = "https://banks.data.fdic.gov/bankfind-suite/bankfind";
+  const applicantState = statedUsState(location);
+  if (applicantState && state && applicantState !== state) {
+    return {
+      status: "INCONCLUSIVE",
+      corroborates: false,
+      reviewFlag: true,
+      url,
+      finding: `FDIC BankFind lists ${listed} (active, ${place}). The bank's state is ${state}, not ${applicantState} on the application. This is an attention item and not a pass.`,
+    };
+  }
+  return {
+    status: "PASS",
+    corroborates: false,
+    url,
+    finding: `FDIC BankFind lists ${listed}${holding ? `, holding company ${holding}` : ""} (active, ${place}). That shows a company by this exact name exists. It does not tie a person to the firm.`,
   };
 }

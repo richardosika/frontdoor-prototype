@@ -192,6 +192,13 @@ export function CheckTable({
 }
 
 function EvidenceLabel({ row }: { row: { checkKey: string; status: string; finding: string } }) {
+  if ((row.checkKey === "edgar" || row.checkKey === "fixture-edgar") && row.status === "INCONCLUSIVE" && /exact current-name match|exact company name/i.test(row.finding)) {
+    return (
+      <span className="inline-flex rounded-sm border border-line bg-cream px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-forest">
+        Company match
+      </span>
+    );
+  }
   const label = newsStoryChipLabel(row.checkKey, row.status, row.finding);
   if (!label) return <EvidenceChip status={row.status} />;
   return (
