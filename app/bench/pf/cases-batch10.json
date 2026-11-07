@@ -1,0 +1,86 @@
+{
+  "_meta": {
+    "title": "Private Floor Club verification benchmark - batch 10 cases",
+    "groundTruthNote": "Batch 10 regression fixtures. B10R01 types the brand RXR and rxr.com, so RXR CEO counts the company. B10R02 is private: STO Building Group must not match Installed Building Products (IBP, CIK 1580905). B10R04 is a self-named firm: a third-party piece that names Adam Leitman Bailey is independent, and the social query must not repeat his name. B10R05 is Walker & Dunlop, CIK 1497770. Willy is a nickname of William, so Form 4 reporting owner Walker William M (CIK 1503841) corroborates. A discovered /in/walkerharris profile is Walker Harris and must not be credited. B10F01 is the unregistered-domain fake and must stay an F with the RDAP not-registered flag. Emails are Gmail. Nothing is sent.",
+    "defaults": {
+      "role": "DEVELOPER",
+      "phone": "",
+      "socialLinks": "",
+      "statement": "I work in commercial real estate and would like to meet other owners and operators.",
+      "inviteNote": "PF-BENCH-0000 · Benchmark invite code",
+      "linkedinUrl": "",
+      "website": "",
+      "location": "New York, NY",
+      "watchlist": "full"
+    },
+    "emailPolicy": "Every case uses a Gmail address so the email domain carries no signal. Nothing is ever sent to these addresses."
+  },
+  "cases": [
+    {
+      "id": "B10R01",
+      "kind": "real",
+      "label": "RXR / Scott Rechler",
+      "segment": "The application org is the brand RXR and the website is rxr.com. A headline such as RXR CEO says names the company.",
+      "name": "Scott Rechler",
+      "email": "scott.rechler.b10@gmail.com",
+      "org": "RXR",
+      "website": "https://www.rxr.com",
+      "location": "New York, NY",
+      "role": "DEVELOPER",
+      "statement": "I lead a New York real estate company and would like to meet owners and capital partners."
+    },
+    {
+      "id": "B10R02",
+      "kind": "real",
+      "label": "STO Building Group / Robert Mullen",
+      "segment": "Private contractor. EDGAR must not call Installed Building Products, Inc. (IBP, CIK 1580905) the parent. Court captions that do not name the company are a count, not a list.",
+      "name": "Robert Mullen",
+      "email": "robert.mullen.b10@gmail.com",
+      "org": "STO Building Group",
+      "website": "https://www.stobuildinggroup.com",
+      "location": "New York, NY",
+      "role": "GENERAL_CONTRACTOR",
+      "statement": "I lead a construction company and would like to meet owners and developers."
+    },
+    {
+      "id": "B10R04",
+      "kind": "real",
+      "label": "Adam Leitman Bailey, P.C. / Adam Leitman Bailey",
+      "segment": "Self-named firm. A Lawdragon piece about him is independent. Social queries must not repeat the name.",
+      "name": "Adam Leitman Bailey",
+      "email": "adam.leitman.bailey.b10@gmail.com",
+      "org": "Adam Leitman Bailey, P.C.",
+      "website": "https://www.alblawfirm.com",
+      "location": "New York, NY",
+      "role": "RE_ATTORNEY",
+      "statement": "I practice real estate law in New York and would like to meet owners and lenders."
+    },
+    {
+      "id": "B10R05",
+      "kind": "real",
+      "label": "Walker & Dunlop / Willy Walker",
+      "segment": "EDGAR CIK 1497770. Form 4 reporting owner Walker William M, CIK 1503841. Willy is a nickname of William. Do not credit linkedin.com/in/walkerharris.",
+      "name": "Willy Walker",
+      "email": "willy.walker.b10@gmail.com",
+      "org": "Walker & Dunlop",
+      "website": "https://www.walkerdunlop.com",
+      "location": "Bethesda, MD",
+      "role": "LENDER",
+      "statement": "I lead a commercial real estate finance company and would like to meet owners and capital partners."
+    },
+    {
+      "id": "B10F01",
+      "kind": "fake",
+      "label": "Batch-10 fake: unregistered domain, invented lender",
+      "segment": "Same invented lender as B9F01. Dead domain. RDAP must stay FAIL, not registered. Do not raise this score.",
+      "name": "Thaddeus Brinkwell",
+      "email": "thaddeus.brinkwell.b10@gmail.com",
+      "org": "Ormsley Vantage Lending Partners LLC",
+      "website": "https://www.ormsleyvantage.com",
+      "linkedinUrl": "https://www.linkedin.com/in/thaddeus-brinkwell-ovlp",
+      "location": "New York, NY",
+      "role": "LENDER",
+      "statement": "I run a private lending firm and would like to meet sponsors who need capital."
+    }
+  ]
+}
