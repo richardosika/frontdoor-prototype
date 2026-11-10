@@ -2,6 +2,7 @@
  * Recommended connections: members who share the viewer's area, fill a category their projects seek, or work on the
  * same project types. Every card shows one specific reason, built only from fields that exist. Staff never appear.
  */
+import { subCanReach } from "@/lib/sub-access";
 import { memberCategories, parseSeeking, seekLabel } from "@/lib/project-contact";
 import { isDeveloperRole } from "@/lib/member-reach";
 import { roleLabel, roleShort } from "@/lib/roles";
@@ -184,7 +185,8 @@ const WEIGHT: Record<Reason["kind"], number> = { category: 3, location: 2, proje
 /** Top matches, best first. Staff are never recommended: admins, staff addresses, and other accounts under a staff member's name. Each pick carries one specific reason line. */
 export function recommend(viewer: RecMember & { seeking: string[] }, others: RecMember[], exclude: Set<string>, limit = 6, staffNames: Set<string> = new Set()) {
   return others
-    .filter((other) => other.id !== viewer.id && !exclude.has(other.id) && !isStaffAccount(other, staffNames))
+    // Nov 10 (Julia): a subcontractor is recommended only general contractors and architects.
+    .filter((other) => other.id !== viewer.id && !exclude.has(other.id) && !isStaffAccount(other, staffNames) && subCanReach(viewer, other))
     .map((other) => {
       const reasons = recommendReasons(viewer, other);
       const line = reasonLine(viewer, other);

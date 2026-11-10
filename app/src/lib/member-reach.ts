@@ -34,6 +34,8 @@ export function memberNav(role: string | null | undefined): { href: string; labe
       { href: "/projects", label: "My Projects", test: "tab-projects" },
       { href: "/deals", label: "Find your team", test: "tab-deals" },
       { href: "/messages", label: "Messages", test: "tab-messages" },
+      // Nov 10: Member Directory (search people in the club). On phones it sits in the More menu.
+      { href: "/directory", label: "Member Directory", test: "tab-directory", sidebarOnly: true },
       // Nov 5: Bids is a sidebar item (it was an "Open Bids" bar on the Ledger). On phones it sits in the More menu.
       { href: "/bids", label: "Bids", test: "tab-bids", sidebarOnly: true },
       { href: "/profile", label: "Profile", test: "tab-profile" },
@@ -44,6 +46,7 @@ export function memberNav(role: string | null | undefined): { href: string; labe
     { href: "/deals", label: "Opportunities", test: "tab-deals" },
     { href: "/network", label: "My Circle", test: "tab-network" },
     { href: "/messages", label: "Messages", test: "tab-messages" },
+    { href: "/directory", label: "Member Directory", test: "tab-directory", sidebarOnly: true },
     { href: "/bids", label: "Bids", test: "tab-bids", sidebarOnly: true },
     { href: "/profile", label: "Profile", test: "tab-profile" },
   ];

@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/url";
 import { COLD_MESSAGE_REASON } from "@/lib/project-contact";
 import { canMessagePair } from "@/lib/project-contact-db";
+import { subCanReach, SUB_REACH_REASON } from "@/lib/sub-access";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -30,6 +31,8 @@ export async function requestConnection(formData: FormData) {
   if (await isBlocked(user.id, toId)) {
     redirect(`/members/${toId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
   }
+  // Nov 10: a subcontractor sends circle requests only to general contractors and architects.
+  if (!subCanReach(user, target)) redirect(`/network?error=${encodeURIComponent(SUB_REACH_REASON)}`);
   if (!(await canMessagePair(user.id, toId))) {
     redirect(`/members/${toId}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
   }
@@ -235,6 +238,9 @@ export async function openConversation(formData: FormData) {
     }),
   ]);
   if (existing) redirect(`/messages/${existing.id}`);
+  // Nov 10: a subcontractor does not start conversations with developers or the hidden categories. People already
+  // connected (for example a developer who reached out first) keep talking.
+  if (!subCanReach(user, other) && connection?.status !== "ACCEPTED" && !(await canMessagePair(user.id, otherId))) redirect(`/messages?error=${encodeURIComponent(SUB_REACH_REASON)}`);
   if (!canMessageAfterIntro({ intro: intro?.status ?? null, connection: connection?.status ?? null }) && !(await canMessagePair(user.id, otherId))) {
     redirect(`/members/${otherId}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
   }

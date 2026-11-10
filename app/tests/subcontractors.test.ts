@@ -37,11 +37,11 @@ describe("Nov 6 subcontractors", () => {
     expect(canOpenRequest({ viewer: sub, requesterId: "gc", recipientIds: [], templateCategory: "SUBCONTRACTOR", trade: "ROOFING", serviceStates: "NY" })).toBeNull();
     expect(canOpenRequest({ viewer: { ...sub, paymentStatus: "DUE" }, requesterId: "gc", recipientIds: [], templateCategory: "SUBCONTRACTOR", trade: "PLUMBING", serviceStates: "NY" })).toBeNull();
   });
-  it("subs can see and express interest in developer projects seeking a GC", () => {
-    expect(interestCategories(sub)).toContain("GENERAL_CONTRACTOR");
+  it("Nov 10 replaces the Nov 6 rule: subs no longer see or contact developer projects seeking a GC", () => {
+    expect(interestCategories(sub)).not.toContain("GENERAL_CONTRACTOR");
     const project = { userId: "dev", reviewStatus: "APPROVED", seeking: "GENERAL_CONTRACTOR", shareWithCircle: false };
-    expect(projectAccessible(project, { id: "s1", isAdmin: false, inOwnerCircle: false, role: "SUBCONTRACTOR" })).toBe(true);
-    expect(canContactAboutProject({ project, from: { id: "s1", role: "SUBCONTRACTOR" }, to: { id: "dev", role: "DEVELOPER" } })).toEqual({ ok: true, category: "SUBCONTRACTOR" });
+    expect(projectAccessible(project, { id: "s1", isAdmin: false, inOwnerCircle: false, role: "SUBCONTRACTOR" })).toBe(false);
+    expect(canContactAboutProject({ project, from: { id: "s1", role: "SUBCONTRACTOR" }, to: { id: "dev", role: "DEVELOPER" } }).ok).toBe(false);
   });
   it("pricing: subcontractors pay the standard $199 a month, first month half", () => {
     expect(monthlyDuesCents("SUBCONTRACTOR")).toBe(19_900);

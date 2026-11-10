@@ -20,6 +20,7 @@ import { eligibleForDirectory } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { projectPageView } from "@/lib/project-page";
+import { subCanSee } from "@/lib/sub-access";
 import { SEEK_CATEGORIES, fixRoleTypos, canContactAboutProject, categoryMemberWhere, memberCategories, memberInCategory, formatProjectValue, parseSeeking, projectLocation, seekLabel } from "@/lib/project-contact";
 import { roleLabel } from "@/lib/roles";
 import { canRequestBids } from "@/lib/bids";
@@ -64,6 +65,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const view = projectPageView(project, { id: viewer.id, isAdmin: viewer.isAdmin, inOwnerCircle: ownerCircle.has(viewer.id), role: viewer.role, extraCategories: viewer.extraCategories });
   // #25: not sought and not in the owner's circle: nothing about the project is shown.
   if (view === "hidden") return <ProjectNotAvailable tx={tx} />;
+  // Nov 10 (Julia): subcontractors have no access to developers' projects unless they are already on the project.
+  const acceptedHere = project.contacts.some((c) => c.status === "ACCEPTED" && (c.fromId === viewer.id || c.toId === viewer.id));
+  if (!viewer.isAdmin && view !== "owner" && !subCanSee(viewer, project.user) && !ownerCircle.has(viewer.id) && !acceptedHere) return <ProjectNotAvailable tx={tx} />;
   const isOwner = view === "owner";
   const seeking = parseSeeking(project.seeking);
   const back = `/projects/${project.id}`;

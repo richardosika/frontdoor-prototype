@@ -18,7 +18,7 @@ import { LOCALES, translator, type Locale } from "@/lib/i18n/messages";
 import { memberNav } from "@/lib/member-reach";
 import { roleLabel, roleShort } from "@/lib/roles";
 
-const ICONS: Record<string, string> = { "/feed": "⌂", "/projects": "▦", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺", "/bids": "▤" };
+const ICONS: Record<string, string> = { "/feed": "⌂", "/projects": "▦", "/deals": "◈", "/network": "⚇", "/messages": "✉", "/profile": "☺", "/bids": "▤", "/directory": "☷" };
 
 function active(pathname: string, href: string) {
   if (href === "/feed") return pathname.startsWith("/feed");

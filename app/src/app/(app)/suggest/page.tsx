@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { seekLabel } from "@/lib/project-contact";
 import { STATUS_TONE, statusLabel, suggestionCategories, type SuggestionStatus } from "@/lib/vendor-suggestions";
 import { syncSuggestionsQuietly } from "@/lib/vendor-suggestions-db";
+import { categoryVisibleTo } from "@/lib/sub-access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export default async function SuggestVendorPage({ searchParams }: { searchParams
   const locale = await currentLocale();
   const user = await requireUser();
   await syncSuggestionsQuietly({ suggestedById: user.id });
+  // Nov 10 (Julia): categories hidden from subcontractors are not offered to them here either.
+  const categories = suggestionCategories().filter((c) => categoryVisibleTo(user, c.id));
   const rows = await prisma.vendorSuggestion.findMany({ where: { suggestedById: user.id }, orderBy: { createdAt: "desc" }, take: 100 });
   const dateFmt = new Intl.DateTimeFormat(numberLocale(locale), { month: "short", day: "numeric", timeZone: "America/New_York" });
   return (
@@ -36,7 +39,7 @@ export default async function SuggestVendorPage({ searchParams }: { searchParams
               {tx("A suggestion is not a membership. Your suggestions are private: other members never see who you suggested, and the vendor only sees your name if you allow it below.")}
             </p>
           </div>
-          <SuggestVendorForm categories={suggestionCategories()} initialCategory={suggestionCategories().some((c) => c.id === q.category) ? q.category : ""} />
+          <SuggestVendorForm categories={categories} initialCategory={categories.some((c) => c.id === q.category) ? q.category : ""} />
         </section>
         <section className={`${card} p-4 shadow-[0_8px_24px_rgba(31,58,46,0.08)] sm:p-7`} data-testid="your-suggestions">
           <h2 className="font-serif text-[26px] font-medium text-forest">{tx("Your suggestions")}</h2>

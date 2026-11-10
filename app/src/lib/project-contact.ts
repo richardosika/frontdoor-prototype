@@ -9,6 +9,7 @@ import { formatUsd } from "@/lib/money";
  */
 import { roleById, type RoleId } from "@/lib/roles";
 import { moneyDigits } from "@/lib/money";
+import { isSubOnly, subCanReach, SUB_REACH_REASON } from "@/lib/sub-access";
 
 export type SeekCategory = { id: string; label: string; roles: RoleId[] };
 
@@ -60,6 +61,8 @@ export function memberCategories(member: CategoryMember): string[] {
  */
 export function interestCategories(member: CategoryMember): string[] {
   const cats = memberCategories(member);
+  // Nov 10 (Julia): subcontractors have no access to developers, so they no longer see developer projects seeking a GC.
+  if (isSubOnly(member)) return cats;
   return cats.includes("SUBCONTRACTOR") && !cats.includes("GENERAL_CONTRACTOR") ? [...cats, "GENERAL_CONTRACTOR"] : cats;
 }
 
@@ -105,6 +108,7 @@ export const CONTACT_REASONS = {
   notOwner: "Contact about a project goes to or comes from the project owner.",
   wrongCategory: "This project is not seeking your category. Private Floor does not allow cold outreach.",
   recipientCategory: "This project is not seeking that member's category.",
+  subReach: SUB_REACH_REASON,
 } as const;
 
 /**
@@ -120,6 +124,8 @@ export function canContactAboutProject(input: { project: ContactProject; from: C
   const ownerSends = project.userId === from.id;
   const ownerReceives = project.userId === to.id;
   if (!ownerSends && !ownerReceives) return { ok: false, reason: CONTACT_REASONS.notOwner };
+  // Nov 10: a subcontractor contacts only general contractors and architects (a developer may still reach a sub).
+  if (!subCanReach(from, to)) return { ok: false, reason: CONTACT_REASONS.subReach };
   const other = ownerSends ? to : from;
   // Nov 6: a subcontractor may express interest in a project seeking a General Contractor (recorded as Subcontractors).
   const direct = memberCategories(other).find((id) => seeking.includes(id));

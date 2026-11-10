@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { projectAudience } from "@/lib/project-contact-db";
 import { canContactAboutProject, memberCategories, projectDetailsVisible } from "@/lib/project-contact";
 import { projectAccessible } from "@/lib/member-reach";
+import { subCanSee } from "@/lib/sub-access";
 import { toPublicVerification, type PublicVerification, type VerificationStatus } from "@/lib/verification";
 
 export async function loadMemberProfile(viewerId: string, memberId: string) {
@@ -54,6 +55,17 @@ export async function loadMemberProfile(viewerId: string, memberId: string) {
       orderBy: { createdAt: "desc" },
     }),
   ]);
+  // Nov 10 (Julia): a subcontractor cannot look up developers or the hidden vendor categories. A profile stays open when
+  // that member already reached out to the sub, or they are connected (Development Partners are one way).
+  if (!viewer.isAdmin && viewerId !== memberId && !subCanSee(viewer, member)) {
+    const related =
+      connection?.status === "ACCEPTED" ||
+      connection?.fromId === memberId ||
+      introduction?.status === "ACCEPTED" ||
+      (await prisma.projectContact.count({ where: { OR: [{ fromId: memberId, toId: viewerId }, { fromId: viewerId, toId: memberId, status: "ACCEPTED" }] } })) > 0 ||
+      (await prisma.conversation.count({ where: { OR: [{ userAId: viewerId, userBId: memberId }, { userAId: memberId, userBId: viewerId }] } })) > 0;
+    if (!related) return null;
+  }
   let state: "NONE" | "PENDING" | "ACCEPTED" | "INCOMING" = "NONE";
   if (connection?.status === "ACCEPTED") state = "ACCEPTED";
   else if (connection?.status === "PENDING" && connection.fromId === viewerId) state = "PENDING";

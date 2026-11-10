@@ -41,7 +41,7 @@ const FLAG_RULES: { term: string; pattern: RegExp }[] = [
 
 export const CHECKLIST = [
   { id: "profile", label: "Fill in your markets and what you are looking for or offering", href: "/profile" },
-  { id: "directory", label: "Search the member directory", href: "/network" },
+  { id: "directory", label: "Search the member directory", href: "/directory" },
   { id: "guidelines", label: "Read the community guidelines", href: "/legal/guidelines" },
   { id: "post", label: "Post what you are seeking or raising", href: "/feed" },
   { id: "intro", label: "Request an introduction", href: "/network" },

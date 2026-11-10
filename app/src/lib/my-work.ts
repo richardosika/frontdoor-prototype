@@ -2,6 +2,7 @@
  * #44 "My work right now" for every member type except developers: Active (developer projects the member is on),
  * In talks (open requests sent / received, recently accepted), New for you (opportunities not yet contacted).
  */
+import { subCanReach } from "@/lib/sub-access";
 import { prisma } from "@/lib/prisma";
 import { memberCategories, parseSeeking } from "@/lib/project-contact";
 import { moneyDigits } from "@/lib/money";
@@ -117,7 +118,7 @@ export function viewChart(views: { viewerId: string; createdAt: Date }[], now = 
   });
 }
 
-export async function loadSidePanels(user: { id: string }, active: { id: string; name: string; next: { title: string; dueDate: Date | null } | null; room: { id: string } | null }[], now = new Date()) {
+export async function loadSidePanels(user: { id: string; role?: string; extraCategories?: string | null }, active: { id: string; name: string; next: { title: string; dueDate: Date | null } | null; room: { id: string } | null }[], now = new Date()) {
   const weekAgo = new Date(now.getTime() - 7 * DAY);
   const activeIds = active.map((a) => a.id);
   const [views, unread, contacts, access, owners, conns] = await Promise.all([
@@ -157,7 +158,8 @@ export async function loadSidePanels(user: { id: string }, active: { id: string;
   const peopleRows = onProject.size
     ? await prisma.user.findMany({ where: { id: { in: [...onProject.keys()] }, status: "ACTIVE" }, select: { id: true, name: true, org: true, role: true } })
     : [];
-  const people = peopleRows.slice(0, 3).map((p) => ({ ...p, projectName: names.get(onProject.get(p.id)!) ?? "" }));
+  // Nov 10: a subcontractor is suggested only general contractors and architects.
+  const people = peopleRows.filter((p) => !user.role || subCanReach({ role: user.role, extraCategories: user.extraCategories }, p)).slice(0, 3).map((p) => ({ ...p, projectName: names.get(onProject.get(p.id)!) ?? "" }));
   return {
     viewers: viewers.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).map((v) => ({ ...v, lastViewed: lastSeen.get(v.id)! })),
     chart: viewChart(views.filter((v) => approved.has(v.viewerId)), now),

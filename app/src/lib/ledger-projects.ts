@@ -5,6 +5,7 @@ import { categoryMemberWhere, interestCategories, memberCategories, memberInCate
 import { circleIds } from "@/lib/project-contact-db";
 import type { MemberRole } from "@prisma/client";
 import { matchesSlimFilters, type SlimFilters } from "@/lib/member-reach";
+import { opportunityOwnerRoles, subCanSee } from "@/lib/sub-access";
 
 /** Everything the role-aware top of the Ledger needs: my projects, who they seek, outreach, and projects seeking me. */
 export async function loadLedgerProjects(user: { id: string; role: string; extraCategories?: string | null }, options: { filters?: SlimFilters; limit?: number; hideDismissed?: boolean; receivedLimit?: number } = {}) {
@@ -81,11 +82,13 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   // #42: the category of mine each project seeks (first match in my order), so multi-category members see every match.
   // Nov 6: subcontractors also see developer projects seeking a General Contractor (interest only, no full GC bid).
   const interestCats = interestCategories(user);
+  // Nov 10 (Julia): subs see projects from general contractors and architects, never from developers.
+  const ownerRoles = opportunityOwnerRoles(user);
   const matchOf = (project: { seeking: string }) => myCategories.find((id) => parseSeeking(project.seeking).includes(id)) ?? interestCats.find((id) => parseSeeking(project.seeking).includes(id)) ?? null;
   const seekingMe = myCategories.length
     ? others
         // #44: only developer projects seek people; a non-developer's past work never matches.
-        .filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && keep(project) && !dismissed.has(project.id))
+        .filter((project) => ownerRoles.includes(project.user.role) && matchOf(project) && keep(project) && !dismissed.has(project.id))
         // Overnight: projects that give this member type the facts it needs come first, then newest.
         .sort((a, b) => factScore(matchOf(b)!, b) - factScore(matchOf(a)!, a))
         .slice(0, limit)
@@ -93,7 +96,7 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
     : [];
   const seekingIds = new Set(seekingMe.map((project) => project.id));
   const circleShared = others
-    .filter((project) => project.shareWithCircle && circle.has(project.userId) && !seekingIds.has(project.id) && keep(project))
+    .filter((project) => project.shareWithCircle && circle.has(project.userId) && !seekingIds.has(project.id) && keep(project) && subCanSee(user, project.user))
     .slice(0, limit);
 
   return {
@@ -101,10 +104,10 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
     myCategories,
     // #44 expanded: every approved developer project seeking one of my categories (ignores filters), for the headline.
     allSeeking: others
-      .filter((project) => project.user.role === "DEVELOPER" && matchOf(project))
+      .filter((project) => ownerRoles.includes(project.user.role) && matchOf(project))
       .map((project) => ({ id: project.id, valueLabel: project.valueLabel, at: project.reviewedAt ?? project.submittedAt, matchedCategory: matchOf(project) })),
     // #44: approved projects seeking me that I have not contacted yet (all of them, not only the first few shown).
-    newForYou: others.filter((project) => project.user.role === "DEVELOPER" && matchOf(project) && !contactStatus.get(contactKey(project.id, user.id, project.userId))).length,
+    newForYou: others.filter((project) => ownerRoles.includes(project.user.role) && matchOf(project) && !contactStatus.get(contactKey(project.id, user.id, project.userId))).length,
     myProjects,
     sent,
     received: received.map((row) => ({ ...row, ownerIsMe: row.project.userId === user.id, inCircle: circle.has(row.fromId) })),

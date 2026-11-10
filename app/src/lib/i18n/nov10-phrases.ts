@@ -20,4 +20,18 @@ export const NOV10_PHRASES: Record<string, readonly [string, string, string]> = 
   "Cancel": ["Cancelar", "Abbrechen", "キャンセル"],
   "Removing…": ["Quitando…", "Wird entfernt…", "削除しています…"],
   "Removed from Opportunities and your Ledger.": ["Quitado de Oportunidades y de su Ledger.", "Aus Chancen und Ihrem Ledger entfernt.", "案件とLedgerから削除しました。"],
+  // Batch B: sub access rules and Member Directory.
+  "Subcontractors connect directly with general contractors and architects on Private Floor.": ["En Private Floor, los subcontratistas se conectan directamente con contratistas generales y arquitectos.", "Auf Private Floor vernetzen sich Subunternehmer direkt mit Generalunternehmern und Architekten.", "Private Floor では、サブコントラクターはゼネコンと建築家に直接つながります。"],
+  "Member Directory": ["Directorio de miembros", "Mitgliederverzeichnis", "会員ディレクトリ"],
+  "Search for people who belong to the club by name, company, category or location.": ["Busque a las personas que pertenecen al club por nombre, empresa, categoría o ubicación.", "Suchen Sie Mitglieder des Clubs nach Name, Firma, Kategorie oder Standort.", "名前、会社、カテゴリー、所在地でクラブのメンバーを検索できます。"],
+  "Name or company": ["Nombre o empresa", "Name oder Firma", "名前または会社"],
+  "Search members": ["Buscar miembros", "Mitglieder suchen", "メンバーを検索"],
+  "All categories": ["Todas las categorías", "Alle Kategorien", "すべてのカテゴリー"],
+  "City or state": ["Ciudad o estado", "Stadt oder Bundesstaat", "市または州"],
+  "Location": ["Ubicación", "Standort", "所在地"],
+  "Search": ["Buscar", "Suchen", "検索"],
+  "1 member": ["1 miembro", "1 Mitglied", "1 人のメンバー"],
+  "{n} members": ["{n} miembros", "{n} Mitglieder", "{n} 人のメンバー"],
+  "No members match this search.": ["Ningún miembro coincide con esta búsqueda.", "Keine Mitglieder entsprechen dieser Suche.", "この検索に一致するメンバーはいません。"],
+  "Showing the first {n}. Narrow the search to see more.": ["Se muestran los primeros {n}. Acote la búsqueda para ver más.", "Die ersten {n} werden angezeigt. Grenzen Sie die Suche ein, um mehr zu sehen.", "最初の {n} 件を表示しています。さらに見るには検索を絞り込んでください。"],
 };
