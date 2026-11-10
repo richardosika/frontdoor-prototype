@@ -14,9 +14,12 @@ export async function loadLedgerProjects(user: { id: string; role: string; extra
   const myCategories = memberCategories(user);
   const myCategory = myCategories[0] ?? null;
   const circle = await circleIds(user.id);
-  const dismissed = options.hideDismissed
-    ? new Set((await prisma.ledgerDismissal.findMany({ where: { userId: user.id }, select: { projectId: true } })).map((row) => row.projectId))
-    : new Set<string>();
+  // Nov 10: the X in Opportunities removes a project from Opportunities and the Ledger; the Ledger X only from the Ledger.
+  const [ledgerGone, oppGone] = await Promise.all([
+    options.hideDismissed ? prisma.ledgerDismissal.findMany({ where: { userId: user.id }, select: { projectId: true } }) : Promise.resolve([] as { projectId: string }[]),
+    prisma.opportunityDismissal.findMany({ where: { userId: user.id }, select: { projectId: true } }),
+  ]);
+  const dismissed = new Set([...ledgerGone, ...oppGone].map((row) => row.projectId));
   const [mine, sent, received, others] = await Promise.all([
     prisma.trackProject.findMany({ where: { userId: user.id }, orderBy: [{ submittedAt: "desc" }] }),
     prisma.projectContact.findMany({

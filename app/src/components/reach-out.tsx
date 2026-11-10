@@ -2,6 +2,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { contactAboutProject } from "@/actions/projects";
 import { btn, btnOutline, field } from "@/components/ui";
 import { serverTx } from "@/lib/i18n/server";
+import { CONTACT_NOTE_MIN } from "@/lib/project-contact";
 
 export type ReachProject = { id: string; name: string; status: string };
 
@@ -70,8 +71,8 @@ export async function ReachOut({
           </label>
         )}
         <label className="grid gap-1 text-[14px] text-mut">
-          {tx("Add a short note (optional)")}
-          <textarea name="note" rows={3} maxLength={500} className={`${field} text-[16px]`} placeholder={tx("A short note. It stays inside Private Floor.")} data-testid="reach-out-note" />
+          {tx("Add a short note (at least 10 characters)")}
+          <textarea name="note" rows={3} required minLength={CONTACT_NOTE_MIN} maxLength={500} className={`${field} text-[16px]`} placeholder={tx("A short note. It stays inside Private Floor.")} data-testid="reach-out-note" />
         </label>
         <SubmitButton className={btn} data-testid="reach-out-send" pendingLabel="Sending request…">
           {tx("Send request")}

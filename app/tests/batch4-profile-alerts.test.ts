@@ -70,10 +70,10 @@ describe("profile photos and messages empty state", () => {
     expect(read("components/profile-view.tsx")).toContain("member.coverId");
     expect(read("app/api/member-images/[id]/route.ts")).toContain('status !== "ACTIVE"');
   });
-  it("shows a full-width helpful empty state with the three next steps", () => {
+  it("Nov 10: the empty state explains how conversations open, with no buttons", () => {
     const page = read("app/(app)/messages/page.tsx");
     expect(page).toContain('data-testid="messages-empty"');
-    for (const href of ["/profile#add-project", "/deals", "/network"]) expect(page).toContain(href);
+    for (const href of ["/profile#add-project", "/network"]) expect(page).not.toContain(href);
     expect(read("components/ledger-projects.tsx")).toContain('id="ledger-seeking"');
   });
   it("every new phrase is translated and avoids banned words", () => {

@@ -33,6 +33,17 @@ export async function listConversations(userId: string) {
       preview: last?.body ?? "New conversation",
       time: last ? timeAgo(last.createdAt) : "",
       unread: unreadMap.get(conversation.id) ?? 0,
+      photoId: other.photoId ?? "",
+      // Nov 10: LinkedIn-style list: "You: …" when the latest message is yours; Sent lists those conversations.
+      lastFromMe: Boolean(last && last.senderId === userId),
     };
   });
+}
+
+export type ConversationRow = Awaited<ReturnType<typeof listConversations>>[number];
+
+/** Nov 10 (Julia): Inbox and Sent like LinkedIn messages. Inbox: every conversation. Sent: the latest message is yours. Search by name or company. */
+export function filterConversations<T extends { name: string; sub: string; lastFromMe: boolean }>(rows: T[], tab: "inbox" | "sent", q = ""): T[] {
+  const needle = q.trim().toLowerCase();
+  return rows.filter((row) => (tab === "sent" ? row.lastFromMe : true)).filter((row) => !needle || `${row.name} ${row.sub}`.toLowerCase().includes(needle));
 }

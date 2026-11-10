@@ -19,6 +19,8 @@ import {
   serializeSeeking,
   parseSeeking,
   seekLabel,
+  contactNoteOk,
+  CONTACT_NOTE_ERROR,
 } from "@/lib/project-contact";
 import { roleLabel, roleShort } from "@/lib/roles";
 import { readFacts, serializeFacts } from "@/lib/project-facts";
@@ -204,6 +206,7 @@ export async function contactAboutProject(formData: FormData) {
   const note = String(formData.get("note") || "").trim().slice(0, 500);
   const project = await prisma.trackProject.findUnique({ where: { id: projectId } });
   if (!project) go(back, "error", "Project not found.");
+  if (!contactNoteOk(note)) go(back, "error", CONTACT_NOTE_ERROR);
   const toId = project.userId === user.id ? String(formData.get("toId") || "") : project.userId;
   const to = await prisma.user.findUnique({ where: { id: toId }, select: { id: true, role: true, extraCategories: true, status: true, email: true, locale: true, notifyIntros: true } });
   if (!to || to.status !== "ACTIVE") go(back, "error", "That member is not available.");

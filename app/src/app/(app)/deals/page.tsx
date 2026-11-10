@@ -6,6 +6,7 @@ import { ProjectFacts } from "@/components/project-facts";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { memberLine } from "@/lib/member-line";
 import { contactAboutProject } from "@/actions/projects";
+import { dismissOpportunity } from "@/actions/feed";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { MyCircleList } from "@/components/my-circle";
@@ -82,7 +83,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           {rows.map((project) =>
             project.why === "seeking" ? (
               // Nov 10 (Julia): the same card as the Ledger, with the "New" tag.
-              <OpportunityCard key={project.id} project={project} fallbackCategory={data.myCategory} back="/deals" />
+              <OpportunityCard key={project.id} project={project} fallbackCategory={data.myCategory} back="/deals" dismissAction={dismissOpportunity} confirmDismiss />
             ) : (
               <li key={project.id} className={`${card} flex flex-col border-t-[3px] border-t-brass p-4`}>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{tx("Shared by My Circle")}</p>

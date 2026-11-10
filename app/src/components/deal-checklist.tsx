@@ -312,7 +312,7 @@ export async function DealChecklist({
                                             <p className="text-[13px] text-mut">
                                               {tx("About")}: <b className="text-ink">{project.name}</b>. {tx("This adds the category to what the project is seeking.")}
                                             </p>
-                                            <textarea name="note" rows={2} maxLength={500} className={`${field} text-[16px]`} placeholder={tx("Add a short note (optional)")} />
+                                            <textarea name="note" rows={2} required minLength={10} maxLength={500} className={`${field} text-[16px]`} placeholder={tx("Add a short note (at least 10 characters)")} />
                                             <SubmitButton className={btn} pendingLabel="Sending request…">{tx("Send request")}</SubmitButton>
                                           </form>
                                         </details>

@@ -263,7 +263,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <form action={contactAboutProject} className="grid gap-2">
                   <input type="hidden" name="projectId" value={project.id} />
                   <input type="hidden" name="back" value={back} />
-                  <textarea name="note" maxLength={500} rows={3} className={`${field} text-[16px]`} placeholder={tx("Short note to the owner (optional)")} />
+                  <textarea name="note" required minLength={10} maxLength={500} rows={3} className={`${field} text-[16px]`} placeholder={tx("Short note to the owner (at least 10 characters)")} data-testid="project-contact-note" />
                   <SubmitButton className={`${btn} justify-self-start`} data-testid="project-contact-button">{tx("Contact about this project")}</SubmitButton>
                 </form>
               ) : (

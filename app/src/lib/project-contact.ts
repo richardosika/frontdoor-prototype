@@ -151,6 +151,13 @@ export function canDirectMessage(input: {
   return input.adminInvolved || input.inCircle || input.introAccepted || input.contactAccepted;
 }
 
+/** Nov 10 (Julia): a contact request about a project carries a note of at least 10 characters. */
+export const CONTACT_NOTE_MIN = 10;
+export const CONTACT_NOTE_ERROR = "Write a note of at least 10 characters.";
+export function contactNoteOk(note: string): boolean {
+  return note.trim().length >= CONTACT_NOTE_MIN;
+}
+
 export const COLD_MESSAGE_REASON =
   "Messaging opens inside your circle or after a project contact is accepted. Private Floor does not allow cold outreach.";
 

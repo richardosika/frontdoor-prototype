@@ -51,4 +51,14 @@ export const NOV10_PHRASES: Record<string, readonly [string, string, string]> = 
   "You can update a bid up to 5 times.": ["Puede actualizar una oferta hasta 5 veces.", "Sie können ein Angebot bis zu 5-mal aktualisieren.", "入札は最大5回まで更新できます。"],
   "Choose one of your trades.": ["Elija uno de sus oficios.", "Wählen Sie eines Ihrer Gewerke.", "あなたの工種から1つ選んでください。"],
   "Question sent.": ["Pregunta enviada.", "Frage gesendet.", "質問を送信しました。"],
+  // Batch D: Opportunities X, contact note, Messages.
+  "Write a note of at least 10 characters.": ["Escriba una nota de al menos 10 caracteres.", "Schreiben Sie eine Notiz mit mindestens 10 Zeichen.", "10文字以上のメモを書いてください。"],
+  "Add a short note (at least 10 characters)": ["Añada una nota breve (al menos 10 caracteres)", "Kurze Notiz hinzufügen (mindestens 10 Zeichen)", "短いメモを追加（10文字以上）"],
+  "Short note to the owner (at least 10 characters)": ["Nota breve para el propietario (al menos 10 caracteres)", "Kurze Notiz an den Eigentümer (mindestens 10 Zeichen)", "オーナーへの短いメモ（10文字以上）"],
+  "Search messages": ["Buscar mensajes", "Nachrichten durchsuchen", "メッセージを検索"],
+  "No conversations match this search.": ["Ninguna conversación coincide con esta búsqueda.", "Keine Unterhaltung entspricht dieser Suche.", "この検索に一致する会話はありません。"],
+  "No sent messages yet.": ["Aún no hay mensajes enviados.", "Noch keine gesendeten Nachrichten.", "送信したメッセージはまだありません。"],
+  "Requests you sent": ["Solicitudes que envió", "Von Ihnen gesendete Anfragen", "送信したリクエスト"],
+  "You": ["Usted", "Sie", "あなた"],
+  "Unread": ["No leído", "Ungelesen", "未読"],
 };

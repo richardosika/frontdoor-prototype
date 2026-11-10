@@ -1251,6 +1251,17 @@ model LedgerDismissal {
   @@unique([userId, projectId])
 }
 
+/// Nov 10 (Julia): a member removed a project from Opportunities with the X (after "Are you sure?"). It also leaves the Ledger.
+model OpportunityDismissal {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+  @@index([userId])
+}
+
 /// Nov 5: a member removed someone from My Circle without blocking them.
 model CircleRemoval {
   id        String   @id @default(cuid())

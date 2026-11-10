@@ -61,7 +61,7 @@ export default async function ThreadPage({
   const conversations = await listConversations(user.id);
 
   return (
-    <div className="lg:grid lg:min-h-dvh lg:grid-cols-[340px_minmax(0,1fr)]">
+    <div className="lg:grid lg:min-h-dvh lg:grid-cols-[360px_minmax(0,1fr)]">
       <div className="hidden lg:block">
         <ConversationList conversations={conversations} activeId={conversation.id} />
       </div>

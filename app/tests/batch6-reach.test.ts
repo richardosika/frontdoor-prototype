@@ -51,9 +51,9 @@ describe("#27 / #28 navigation", () => {
     expect(read("src/app/(app)/deals/page.tsx")).not.toContain("All roles");
     expect(read("src/app/(app)/deals/page.tsx")).not.toContain("Post a deal");
   });
-  it("Messages empty state points developers to Find your team", () => {
+  it("Messages empty state has no buttons (Nov 10, Julia replaced the Find your team link)", () => {
     const messages = read("src/app/(app)/messages/page.tsx");
-    expect(messages).toContain('tx("Find your team")');
+    expect(messages).not.toContain('tx("Find your team")');
     expect(messages).not.toContain('tx("Projects seeking your category")');
   });
 });

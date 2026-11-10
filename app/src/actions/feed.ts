@@ -231,3 +231,19 @@ export async function dismissLedgerProject(formData: FormData) {
   revalidatePath("/feed");
   redirect("/feed?notice=" + encodeURIComponent("Removed from your Ledger. It is still listed in Opportunities.") + "#ledger-seeking");
 }
+
+/** Nov 10 (Julia): the X on an Opportunities card, after "Are you sure you want to remove this project?". */
+export async function dismissOpportunity(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") || "");
+  if (projectId) {
+    await prisma.opportunityDismissal.upsert({
+      where: { userId_projectId: { userId: user.id, projectId } },
+      update: {},
+      create: { userId: user.id, projectId },
+    });
+  }
+  revalidatePath("/deals");
+  revalidatePath("/feed");
+  redirect("/deals?notice=" + encodeURIComponent("Removed from Opportunities and your Ledger."));
+}
