@@ -258,6 +258,9 @@ model User {
   pausedAt               DateTime?
   pausedUntil            DateTime?
   pauseReminderSentAt    DateTime?
+  /// Nov 10 (Julia): developers and GCs choose OPEN (Open to Bid: qualifying members are let in without approval,
+  /// Deal Rooms open too) or APPROVAL (Approval Required: the owner approves every member). Default APPROVAL.
+  projectAccessMode      String           @default("APPROVAL")
   ndaAcceptedAt          DateTime?
   ndaVersion             String           @default("")
   createdAt              DateTime         @default(now())
@@ -666,6 +669,10 @@ model DealDocument {
   fileName    String   @default("")
   contentType String   @default("")
   sizeBytes   Int      @default(0)
+  /// Nov 10 (Julia): Deal Rooms store the file itself (construction documents, specs, renderings), up to 25 MB.
+  bytes       Bytes?
+  /// Nov 10: CONSTRUCTION, SPECS, RENDERING or OTHER.
+  kind        String   @default("")
   createdAt   DateTime @default(now())
 
   @@index([dealId, createdAt])

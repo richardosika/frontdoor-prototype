@@ -26,6 +26,8 @@ import { roleLabel } from "@/lib/roles";
 import { canRequestBids } from "@/lib/bids";
 import { isGeneralContractor, parseTrades, tradeLabel } from "@/lib/trades";
 import { sortByShownLabel } from "@/lib/category-sort";
+import { ACCESS_MODES, accessModeOf, canCreateDealRoom, choosesAccessMode } from "@/lib/deal-room-access";
+import { createProjectDealRoom, setProjectAccessMode } from "@/actions/deals";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +48,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const project = await prisma.trackProject.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, initials: true, photoId: true, org: true, role: true, status: true } },
+      user: { select: { id: true, name: true, initials: true, photoId: true, org: true, role: true, status: true, projectAccessMode: true } },
       documents: { select: { id: true, title: true, fileName: true, sizeBytes: true, version: true, updatedAt: true, contentType: true }, orderBy: { createdAt: "asc" } },
       deals: { select: { id: true, title: true } },
       contacts: {
@@ -77,6 +79,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const files = project.documents.filter((doc) => !doc.contentType.startsWith("image/"));
   const full = view === "owner" || view === "full";
   const myContact = project.contacts.find((c) => c.fromId === viewer.id || c.toId === viewer.id);
+  // Nov 10 (Julia): the project's Deal Room and how the owner lets members in.
+  const room = project.deals[0] ?? null;
+  const myRoomAccess = room && !isOwner ? await prisma.dealAccess.findUnique({ where: { dealId_requesterId: { dealId: room.id, requesterId: viewer.id } }, select: { status: true } }) : null;
+  const ownerMode = accessModeOf(project.user);
   const canContact = !isOwner && canContactAboutProject({ project, from: { id: viewer.id, role: viewer.role, extraCategories: viewer.extraCategories }, to: { id: project.userId, role: project.user.role } }).ok;
   // #42: the first of my categories this project seeks (or my primary one).
   const myCategory = memberCategories(viewer).find((id) => seeking.includes(id)) ?? memberCategories(viewer)[0] ?? null;
@@ -337,6 +343,45 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           />
         </section>
       ) : null}
+
+      <section className={box} id="deal-room" data-testid="project-deal-room">
+        <h2 className={h2}>{tx("Deal Room")}</h2>
+        <p className="text-[15px] leading-relaxed text-ink">{tx("Construction documents, specs, renderings and questions for this project, in one private room.")}</p>
+        {room ? (
+          isOwner || viewer.isAdmin || myRoomAccess?.status === "APPROVED" ? (
+            <Link href={`/deals/${room.id}/room`} className={`${btn} mt-3 inline-flex items-center`} data-testid="deal-room-open">{tx("Open Deal Room")}</Link>
+          ) : myRoomAccess?.status === "PENDING" ? (
+            <p className="mt-3 text-[15px] text-mut" data-testid="deal-room-pending">{tx("Access requested. The owner approves each member.")}</p>
+          ) : (
+            <div className="mt-3">
+              <Link href={`/deals/${room.id}`} className={`${btn} inline-flex items-center`} data-testid="deal-room-request">{tx(ownerMode === "OPEN" ? "Enter Deal Room" : "Request access")}</Link>
+              <p className="mt-2 text-[14px] text-mut">{tx(ownerMode === "OPEN" ? "Open to Bid: members who meet the requirements get in without approval." : "Approval Required: the owner approves each member.")}</p>
+            </div>
+          )
+        ) : isOwner && canCreateDealRoom(viewer.role) ? (
+          <form action={createProjectDealRoom} className="mt-3">
+            <input type="hidden" name="projectId" value={project.id} />
+            <SubmitButton className={btn} data-testid="deal-room-create" pendingLabel="Creating…">{tx("Create Deal Room")}</SubmitButton>
+          </form>
+        ) : isOwner ? (
+          <p className="mt-3 text-[15px] text-mut">{tx("Developers, general contractors, architects and engineers can create a Deal Room. You can still join the Deal Rooms other members open to you.")}</p>
+        ) : (
+          <p className="mt-3 text-[15px] text-mut" data-testid="deal-room-none">{tx("No Deal Room for this project yet.")}</p>
+        )}
+        {isOwner && choosesAccessMode(viewer.role) ? (
+          <form action={setProjectAccessMode} className="mt-4 grid gap-2 border-t border-line pt-4" data-testid="access-mode">
+            <input type="hidden" name="back" value={back} />
+            <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-mut">{tx("Who can bid and enter your Deal Rooms (all your projects)")}</p>
+            {ACCESS_MODES.map((m) => (
+              <label key={m.id} className="flex min-h-11 items-start gap-3 rounded border border-line p-3 text-[15px]">
+                <input type="radio" name="mode" value={m.id} defaultChecked={ownerMode === m.id} className="mt-1 h-5 w-5 accent-forest" data-testid={`access-mode-${m.id}`} />
+                <span><b className="block text-forest">{tx(m.label)}</b><span className="text-mut">{tx(m.help)}</span></span>
+              </label>
+            ))}
+            <SubmitButton className={`${btnOutline} justify-self-start`} data-testid="access-mode-save">{tx("Save")}</SubmitButton>
+          </form>
+        ) : null}
+      </section>
 
       {isOwner ? (
         <section className={box} data-testid="project-sharing">

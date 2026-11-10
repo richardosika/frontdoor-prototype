@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { accessModeOf } from "@/lib/deal-room-access";
 import { requireAdmin, requireUser } from "@/lib/current-user";
 import { sendEmail } from "@/lib/email";
 import { isLocale } from "@/lib/i18n/messages";
@@ -208,7 +209,7 @@ export async function contactAboutProject(formData: FormData) {
   if (!project) go(back, "error", "Project not found.");
   if (!contactNoteOk(note)) go(back, "error", CONTACT_NOTE_ERROR);
   const toId = project.userId === user.id ? String(formData.get("toId") || "") : project.userId;
-  const to = await prisma.user.findUnique({ where: { id: toId }, select: { id: true, role: true, extraCategories: true, status: true, email: true, locale: true, notifyIntros: true } });
+  const to = await prisma.user.findUnique({ where: { id: toId }, select: { id: true, role: true, extraCategories: true, status: true, email: true, locale: true, notifyIntros: true, projectAccessMode: true } });
   if (!to || to.status !== "ACTIVE") go(back, "error", "That member is not available.");
   const decision = canContactAboutProject({ project, from: { id: user.id, role: user.role, extraCategories: user.extraCategories }, to: { id: to.id, role: to.role, extraCategories: to.extraCategories } });
   if (!decision.ok) go(back, "error", decision.reason);
@@ -219,6 +220,16 @@ export async function contactAboutProject(formData: FormData) {
     where: { projectId, OR: [{ fromId: user.id, toId: to.id }, { fromId: to.id, toId: user.id }] },
   });
   if (existing) go(back, "notice", "There is already a contact request for this project.");
+  // Nov 10 (Julia): an owner who is Open to Bid does not approve each member: a qualifying request is accepted at once.
+  if (to.id === project.userId && accessModeOf(to) === "OPEN") {
+    await prisma.projectContact.create({ data: { projectId, fromId: user.id, toId: to.id, category: decision.category, note, status: "ACCEPTED", decidedAt: new Date() } });
+    await notify(to.id, { title: "New member on your project (Open to Bid)", body: `${user.name}${user.org ? ` (${user.org})` : ""}: ${project.name}`, href: `/projects/${project.id}#interest` }).catch(() => null);
+    const sent = await deliverPortalMessage({ from: user, toId: to.id, kind: "INTRO", body: `${project.name}: ${note}` });
+    refresh();
+    revalidatePath("/messages");
+    if (sent.ok) redirect(`/messages/${sent.conversationId}`);
+    go(back, "notice", "You're connected. This project is Open to Bid.");
+  }
   await prisma.projectContact.create({
     data: { projectId, fromId: user.id, toId: to.id, category: decision.category, note },
   });

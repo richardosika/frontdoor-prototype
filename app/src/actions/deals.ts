@@ -13,6 +13,8 @@ import { BRAND } from "@/lib/brand";
 import { RATE_LIMITS, withinRateLimit } from "@/lib/messaging";
 import { notify } from "@/lib/notify";
 import { deliverPortalMessage, isBlocked } from "@/lib/portal-message";
+import { DEAL_ROOM_DOC_MAX_BYTES, DOC_KINDS, accessModeOf, canCreateDealRoom, choosesAccessMode, isAccessMode } from "@/lib/deal-room-access";
+import { planType, safePlanName } from "@/lib/bid-plans";
 
 export async function requestAccess(formData: FormData) {
   const user = await requireUser();
@@ -49,6 +51,8 @@ export async function requestAccess(formData: FormData) {
     redirect(`/deals/${dealId}?error=${encodeURIComponent("You have sent too many access requests today.")}`);
   }
 
+  // Nov 10 (Julia): an owner who is Open to Bid lets qualifying members in without approving each one.
+  const open = accessModeOf(deal.sponsor) === "OPEN";
   const headerList = await headers();
   const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || headerList.get("x-real-ip") || "";
   const ndaVersion = documentVersion(readLegalMarkdown("deal-room-nda.md"));
@@ -58,15 +62,22 @@ export async function requestAccess(formData: FormData) {
     ndaVersion,
     ndaIpHash: hashClientIp(ip || "unknown"),
   };
+  const settled = open ? { status: "APPROVED" as const, reviewedAt: new Date() } : { status: "PENDING" as const, reviewedAt: null };
   if (existing) {
     await prisma.dealAccess.update({
       where: { id: existing.id },
-      data: { ...nda, status: "PENDING", reviewedAt: null },
+      data: { ...nda, ...settled },
     });
   } else {
     await prisma.dealAccess.create({
-      data: { dealId, requesterId: user.id, ...nda },
+      data: { dealId, requesterId: user.id, ...nda, ...settled },
     });
+  }
+  if (open) {
+    await notify(deal.sponsorId, { title: "New member in your Deal Room", body: `${user.name} joined "${deal.title}" (Open to Bid).`, href: `/deals/${dealId}/room` }).catch(() => null);
+    await prisma.dealEvent.create({ data: { dealId, actorId: user.id, summary: `${user.name} joined the Deal Room (Open to Bid).` } }).catch(() => null);
+    revalidatePath(`/deals/${dealId}`);
+    redirect(`/deals/${dealId}/room?notice=${encodeURIComponent("You're in. This Deal Room is open to members who meet the requirements.")}`);
   }
 
   const sent = await deliverPortalMessage({
@@ -184,21 +195,26 @@ async function requireRoom(dealId: string, userId: string) {
   return deal;
 }
 
+/** Nov 10 (Julia): Deal Rooms store the files (construction documents, specs, renderings), up to 25 MB each. */
 export async function addDealDocument(formData: FormData) {
   const user = await requireUser();
   const dealId = String(formData.get("dealId") || "");
   const title = String(formData.get("title") || "").trim().slice(0, 120);
   const note = String(formData.get("note") || "").trim().slice(0, 500);
+  const kindRaw = String(formData.get("kind") || "");
+  const kind = DOC_KINDS.some((k) => k.id === kindRaw) ? kindRaw : "OTHER";
   const room = `/deals/${dealId}/room`;
   const upload = formData.get("file");
-  const file = upload instanceof File ? upload : null;
+  const file = upload instanceof File && upload.size > 0 ? upload : null;
   if (!file || title.length < 2) {
-    redirect(`${room}?error=${encodeURIComponent("Add a title and a PDF, JPG, or PNG.")}`);
+    redirect(`${room}?error=${encodeURIComponent("Add a title and a file.")}`);
   }
-  const checked = documentListEntry({ fileName: file.name, contentType: file.type || "application/octet-stream", sizeBytes: file.size });
-  if (!checked.ok) redirect(`${room}?error=${encodeURIComponent(checked.error)}`);
+  if (file.size > DEAL_ROOM_DOC_MAX_BYTES) redirect(`${room}?error=${encodeURIComponent("Each file can be up to 25 MB.")}`);
   const deal = await requireRoom(dealId, user.id);
   if (!deal) redirect(`/deals/${dealId}?error=${encodeURIComponent("The sponsor has not approved your access.")}`);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const contentType = planType(file.name, bytes);
+  if (!contentType) redirect(`${room}?error=${encodeURIComponent("Files must be PDF, DWG, PNG, JPG or WebP.")}`);
 
   await prisma.dealDocument.create({
     data: {
@@ -206,17 +222,58 @@ export async function addDealDocument(formData: FormData) {
       authorId: user.id,
       title,
       url: "",
-      note: note || "Name, type, and size only. The file itself is not stored on this host.",
-      fileName: file.name.slice(0, 180),
-      contentType: (file.type || "application/octet-stream").slice(0, 80),
+      note,
+      kind,
+      fileName: safePlanName(file.name),
+      contentType,
       sizeBytes: file.size,
+      bytes,
     },
   });
   await prisma.dealEvent.create({
-    data: { dealId, actorId: user.id, summary: `${user.name} listed a document: ${title} (${file.name}, ${file.size} bytes).` },
+    data: { dealId, actorId: user.id, summary: `${user.name} added a document: ${title} (${safePlanName(file.name)}).` },
   });
   revalidatePath(room);
-  redirect(room);
+  redirect(`${room}?notice=${encodeURIComponent("Document added.")}`);
+}
+
+/** Nov 10 (Julia): a Deal Room inside a project. Developers, GCs, architects and engineers create one for a project they own. */
+export async function createProjectDealRoom(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") || "");
+  const back = `/projects/${projectId}`;
+  const project = await prisma.trackProject.findUnique({ where: { id: projectId }, include: { deals: { select: { id: true } } } });
+  if (!project || project.userId !== user.id) redirect(`${back}?error=${encodeURIComponent("Only the project owner can create its Deal Room.")}`);
+  if (!canCreateDealRoom(user.role)) redirect(`${back}?error=${encodeURIComponent("Developers, general contractors, architects and engineers can create a Deal Room.")}`);
+  if (project.deals[0]) redirect(`/deals/${project.deals[0].id}/room`);
+  const deal = await prisma.deal.create({
+    data: {
+      sponsorId: user.id,
+      kind: "DEAL",
+      title: project.name.slice(0, 140),
+      blurb: "",
+      market: project.location || "",
+      sizeBand: "",
+      assetClass: project.asset || "",
+      raiseLabel: "",
+      projectId: project.id,
+    },
+  });
+  await prisma.dealEvent.create({ data: { dealId: deal.id, actorId: user.id, summary: `${user.name} created the Deal Room for ${project.name}.` } });
+  revalidatePath(back);
+  redirect(`/deals/${deal.id}/room?notice=${encodeURIComponent("Deal Room created. Add construction documents, specs and renderings.")}`);
+}
+
+/** Nov 10 (Julia): developers and GCs choose Open to Bid or Approval Required for all their projects and Deal Rooms. */
+export async function setProjectAccessMode(formData: FormData) {
+  const user = await requireUser();
+  const mode = String(formData.get("mode") || "");
+  const rawBack = String(formData.get("back") || "/projects");
+  const back = /^\/projects(\/[A-Za-z0-9_-]+)?$/.test(rawBack) ? rawBack : "/projects";
+  if (!choosesAccessMode(user.role) || !isAccessMode(mode)) redirect(`${back}?error=${encodeURIComponent("Developers and general contractors choose Open to Bid or Approval Required.")}`);
+  await prisma.user.update({ where: { id: user.id }, data: { projectAccessMode: mode } });
+  revalidatePath(back);
+  redirect(`${back}?notice=${encodeURIComponent(mode === "OPEN" ? "Your projects are Open to Bid." : "Your projects now require your approval.")}#deal-room`);
 }
 
 export async function postDealQuestion(formData: FormData) {

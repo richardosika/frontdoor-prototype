@@ -19,6 +19,8 @@ import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { timeAgo } from "@/lib/format";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { DOC_KINDS, docKindLabel } from "@/lib/deal-room-access";
+import { PLAN_ACCEPT } from "@/lib/bid-plans";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,7 @@ export default async function DealRoomPage({
     include: {
       sponsor: true,
       access: { where: { status: "APPROVED" }, include: { requester: true } },
-      documents: { orderBy: { createdAt: "desc" }, include: { author: true } },
+      documents: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, note: true, kind: true, fileName: true, contentType: true, sizeBytes: true, createdAt: true, url: true, author: { select: { name: true } }, bytes: false } },
       messages: { orderBy: { createdAt: "asc" }, include: { author: true, replies: { include: { author: true }, orderBy: { createdAt: "asc" } } } },
       events: { orderBy: { createdAt: "desc" }, take: 15 },
     },
@@ -91,9 +93,9 @@ export default async function DealRoomPage({
         <Link href={`/deals/${deal.id}`} className="hidden min-h-11 items-center text-sm text-mut md:inline-flex">
           ‹ {deal.title}
         </Link>
-        <Banner error={query.error} notice={query.notice} />
+        <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
         <div className={`mt-3 p-5 ${card}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Deal room")}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Deal Room")}</p>
           <h1 className="mt-1 font-serif text-2xl font-normal">{deal.title}</h1>
           {project && project.reviewStatus === "APPROVED" ? (
             <Link href={`/bids/new?project=${project.id}`} className="mt-3 inline-flex min-h-11 items-center rounded-sm border border-forest px-4 text-[14px] font-semibold text-forest" data-testid="room-request-bids">
@@ -101,7 +103,7 @@ export default async function DealRoomPage({
             </Link>
           ) : null}
           <p className="mt-2 text-sm text-ink">
-            Approved members and {deal.sponsor.name} can list documents, ask questions, and see what changed. {BRAND.name} stores the file name, type, and size. It does not keep the file and does not process a payment.
+            {tx("Approved members and the owner can share construction documents, specs and renderings, ask questions, and see what changed.")}
           </p>
           <ul className="mt-4 divide-y divide-line">
             {members.map((person) => (
@@ -148,12 +150,19 @@ export default async function DealRoomPage({
         <div className="max-w-3xl">
         <section className={`mt-4 p-5 ${card}`}>
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Documents")}</h2>
-          <p className="mt-1 text-xs text-mut">{tx("PDF, JPG, or PNG, 8 MB or smaller. Only the name, type, and size are stored.")}</p>
+          <p className="mt-1 text-xs text-mut">{tx("Construction documents, specs, renderings and more. PDF, DWG, PNG, JPG or WebP, up to 25 MB each.")}</p>
           {deal.documents.length === 0 ? <p className="mt-3 text-sm text-mut">{tx("No documents listed yet.")}</p> : null}
           <ul className="mt-3 divide-y divide-line">
             {deal.documents.map((document) => (
               <li key={document.id} className="py-3">
-                <p className="font-semibold text-forest">{document.title}</p>
+                <p className="font-semibold text-forest">
+                  {document.sizeBytes && document.contentType && !document.note.startsWith("Name, type, and size only") ? (
+                    <a href={`/api/deal-documents/${document.id}`} target="_blank" rel="noreferrer" className="underline decoration-brass [overflow-wrap:anywhere]" data-testid="deal-doc-link">{document.title}</a>
+                  ) : (
+                    document.title
+                  )}
+                  {document.kind ? <span className="ml-2 rounded-full border border-brass px-2 text-[11px] font-semibold text-forest">{tx(docKindLabel(document.kind))}</span> : null}
+                </p>
                 <p className="text-xs text-mut">
                   {document.fileName || "File"} · {document.contentType || "unknown type"} · {document.sizeBytes ? `${Math.ceil(document.sizeBytes / 1024)} KB` : "size not recorded"} · {document.author.name} · {timeAgo(document.createdAt)}
                 </p>
@@ -168,15 +177,21 @@ export default async function DealRoomPage({
               <input name="title" className={field} placeholder={tx("Site sketch")} required />
             </div>
             <div>
+              <label className={labelCls}>{tx("Type")}</label>
+              <select name="kind" className={field} defaultValue="CONSTRUCTION" data-testid="deal-doc-kind">
+                {DOC_KINDS.map((k) => <option key={k.id} value={k.id}>{tx(k.label)}</option>)}
+              </select>
+            </div>
+            <div>
               <label className={labelCls}>{tx("File")}</label>
-              <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" className="text-sm" required />
+              <input name="file" type="file" accept={PLAN_ACCEPT} className="text-sm" required data-testid="deal-doc-file" />
             </div>
             <div>
               <label className={labelCls}>{tx("Note")}</label>
               <input name="note" className={field} placeholder={tx("What this file is for")} />
             </div>
             <SubmitButton className={btnOutline}>
-              {tx("List document")}
+              {tx("Add document")}
             </SubmitButton>
           </form>
         </section>
