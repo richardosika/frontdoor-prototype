@@ -19,6 +19,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       console.error("Could not send the full-price reminder");
     });
   }
+  // Nov 10 (Julia): card-expiry emails 30 and 2 days out. A member's visit checks their card; an administrator's
+  // visit checks every paid Stripe member, so the notice goes out even if the member does not sign in.
+  if (user.paymentStatus === "PAID" || user.isAdmin) {
+    try {
+      const { cardExpirySweep } = await import("@/lib/billing-db");
+      const ids = user.isAdmin
+        ? (await prisma.user.findMany({ where: { paymentStatus: "PAID", cancelRequestedAt: null, paymentMethods: { some: { role: "PRIMARY", mode: "stripe", expYear: { gt: 0 } } } }, select: { id: true } })).map((row) => row.id)
+        : [user.id];
+      const base = await (await import("@/lib/url")).appBaseUrl();
+      for (const id of ids) await cardExpirySweep(id, new Date(), base).catch(() => console.error("Could not run the card expiry sweep"));
+    } catch {
+      console.error("Could not run the card expiry sweep");
+    }
+  }
   if (user.pausedUntil || user.isAdmin) {
     // Members sweep their own pause; an administrator's visit also sweeps every paused membership,
     // so the resume reminder goes out even if the member does not sign in that week.

@@ -63,6 +63,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
     label: "Email templates & Outbox",
     links: [
       { href: "/admin/templates", label: "Email templates" },
+      { href: "/admin/templates/billing", label: "Billing email previews" },
       { href: "/admin/outbox", label: "Outbox" },
     ],
   },

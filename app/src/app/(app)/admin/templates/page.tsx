@@ -46,6 +46,9 @@ export default async function TemplatesPage({
             Save flag
           </SubmitButton>
         </form>
+        <Link href="/admin/templates/billing" className={`${card} mt-4 block p-4`}>
+          Billing email previews
+        </Link>
         <ul className="mt-4 space-y-3">
           {templates.map((template) => (
             <li key={template.id}>

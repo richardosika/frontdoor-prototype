@@ -30,11 +30,10 @@ describe("October 27 display fixes", () => {
       firstName: "Alex",
       paymentLink: "https://cornicio-mvp.onrender.com/pay/preview",
     });
-    expect(letter.subject).toBe("Your Private Floor payment did not go through");
-    expect(letter.text).toContain("The payment did not go through.");
-    expect(letter.text).toContain("Nothing was charged.");
-    expect(letter.text).toContain("Pay membership dues");
-    expect(letter.text.toLowerCase()).not.toContain("still need attention");
+    // Nov 10 (Julia): her declined wording replaced the older text.
+    expect(letter.subject).toBe("Your membership payment was declined");
+    expect(letter.text).toContain("the transaction was declined.");
+    expect(letter.text).toContain("https://cornicio-mvp.onrender.com/pay/preview");
     expect(letter.text).not.toContain("Next charge date");
     expect(letter.text.toLowerCase()).not.toContain("invited");
     const record = readFileSync(path.join(ROOT, "lib/payment-record.ts"), "utf8");

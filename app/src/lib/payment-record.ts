@@ -1,3 +1,4 @@
+import { paymentDeclinedEmail } from "@/lib/billing-emails";
 import { currentMonthlyCents, firstMonthCents, formatMoney, mailDuesAmounts } from "@/lib/dues";
 import { RECEIPT_SUBJECT } from "@/lib/email-layout";
 import { SIGN_OFF } from "@/lib/email-templates";
@@ -148,19 +149,9 @@ export async function activatePaidMembership(input: {
 }
 
 /** Failed-payment letter. Nothing was collected, so there is no next charge date. */
-export function failedPaymentNotice(input: { firstName: string; paymentLink: string }): { subject: string; text: string } {
-  return {
-    subject: "Your Private Floor payment did not go through",
-    text: `Hello ${input.firstName},
-
-The payment did not go through. Nothing was charged. No card number is stored.
-
-Pay membership dues
-${input.paymentLink}
-
-${SIGN_OFF}
-`,
-  };
+/** Nov 10 (Julia): the declined-payment email in her wording (EN, ES, DE, JA). The link opens the dues page. */
+export function failedPaymentNotice(input: { firstName: string; paymentLink: string; locale?: string | null }): { subject: string; text: string } {
+  return paymentDeclinedEmail({ locale: input.locale, name: input.firstName, link: input.paymentLink });
 }
 
 export async function markPaymentFailed(userId: string) {
@@ -169,9 +160,11 @@ export async function markPaymentFailed(userId: string) {
   await prisma.user.update({ where: { id: user.id }, data: { paymentStatus: "FAILED" } });
   const base = await appBaseUrl();
   const link = user.paymentToken ? `${base}/pay/${user.paymentToken}` : `${base}/pay`;
+  // Nov 10 (Julia): her "payment declined" wording, in the member's language, sent right away.
   const letter = failedPaymentNotice({
     firstName: givenNameFrom("", user.name),
     paymentLink: link,
+    locale: user.locale,
   });
   await ensureCrmPerson({
     email: user.email,

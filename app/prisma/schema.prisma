@@ -1413,3 +1413,15 @@ model BidRevision {
   @@unique([bidId, version])
   @@index([bidId])
 }
+
+/// Nov 10 (Julia): card-expiry emails already sent (30 days and 2 days out), one of each per card expiry.
+model CardExpiryNotice {
+  id      String   @id @default(cuid())
+  userId  String
+  kind    String
+  expKey  String
+  sentAt  DateTime @default(now())
+
+  @@unique([userId, kind, expKey])
+  @@index([userId])
+}
