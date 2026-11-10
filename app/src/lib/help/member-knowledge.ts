@@ -15,10 +15,10 @@ export const MEMBER_TOPICS: MemberTopic[] = [
     audience: "member",
     title: { en: "Your Ledger", es: "Su Ledger", de: "Ihr Ledger", ja: "あなたの Ledger" },
     body: {
-      en: "The [Ledger](/feed) shows how many approved projects need your category right now, their total value, and how many developers want to talk to you. Below that are Opportunities for you (New and Closes soon tags), Active Pipeline (Active and In talks), and a This month strip with projects shown, developer profile views and deals won.",
-      es: "El [Ledger](/feed) muestra cuántos proyectos aprobados necesitan su categoría ahora, su valor total y cuántos desarrolladores quieren hablar con usted. Debajo están Oportunidades para usted (etiquetas Nuevo y Cierra pronto), Cartera Activa (Active Pipeline) (Activo y En conversación) y la franja Este mes con proyectos mostrados, visitas de desarrolladores y acuerdos ganados.",
-      de: "Das [Ledger](/feed) zeigt, wie viele freigegebene Projekte Ihre Kategorie gerade brauchen, ihren Gesamtwert und wie viele Entwickler mit Ihnen sprechen möchten. Darunter: Chancen für Sie (Neu und Endet bald), Active Pipeline (Aktiv und In Gesprächen) und die Leiste Diesen Monat mit gezeigten Projekten, Profilaufrufen von Entwicklern und gewonnenen Aufträgen.",
-      ja: "[Ledger](/feed) には、今あなたのカテゴリーを必要とする承認済みプロジェクトの数、総額、話したいデベロッパーの数が表示されます。その下に「あなたへの案件」（新着・締切間近）、「アクティブ・パイプライン」（進行中・交渉中）、今月の実績（表示された案件、デベロッパーの閲覧、成約）があります。",
+      en: "The [Ledger](/feed) shows how many approved projects need your category right now. Below that are Opportunities for you (each new project has a New tag, and Closes soon when bids are due shortly), Active Pipeline (Active and In talks), and a This month strip with projects shown and deals won.",
+      es: "El [Ledger](/feed) muestra cuántos proyectos aprobados necesitan su categoría ahora. Debajo están Oportunidades para usted (cada proyecto nuevo lleva la etiqueta Nuevo, y Cierra pronto cuando las ofertas vencen en breve), Cartera Activa (Activo y En conversación) y la franja Este mes con proyectos mostrados y acuerdos ganados.",
+      de: "Das [Ledger](/feed) zeigt, wie viele freigegebene Projekte Ihre Kategorie gerade brauchen. Darunter: Chancen für Sie (jedes neue Projekt trägt Neu, und Endet bald, wenn Angebote bald fällig sind), Active Pipeline (Aktiv und In Gesprächen) und die Leiste Diesen Monat mit gezeigten Projekten und gewonnenen Aufträgen.",
+      ja: "[Ledger](/feed) には、今あなたのカテゴリーを必要とする承認済みプロジェクトの数が表示されます。その下に「あなたへの案件」（新しいプロジェクトには「新着」、入札期限が近いものには「まもなく締切」）、「アクティブ・パイプライン」（進行中・協議中）、今月の実績（表示された案件、成約）があります。",
     },
     keys: ["ledger", "home", "dashboard", "opportunit", "headline", "this month", "inicio", "oportunidad", "startseite", "chancen", "ホーム", "案件", "レジャー"],
   },
@@ -87,7 +87,7 @@ export const MEMBER_TOPICS: MemberTopic[] = [
     audience: "member",
     title: { en: "Who viewed your profile", es: "Quién vio su perfil", de: "Wer Ihr Profil angesehen hat", ja: "プロフィールを見た人" },
     body: {
-      en: "The right column of the [Ledger](/feed) shows developers who viewed your profile this week, with a 7-day chart. [See all viewers](/viewers) lists the last 30 days. Only approved members are shown. People you may want to work with suggests approved members who share a project with you.",
+      en: "The right column of the [Ledger](/feed) shows who viewed your profile this week, with a 7-day chart. [See all viewers](/viewers) lists the last 30 days. Only approved members are shown. People you may want to work with suggests approved members who share a project with you.",
       es: "La columna derecha del [Ledger](/feed) muestra los desarrolladores que vieron su perfil esta semana, con un gráfico de 7 días. [Ver todas las visitas](/viewers) muestra los últimos 30 días. Solo se muestran miembros aprobados. Personas con quienes podría trabajar sugiere miembros que comparten un proyecto con usted.",
       de: "Die rechte Spalte im [Ledger](/feed) zeigt Entwickler, die Ihr Profil diese Woche angesehen haben, mit 7-Tage-Diagramm. [Alle Besucher ansehen](/viewers) zeigt die letzten 30 Tage. Nur zugelassene Mitglieder. Personen, mit denen Sie arbeiten könnten, schlägt Mitglieder aus gemeinsamen Projekten vor.",
       ja: "[Ledger](/feed) の右側に、今週プロフィールを見たデベロッパーが7日間のグラフとともに表示されます。[閲覧者をすべて表示](/viewers)で過去30日分を確認できます。承認済みメンバーのみ表示されます。「一緒に仕事をしたい人」は共通のプロジェクトのメンバーを提案します。",

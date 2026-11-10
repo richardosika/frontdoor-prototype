@@ -8,7 +8,7 @@ import { HELP_COOKIE } from "@/lib/help/store";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DECLINED_APPLICATION_STATUSES, OPEN_APPLICATION_STATUSES } from "@/lib/application-status";
-import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, GENERIC_SIGN_IN_ERROR, looksLikeGateUsername, NOT_AN_EMAIL_SIGN_IN_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { adminLoginDecision, adminLoginTrace, adminSignInAllowed, GENERIC_SIGN_IN_ERROR, looksLikeGateUsername, NOT_AN_EMAIL_SIGN_IN_ERROR, signInFailureCopy, STAFF_ACCOUNT_ERROR } from "@/lib/sign-in";
 
 function safeNext(value: string): string {
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "/feed";
@@ -27,19 +27,21 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   if (user?.isAdmin) {
     if (password) await bcrypt.compare(password, user.passwordHash);
-    console.log("MEMBER_SIGN_IN result=rejected");
-    return { error: GENERIC_SIGN_IN_ERROR };
+    console.log("MEMBER_SIGN_IN result=rejected staff=1");
+    return { error: STAFF_ACCOUNT_ERROR };
   }
   // Pasted passwords often carry a trailing space; the credentials check already ignores end spaces, so this one does too.
   const memberPasswordMatches = user ? await passwordMatchesAccount(password, user.passwordHash) : false;
   let pendingApplicationPasswordMatches = false;
   let declinedApplicationPasswordMatches = false;
-  if (!user && email && password) {
+  let applicationFound = false;
+  if (!user && email) {
     const application = await prisma.application.findFirst({
       where: { email, status: { in: [...OPEN_APPLICATION_STATUSES, ...DECLINED_APPLICATION_STATUSES] } },
       orderBy: { createdAt: "desc" },
     });
-    if (application && (await passwordMatchesAccount(password, application.passwordHash))) {
+    applicationFound = Boolean(application);
+    if (application && password && (await passwordMatchesAccount(password, application.passwordHash))) {
       const declined = (DECLINED_APPLICATION_STATUSES as readonly string[]).includes(application.status);
       declinedApplicationPasswordMatches = declined;
       pendingApplicationPasswordMatches = !declined;
@@ -52,6 +54,8 @@ export async function loginAction(formData: FormData): Promise<{ error: string }
     memberActive: user?.status === "ACTIVE",
     pendingApplicationPasswordMatches,
     declinedApplicationPasswordMatches,
+    applicationFound,
+    passwordEmpty: !password.trim(),
   });
   if (failure) {
     console.log(`MEMBER_SIGN_IN result=rejected found=${user ? 1 : 0} compare=${memberPasswordMatches ? 1 : 0}`);

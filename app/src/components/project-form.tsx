@@ -31,6 +31,7 @@ const label = `${labelCls} text-[12px]`;
 /** The project form, used on the profile and on the Ledger. New and edited projects go to staff review. */
 export async function ProjectForm({ back, project, pastWork = false }: { back: "/profile" | "/feed" | "/projects"; project?: EditableProject; pastWork?: boolean }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const seeking = new Set(parseSeeking(project?.seeking ?? ""));
   const id = project ? `p-${project.id}` : `new-${back.slice(1)}`;
   return (
@@ -47,7 +48,7 @@ export async function ProjectForm({ back, project, pastWork = false }: { back: "
           <option value="" disabled>
             {tx("Choose one")}
           </option>
-          {PROJECT_ASSET_CLASSES.map((item) => (
+          {sortByShownLabel(PROJECT_ASSET_CLASSES, (item) => tx(item), locale).map((item) => (
             <option key={item} value={item}>
               {tx(item)}
             </option>
@@ -60,7 +61,7 @@ export async function ProjectForm({ back, project, pastWork = false }: { back: "
           <option value="" disabled>
             {tx("Choose one")}
           </option>
-          {PROJECT_ROLE_LABELS.map((item) => (
+          {sortByShownLabel(PROJECT_ROLE_LABELS, (item) => tx(item), locale).map((item) => (
             <option key={item} value={item}>
               {tx(item)}
             </option>

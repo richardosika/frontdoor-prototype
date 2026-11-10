@@ -3,6 +3,7 @@ import { StartLocked } from "@/components/start-locked";
 import Link from "next/link";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { ProjectFacts } from "@/components/project-facts";
+import { OpportunityCard } from "@/components/opportunity-card";
 import { memberLine } from "@/lib/member-line";
 import { contactAboutProject } from "@/actions/projects";
 import { Avatar } from "@/components/avatar";
@@ -77,37 +78,27 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           {active ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </div>
       ) : (
-        <ul className="mt-3 grid gap-4 md:grid-cols-2">
-          {rows.map((project) => (
-            <li key={project.id} className={`${card} flex flex-col border-t-[3px] border-t-brass p-4`}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">
-                {project.why === "seeking" ? tx("Seeking your category") : tx("Shared by My Circle")}
-                {project.why === "seeking" && data.myCategories.length > 1 ? ` · ${tx(seekLabel((("matchedCategory" in project && (project.matchedCategory as string | null)) || data.myCategory) ?? ""))}` : ""}
-              </p>
-              <Link href={`/projects/${project.id}`} className="mt-1 font-serif text-[22px] leading-snug underline decoration-brass underline-offset-2 hover:text-forest">
-                {project.name}
-              </Link>
-              <p className="mt-1 text-[15px] text-mut">
-                {project.user.name}{project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.location} · {project.year}
-              </p>
-              <ProjectFacts category={(("matchedCategory" in project && (project.matchedCategory as string | null)) || data.myCategory)} project={project} compact />
-              {project.why === "seeking" ? (
-                project.status ? (
-                  <p className="mt-3 text-[14px] text-mut">
-                    {tx("Contact request")}: {tx(statusWord(project.status))}
-                  </p>
-                ) : (
-                  <div className="mt-auto pt-3">
-                    <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} back="/deals" label={tx("Contact about this project")} primary align="start" />
-                  </div>
-                )
-              ) : (
+        <ul className="mt-3 grid gap-4 lg:grid-cols-2">
+          {rows.map((project) =>
+            project.why === "seeking" ? (
+              // Nov 10 (Julia): the same card as the Ledger, with the "New" tag.
+              <OpportunityCard key={project.id} project={project} fallbackCategory={data.myCategory} back="/deals" />
+            ) : (
+              <li key={project.id} className={`${card} flex flex-col border-t-[3px] border-t-brass p-4`}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass">{tx("Shared by My Circle")}</p>
+                <Link href={`/projects/${project.id}`} className="mt-1 font-serif text-[22px] leading-snug underline decoration-brass underline-offset-2 hover:text-forest">
+                  {project.name}
+                </Link>
+                <p className="mt-1 text-[15px] text-mut">
+                  {project.user.name}{project.user.org ? ` · ${project.user.org}` : ""} · {tx(project.asset)} · {project.location} · {project.year}
+                </p>
+                <ProjectFacts category={data.myCategory} project={project} compact />
                 <Link href={`/projects/${project.id}`} className={`${btnOutline} mt-3`}>
                   {tx("Open the project")}
                 </Link>
-              )}
-            </li>
-          ))}
+              </li>
+            ),
+          )}
         </ul>
       )}
     </div>

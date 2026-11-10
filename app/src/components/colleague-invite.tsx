@@ -7,7 +7,8 @@ import { useTx } from "@/components/locale-context";
 import { btn, btnOutline, field } from "@/components/ui";
 
 /** #43 "Refer a colleague": sends the referral email (code embedded in the apply link, never shown here), then a confirmation. */
-export function ColleagueInvite({ left }: { left: number }) {
+/** Nov 10: no referral cap; `left` is kept for callers that still pass it. */
+export function ColleagueInvite({ left = Number.POSITIVE_INFINITY }: { left?: number } = {}) {
   const tx = useTx();
   const router = useRouter();
   const [pending, setPending] = useState(false);

@@ -4,7 +4,7 @@ import { card } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
-import { referralStatus, referralsLeft } from "@/lib/referrals";
+import { referralStatus } from "@/lib/referrals";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,6 @@ export default async function ReferPage() {
     select: { id: true, referredName: true, referredEmail: true, sentAt: true, applications: { select: { status: true } } },
     orderBy: { sentAt: "desc" },
   });
-  const left = referralsLeft(sent.length);
   const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24 pt-3 md:pb-6 md:pt-6 lg:px-8">
@@ -31,11 +30,8 @@ export default async function ReferPage() {
       <p className="mt-2 text-[16px] leading-relaxed text-ink">
         {tx("Recommend someone you have worked with. We email them a link to apply; every application is personally reviewed.")}
       </p>
-      <p className="mt-2 font-sans text-[15px] font-semibold text-forest" data-testid="referrals-left">
-        {tx("Referrals left")}: {left}
-      </p>
       <div className="mt-4">
-        <ColleagueInvite left={left} />
+        <ColleagueInvite />
       </div>
       <section className={`${card} mt-5 p-4`} data-testid="referral-list">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Your referrals")}</h2>

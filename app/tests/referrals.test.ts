@@ -4,9 +4,11 @@ import { PHRASES } from "@/lib/i18n/phrases";
 
 describe("#43 referrals", () => {
   it("counts referrals left and never goes below zero", () => {
-    expect(referralsLeft(0)).toBe(3);
-    expect(referralsLeft(2)).toBe(1);
-    expect(referralsLeft(5)).toBe(0);
+    // Nov 10 (Julia): no referral cap for any member; an explicit allowance still never goes below zero.
+    expect(referralsLeft(0)).toBe(Number.POSITIVE_INFINITY);
+    expect(referralsLeft(50)).toBe(Number.POSITIVE_INFINITY);
+    expect(referralsLeft(2, 3)).toBe(1);
+    expect(referralsLeft(5, 3)).toBe(0);
   });
   it("status follows the application on the code", () => {
     expect(referralStatus([])).toBe("Sent");

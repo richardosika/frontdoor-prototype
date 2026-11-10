@@ -35,7 +35,6 @@ export function Shell({
   user,
   unread,
   alerts,
-  referrals = 0,
   interestWaiting = 0,
   locale = "en",
   children,
@@ -43,7 +42,6 @@ export function Shell({
   user: { name: string; initials: string; photoId?: string; tier: string; isAdmin: boolean; memberSince?: number; role?: string };
   unread: number;
   alerts: number;
-  referrals?: number;
   /** Nov 6: interest requests waiting on the developer's projects (My Projects badge). */
   interestWaiting?: number;
   locale?: Locale;
@@ -165,7 +163,7 @@ export function Shell({
               <span className="ml-auto hidden rounded-sm bg-brass px-1.5 text-[10px] font-sans font-bold lg:inline">{alerts}</span>
             ) : null}
           </Link>
-          {/* #43: Refer a colleague, badge = referrals left. */}
+          {/* #43: Refer a colleague. Nov 10: no referral cap, so no "left" badge. */}
           <Link
             href="/refer"
             data-testid="nav-refer"
@@ -177,9 +175,6 @@ export function Shell({
             {pathname.startsWith("/refer") ? <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] bg-brass lg:-left-4" /> : null}
             <span className="grid h-6 w-6 place-items-center text-lg">✦</span>
             <span className="hidden lg:inline">{phrase(locale, "Refer a colleague")}</span>
-            <span className="absolute right-1 top-1 rounded-sm bg-brass px-1 text-[9px] font-sans font-bold text-paper lg:static lg:ml-auto lg:px-1.5 lg:text-[10px]" data-testid="nav-refer-badge" title={phrase(locale, "Referrals left")}>
-              {referrals}
-            </span>
           </Link>
           {/* Suggest a vendor: private suggestions, personally reviewed. */}
           <Link
@@ -308,7 +303,6 @@ export function Shell({
             </Link>
             <Link href="/refer" data-testid="menu-refer" className="flex min-h-11 items-center justify-between border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {phrase(locale, "Refer a colleague")}
-              <span className="rounded-sm bg-brass px-1.5 text-[10px] font-bold text-paper">{referrals}</span>
             </Link>
             <Link href="/suggest" data-testid="menu-suggest" className="flex min-h-11 items-center border-t border-line text-sm font-semibold" onClick={() => setMenuOpen(false)}>
               {phrase(locale, "Suggest a vendor")}

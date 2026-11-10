@@ -1,5 +1,6 @@
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { Avatar } from "@/components/avatar";
 import { StatusPill } from "@/components/reach-out";
 import { btn, btnOutline, field } from "@/components/ui";
@@ -134,7 +135,7 @@ export async function DealChecklist({
                 </select>
                 <select name="category" className={`${field} text-[16px]`} defaultValue="">
                   <option value="">{tx("Who usually fills it (optional)")}</option>
-                  {SEEK_CATEGORIES.map((category) => (
+                  {sortByShownLabel(SEEK_CATEGORIES, (category) => tx(category.label), locale, (category) => category.id).map((category) => (
                     <option key={category.id} value={category.id}>{tx(category.label)}</option>
                   ))}
                 </select>
@@ -239,7 +240,7 @@ export async function DealChecklist({
                                     <input name="dueDate" type="date" defaultValue={dueInputValue(item.dueDate)} className={`${field} text-[16px]`} aria-label={tx("Due date")} />
                                     <select name="category" defaultValue={item.category} className={`${field} text-[16px]`} aria-label={tx("Category")}>
                                       <option value="">{tx("No category")}</option>
-                                      {SEEK_CATEGORIES.map((category) => (
+                                      {sortByShownLabel(SEEK_CATEGORIES, (category) => tx(category.label), locale, (category) => category.id).map((category) => (
                                         <option key={category.id} value={category.id}>{tx(category.label)}</option>
                                       ))}
                                     </select>

@@ -24,7 +24,7 @@ import { membershipChipLabel, plural, tierLabel } from "@/lib/format";
 import { SEEDED_MEMBER_FILES, SEEDED_PROJECT_FILES, seededCaseCount } from "@/lib/seed-coherence";
 import { shouldDiscardInviteRequest, validateInviteRequest, INVITE_REQUESTS_PER_EMAIL_PER_DAY } from "@/lib/invite-request";
 import { withinRateLimit } from "@/lib/messaging";
-import { GENERIC_SIGN_IN_ERROR, INACTIVE_ACCOUNT_ERROR, PENDING_APPROVAL_ERROR, signInFailureCopy } from "@/lib/sign-in";
+import { INACTIVE_ACCOUNT_ERROR, NO_ACCOUNT_ERROR, PENDING_APPROVAL_ERROR, WRONG_PASSWORD_ERROR, signInFailureCopy } from "@/lib/sign-in";
 import { ROLE_IDS, ROLES, roleLabel } from "@/lib/roles";
 
 const BRIEF_LABELS = [
@@ -50,7 +50,8 @@ describe("brand", () => {
   it("uses the Private Floor name", () => {
     expect(BRAND.name).toBe("Private Floor");
     expect(BRAND.club).toBe("Private Floor Club");
-    expect(BRAND.tagline).toBe("The vetted circle for real estate deal teams.");
+    // Nov 10 (Julia): new tagline.
+    expect(BRAND.tagline).toBe("The vetted circle where real estate professionals connect to move projects forward.");
     expect(NDA_ACKNOWLEDGEMENT).toContain(BRAND.club);
     expect(NDA_ACKNOWLEDGEMENT).not.toContain("FrontDoor");
     expect(NDA_ACKNOWLEDGEMENT).not.toContain("Cornicio");
@@ -345,7 +346,8 @@ describe("network and verification", () => {
         memberActive: false,
         pendingApplicationPasswordMatches: false,
       }),
-    ).toBe(GENERIC_SIGN_IN_ERROR);
+    ).toBe(NO_ACCOUNT_ERROR);
+    // Nov 10 (Julia): a wrong password on a known email says so (it used to be the generic error).
     expect(
       signInFailureCopy({
         memberFound: true,
@@ -353,7 +355,7 @@ describe("network and verification", () => {
         memberActive: true,
         pendingApplicationPasswordMatches: true,
       }),
-    ).toBe(GENERIC_SIGN_IN_ERROR);
+    ).toBe(WRONG_PASSWORD_ERROR);
     expect(
       signInFailureCopy({
         memberFound: true,

@@ -1,13 +1,15 @@
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { btn, field } from "@/components/ui";
-import { serverTx } from "@/lib/i18n/server";
+import { currentLocale, serverTx } from "@/lib/i18n/server";
+import { sortByShownLabel } from "@/lib/category-sort";
 import { DEAL_SIZE_BANDS, type SlimFilters } from "@/lib/member-reach";
 import { PROJECT_ASSET_CLASSES, US_STATES } from "@/lib/project-contact";
 
 /** The slim filter bar (#21, #27): asset class, state and deal size only. A plain GET form; works on a 390px phone. */
 export async function SlimFilterBar({ path, filters, anchor }: { path: string; filters: SlimFilters; anchor?: string }) {
   const tx = await serverTx();
+  const locale = await currentLocale();
   const active = Boolean(filters.asset || filters.state || filters.size);
   return (
     <form action={`${path}${anchor ? `#${anchor}` : ""}`} className="mb-3 grid grid-cols-2 gap-2 rounded border border-line bg-cream p-2 sm:grid-cols-[1fr_1fr_1fr_auto]" data-testid="slim-filters">
@@ -15,7 +17,7 @@ export async function SlimFilterBar({ path, filters, anchor }: { path: string; f
         <span className="sr-only">{tx("Asset class")}</span>
         <select name="asset" defaultValue={filters.asset} className={`${field} w-full text-[15px]`} aria-label={tx("Asset class")}>
           <option value="">{tx("Asset class")}: {tx("Any")}</option>
-          {PROJECT_ASSET_CLASSES.map((item) => (
+          {sortByShownLabel(PROJECT_ASSET_CLASSES, (item) => tx(item), locale).map((item) => (
             <option key={item} value={item}>
               {tx(item)}
             </option>

@@ -50,7 +50,7 @@ export async function ProjectFilterBar({
           <span className={labelCls}>{tx("Asset class")}</span>
           <select className={field} name={assetName} defaultValue={assetValue}>
             <option value="">{tx("Any")}</option>
-            {ASSET_CLASSES.map((item) => (
+            {sortByShownLabel(ASSET_CLASSES, (item) => tx(item), locale).map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -73,7 +73,7 @@ export async function ProjectFilterBar({
             <span className={labelCls}>{tx("Deal type")}</span>
             <select className={field} name="dealType" defaultValue={filters.dealType || ""}>
               <option value="">{tx("Any")}</option>
-              {DEAL_TYPES.map((item) => (
+              {sortByShownLabel(DEAL_TYPES, (item) => tx(item), locale).map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -111,7 +111,7 @@ export async function ProjectFilterBar({
           <span className={labelCls}>{tx("What is needed")}</span>
           <select className={field} name="need" defaultValue={filters.need || ""}>
             <option value="">{tx("Any")}</option>
-            {PROJECT_NEEDS.map((item) => (
+            {sortByShownLabel(PROJECT_NEEDS, (item) => tx(item.label), locale, (item) => item.id).map((item) => (
               <option key={item.id} value={item.id}>
                 {tx(item.label)}
               </option>

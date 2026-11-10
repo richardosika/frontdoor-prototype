@@ -3,7 +3,7 @@
  * in their own language; Japanese by reading, so kanji names sit among the katakana ones in あいうえお order).
  * "Other …" catch-alls such as Other Deal Professionals stay at the end.
  */
-const LAST = new Set(["OTHER_PROFESSIONAL", "OTHER_DEAL_PROFESSIONALS", "Other Deal Professionals", "OTHER"]);
+const LAST = new Set(["OTHER_PROFESSIONAL", "OTHER_DEAL_PROFESSIONALS", "Other Deal Professionals", "OTHER", "Other"]);
 
 /** Readings for the Japanese category names that start with kanji. */
 export const JA_READING: Record<string, string> = {

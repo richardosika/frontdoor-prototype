@@ -42,15 +42,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? prisma.projectContact.count({ where: { toId: user.id, status: "PENDING", project: { userId: user.id } } })
       : Promise.resolve(0),
   ]);
-  // #43: referrals left, for the sidebar badge.
-  const { referralsLeft } = await import("@/lib/referrals");
-  const referrals = referralsLeft(await prisma.inviteCode.count({ where: { createdById: user.id, sentAt: { not: null } } }));
   return (
     <Shell
       user={{ name: user.name, initials: user.initials, photoId: user.photoId, tier: user.tier, isAdmin: user.isAdmin, memberSince: user.createdAt.getFullYear(), role: user.role }}
       unread={unread}
       alerts={alerts}
-      referrals={referrals}
       interestWaiting={interestWaiting}
       locale={await currentLocale()}
     >

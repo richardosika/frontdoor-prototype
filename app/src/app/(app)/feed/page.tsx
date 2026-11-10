@@ -72,12 +72,10 @@ export default async function FeedPage({
     prisma.message.count({ where: { readAt: null, senderId: { not: user.id }, conversation: { OR: [{ userAId: user.id }, { userBId: user.id }] } } }),
     prisma.projectContact.count({ where: { toId: user.id, status: "PENDING" } }),
   ]);
-  const weekAgo = Date.now() - 7 * 86400000;
-  const newOpps = ledgerProjects.seekingMe.filter((p) => !p.status && (p.reviewedAt ?? p.submittedAt).getTime() >= weekAgo).length;
   const whatsNew = locked
     ? []
     : [
-        newOpps ? { n: newOpps, text: tx(newOpps === 1 ? "new opportunity" : "new opportunities"), href: "#ledger-seeking" } : null,
+        // Nov 10 (Julia): new opportunities are no longer counted here; each new project carries its own "New" tag.
         pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: developer ? "/projects#interest" : "#ledger-my-work" } : null,
         unreadCount ? { n: unreadCount, text: tx(unreadCount === 1 ? "unread message" : "unread messages"), href: "/messages" } : null,
       ].filter((x): x is { n: number; text: string; href: string } => Boolean(x));
@@ -91,9 +89,6 @@ export default async function FeedPage({
     <>
       <div className={panel} data-testid="ledger-viewed-you">
         <h2 className={panelH}>{tx("Who viewed your profile")}</h2>
-        <p className="mt-1 font-serif text-[18px] leading-snug text-forest">
-          {side.viewers.length} {tx(side.viewers.length === 1 ? "developer viewed your profile this week" : "developers viewed your profile this week")}
-        </p>
         <div className="mt-3" data-testid="viewed-chart" aria-label={tx("Profile views, last 7 days")}>
           <div className="flex h-16 items-end gap-1.5">
             {side.chart.map((d) => (
@@ -172,8 +167,8 @@ export default async function FeedPage({
   // Nov 5: My Circle, explained in one line, with the people in it and what you can do there.
   const circlePanel = locked ? null : (
     <div className="rounded border border-line bg-paper p-5" data-testid="ledger-circle">
-      <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("My Circle")}</h2>
-      <p className="mt-1 font-serif text-[20px] leading-snug text-forest">{circle.length === 1 ? t("ledger.connection") : t("ledger.connections", { count: circle.length })}</p>
+      {/* Nov 10 (Julia): "Connections" is gone; My Circle is the one name, with its member count. */}
+      <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("My Circle")} · <span data-testid="ledger-circle-count">{circle.length}</span></h2>
       <p className="mt-1 text-[14px] leading-relaxed text-ink">{tx("Your circle is the members you have worked with: someone joins when a contact about a project is accepted. You can message people in your circle at any time.")}</p>
       {circle.length ? (
         <ul className="mt-3 grid gap-2" data-testid="ledger-circle-people">
@@ -190,7 +185,7 @@ export default async function FeedPage({
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-[14px] text-mut">{tx("No one yet. Express interest in an opportunity; when the developer accepts, you are connected.")}</p>
+        <p className="mt-2 text-[14px] text-mut">{tx("No one yet. Express interest in an opportunity; once your request is accepted, you are connected.")}</p>
       )}
       <Link href={developer ? "/deals#my-circle" : "/network"} className="mt-3 inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">
         {circle.length ? tx("See everyone, message or remove") : tx("Open My Circle")} ›

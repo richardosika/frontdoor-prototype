@@ -66,9 +66,19 @@ export const DECLINED_APPLICATION_ERROR = "This application was not approved.";
 export const INACTIVE_ACCOUNT_ERROR = "This account is not active. Contact connect@privatefloorclub.com if you need help.";
 
 /**
+ * Nov 10 (Julia): a failed sign-in says why. A known email with the wrong password and an email with no account or
+ * application get their own messages. Pending and declined applications are still mentioned only after the password
+ * matches that application.
+ */
+export const WRONG_PASSWORD_ERROR = "The password is incorrect for this email. Check it and try again; passwords are case-sensitive.";
+export const NO_ACCOUNT_ERROR = "We could not find a member account with this email. Check the spelling, or apply to join.";
+export const STAFF_ACCOUNT_ERROR = "This email belongs to a staff account. Staff sign in on the administrator page.";
+export const MISSING_PASSWORD_ERROR = "Enter your password.";
+
+/**
  * Pending approval is mentioned only after the password matches a pending application.
- * A wrong password, or an email with no matching password, always gets the generic error.
- * Returns null when the member password matches an active account and sign-in should proceed.
+ * Nov 10: a wrong password on a known email (member or application) says the password is incorrect; an unknown email
+ * says there is no account. Returns null when the member password matches an active account and sign-in should proceed.
  */
 export function signInFailureCopy(input: {
   memberFound: boolean;
@@ -76,10 +86,16 @@ export function signInFailureCopy(input: {
   memberActive: boolean;
   pendingApplicationPasswordMatches: boolean;
   declinedApplicationPasswordMatches?: boolean;
+  /** Nov 10: an application exists for this email (any password). */
+  applicationFound?: boolean;
+  /** Nov 10: the password box was empty. */
+  passwordEmpty?: boolean;
 }): string | null {
   if (input.memberFound && input.memberPasswordMatches && input.memberActive) return null;
   if (input.memberFound && input.memberPasswordMatches && !input.memberActive) return INACTIVE_ACCOUNT_ERROR;
   if (!input.memberFound && input.declinedApplicationPasswordMatches) return DECLINED_APPLICATION_ERROR;
   if (!input.memberFound && input.pendingApplicationPasswordMatches) return PENDING_APPROVAL_ERROR;
-  return GENERIC_SIGN_IN_ERROR;
+  if (input.passwordEmpty) return MISSING_PASSWORD_ERROR;
+  if (input.memberFound || input.applicationFound) return WRONG_PASSWORD_ERROR;
+  return NO_ACCOUNT_ERROR;
 }

@@ -324,7 +324,7 @@ function ScopeSchedule({ req, tx }: { req: { scopeOfWork: string; schedule: stri
   );
 }
 
-/** Nov 5: questions from a bidder (e.g. a general contractor) to the developer, and the answers. */
+/** Nov 5: questions from a bidder to the requester, and the answers. Nov 10: "Ask a Question", no developer wording. */
 async function BidQA({ requestId, viewerId, isRequester, readOnly, tx, locale }: { requestId: string; viewerId: string; isRequester: boolean; readOnly: boolean; tx: Tx; locale: string }) {
   const rows = await prisma.bidQuestion.findMany({ where: { requestId, ...(isRequester || readOnly ? {} : { askerId: viewerId }) }, orderBy: { createdAt: "asc" } });
   const askers = isRequester || readOnly ? await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.askerId))] } }, select: { id: true, name: true, org: true } }) : [];
@@ -332,7 +332,7 @@ async function BidQA({ requestId, viewerId, isRequester, readOnly, tx, locale }:
   return (
     <section id="bid-qa" className={`${card} mt-4 scroll-mt-20 p-4 sm:p-5`} data-testid="bid-qa">
       <h2 className={h2}>{tx("Questions and answers")}</h2>
-      <p className="mb-3 text-[14px] text-mut">{isRequester ? tx("Bidders' questions to you. Each answer goes only to the bidder who asked.") : tx("Ask the developer about the scope, schedule or plans. Only you and the developer see your questions.")}</p>
+      {/* Nov 10 (Julia): the explanatory line under Questions and answers is removed for every member. */}
       {rows.length === 0 ? <p className="text-[15px] text-mut">{tx("No questions yet.")}</p> : null}
       <ul className="grid gap-3">
         {rows.map((r) => {
@@ -359,8 +359,8 @@ async function BidQA({ requestId, viewerId, isRequester, readOnly, tx, locale }:
       {!isRequester && !readOnly ? (
         <form action={askBidQuestion} className="mt-3 grid gap-2">
           <input type="hidden" name="requestId" value={requestId} />
-          <textarea name="question" required minLength={3} maxLength={1000} rows={3} className={field} placeholder={tx("Your question for the developer")} />
-          <SubmitButton className={`${btnOutline} justify-self-start`} pendingLabel="Sending…" data-testid="bid-qa-ask">{tx("Ask the developer")}</SubmitButton>
+          <textarea name="question" required minLength={3} maxLength={1000} rows={3} className={field} placeholder={tx("Your question")} />
+          <SubmitButton className={`${btnOutline} justify-self-start`} pendingLabel="Sending…" data-testid="bid-qa-ask">{tx("Ask a Question")}</SubmitButton>
         </form>
       ) : null}
     </section>

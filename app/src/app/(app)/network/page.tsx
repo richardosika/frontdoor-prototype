@@ -50,7 +50,7 @@ export default async function NetworkPage({ searchParams }: { searchParams: Prom
         {tx("People connected to you through a project, with the projects you share. Email and phone stay private; messages stay inside Private Floor.")}
       </p>
       <ul className="mt-3 grid gap-2 rounded border border-line bg-paper p-4 text-[15px] leading-relaxed text-ink sm:grid-cols-3" data-testid="circle-how">
-        <li><b className="block text-forest">{tx("How people join")}</b>{tx("When a developer accepts your interest in a project, or you accept theirs.")}</li>
+        <li><b className="block text-forest">{tx("How people join")}</b>{tx("When a request about a project is accepted, whichever side sent it.")}</li>
         <li><b className="block text-forest">{tx("What you can do")}</b>{tx("Message anyone in your circle, see the projects you share, and introduce two members you know.")}</li>
         <li><b className="block text-forest">{tx("Remove or block")}</b>{tx("Remove someone quietly from your circle, or block them from their profile to stop all contact.")}</li>
       </ul>

@@ -17,7 +17,7 @@ export default async function HomePage() {
           <Logo tone="paper" />
         </div>
         <div className="flex flex-1 flex-col justify-center px-6 py-10">
-          <h1 className="font-serif text-4xl font-normal leading-tight">{BRAND.tagline}</h1>
+          <h1 className="font-serif text-4xl font-normal leading-tight">{tx(BRAND.tagline)}</h1>
           <p className="mt-4 text-base leading-relaxed text-ink">{LANDING_INTRO}</p>
           <LandingStart signedIn={Boolean(session?.user)} />
           <section className="mt-8 border-t border-line pt-6" data-testid="landing-pricing" aria-labelledby="landing-pricing-h">

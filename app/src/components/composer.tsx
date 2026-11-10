@@ -1,6 +1,7 @@
 "use client";
 import { SubmitButton } from "@/components/submit-button";
-import { useTx } from "@/components/locale-context";
+import { useLocale, useTx } from "@/components/locale-context";
+import { sortByShownLabel } from "@/lib/category-sort";
 
 import { useMemo, useState } from "react";
 import { createPost } from "@/actions/feed";
@@ -21,6 +22,7 @@ export function Composer({
   rulesHtml: string;
 }) {
   const tx = useTx();
+  const locale = useLocale();
   const [kind, setKind] = useState<Kind>("NORMAL");
   const choices = useMemo(() => intents.filter((item) => item.kind === kind), [intents, kind]);
   const structured = kind !== "NORMAL";
@@ -90,7 +92,7 @@ export function Composer({
           <div>
             <label className={labelCls}>{tx("Asset class")}</label>
             <select name="assetClass" className={field} defaultValue="Multifamily" required>
-              {ASSET_CLASSES.map((item) => (
+              {sortByShownLabel(ASSET_CLASSES, (item) => tx(item), locale).map((item) => (
                 <option key={item} value={item}>{tx(item)}</option>
               ))}
             </select>
@@ -108,7 +110,7 @@ export function Composer({
           <div>
             <label className={labelCls}>{tx("What is needed")}</label>
             <select key={kind} name="need" className={field} defaultValue={kind === "SEEKING" ? "gc" : "equity"} required>
-              {PROJECT_NEEDS.map((item) => (
+              {sortByShownLabel(PROJECT_NEEDS, (item) => tx(item.label), locale, (item) => item.id).map((item) => (
                 <option key={item.id} value={item.id}>
                   {tx(item.label)}
                 </option>
@@ -137,7 +139,7 @@ export function Composer({
             <div className="sm:col-span-2">
               <label className={labelCls}>{tx("Role needed")}</label>
               <select name="roleNeeded" className={field} defaultValue="GENERAL_CONTRACTOR">
-                {ROLES.map((role) => (
+                {sortByShownLabel(ROLES, (role) => tx(roleShort(role.label)), locale, (role) => role.id).map((role) => (
                   <option key={role.id} value={role.id}>
                     {tx(roleShort(role.label))}
                   </option>

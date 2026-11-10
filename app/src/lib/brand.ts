@@ -2,7 +2,7 @@
 export const BRAND = {
   name: "Private Floor",
   club: "Private Floor Club",
-  tagline: "The vetted circle for real estate deal teams.",
+  tagline: "The vetted circle where real estate professionals connect to move projects forward.",
   /** Two-line text wordmark. */
   mark: ["Private", "Floor"],
   legalName: "Private Floor Club LLC",

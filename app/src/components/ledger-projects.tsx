@@ -4,6 +4,7 @@ import { addContactToCircle, respondProjectContact } from "@/actions/projects";
 import { ReachOut, StatusPill } from "@/components/reach-out";
 import { memberLine } from "@/lib/member-line";
 import { ProjectFacts } from "@/components/project-facts";
+import { OpportunityCard } from "@/components/opportunity-card";
 import { ProjectForm, ReviewChip } from "@/components/project-form";
 import { btn, btnOutline } from "@/components/ui";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
@@ -299,7 +300,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="min-w-0" data-testid="my-work-active">
           <p className="text-[15px] font-semibold text-forest">{tx("Active")} <span className="text-mut">({myWork.active.length})</span></p>
-          {myWork.active.length === 0 ? <p className="text-[15px] text-mut">{tx("No active projects yet. Once a developer accepts your request, the project shows here.")}</p> : null}
+          {myWork.active.length === 0 ? <p className="text-[15px] text-mut">{tx("No active projects yet. Once a request is accepted, the project shows here.")}</p> : null}
           <ul>
             {myWork.active.map((item) => (
               <li key={item.id} className="border-t border-line py-2 first:border-t-0" data-testid="my-work-active-item">
@@ -357,7 +358,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
         {tx("You're on the list. When a project seeking a {category} gets approved, you'll see it here before anyone outside the network.").replace("{category}", catLabel).replace(/\bseeking a ([AEIOU])/, "seeking an $1")}
       </p>
       <p className="mt-3 text-[15px] text-paper md:text-[16px]" data-testid="headline-nudge">
-        <a href="/profile" className="underline decoration-brass">{tx("Get found faster: developers searching for a {category} see your profile in Find your team.").replace("{category}", catLabel).replace(/\bfor a ([AEIOU])/, "for an $1")}</a>
+        <a href="/profile" className="underline decoration-brass">{tx("Get found faster: members searching for a {category} see your profile.").replace("{category}", catLabel).replace(/\bfor a ([AEIOU])/, "for an $1")}</a>
       </p>
       {results ? (
         <p className="mt-1 text-[15px] text-sand md:text-[17px]" data-testid="headline-network">
@@ -368,12 +369,9 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
   ) : head ? (
     <section className="rounded border border-brass bg-forest px-4 py-4 text-paper md:px-6 md:py-5" data-testid="ledger-value-headline" key="headline">
       <p className="font-serif text-[22px] leading-snug md:text-[28px]">
-        <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project needs a {category} right now" : "projects need a {category} right now").replace("{category}", catLabel).replace(/\b(needs?) a ([AEIOU])/, "$1 an $2")}
+        <span data-testid="headline-projects">{head.projects}</span> {tx(head.projects === 1 ? "project is seeking {category} right now" : "projects are seeking {category} right now").replace("{category}", catLabel)}
       </p>
-      <p className="mt-1 text-[15px] text-sand md:text-[17px]">
-        <span data-testid="headline-value">{money.format(head.total)}</span> {tx("total project value")} · <span data-testid="headline-developers">{head.developers}</span>{" "}
-        {tx(head.developers === 1 ? "developer wants to talk to you" : "developers want to talk to you")}
-      </p>
+      {/* Nov 10 (Julia): the total project value and "developers want to talk to you" line is removed. */}
     </section>
   ) : null;
   const now = Date.now();
@@ -390,46 +388,9 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
         </p>
       ) : null}
       <ul className="mt-3 grid gap-4 lg:grid-cols-2">
-        {data.seekingMe.map((project) => {
-          const at = (project.reviewedAt ?? project.submittedAt).getTime();
-          const bid = parseFacts(project.roleFacts).bidDue;
-          const closes = bid ? new Date(`${bid}T23:59:00`).getTime() - now : NaN;
-          const isNew = now - at <= 7 * 86400000;
-          const soon = closes >= 0 && closes <= 14 * 86400000;
-          return (
-            <li key={project.id} className="relative flex min-w-0 flex-col rounded border border-line border-t-[4px] border-t-brass bg-paper p-4 md:p-5" data-testid="opportunity-card">
-              {dismissAction ? (
-                <form action={dismissAction} className="absolute right-1 top-1">
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <SubmitButton aria-label={tx("Not interested: remove from my Ledger")} title={tx("Not interested: remove from my Ledger")} className="grid h-11 w-11 place-items-center rounded-full text-[22px] leading-none text-mut hover:bg-cream hover:text-forest" pendingLabel="…" data-testid="opportunity-dismiss">
-                    ×
-                  </SubmitButton>
-                </form>
-              ) : null}
-              <div className="flex flex-wrap gap-2 pr-10">
-                {isNew ? <span className="rounded-full bg-brass px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-paper" data-testid="tag-new">{tx("New")}</span> : null}
-                {soon ? <span className="rounded-full bg-[#A2412C] px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white" data-testid="tag-closes-soon">{tx("Closes soon")}</span> : null}
-                {project.matchedCategory ? <span className="rounded-full border border-brass px-2.5 py-0.5 text-[12px] text-forest">{tx(seekLabel(project.matchedCategory))}</span> : null}
-              </div>
-              <Link href={`/projects/${project.id}`} className="mt-2 font-serif text-[24px] leading-snug underline decoration-brass underline-offset-2 hover:text-forest [overflow-wrap:anywhere]">{project.name}</Link>
-              <p className="mt-1 text-[15px] text-mut [overflow-wrap:anywhere]">
-                <Link href={`/members/${project.user.id}`} className="text-ink underline decoration-line">{project.user.name}</Link>
-                {project.user.org ? ` · ${project.user.org}` : ""} · {project.location}
-              </p>
-              <p className="mt-1 text-[15px] text-ink">
-                {tx(project.asset)}{project.valueLabel ? ` · ${formatProjectValue(project.valueLabel, locale)}` : ""} · {project.year}
-              </p>
-              <div className="mt-1 flex-1"><ProjectFacts category={project.matchedCategory ?? data.myCategory} project={project} /></div>
-              {project.status ? (
-                <p className="mt-3 text-[15px] font-semibold text-forest">{tx("Contact request")}: {tx(statusWord(project.status))}</p>
-              ) : (
-                <div className="mt-3">
-                  <ReachOut projects={[{ id: project.id, name: project.name, status: "" }]} back="/feed" label={tx("Express interest")} primary align="start" />
-                </div>
-              )}
-            </li>
-          );
-        })}
+        {data.seekingMe.map((project) => (
+          <OpportunityCard key={project.id} project={project} fallbackCategory={data.myCategory} back="/feed" dismissAction={dismissAction} now={now} />
+        ))}
       </ul>
     </section>
   ) : null;
@@ -437,7 +398,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
     <section className="rounded border border-line bg-cream px-4 py-3" data-testid="ledger-results" key="results">
       <p className="text-[15px] text-ink">
         <span className="font-semibold text-forest">{tx("This month")}:</span>{" "}
-        <span data-testid="results-shown">{results.shown}</span> {tx(results.shown === 1 ? "project shown to you" : "projects shown to you")} · <span data-testid="results-views">{results.views}</span> {tx(results.views === 1 ? "developer viewed your profile" : "developers viewed your profile")} · <span data-testid="results-won">{results.won}</span> {tx(results.won === 1 ? "deal won" : "deals won")}
+        <span data-testid="results-shown">{results.shown}</span> {tx(results.shown === 1 ? "project shown to you" : "projects shown to you")} · <span data-testid="results-won">{results.won}</span> {tx(results.won === 1 ? "deal won" : "deals won")}
       </p>
     </section>
   ) : null;
