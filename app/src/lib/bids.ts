@@ -1,3 +1,4 @@
+import { RETIRED_BID_FIELDS } from "@/lib/bid-revisions";
 /** #51 Bids / proposals: pure rules (who may request, who may see, comparison). DB code lives in bids-db.ts. */
 import type { BidField } from "@/lib/bid-templates";
 
@@ -9,7 +10,8 @@ export const ANSWER_MAX = 500;
 export function parseFields(json: string): BidField[] {
   try {
     const v = JSON.parse(json);
-    return Array.isArray(v) ? v.filter((x) => x && typeof x.key === "string" && typeof x.label === "string") : [];
+    // Nov 10 (Julia): retired fields (unit pricing) are never asked or shown, even on older template versions.
+    return Array.isArray(v) ? v.filter((x) => x && typeof x.key === "string" && typeof x.label === "string" && !RETIRED_BID_FIELDS.has(x.key)) : [];
   } catch {
     return [];
   }

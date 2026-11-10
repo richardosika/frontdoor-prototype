@@ -104,7 +104,7 @@ export async function loadBidsHome(userId: string) {
         request: {
           include: {
             project: { select: { id: true, name: true, location: true } },
-            requester: { select: { id: true, name: true, org: true } },
+            requester: { select: { id: true, name: true, org: true, role: true } },
             template: { select: { name: true, version: true } },
             bids: { where: { bidderId: userId }, select: { id: true, status: true, submittedAt: true } },
           },
@@ -133,7 +133,7 @@ export async function loadBidsHome(userId: string) {
           take: 50,
           include: {
             project: { select: { id: true, name: true, location: true } },
-            requester: { select: { id: true, name: true, org: true } },
+            requester: { select: { id: true, name: true, org: true, role: true } },
             template: { select: { name: true, version: true } },
             _count: { select: { plans: true } },
           },

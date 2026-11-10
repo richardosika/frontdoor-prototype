@@ -27,7 +27,7 @@ export async function openPackagesFor(viewer: { id: string; role: string; extraC
     take: 100,
     include: {
       project: { select: { id: true, name: true, location: true } },
-      requester: { select: { id: true, name: true, org: true } },
+      requester: { select: { id: true, name: true, org: true, role: true } },
       template: { select: { name: true, version: true } },
       _count: { select: { plans: true } },
     },

@@ -1292,6 +1292,7 @@ model Bid {
   decidedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  revisions   BidRevision[]
 
   @@unique([requestId, bidderId])
   @@index([bidderId])
@@ -1380,3 +1381,17 @@ model InsuranceCertificate {
   uploadedAt  DateTime @default(now())
 }
 
+
+/// Nov 10 (Julia): every submitted version of a bid. Version 1 is the original; up to 5 updates follow.
+model BidRevision {
+  id          String   @id @default(cuid())
+  bidId       String
+  bid         Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  version     Int
+  values      String   @default("{}")
+  answers     String   @default("[]")
+  submittedAt DateTime @default(now())
+
+  @@unique([bidId, version])
+  @@index([bidId])
+}

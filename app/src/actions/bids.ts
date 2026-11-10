@@ -8,6 +8,7 @@ import { bidAccess, bidNotice, estimateCopy, parseQuestions } from "@/lib/bids-d
 import type { BidField } from "@/lib/bid-templates";
 import { isGeneralContractor, isTrade, statesFrom, tradeLabel } from "@/lib/trades";
 import { matchingSubs } from "@/lib/trades-db";
+import { BID_UPDATE_LIMIT_ERROR, TRADE_CHOICE_ERROR, canAddVersion, tradeChoiceOk, versionsOf } from "@/lib/bid-revisions";
 import { PLAN_MAX_BYTES, PLAN_MAX_FILES, canOpenRequest, isOpenToGcs, planType, safePlanName, type OpenViewer } from "@/lib/bid-plans";
 
 function go(path: string, key: "error" | "notice", text: string): never {
@@ -129,6 +130,16 @@ export async function saveBid(formData: FormData) {
     if (!isPdf(bytes)) go(back, "error", "Attach a PDF up to 25 MB.");
     Object.assign(pdf, { pdfName: file.name.replace(/[^\w .()-]/g, "_").slice(0, 160) || "bid.pdf", pdfSize: file.size, pdfBytes: bytes });
   }
+  // Nov 10: on a subcontractor bid, Trade is one of the trades the sub chose when joining.
+  if (req.template.category === "SUBCONTRACTOR" && fields.some((f) => f.key === "trade")) {
+    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { trades: true } });
+    if (values.trade && !tradeChoiceOk(values.trade, me?.trades)) go(back, "error", TRADE_CHOICE_ERROR);
+  }
+  // Nov 10: the original plus up to 5 updates are kept; a sixth update is refused.
+  const wasSent = existing && existing.status === "SUBMITTED";
+  const priorRows = existing ? await prisma.bidRevision.findMany({ where: { bidId: existing.id }, select: { version: true, values: true, submittedAt: true } }) : [];
+  const prior = existing ? versionsOf(existing, priorRows) : [];
+  if (submit && wasSent && !canAddVersion(prior.length)) go(back, "error", BID_UPDATE_LIMIT_ERROR);
   if (submit) {
     // Nov 5: requester questions are no longer shown to bidders, so they are not required.
     const missing = missingFields(fields, values, [], []);
@@ -143,18 +154,27 @@ export async function saveBid(formData: FormData) {
   }
   const wasSubmitted = existing?.status === "SUBMITTED";
   const status = submit || wasSubmitted ? "SUBMITTED" : "DRAFT";
-  await prisma.bid.upsert({
+  const saved = await prisma.bid.upsert({
     where: { requestId_bidderId: { requestId, bidderId: user.id } },
     update: { values: JSON.stringify(values), answers: JSON.stringify(answers), status, ...(submit ? { submittedAt: new Date() } : {}), ...pdf },
     create: { requestId, bidderId: user.id, values: JSON.stringify(values), answers: JSON.stringify(answers), status, ...(submit ? { submittedAt: new Date() } : {}), ...pdf },
   });
+  if (submit) {
+    // Keep this version. A bid sent before Nov 10 first stores its earlier numbers as the original.
+    if (!priorRows.length && prior.length) {
+      await prisma.bidRevision.create({ data: { bidId: saved.id, version: 1, values: prior[0].values, answers: existing?.answers ?? "[]", submittedAt: prior[0].submittedAt } });
+    }
+    await prisma.bidRevision.create({ data: { bidId: saved.id, version: prior.length + 1, values: JSON.stringify(values), answers: JSON.stringify(answers), submittedAt: saved.submittedAt ?? new Date() } });
+  }
   if (submit) {
     await bidNotice(req.requester, "submitted", { name: user.name, project: req.project.name }, `/bids/${requestId}`);
     // Nov 5: the bidder gets a copy of the estimate they submitted.
     await estimateCopy({ id: user.id, email: user.email, locale: user.locale, name: user.name }, req.project.name, fields, values, `/bids/${requestId}`).catch(() => null);
   }
   refresh();
-  go(back, "notice", submit ? "Proposal submitted." : "Draft saved.");
+  // Nov 10: after submitting or updating, back to the submission view with a "Thanks for submitting." pop-up.
+  if (submit) redirect(`${back}?thanks=1`);
+  go(back, "notice", "Draft saved.");
 }
 
 export async function decideBid(formData: FormData) {
@@ -224,7 +244,7 @@ export async function setTemplateStatus(formData: FormData) {
   go("/admin/bid-templates", "notice", status === "APPROVED" ? "Template approved." : "Template retired.");
 }
 
-/** Nov 5: a bidder asks the requester (the developer) a question about the request. */
+/** Nov 5: a bidder asks the requester a question about the request. */
 export async function askBidQuestion(formData: FormData) {
   const user = await requireUser();
   const requestId = String(formData.get("requestId") || "");
@@ -238,7 +258,7 @@ export async function askBidQuestion(formData: FormData) {
   await prisma.bidQuestion.create({ data: { requestId, askerId: user.id, question } });
   await bidNotice(req.requester, "question", { name: user.name, project: req.project.name }, `${back}#bid-qa`);
   refresh();
-  go(`${back}#bid-qa`, "notice", "Question sent to the developer.");
+  go(`${back}#bid-qa`, "notice", "Question sent.");
 }
 
 /** Nov 5: the requester answers a bidder's question. Only the bidder who asked and the requester see it. */

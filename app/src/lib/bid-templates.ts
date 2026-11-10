@@ -232,10 +232,9 @@ export const BID_TEMPLATE_SEEDS: TemplateSeed[] = [
   ], "Total fee", { perUnit: false }),
 ];
 
-/** Subcontractor trade work bid by a GC's subs uses the GC template's unit-price variant below. */
+/** Subcontractor trade work bid by a GC's subs. Nov 10: unit pricing removed; Trade is picked from the sub's own trades. */
 export const SUBCONTRACTOR_TEMPLATE: TemplateSeed = T("SUBCONTRACTOR", "Subcontractor trade", [
   f("trade", "Trade", "text", "scope"),
-  f("unitPricing", "Unit pricing", "long", "price", opt),
   f("crew", "Crew size / manpower", "text", "terms", opt),
 ], "Lump sum");
 

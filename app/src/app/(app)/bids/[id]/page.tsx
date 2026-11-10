@@ -11,6 +11,9 @@ import { parseQuestions, profileFacts } from "@/lib/bids-db";
 import { requireUser } from "@/lib/current-user";
 import { canOpenRequest } from "@/lib/bid-plans";
 import { tradeLabel } from "@/lib/trades";
+import { roleById } from "@/lib/roles";
+import { MORE_DETAIL_FIELDS, canAddVersion, pickVersion, tradeChoices, versionName, versionsOf } from "@/lib/bid-revisions";
+import { ThanksPopup } from "@/components/thanks-popup";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 
@@ -28,7 +31,7 @@ function NotAvailable({ tx }: { tx: Tx }) {
   );
 }
 
-export default async function BidRequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; notice?: string }> }) {
+export default async function BidRequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; notice?: string; v?: string; edit?: string; thanks?: string }> }) {
   const user = await requireUser();
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -38,7 +41,7 @@ export default async function BidRequestPage({ params, searchParams }: { params:
     where: { id },
     include: {
       project: { select: { id: true, name: true, location: true } },
-      requester: { select: { id: true, name: true, org: true } },
+      requester: { select: { id: true, name: true, org: true, role: true } },
       template: true,
       recipients: { select: { memberId: true } },
       plans: { select: { id: true, fileName: true, sizeBytes: true, contentType: true } },
@@ -70,7 +73,7 @@ export default async function BidRequestPage({ params, searchParams }: { params:
     </>
   );
   if (isRequester || isStaff) return <Compare readOnly={isStaff} req={req} fields={fields} questions={questions} tx={tx} locale={locale} due={due} head={head} />;
-  return <BidForm req={req} fields={fields} questions={questions} userId={user.id} tx={tx} locale={locale} due={due} head={head} />;
+  return <BidForm req={req} fields={fields} questions={questions} userId={user.id} tx={tx} locale={locale} due={due} head={head} view={{ v: q.v, edit: q.edit === "1", thanks: q.thanks === "1" }} />;
 }
 
 function PlansList({ plans, tx }: { plans: { id: string; fileName: string; sizeBytes: number; contentType: string }[]; tx: (s: string) => string }) {
@@ -94,7 +97,7 @@ function PlansList({ plans, tx }: { plans: { id: string; fileName: string; sizeB
 
 type Req = NonNullable<Awaited<ReturnType<typeof loadReq>>>;
 async function loadReq(id: string) {
-  return prisma.bidRequest.findUnique({ where: { id }, include: { project: { select: { id: true, name: true, location: true } }, requester: { select: { id: true, name: true, org: true } }, template: true, recipients: { select: { memberId: true } } } });
+  return prisma.bidRequest.findUnique({ where: { id }, include: { project: { select: { id: true, name: true, location: true } }, requester: { select: { id: true, name: true, org: true, role: true } }, template: true, recipients: { select: { memberId: true } } } });
 }
 
 async function Compare({ readOnly = false, req, fields, questions, tx, locale, due, head }: { readOnly?: boolean; req: Req; fields: BidField[]; questions: string[]; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
@@ -216,15 +219,22 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
   );
 }
 
-async function BidForm({ req, fields, questions, userId, tx, locale, due, head }: { req: Req; fields: BidField[]; questions: string[]; userId: string; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
+async function BidForm({ req, fields, questions, userId, tx, locale, due, head, view }: { req: Req; fields: BidField[]; questions: string[]; userId: string; tx: Tx; locale: string; due: string; head: React.ReactNode; view: { v?: string; edit: boolean; thanks: boolean } }) {
   const [bid, me] = await Promise.all([
-    prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true, submittedAt: true } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { insuranceCoverage: true, insuranceInfo: true, credentialNote: true } }),
+    prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true, submittedAt: true, revisions: { select: { version: true, values: true, submittedAt: true } } } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { insuranceCoverage: true, insuranceInfo: true, credentialNote: true, trades: true } }),
   ]);
+  // Nov 10: every submitted version; the latest shows by default and the sub can switch between them.
+  const versions = bid ? versionsOf(bid, bid.revisions) : [];
+  const shownVersion = pickVersion(versions, view.v);
+  const trades = req.template.category === "SUBCONTRACTOR" ? tradeChoices(me?.trades) : [];
   const values = parseJson<Record<string, unknown>>(bid?.values ?? "{}", {});
   const answers = parseJson<string[]>(bid?.answers ?? "[]", []);
   const facts = me ? profileFacts(me, tx) : { insurance: "", license: "" };
   const editable = canEditBid({ requestStatus: req.status, dueAt: req.dueAt, bidStatus: bid?.status });
+  const submitted = bid?.status === "SUBMITTED";
+  // Nov 10: a submitted bid shows its submission view; "Update Bid" opens the form (and only 5 updates are allowed).
+  const showForm = !bid || bid.status === "DRAFT" || (submitted && editable && view.edit && canAddVersion(versions.length));
   const input = (f: BidField) => {
     const v = values[f.key];
     const name = `f_${f.key}`;
@@ -235,6 +245,16 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
     if (f.type === "checks") return <div>{(f.options ?? []).map((o) => <label key={o} className="flex min-h-11 items-center gap-2 text-[15px]"><input type="checkbox" name={name} value={o} defaultChecked={Array.isArray(v) && v.includes(o)} disabled={dis} className="h-5 w-5 accent-forest" />{tx(o)}</label>)}</div>;
     if (f.type === "yesno") return <select name={name} defaultValue={String(v ?? "")} disabled={dis} className={field}><option value="">—</option><option value="yes">{tx("Yes")}</option><option value="no">{tx("No")}</option></select>;
     if (f.type === "date") return <input type="date" name={name} defaultValue={String(v ?? "")} disabled={dis} className={field} />;
+    // Nov 10: on a subcontractor bid, Trade is a drop-down of the trades the sub chose when joining.
+    if (f.key === "trade" && trades.length) {
+      const preset = String(v ?? "") || (req.trade && trades.includes(tradeLabel(req.trade)) ? tradeLabel(req.trade) : "");
+      return (
+        <select name={name} defaultValue={preset} disabled={dis} required={req2} className={field} data-testid="bid-trade-select">
+          <option value="">—</option>
+          {trades.map((t) => <option key={t} value={t}>{tx(t)}</option>)}
+        </select>
+      );
+    }
     if (f.type === "money") return <MoneyInput name={name} defaultValue={String(v ?? "")} disabled={dis} placeholder={f.hint ? tx(f.hint) : ""} className={field} />;
     const num = ["percent", "number", "months"].includes(f.type);
     return (
@@ -250,15 +270,31 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Your proposal")} · {tx(req.template.name)}</p>
       <h1 className="font-serif text-[28px] leading-tight text-forest sm:text-[36px]">{req.project.name}</h1>
       <p className="mt-1 flex flex-wrap items-center gap-2 text-[15px] text-mut">
-        <span>{req.requester.name} · {req.requester.org} · {tx("Due")} {due}</span>
+        <span data-testid="bid-requester">{req.requester.name} · {req.requester.org}{roleById(req.requester.role) ? <> · <b className="font-semibold text-forest">{tx(roleById(req.requester.role)!.label)}</b></> : null} · {tx("Due")} {due}</span>
         {req.isSample ? <SampleTag tx={tx} /> : null}
         {bid ? <StatusPill status={bid.status} tx={tx} /> : null}
       </p>
       {req.units || req.squareFeet || req.basisNote ? <p className="mt-2 text-[14px] text-ink">{tx("Project basis")}: {[req.basisNote, req.units ? `${req.units} ${tx("units")}` : "", req.squareFeet ? `${req.squareFeet.toLocaleString("en-US")} ${tx("gross SF")}` : ""].filter(Boolean).join(" · ")}</p> : null}
       <ScopeSchedule req={req} tx={tx} />
-      {bid && bid.status !== "DRAFT" ? <EstimateCopy fields={fields} values={values} submittedAt={bid.submittedAt} tx={tx} locale={locale} /> : null}
+      {view.thanks ? <ThanksPopup text={tx("Thanks for submitting.")} ok={tx("OK")} /> : null}
+      {submitted && shownVersion ? (
+        <>
+          <VersionButtons requestId={req.id} versions={versions} shown={shownVersion.version} tx={tx} locale={locale} />
+          <EstimateCopy
+            fields={fields}
+            values={parseJson<Record<string, unknown>>(shownVersion.values, {})}
+            submittedAt={shownVersion.submittedAt}
+            tx={tx}
+            locale={locale}
+            title={tx(versionName(shownVersion.version).key).replace("{n}", String(versionName(shownVersion.version).n))}
+            update={editable && canAddVersion(versions.length) && !view.edit ? `/bids/${req.id}?edit=1#bid-edit` : ""}
+          />
+          {editable && !canAddVersion(versions.length) ? <p className="mt-3 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]">{tx("You can update a bid up to 5 times.")}</p> : null}
+        </>
+      ) : null}
       {!editable ? <p className="mt-3 border-l-[3px] border-brass bg-cream px-3 py-2 text-[14px]">{tx(bid && bid.status !== "DRAFT" && bid.status !== "SUBMITTED" ? "The requester has made a decision on your proposal." : "This request is closed for changes.")}</p> : null}
-      <form action={saveBid} className="mt-4">
+      {showForm ? (
+      <form action={saveBid} className="mt-4 scroll-mt-20" id="bid-edit">
         <input type="hidden" name="requestId" value={req.id} />
         {SECTIONS.map(([sec, label]) => {
           const list = fields.filter((f) => f.section === sec);
@@ -292,10 +328,12 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head }
         {editable ? (
           <div className="flex flex-wrap justify-end gap-2">
             {bid?.status === "SUBMITTED" ? null : <SubmitButton className={btnOutline} name="intent" value="draft" data-testid="bid-save-draft" pendingLabel="Saving…">{tx("Save draft")}</SubmitButton>}
-            <SubmitButton className={btn} name="intent" value="submit" data-testid="bid-submit">{tx(bid?.status === "SUBMITTED" ? "Update proposal" : "Submit proposal")}</SubmitButton>
+            {submitted ? <Link href={`/bids/${req.id}`} className={`${btnOutline} inline-flex items-center`} data-testid="bid-edit-cancel">{tx("Cancel")}</Link> : null}
+            <SubmitButton className={btn} name="intent" value="submit" data-testid="bid-submit">{tx(submitted ? "Update Bid" : "Submit proposal")}</SubmitButton>
           </div>
         ) : null}
       </form>
+      ) : null}
       <BidQA requestId={req.id} viewerId={userId} isRequester={false} readOnly={false} tx={tx} locale={locale} />
     </div>
   );
@@ -367,21 +405,67 @@ async function BidQA({ requestId, viewerId, isRequester, readOnly, tx, locale }:
   );
 }
 
-/** Nov 5: once submitted, the bidder sees a copy of the estimate they sent. */
-function EstimateCopy({ fields, values, submittedAt, tx, locale }: { fields: BidField[]; values: Record<string, unknown>; submittedAt: Date | null; tx: Tx; locale: string }) {
-  const rows = fields.filter((f) => f.type !== "profile").map((f) => ({ f, text: showValue(f, values[f.key], locale, tx) })).filter((r) => r.text);
+/** Nov 10: one button per version (original + up to 5 updates) with its date and amount. */
+function VersionButtons({ requestId, versions, shown, tx, locale }: { requestId: string; versions: { version: number; values: string; submittedAt: Date }[]; shown: number; tx: Tx; locale: string }) {
+  if (versions.length < 2) return null;
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" });
+  return (
+    <nav className="mt-4 flex flex-wrap gap-2" aria-label={tx("Bid versions")} data-testid="bid-versions">
+      {versions.map((r) => {
+        const name = versionName(r.version);
+        const total = numeric(parseJson<Record<string, unknown>>(r.values, {}).total);
+        const on = r.version === shown;
+        return (
+          <Link
+            key={r.version}
+            href={`/bids/${requestId}?v=${r.version}`}
+            aria-current={on ? "true" : undefined}
+            className={`inline-flex min-h-11 flex-col justify-center rounded-sm border px-3 py-1.5 text-left text-[13px] leading-tight ${on ? "border-brass bg-forest text-paper" : "border-line bg-paper text-forest hover:border-brass"}`}
+            data-testid={`bid-version-${r.version}`}
+          >
+            <b className="font-semibold">{tx(name.key).replace("{n}", String(name.n))}</b>
+            <span>{date.format(r.submittedAt)}{total != null ? ` · ${money(total, false, locale)}` : ""}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Nov 5: once submitted, the bidder sees a copy of the estimate they sent. Nov 10: Exclusions and Assumptions sit behind "More details"; "Update Bid" top right. */
+function EstimateCopy({ fields, values, submittedAt, tx, locale, title, update }: { fields: BidField[]; values: Record<string, unknown>; submittedAt: Date | null; tx: Tx; locale: string; title?: string; update?: string }) {
+  const all = fields.filter((f) => f.type !== "profile").map((f) => ({ f, text: showValue(f, values[f.key], locale, tx) })).filter((r) => r.text);
+  const rows = all.filter((r) => !MORE_DETAIL_FIELDS.has(r.f.key));
+  const more = all.filter((r) => MORE_DETAIL_FIELDS.has(r.f.key));
+  const Row = ({ f, text }: { f: BidField; text: string }) => (
+    <div className="flex justify-between gap-3 border-b border-line py-1.5 text-[14px]">
+      <dt className="text-mut">{tx(f.label)}</dt>
+      <dd className="text-right text-forest [overflow-wrap:anywhere]">{text}</dd>
+    </div>
+  );
   return (
     <section className={`${card} mt-4 border-brass p-4 sm:p-5`} data-testid="bid-estimate-copy">
-      <h2 className={h2}>{tx("Copy of your submitted estimate")}</h2>
-      {submittedAt ? <p className="mb-2 text-[13px] text-mut">{tx("Submitted")} {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(submittedAt)} ET</p> : null}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className={h2}>{tx("Copy of your submitted estimate")}{title ? ` · ${title}` : ""}</h2>
+          {submittedAt ? <p className="mb-2 text-[13px] text-mut">{tx("Submitted")} {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(submittedAt)} ET</p> : null}
+        </div>
+        {update ? <Link href={update} className={`${btn} inline-flex min-h-11 items-center`} data-testid="bid-update">{tx("Update Bid")}</Link> : null}
+      </div>
       <dl className="grid gap-x-6 sm:grid-cols-2">
-        {rows.map(({ f, text }) => (
-          <div key={f.key} className="flex justify-between gap-3 border-b border-line py-1.5 text-[14px]">
-            <dt className="text-mut">{tx(f.label)}</dt>
-            <dd className="text-right text-forest [overflow-wrap:anywhere]">{text}</dd>
-          </div>
-        ))}
+        {rows.map((r) => <Row key={r.f.key} {...r} />)}
       </dl>
+      {more.length ? (
+        <details className="group mt-2" data-testid="bid-more-details">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-semibold text-forest underline decoration-brass">
+            <span className="group-open:hidden">{tx("More details")}</span>
+            <span className="hidden group-open:inline">{tx("Fewer details")}</span>
+          </summary>
+          <dl className="grid gap-x-6 sm:grid-cols-2">
+            {more.map((r) => <Row key={r.f.key} {...r} />)}
+          </dl>
+        </details>
+      ) : null}
       <p className="mt-2 text-[13px] text-mut">{tx("We also emailed you this copy.")}</p>
     </section>
   );
