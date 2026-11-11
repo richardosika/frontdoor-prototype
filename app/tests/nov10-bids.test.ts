@@ -22,12 +22,16 @@ describe("Nov 10: bids", () => {
     expect(versionName(1)).toEqual({ key: "Original", n: 0 });
     expect(versionName(3)).toEqual({ key: "Revision {n}", n: 2 });
   });
-  it("shows the latest version by default and any version on request", () => {
+  it("shows the original version by default and any version on request", () => {
     const at = new Date("2026-11-10T14:00:00Z");
     const revs = [1, 2, 3].map((version) => ({ version, values: `{"total":${version}}`, submittedAt: at }));
-    expect(pickVersion(revs)?.version).toBe(3);
+    expect(pickVersion(revs)?.version).toBe(1);
+    expect(pickVersion(revs, "")?.version).toBe(1);
+    expect(pickVersion(revs, "3")?.version).toBe(3);
+    expect(pickVersion(revs, "bad")?.version).toBe(1);
+    expect(pickVersion([{ version: 4 }, { version: 2 }])?.version).toBe(2);
     expect(pickVersion(revs, "1")?.version).toBe(1);
-    expect(pickVersion(revs, "9")?.version).toBe(3);
+    expect(pickVersion(revs, "9")?.version).toBe(1);
     expect(pickVersion([], "1")).toBeNull();
   });
   it("a bid sent before Nov 10 counts its current numbers as the original", () => {

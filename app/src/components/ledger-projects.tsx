@@ -10,6 +10,7 @@ import { btn, btnOutline } from "@/components/ui";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { SlimFilterBar } from "@/components/slim-filters";
 import { isDeveloperRole, type SlimFilters } from "@/lib/member-reach";
+import { isSubOnly } from "@/lib/sub-access";
 import type { loadLedgerProjects } from "@/lib/ledger-projects";
 import type { loadMyWork, loadResults } from "@/lib/my-work";
 import { valueHeadline } from "@/lib/my-work";
@@ -28,7 +29,7 @@ function statusWord(status: string) {
   return "Pending";
 }
 
-export async function LedgerProjects({ data, role, filters, myWork, results, dismissAction, variant = "ledger", openAdd = false }: { data: Data; role: string; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null; dismissAction?: (formData: FormData) => Promise<void>; /** Nov 6: "myProjects" is the developer's My Projects page; the Ledger keeps an overview card. */ variant?: "ledger" | "myProjects"; openAdd?: boolean }) {
+export async function LedgerProjects({ data, role, extraCategories, filters, myWork, results, dismissAction, variant = "ledger", openAdd = false }: { data: Data; role: string; extraCategories?: string | null; filters?: SlimFilters; myWork?: Awaited<ReturnType<typeof loadMyWork>> | null; results?: Awaited<ReturnType<typeof loadResults>> | null; dismissAction?: (formData: FormData) => Promise<void>; /** Nov 6: "myProjects" is the developer's My Projects page; the Ledger keeps an overview card. */ variant?: "ledger" | "myProjects"; openAdd?: boolean }) {
   const developer = isDeveloperRole(role);
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -240,7 +241,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
       </h2>
       {data.seekingMe.length === 0 ? (
         <p className="mt-2 text-[15px] text-mut">
-          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : isSubOnly({ role, extraCategories }) ? tx("When a general contractor or architect posts a project seeking your category, it will appear here.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </p>
       ) : null}
       <ul className="mt-2">
@@ -384,7 +385,7 @@ export async function LedgerProjects({ data, role, filters, myWork, results, dis
       {filters ? <div className="mt-2"><SlimFilterBar path="/feed" filters={filters} anchor="ledger-seeking" /></div> : null}
       {data.seekingMe.length === 0 ? (
         <p className="mt-2 rounded border border-line bg-paper p-4 text-[15px] text-mut">
-          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
+          {filters && (filters.asset || filters.state || filters.size) ? tx("No projects match these filters.") : isSubOnly({ role, extraCategories }) ? tx("When a general contractor or architect posts a project seeking your category, it will appear here.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </p>
       ) : null}
       <ul className="mt-3 grid gap-4 lg:grid-cols-2">

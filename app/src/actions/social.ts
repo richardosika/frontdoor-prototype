@@ -23,25 +23,32 @@ const DAY = 24 * 60 * 60 * 1000;
 export async function requestConnection(formData: FormData) {
   const user = await requireUser();
   const toId = String(formData.get("toId") || "");
+  const rawBack = String(formData.get("back") || "");
+  const backPath = rawBack.startsWith("/") && !rawBack.startsWith("//") && !/[\\\r\n]/.test(rawBack) ? rawBack : null;
+  // URL normalization must not turn an internal path into a protocol-relative destination.
+  const back = backPath && !new URL(backPath, "https://internal.local").pathname.startsWith("//") ? backPath : null;
+  const dest = (kind: "error" | "notice", text: string, fallback: string) => {
+    if (!back) return fallback;
+    const url = new URL(back, "https://internal.local");
+    url.searchParams.set(kind, text);
+    return `${url.pathname}${url.search}${url.hash}`;
+  };
   const decision = canConnect(user.id, toId);
-  if (!decision.ok) redirect(`/network?error=${encodeURIComponent(decision.reason)}`);
+  if (!decision.ok) redirect(dest("error", decision.reason, `/network?error=${encodeURIComponent(decision.reason)}`));
 
   const target = await prisma.user.findUnique({ where: { id: toId } });
-  if (!target || !eligibleForDirectory(target)) redirect("/network");
+  if (!target || !eligibleForDirectory(target)) redirect(dest("error", "That member is not available.", "/network"));
   if (await isBlocked(user.id, toId)) {
-    redirect(`/members/${toId}?error=${encodeURIComponent("Messaging is closed between these members.")}`);
+    redirect(dest("error", "Messaging is closed between these members.", `/members/${toId}?error=${encodeURIComponent("Messaging is closed between these members.")}`));
   }
   // Nov 10: a subcontractor sends circle requests only to general contractors and architects.
-  if (!subCanReach(user, target)) redirect(`/network?error=${encodeURIComponent(SUB_REACH_REASON)}`);
-  if (!(await canMessagePair(user.id, toId))) {
-    redirect(`/members/${toId}?error=${encodeURIComponent(COLD_MESSAGE_REASON)}`);
-  }
+  if (!subCanReach(user, target)) redirect(dest("error", SUB_REACH_REASON, `/network?error=${encodeURIComponent(SUB_REACH_REASON)}`));
 
   const recent = await prisma.connection.count({
     where: { fromId: user.id, createdAt: { gte: new Date(Date.now() - DAY) } },
   });
   if (!withinRateLimit(recent, RATE_LIMITS.connectionsPerDay)) {
-    redirect(`/members/${toId}?error=${encodeURIComponent("You have sent too many connection requests today.")}`);
+    redirect(dest("error", "You have sent too many connection requests today.", `/members/${toId}?error=${encodeURIComponent("You have sent too many connection requests today.")}`));
   }
 
   const existing = await prisma.connection.findFirst({
@@ -53,8 +60,8 @@ export async function requestConnection(formData: FormData) {
     },
   });
 
-  if (existing?.status === "ACCEPTED") redirect(`/members/${toId}`);
-  if (existing?.status === "PENDING") redirect(`/members/${toId}?notice=Request+already+pending`);
+  if (existing?.status === "ACCEPTED") redirect(dest("notice", "In My Circle", `/members/${toId}`));
+  if (existing?.status === "PENDING") redirect(dest("notice", "Request already pending", `/members/${toId}?notice=Request+already+pending`));
 
   if (existing) {
     await prisma.connection.update({
@@ -71,12 +78,13 @@ export async function requestConnection(formData: FormData) {
     kind: "CONNECTION",
     body: `${user.name} requested to connect. Accept or decline in Network.`,
   });
-  if (!sent.ok) redirect(`/members/${toId}?error=${encodeURIComponent(sent.reason)}`);
+  if (!sent.ok) redirect(dest("error", sent.reason, `/members/${toId}?error=${encodeURIComponent(sent.reason)}`));
 
   revalidatePath("/network");
   revalidatePath(`/members/${toId}`);
   revalidatePath("/messages");
-  redirect(`/messages/${sent.conversationId}`);
+  revalidatePath("/directory");
+  redirect(dest("notice", "Request sent.", `/messages/${sent.conversationId}`));
 }
 
 export async function respondConnection(formData: FormData) {

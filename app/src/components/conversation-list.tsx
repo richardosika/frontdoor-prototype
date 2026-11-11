@@ -2,7 +2,7 @@ import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { field } from "@/components/ui";
-import { filterConversations, type ConversationRow } from "@/lib/conversations";
+import { conversationListState, type ConversationRow } from "@/lib/conversations";
 
 /**
  * Nov 10 (Julia): the conversation list mirrors LinkedIn messages: a search box, Inbox and Sent tabs, one row per
@@ -14,16 +14,17 @@ export async function ConversationList({
   tab = "inbox",
   q = "",
   requestsSent = 0,
+  children,
 }: {
   conversations: ConversationRow[];
   activeId: string | null;
   tab?: "inbox" | "sent";
   q?: string;
   requestsSent?: number;
+  children?: React.ReactNode;
 }) {
   const tx = await serverTx();
-  const rows = filterConversations(conversations, tab, q);
-  const sentCount = conversations.filter((c) => c.lastFromMe).length + requestsSent;
+  const { rows, sentCount, showEmpty } = conversationListState(conversations, tab, q, requestsSent);
   const tabCls = (on: boolean) =>
     `inline-flex min-h-11 items-center border-b-2 px-3 text-[15px] font-semibold ${on ? "border-forest text-forest" : "border-transparent text-mut hover:text-forest"}`;
   const unreadTotal = conversations.reduce((n, c) => n + (c.unread ? 1 : 0), 0);
@@ -46,7 +47,7 @@ export async function ConversationList({
           </Link>
         </nav>
       </div>
-      {rows.length === 0 ? (
+      {showEmpty ? (
         <p className="px-4 py-6 text-[15px] text-mut" data-testid="conversation-list-empty">
           {q ? tx("No conversations match this search.") : tab === "sent" ? tx("No sent messages yet.") : tx("No conversations yet")}
         </p>
@@ -80,6 +81,7 @@ export async function ConversationList({
           );
         })}
       </ul>
+      {children}
     </section>
   );
 }

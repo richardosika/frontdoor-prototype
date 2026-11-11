@@ -224,7 +224,7 @@ async function BidForm({ req, fields, questions, userId, tx, locale, due, head, 
     prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true, submittedAt: true, revisions: { select: { version: true, values: true, submittedAt: true } } } }),
     prisma.user.findUnique({ where: { id: userId }, select: { insuranceCoverage: true, insuranceInfo: true, credentialNote: true, trades: true } }),
   ]);
-  // Nov 10: every submitted version; the latest shows by default and the sub can switch between them.
+  // Nov 10: every submitted version; the original shows by default and the sub can switch between them.
   const versions = bid ? versionsOf(bid, bid.revisions) : [];
   const shownVersion = pickVersion(versions, view.v);
   const trades = req.template.category === "SUBCONTRACTOR" ? tradeChoices(me?.trades) : [];

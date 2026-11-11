@@ -50,7 +50,7 @@ export default async function MyProjectsPage({ searchParams }: { searchParams: P
           </Link>
         </section>
       ) : null}
-      <LedgerProjects data={data} role={user.role} variant="myProjects" openAdd={one("add") === "1" || data.myProjects.length === 0} />
+      <LedgerProjects data={data} role={user.role} extraCategories={user.extraCategories} variant="myProjects" openAdd={one("add") === "1" || data.myProjects.length === 0} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { isSubOnly } from "@/lib/sub-access";
 import { startLocked } from "@/lib/start-gate";
 import { StartLocked } from "@/components/start-locked";
 import Link from "next/link";
@@ -65,6 +66,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           ? `${tx("Approved projects seeking your category")}: ${data.myCategories.map((id) => tx(seekLabel(id))).join(", ")}. ${tx("Plus projects your circle shares with you.")}`
           : tx("Projects your circle shares with you.")}
       </p>
+      {isSubOnly(user) ? <p className="mt-1 text-[14px] text-mut">{tx("Projects here come from general contractors and architects.")}</p> : null}
       <div className="mt-3">
         <Banner error={error ? tx(error) : undefined} notice={notice ? tx(notice) : undefined} />
       </div>
@@ -76,7 +78,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
       </p>
       {rows.length === 0 ? (
         <div className={`${card} mt-3 p-6 text-center text-[16px] text-mut`}>
-          {active ? tx("No projects match these filters.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
+          {active ? tx("No projects match these filters.") : isSubOnly(user) ? tx("When a general contractor or architect posts a project seeking your category, it will appear here.") : tx("New projects seeking your category will appear here as soon as they're approved.")}
         </div>
       ) : (
         <ul className="mt-3 grid gap-4 lg:grid-cols-2">

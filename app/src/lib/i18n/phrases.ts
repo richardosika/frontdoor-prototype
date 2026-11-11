@@ -8,6 +8,7 @@ import { CATEGORY_PHRASES } from "@/lib/i18n/category-phrases";
 import { NOV5_PHRASES } from "@/lib/i18n/nov5-phrases";
 import { NOV6_PHRASES } from "@/lib/i18n/nov6-phrases";
 import { SUB_PHRASES } from "@/lib/i18n/sub-phrases";
+import { NOV11_PHRASES } from "@/lib/i18n/nov11-phrases";
 import { NOV10_PHRASES } from "@/lib/i18n/nov10-phrases";
 
 const P: Record<string, readonly [string, string, string]> = {
@@ -1095,6 +1096,7 @@ for (const [k, v] of Object.entries(VENDOR_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(NETWORK_PHRASES)) if (!P[k]) P[k] = v;
 // Nov 10: the newest wording wins over any older entry with the same key.
 for (const [k, v] of Object.entries(NOV10_PHRASES)) P[k] = v;
+for (const [k, v] of Object.entries(NOV11_PHRASES)) P[k] = v;
 export const PHRASES = P;
 
 const INDEX: Record<Exclude<Locale, "en">, 0 | 1 | 2> = { es: 0, de: 1, ja: 2 };

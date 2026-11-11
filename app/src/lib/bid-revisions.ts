@@ -2,7 +2,7 @@
  * Nov 10 (Julia's minutes), Bids:
  * - Unit pricing is removed from every bid (old templates and old bids keep the data; it is never shown or asked).
  * - Exclusions and Assumptions & notes sit behind a "More details" button on a submitted estimate.
- * - "Update Bid": every submitted version is kept. The original plus up to 5 updates; the latest shows by default.
+ * - "Update Bid": every submitted version is kept. The original plus up to 5 updates; the original shows by default.
  * - The Trade field on a subcontractor bid is a drop-down of the trades the sub chose when joining.
  */
 import { parseTrades, tradeLabel } from "@/lib/trades";
@@ -26,12 +26,12 @@ export function versionName(version: number): { key: "Original" | "Revision {n}"
   return version <= 1 ? { key: "Original", n: 0 } : { key: "Revision {n}", n: version - 1 };
 }
 
-/** The version to show: the one asked for (?v=) when it exists, otherwise the latest. */
+/** The version to show: the one asked for (?v=) when it exists, otherwise the original (or lowest available version). */
 export function pickVersion<T extends { version: number }>(revisions: T[], asked?: string | null): T | null {
   if (!revisions.length) return null;
   const n = Number(asked);
-  const hit = Number.isInteger(n) ? revisions.find((r) => r.version === n) : undefined;
-  return hit ?? revisions.reduce((a, b) => (b.version > a.version ? b : a));
+  const hit = asked?.trim() && Number.isInteger(n) ? revisions.find((r) => r.version === n) : undefined;
+  return hit ?? revisions.find((r) => r.version === 1) ?? revisions.reduce((a, b) => (b.version < a.version ? b : a));
 }
 
 /**

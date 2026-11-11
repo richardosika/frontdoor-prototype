@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { requestConnection } from "@/actions/social";
+import { Banner } from "@/components/banner";
+import { SubmitButton } from "@/components/submit-button";
 import { Avatar } from "@/components/avatar";
 import { PageHeader } from "@/components/page-header";
 import { btn, card, field, labelCls } from "@/components/ui";
@@ -10,12 +13,12 @@ import { prisma } from "@/lib/prisma";
 import { staffNameSet } from "@/lib/project-contact-db";
 import { NOT_STAFF_WHERE } from "@/lib/recommendations";
 import { ROLES, roleById } from "@/lib/roles";
-import { subCanSee } from "@/lib/sub-access";
+import { subCanReach, subCanSee } from "@/lib/sub-access";
 
 export const dynamic = "force-dynamic";
 
 /** Nov 10 (Julia): Member Directory, where members search for people who belong to the club. */
-export default async function DirectoryPage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string; location?: string }> }) {
+export default async function DirectoryPage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string; location?: string; error?: string; notice?: string }> }) {
   const user = await requireUser();
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -33,6 +36,15 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   const viewer = { id: user.id, role: user.role, extraCategories: user.extraCategories };
   const found = filterDirectory(rows, viewer, query, { staffNames, blocked, shown: tx });
   const shown = found.slice(0, DIRECTORY_PAGE_SIZE);
+  const visibleIds = shown.map((row) => row.id);
+  const connections = await prisma.connection.findMany({
+    where: { OR: [{ fromId: user.id, toId: { in: visibleIds } }, { toId: user.id, fromId: { in: visibleIds } }] },
+    select: { fromId: true, toId: true, status: true },
+  });
+  const connectionByMember = new Map(connections.map((c) => [c.fromId === user.id ? c.toId : c.fromId, c]));
+  const backQuery = new URLSearchParams();
+  for (const key of ["q", "category", "location"] as const) if (query[key]) backQuery.set(key, query[key]);
+  const back = `/directory${backQuery.size ? `?${backQuery}` : ""}`;
   const categories = sortByShownLabel(
     ROLES.filter((role) => subCanSee(viewer, { role: role.id })),
     (role) => tx(role.category),
@@ -42,6 +54,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-[980px] px-4 pb-24 pt-3 md:pb-8 md:pt-6 lg:px-8" data-testid="member-directory">
       <PageHeader title={tx("Member Directory")} />
+      <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
       <p className="mt-1 text-[16px] leading-relaxed text-ink">{tx("Search for people who belong to the club by name, company, category or location.")}</p>
       <form method="get" className={`${card} mt-4 grid grid-cols-1 gap-3 p-4 sm:grid-cols-[2fr_1.4fr_1.2fr_auto] sm:items-end`} data-testid="directory-search">
         <label className="block min-w-0">
@@ -68,18 +81,39 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
       </p>
       {shown.length ? (
         <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="directory-list">
-          {shown.map((row) => (
-            <li key={row.id}>
-              <Link href={`/members/${row.id}`} className={`${card} flex min-h-[72px] items-center gap-3 p-3 hover:border-brass`} data-testid="directory-row">
-                <Avatar initials={row.initials} photoId={row.photoId ?? ""} />
-                <span className="min-w-0">
-                  <b className="block truncate text-[16px] text-forest">{row.name}</b>
-                  <span className="block truncate text-[14px] text-ink">{[row.org, tx(roleById(row.role)?.category ?? "Member")].filter(Boolean).join(" · ")}</span>
-                  {row.location ? <span className="block truncate text-[13px] text-mut">{row.location}</span> : null}
-                </span>
-              </Link>
-            </li>
-          ))}
+          {shown.map((row) => {
+            const connection = connectionByMember.get(row.id);
+            const status = connection?.status === "ACCEPTED" ? "ACCEPTED" : connection?.status === "PENDING" ? (connection.fromId === user.id ? "PENDING" : "INCOMING") : "NONE";
+            return (
+              <li key={row.id} className={`${card} min-w-0 p-3`} data-testid="directory-row">
+                <Link href={`/members/${row.id}`} className="flex min-h-[72px] items-center gap-3 hover:text-forest">
+                  <Avatar initials={row.initials} photoId={row.photoId ?? ""} />
+                  <span className="min-w-0">
+                    <b className="block truncate text-[16px] text-forest">{row.name}</b>
+                    <span className="block truncate text-[14px] text-ink">{[row.org, tx(roleById(row.role)?.category ?? "Member")].filter(Boolean).join(" · ")}</span>
+                    {row.location ? <span className="block truncate text-[13px] text-mut">{row.location}</span> : null}
+                  </span>
+                </Link>
+                {subCanReach(viewer, row) ? (
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center">
+                    {status === "NONE" ? (
+                      <form action={requestConnection} className="w-full min-w-0">
+                        <input type="hidden" name="toId" value={row.id} />
+                        <input type="hidden" name="back" value={back} />
+                        <SubmitButton className={`${btn} min-h-11 w-full whitespace-normal`} data-testid="directory-add-circle" pendingLabel="Sending request…">{tx("Add to My Circle")}</SubmitButton>
+                      </form>
+                    ) : status === "PENDING" ? (
+                      <span className="flex min-h-11 items-center text-[14px] text-mut" data-testid="directory-pending">{tx("Request pending")}</span>
+                    ) : status === "INCOMING" ? (
+                      <Link href="/network" className="inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">{tx("Respond")}</Link>
+                    ) : (
+                      <span className="flex min-h-11 items-center text-[14px] text-forest" data-testid="directory-in-circle">{tx("In My Circle")}</span>
+                    )}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className={`${card} mt-2 p-4 text-[15px] text-ink`} data-testid="directory-empty">{tx("No members match this search.")}</p>

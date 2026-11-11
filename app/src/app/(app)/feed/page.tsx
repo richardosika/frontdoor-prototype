@@ -249,7 +249,7 @@ export default async function FeedPage({
             <p className="mt-2 text-[15px] leading-relaxed text-sand md:text-[16px]">{tx("Opportunities, your circle and who viewed your profile stay hidden until each Getting started step above is done. This keeps every member on Private Floor fully reviewed and complete.")}</p>
           </section>
         ) : (
-          <LedgerProjects data={ledgerProjects} role={user.role} filters={filters} myWork={myWork}
+          <LedgerProjects data={ledgerProjects} role={user.role} extraCategories={user.extraCategories} filters={filters} myWork={myWork}
             results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
             dismissAction={dismissLedgerProject}
           />

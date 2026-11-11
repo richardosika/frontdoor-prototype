@@ -21,13 +21,11 @@ async function SentList({ userId, tx, locale }: { userId: string; tx: (t: string
       where: { fromId: userId },
       include: { to: { select: { id: true, name: true, org: true } }, project: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
-      take: 100,
     }),
     prisma.introduction.findMany({
       where: { fromId: userId },
       include: { to: { select: { id: true, name: true, org: true } } },
       orderBy: { createdAt: "desc" },
-      take: 100,
     }),
   ]);
   const rows = [
@@ -78,8 +76,9 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
     <div className="mx-auto max-w-3xl pb-24 lg:grid lg:min-h-dvh lg:max-w-none lg:grid-cols-[360px_minmax(0,1fr)] lg:pb-0" data-testid="messages-page">
       <div>
         {params.error ? <p className="border-b border-line bg-[#FBEAE3] px-4 py-2 text-[14px] text-[#9A3B1E]" role="alert">{tx(params.error)}</p> : null}
-        <ConversationList conversations={conversations} activeId={null} tab={tab} q={q} requestsSent={requestsSent} />
-        {tab === "sent" ? <SentList userId={user.id} tx={tx} locale={locale} /> : null}
+        <ConversationList conversations={conversations} activeId={null} tab={tab} q={q} requestsSent={requestsSent}>
+          {tab === "sent" && !q ? <SentList userId={user.id} tx={tx} locale={locale} /> : null}
+        </ConversationList>
       </div>
       <div className="hidden items-center justify-center bg-cream p-8 lg:flex">
         {none ? (

@@ -47,3 +47,11 @@ export function filterConversations<T extends { name: string; sub: string; lastF
   const needle = q.trim().toLowerCase();
   return rows.filter((row) => (tab === "sent" ? row.lastFromMe : true)).filter((row) => !needle || `${row.name} ${row.sub}`.toLowerCase().includes(needle));
 }
+
+/** Sent requests share the Sent tab with conversations, so both determine its count and empty state. */
+export function conversationListState<T extends { name: string; sub: string; lastFromMe: boolean }>(conversations: T[], tab: "inbox" | "sent", q = "", requestsSent = 0) {
+  const rows = filterConversations(conversations, tab, q);
+  const sentCount = conversations.filter((c) => c.lastFromMe).length + requestsSent;
+  const showEmpty = rows.length === 0 && Boolean(q || tab !== "sent" || requestsSent === 0);
+  return { rows, sentCount, showEmpty };
+}
