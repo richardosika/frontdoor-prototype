@@ -75,10 +75,10 @@ export const MEMBER_TOPICS: MemberTopic[] = [
     audience: "all",
     title: { en: "Refer a colleague", es: "Recomendar a un colega", de: "Kollegen empfehlen", ja: "同僚を紹介する" },
     body: {
-      en: "Use [Refer a colleague](/refer) in the menu. Enter their name and email and we send them a link to apply. Each member has a set number of referrals; the badge shows how many you have left. Your referrals show as Sent, Applied or Approved. Every application is still reviewed by staff.",
-      es: "Use [Recomendar a un colega](/refer) en el menú. Escriba su nombre y correo y le enviamos un enlace para solicitar. Cada miembro tiene un número fijo de recomendaciones; el distintivo muestra cuántas le quedan. Aparecen como Enviada, Solicitó o Aprobada. El personal revisa cada solicitud.",
-      de: "Nutzen Sie [Kollegen empfehlen](/refer) im Menü. Geben Sie Name und E-Mail ein, und wir senden einen Link zur Bewerbung. Jedes Mitglied hat eine feste Anzahl an Empfehlungen; das Abzeichen zeigt, wie viele übrig sind. Status: Gesendet, Beworben oder Zugelassen. Jede Bewerbung prüft weiterhin das Team.",
-      ja: "メニューの[同僚を紹介する](/refer)を使います。名前とメールを入力すると、申し込み用のリンクをお送りします。紹介できる数は会員ごとに決まっており、バッジで残り数がわかります。状況は送信済み・申請済み・承認済みで表示されます。申請はすべてスタッフが審査します。",
+      en: "Use [Refer a colleague](/refer) in the menu. Enter their name and email and we send them a link to apply. There is no referral maximum; daily send rules still apply. Your referrals show as Sent, Applied or Approved. Every application is still reviewed by staff.",
+      es: "Use [Recomendar a un colega](/refer) en el menú. Escriba su nombre y correo y le enviamos un enlace para solicitar. No hay un máximo de recomendaciones; siguen vigentes las reglas de envío diario. Aparecen como Enviada, Solicitó o Aprobada. El personal revisa cada solicitud.",
+      de: "Nutzen Sie [Kollegen empfehlen](/refer) im Menü. Geben Sie Name und E-Mail ein, und wir senden einen Link zur Bewerbung. Es gibt keine Höchstzahl an Empfehlungen; die täglichen Versandregeln gelten weiterhin. Status: Gesendet, Beworben oder Zugelassen. Jede Bewerbung prüft weiterhin das Team.",
+      ja: "メニューの[同僚を紹介する](/refer)を使います。名前とメールを入力すると、申し込み用のリンクをお送りします。紹介数に上限はありません。1日ごとの送信ルールは引き続き適用されます。状況は送信済み・申請済み・承認済みで表示されます。申請はすべてスタッフが審査します。",
     },
     keys: ["refer", "referral", "colleague", "recommend", "friend", "recomendar", "colega", "empfehlen", "kollege", "紹介", "同僚"],
   },
@@ -144,8 +144,17 @@ export const MEMBER_TOPICS: MemberTopic[] = [
   },
 ];
 
-export function topicsFor(isDeveloper: boolean): MemberTopic[] {
-  return MEMBER_TOPICS.filter((t) => t.audience === "all" || t.audience === (isDeveloper ? "developer" : "member"));
+export function topicsFor(isDeveloper: boolean, subOnly = false): MemberTopic[] {
+  return MEMBER_TOPICS.filter((t) => t.audience === "all" || t.audience === (isDeveloper ? "developer" : "member"))
+    .map((topic) => !subOnly || topic.id !== "getting-started-member" ? topic : {
+      ...topic,
+      body: {
+        en: topic.body.en.replace("a developer posts one", "a general contractor or architect posts one"),
+        es: topic.body.es.replace("un desarrollador publique uno", "un contratista general o arquitecto publique uno"),
+        de: topic.body.de.replace("ein Entwickler eines einstellt", "ein Generalunternehmer oder Architekt eines einstellt"),
+        ja: topic.body.ja.replace("デベロッパーが掲載", "ゼネコンまたは建築家が掲載"),
+      },
+    });
 }
 
 export function topicText(topic: MemberTopic, locale: Locale, vars: Record<string, string> = {}): { title: string; body: string } {

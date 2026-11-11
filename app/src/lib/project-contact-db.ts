@@ -1,3 +1,4 @@
+import { STAFF_EMAILS } from "@/lib/recommendations";
 import { prisma } from "@/lib/prisma";
 import { canDirectMessage, projectAudienceIds } from "@/lib/project-contact";
 
@@ -74,6 +75,6 @@ export async function canViewProjectDocuments(projectId: string, viewer: { id: s
 
 /** Lowercased names of staff and admin accounts, so another account under a staff member's name is not suggested. */
 export async function staffNameSet(): Promise<Set<string>> {
-  const rows = await prisma.user.findMany({ where: { OR: [{ isAdmin: true }, { email: { endsWith: "@privatefloorclub.com", mode: "insensitive" } }] }, select: { name: true } });
+  const rows = await prisma.user.findMany({ where: { OR: [{ isAdmin: true }, { email: { in: STAFF_EMAILS, mode: "insensitive" } }] }, select: { name: true } });
   return new Set(rows.map((r) => r.name.trim().toLowerCase()).filter(Boolean));
 }

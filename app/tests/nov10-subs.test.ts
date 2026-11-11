@@ -60,7 +60,7 @@ describe("Nov 10: Member Directory", () => {
     row("g1", "Elena Voss", "GENERAL_CONTRACTOR"),
     row("d1", "Marcus Hale", "DEVELOPER", { location: "Austin, TX" }),
     row("l1", "Lena Brook", "LENDER"),
-    row("x1", "Staff Person", "GENERAL_CONTRACTOR", { email: "x@privatefloorclub.com" }),
+    row("x1", "Staff Person", "GENERAL_CONTRACTOR", { email: "connect@privatefloorclub.com" }),
     row("p1", "Pat Due", "GENERAL_CONTRACTOR", { paymentStatus: "DUE" }),
     row("b1", "Blocked Guy", "GENERAL_CONTRACTOR"),
     row("s1", "Me Myself", "SUBCONTRACTOR"),

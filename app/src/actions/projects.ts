@@ -1,4 +1,5 @@
 "use server";
+import { canSeekOnProject } from "@/lib/project-seeking";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -58,8 +59,8 @@ export async function addProject(formData: FormData) {
   const back = backPath(formData);
   const read = readProjectForm(formData, PROJECT_ROLE_LABELS);
   if (!read.ok) go(back, "error", read.reason);
-  // #44: only developers seek people on a project; other members' projects are past work.
-  const value = user.role === "DEVELOPER" ? read.value : { ...read.value, seeking: [] };
+  // #44: developers, general contractors and architects can seek a team; other roles show past work.
+  const value = canSeekOnProject(user.role) ? read.value : { ...read.value, seeking: [] };
   const attached = await readSubmissionFiles(formData);
   if (!attached.ok) go(back, "error", attached.reason);
   const project = await prisma.trackProject.create({
@@ -109,8 +110,8 @@ export async function resubmitProject(formData: FormData) {
   if (!canEditProject(project.reviewStatus)) go(back, "error", "This project cannot be edited right now.");
   const read = readProjectForm(formData, PROJECT_ROLE_LABELS);
   if (!read.ok) go(back, "error", read.reason);
-  // #44: only developers seek people on a project; other members' projects are past work.
-  const value = user.role === "DEVELOPER" ? read.value : { ...read.value, seeking: [] };
+  // #44: developers, general contractors and architects can seek a team; other roles show past work.
+  const value = canSeekOnProject(user.role) ? read.value : { ...read.value, seeking: [] };
   await prisma.trackProject.update({
     where: { id: project.id },
     data: {

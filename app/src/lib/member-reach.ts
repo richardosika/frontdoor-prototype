@@ -1,11 +1,12 @@
+import { isSubOnly } from "@/lib/sub-access";
 import { roleProfile } from "@/lib/role-profile";
 /**
  * Who sees which projects and people (#25, #27, #28).
  *
  * A member sees an approved project only when it seeks the member's category or when the member is in the owner's
- * circle. Owners and Private Floor administrators always see it. Nobody browses the full member list: developers see
- * members in the categories their own approved projects seek ("Find your team"); everyone else sees only people
- * connected to them through a project ("My Circle").
+ * circle. Owners and Private Floor administrators always see it. Developers find team matches in the categories
+ * their approved projects seek; other members manage project connections in My Circle. Member Directory at
+ * /directory also supports member searches under the applicable access rules.
  */
 import { memberCategories, interestCategories, parseSeeking } from "@/lib/project-contact";
 
@@ -106,6 +107,7 @@ export function sequential(items: { id: string; label: string; href: string; don
 /** The role-tailored "Getting started" checklist. Every item completes itself from what the member has done. */
 export function gettingStarted(input: {
   role: string;
+  extraCategories?: string | null;
   profileDone: boolean;
   ndaAccepted: boolean;
   projectCount: number;
@@ -141,7 +143,7 @@ export function gettingStarted(input: {
     { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
     input.outreachSent === 0 && input.noMatches
-      ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: "You're first in line. We'll alert you the moment a developer posts a project seeking a {category}." }
+      ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: isSubOnly(input) ? "You're first in line. We'll alert you the moment a general contractor or architect posts a project seeking a {category}." : "You're first in line. We'll alert you the moment a developer posts a project seeking a {category}." }
       : { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: input.outreachSent > 0 },
   ]);
 }

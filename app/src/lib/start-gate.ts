@@ -12,6 +12,7 @@ type GateUser = {
   ndaAcceptedAt: Date | null;
   photoId: string | null;
   licenses?: string | null;
+  extraCategories?: string | null;
 };
 
 /**
@@ -23,6 +24,7 @@ export async function startLocked(user: GateUser): Promise<boolean> {
   const projectCount = await prisma.trackProject.count({ where: { userId: user.id } });
   const items = gettingStarted({
     role: user.role,
+    extraCategories: user.extraCategories,
     profileDone: user.markets.trim().length > 1 && (user.lookingFor.trim().length > 1 || user.offering.trim().length > 1 || user.bio.trim().length > 1),
     ndaAccepted: Boolean(user.ndaAcceptedAt),
     projectCount,

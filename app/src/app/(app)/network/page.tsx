@@ -20,8 +20,8 @@ import { roleLabel, roleShort } from "@/lib/roles";
 export const dynamic = "force-dynamic";
 
 /**
- * #28: no member browses the full member list. Developers find people through "Find your team"; everyone else
- * sees "My Circle": only people connected through a project. The full directory stays in admin.
+ * #28: developers find people through "Find your team"; other members use "My Circle" for project connections.
+ * Member Directory is at /directory, in the desktop sidebar and the More menu on phones.
  */
 export default async function NetworkPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const user = await requireUser();

@@ -53,7 +53,11 @@ describe("#48 no matching projects", () => {
   it("step 5 completes itself with a note, 5/5", () => {
     const items = gettingStarted({ ...base, noMatches: true });
     expect(items.filter((i) => i.done)).toHaveLength(5);
-    expect(items[4].note).toMatch(/^You're first in line/);
+    expect(items[4].note).toContain("a developer posts a project");
+  });
+  it("gives sub-only members the GC and architect note", () => {
+    expect(gettingStarted({ ...base, role: "SUBCONTRACTOR", noMatches: true })[4].note).toContain("a general contractor or architect");
+    expect(gettingStarted({ ...base, role: "SUBCONTRACTOR", extraCategories: "GENERAL_CONTRACTOR", noMatches: true })[4].note).toContain("a developer");
   });
   it("stays open when projects match", () => {
     const items = gettingStarted({ ...base, noMatches: false });

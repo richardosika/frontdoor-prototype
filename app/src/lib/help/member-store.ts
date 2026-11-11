@@ -1,6 +1,7 @@
 import type { User } from "@prisma/client";
 import { withinRateLimit } from "@/lib/help/answer";
 import { knowledgeChunks } from "@/lib/help/knowledge";
+import { isSubOnly } from "@/lib/sub-access";
 import { composeMemberAnswer, type ChatResult, type MemberContext } from "@/lib/help/member-chat";
 import { completeWithProvider, selectHelpProvider, type ProviderEnv } from "@/lib/help/provider";
 import { publishedFaq } from "@/lib/help/store";
@@ -19,6 +20,7 @@ export async function memberHelpContext(user: User, locale: Locale): Promise<Mem
   ]);
   const items = gettingStarted({
     role: user.role,
+    extraCategories: user.extraCategories,
     profileDone: user.markets.trim().length > 1 && (user.lookingFor.trim().length > 1 || user.offering.trim().length > 1 || user.bio.trim().length > 1),
     ndaAccepted: Boolean(user.ndaAcceptedAt),
     projectCount: mine.length,
@@ -34,6 +36,7 @@ export async function memberHelpContext(user: User, locale: Locale): Promise<Mem
     firstName: user.name.split(" ")[0] || user.name,
     type: roleLabel(user.role),
     isDeveloper: isDeveloperRole(user.role),
+    subOnly: isSubOnly(user),
     credential: phrase(locale, roleProfile(user.role).credential).toLowerCase(),
     categories: memberCategories(user).map(seekLabel).join(", "),
     nextStep: next ? phrase(locale, next.label) : "",

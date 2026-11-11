@@ -9,7 +9,7 @@ import { LANGUAGE_NAME, matchTopics, topicText, topicsFor } from "@/lib/help/mem
 import type { Locale } from "@/lib/i18n/messages";
 
 export const STAFF_TOKEN = "[[STAFF]]";
-export type MemberContext = { firstName: string; type: string; isDeveloper: boolean; credential: string; categories: string; nextStep: string; done: string };
+export type MemberContext = { firstName: string; type: string; isDeveloper: boolean; subOnly?: boolean; credential: string; categories: string; nextStep: string; done: string };
 export type ChatResult = { answer: string; escalate: boolean; kind: "answer" | "refused" | "handoff"; provider: "keyword" | "model" };
 
 type L4 = Record<Locale, string>;
@@ -94,7 +94,7 @@ export function vetReply(text: string): { text: string; escalate: boolean; ok: b
 }
 
 export function knowledgeText(ctx: MemberContext, faq: HelpChunk[]): string {
-  const topics = topicsFor(ctx.isDeveloper).map((t) => {
+  const topics = topicsFor(ctx.isDeveloper, ctx.subOnly).map((t) => {
     const { title, body } = topicText(t, "en", { credential: ctx.credential });
     return `## ${title}\n${body}`;
   });
@@ -138,7 +138,7 @@ export function buildChatPrompt(question: string, history: { question: string; a
 
 function keyword(question: string, ctx: MemberContext, locale: Locale, faq: HelpChunk[]): ChatResult {
   const nextAsk = /next|what now|what should i do|siguiente|qué hago|nächste|was jetzt|次/i.test(question);
-  const top = matchTopics(question, topicsFor(ctx.isDeveloper))[0];
+  const top = matchTopics(question, topicsFor(ctx.isDeveloper, ctx.subOnly))[0];
   if (top) {
     let body = topicText(top.topic, locale, { credential: ctx.credential }).body;
     if (nextAsk && ctx.nextStep) body = `${T.next[locale].replace("{step}", ctx.nextStep)} ${body}`;

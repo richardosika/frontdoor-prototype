@@ -36,6 +36,8 @@ describe("recommendations: staff and specific reasons", () => {
     ];
     expect(isStaffAccount({ email: "rich@privatefloorclub.com" })).toBe(true);
     expect(isStaffAccount({ email: "team@captiva.com" })).toBe(false);
+    expect(isStaffAccount({ email: "rich+pf-lender1@privatefloorclub.com" })).toBe(false);
+    expect(recommend({ ...dev, seeking: ["FINANCING"] }, [{ id: "tester", role: "LENDER", ...base, email: "rich+pf-lender1@privatefloorclub.com" }], new Set()).map((r) => r.id)).toEqual(["tester"]);
     expect(recommend(dev, others, new Set()).map((r) => r.id)).toEqual(["b"]);
   });
   it("lender in TX matches a Houston project", () => {

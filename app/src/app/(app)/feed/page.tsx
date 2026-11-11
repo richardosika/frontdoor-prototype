@@ -52,6 +52,7 @@ export default async function FeedPage({
   const firstName = user.name.split(" ")[0] || user.name;
   const checklist = gettingStarted({
     role: user.role,
+    extraCategories: user.extraCategories,
     profileDone: user.markets.trim().length > 1 && (user.lookingFor.trim().length > 1 || user.offering.trim().length > 1 || user.bio.trim().length > 1),
     ndaAccepted: Boolean(user.ndaAcceptedAt),
     projectCount: mine.length,

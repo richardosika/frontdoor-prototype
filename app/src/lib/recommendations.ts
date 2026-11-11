@@ -29,19 +29,18 @@ export type Reason = { kind: "location" | "category" | "projectType"; text: stri
 /** One-line reason: an English phrase key with {placeholders}, and values. `t` marks values to translate. */
 export type ReasonLine = { key: string; vars: Record<string, string>; t: string[] };
 
-/** Private Floor staff domain. */
-export const STAFF_EMAIL_DOMAIN = "privatefloorclub.com";
+/** Explicit staff mailboxes; other mailboxes at this domain can belong to members. */
+export const STAFF_EMAILS = ["rich@privatefloorclub.com", "connect@privatefloorclub.com"];
 
 /** Staff and admin accounts: the admin flag, or a Private Floor staff address. Company members are not staff. */
 export function isStaffAccount(user: { isAdmin?: boolean | null; email?: string | null; name?: string | null }, staffNames: Set<string> = new Set()): boolean {
   if (user.isAdmin) return true;
   if (user.name && staffNames.has(user.name.trim().toLowerCase())) return true;
-  const domain = (user.email || "").trim().toLowerCase().split("@")[1] || "";
-  return domain === STAFF_EMAIL_DOMAIN;
+  return STAFF_EMAILS.includes((user.email || "").trim().toLowerCase());
 }
 
 /** Prisma filter that leaves out staff and admin accounts. */
-export const NOT_STAFF_WHERE = { isAdmin: false, NOT: { email: { endsWith: `@${STAFF_EMAIL_DOMAIN}`, mode: "insensitive" } } } as const;
+export const NOT_STAFF_WHERE = { isAdmin: false, email: { notIn: STAFF_EMAILS, mode: "insensitive" } } as const;
 
 const split = (value: string) =>
   value

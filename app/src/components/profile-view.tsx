@@ -1,3 +1,4 @@
+import { canSeekOnProject } from "@/lib/project-seeking";
 import { SubmitButton } from "@/components/submit-button";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -317,7 +318,7 @@ export async function ProfileView({
                   <details className="mt-2 rounded border border-line bg-paper p-3" open={project.reviewStatus === "NEEDS_INFO"}>
                     <summary className="cursor-pointer text-[15px] font-semibold text-forest">{tx("Edit and resubmit")}</summary>
                     <div className="mt-3">
-                      <ProjectForm back="/profile" project={project} pastWork={member.role !== "DEVELOPER"} />
+                      <ProjectForm back="/profile" project={project} pastWork={!canSeekOnProject(member.role)} />
                     </div>
                   </details>
                 ) : null}
@@ -352,8 +353,8 @@ export async function ProfileView({
         </ul>
         {isSelf ? (
           <section id="add-project" className="mt-6 min-w-0 rounded border border-line bg-cream p-5 sm:p-7">
-            <h2 className="mb-4 font-serif text-2xl text-forest sm:text-[28px]">{member.role === "DEVELOPER" ? tx("Add a project") : tx("Add past work")}</h2>
-            <ProjectForm back="/profile" pastWork={member.role !== "DEVELOPER"} />
+            <h2 className="mb-4 font-serif text-2xl text-forest sm:text-[28px]">{canSeekOnProject(member.role) ? tx("Add a project") : tx("Add past work")}</h2>
+            <ProjectForm back="/profile" pastWork={!canSeekOnProject(member.role)} />
           </section>
         ) : null}
       </div>

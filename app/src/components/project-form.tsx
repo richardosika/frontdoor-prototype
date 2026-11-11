@@ -101,7 +101,7 @@ export async function ProjectForm({ back, project, pastWork = false }: { back: "
         <span className={label}>{tx("Project notes")}</span>
         <textarea name="summary" rows={2} defaultValue={project?.summary} className={big} placeholder={tx("Optional")} />
       </label>
-      {/* #44: past work by non-developers is a track record only: no seeking, no matching. */}
+      {/* #44: roles that cannot seek show past work as a track record only. */}
       {pastWork ? null : <>
       <fieldset className="min-w-0 sm:col-span-2">
         <legend className={label}>{tx("Who is this project seeking?")}</legend>
