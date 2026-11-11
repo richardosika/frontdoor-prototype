@@ -1,3 +1,4 @@
+import { CircleRequestControl, type CircleState } from "@/components/circle-request-control";
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
@@ -49,6 +50,8 @@ const h2 = "mb-2 text-[13px] font-semibold uppercase tracking-[0.16em] text-bras
 /** #38: a member's profile seen by someone else, laid out like a vendor page. */
 export async function VendorProfile({
   member,
+  viewer,
+  connection,
   projects,
   gallery,
   reach,
@@ -60,6 +63,8 @@ export async function VendorProfile({
   viewerCanOpenCoi = false,
 }: {
   member: Member;
+  viewer: { id: string; role: string; extraCategories?: string };
+  connection: CircleState;
   projects: PastProject[];
   gallery: { id: string; caption: string; width: number; height: number }[];
   reach: ReachProject[];
@@ -145,6 +150,7 @@ export async function VendorProfile({
             <p className="rounded border border-line bg-cream px-3 py-2 text-[15px] text-ink">{tx("Messaging is closed between these members.")}</p>
           ) : (
             <>
+              <CircleRequestControl viewer={viewer} member={member} state={connection} back={`/members/${member.id}`} prefix="vendor" tx={tx} />
               <ReachOut projects={reach} toId={member.id} back={`/members/${member.id}`} primary align="start" label={reach.filter((p) => !p.status).length === 1 ? `${tx("Reach out about")} ${reach.find((p) => !p.status)?.name}` : undefined} />
               {canMessage ? (
                 <form action={openConversation}>

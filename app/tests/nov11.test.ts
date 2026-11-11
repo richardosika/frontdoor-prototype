@@ -45,20 +45,20 @@ describe("Nov 11: member feedback", () => {
 
   it("directory cards offer reachable members a circle request and show each connection state", () => {
     const page = read("app/(app)/directory/page.tsx");
-    expect(page).toContain('import { requestConnection } from "@/actions/social"');
-    expect(page).toContain("subCanReach(viewer, row) ? (");
-    expect(page).toContain('<form action={requestConnection}');
-    expect(page).toContain('name="toId" value={row.id}');
-    expect(page).toContain('name="back" value={back}');
-    expect(page).toContain('tx("Add to My Circle")');
-    for (const id of ["directory-add-circle", "directory-pending", "directory-in-circle"]) expect(page).toContain(`data-testid="${id}"`);
-    expect(page).toContain('status === "INCOMING"');
-    expect(page).toContain('href="/network"');
+    const control = read("components/circle-request-control.tsx");
+    expect(page).toContain("CircleRequestControl viewer={viewer} member={row}");
+    expect(control).toContain("subCanReach(viewer, member)");
+    expect(control).toContain("<form action={requestConnection}");
+    expect(control).toContain('name="toId" value={member.id}');
+    expect(control).toContain('name="back" value={back}');
+    expect(control).toContain('tx("Add to My Circle")');
+    expect(control).toContain('state === "INCOMING"');
+    expect(control).toContain('href="/network"');
     expect(page).toContain("<Banner error=");
     expect(page).toContain('const key of ["q", "category", "location"]');
     expect(page.match(/prisma.connection.findMany/g)).toHaveLength(1);
     expect(page.indexOf("prisma.connection.findMany")).toBeLessThan(page.indexOf("shown.map((row) => {"));
-    expect(page).toContain("min-h-11 w-full whitespace-normal");
+    expect(control).toContain("min-h-11 w-full whitespace-normal");
     const sub = { role: "SUBCONTRACTOR", extraCategories: "" };
     expect(subCanReach(sub, { role: "GENERAL_CONTRACTOR" })).toBe(true);
     expect(subCanReach(sub, { role: "DEVELOPER" })).toBe(false);

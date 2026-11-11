@@ -87,6 +87,20 @@ export async function requestConnection(formData: FormData) {
   redirect(dest("notice", "Request sent.", `/messages/${sent.conversationId}`));
 }
 
+export async function withdrawConnection(formData: FormData) {
+  const user = await requireUser();
+  const connectionId = String(formData.get("connectionId") || "");
+  await prisma.connection.updateMany({
+    where: { id: connectionId, fromId: user.id, status: "PENDING" },
+    data: { status: "DECLINED" },
+  });
+  revalidatePath("/network");
+  revalidatePath("/directory");
+  revalidatePath("/members", "layout");
+  revalidatePath("/messages", "layout");
+  redirect(`/messages/sent/connection/${encodeURIComponent(connectionId)}`);
+}
+
 export async function respondConnection(formData: FormData) {
   const user = await requireUser();
   const connectionId = String(formData.get("connectionId") || "");
@@ -94,13 +108,14 @@ export async function respondConnection(formData: FormData) {
   if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect("/network");
 
   const connection = await prisma.connection.findUnique({ where: { id: connectionId } });
-  if (!connection || connection.toId !== user.id) redirect("/network");
+  if (!connection || connection.toId !== user.id || connection.status !== "PENDING") redirect("/network");
   if (await isBlocked(user.id, connection.fromId)) redirect("/network?error=Messaging+is+closed+between+these+members.");
 
-  await prisma.connection.update({
-    where: { id: connection.id },
+  const changed = await prisma.connection.updateMany({
+    where: { id: connection.id, toId: user.id, status: "PENDING" },
     data: { status: decision },
   });
+  if (!changed.count) redirect("/network");
   await deliverPortalMessage({
     from: user,
     toId: connection.fromId,

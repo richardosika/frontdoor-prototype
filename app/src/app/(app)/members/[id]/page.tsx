@@ -59,6 +59,8 @@ export default async function MemberPage({
       </div>
       {user.id !== loaded.member.id ? (
         <VendorProfile
+          viewer={user}
+          connection={loaded.connection}
           member={loaded.member}
           projects={loaded.projects}
           gallery={loaded.gallery}

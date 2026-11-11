@@ -1,3 +1,4 @@
+import { CircleRequestControl, circleState } from "@/components/circle-request-control";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { card } from "@/components/ui";
@@ -30,6 +31,11 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
   const seeking = [...new Set(projects.filter((p) => p.reviewStatus === "APPROVED").flatMap((p) => parseSeeking(p.seeking)))];
   const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, others.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle, 6, staff);
   if (!picks.length) return null;
+  const connections = await prisma.connection.findMany({
+    where: { OR: [{ fromId: user.id, toId: { in: picks.map((p) => p.id) } }, { toId: user.id, fromId: { in: picks.map((p) => p.id) } }] },
+    select: { fromId: true, toId: true, status: true },
+  });
+  const connectionByMember = new Map(connections.map((c) => [c.fromId === user.id ? c.toId : c.fromId, c]));
   const byId = new Map(others.map((o) => [o.id, o]));
   return (
     <section className={`${card} mt-4 p-4`} data-testid="recommended-connections">
@@ -40,10 +46,11 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
           return (
             <li key={m.id} className="flex gap-3 rounded border border-line p-3" data-testid="recommended-row">
               <Avatar initials={m.initials} photoId={m.photoId ?? undefined} size="md" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <Link href={`/members/${m.id}`} className="font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{m.name}</Link>
                 <p className="text-[13px] text-mut [overflow-wrap:anywhere]">{tx(roleShort(roleLabel(m.role)))} · {m.org}</p>
                 {pick.line ? <p className="mt-1 text-[13px] text-forest [overflow-wrap:anywhere]" data-testid="recommended-reasons">{formatReason(pick.line, tx)}</p> : null}
+                <CircleRequestControl viewer={user} member={m} state={circleState(connectionByMember.get(m.id), user.id)} back="/network" prefix="recommended" tx={tx} />
               </div>
             </li>
           );

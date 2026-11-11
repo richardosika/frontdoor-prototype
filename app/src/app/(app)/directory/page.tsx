@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { requestConnection } from "@/actions/social";
+import { CircleRequestControl, circleState } from "@/components/circle-request-control";
 import { Banner } from "@/components/banner";
-import { SubmitButton } from "@/components/submit-button";
 import { Avatar } from "@/components/avatar";
 import { PageHeader } from "@/components/page-header";
 import { btn, card, field, labelCls } from "@/components/ui";
@@ -13,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { staffNameSet } from "@/lib/project-contact-db";
 import { NOT_STAFF_WHERE } from "@/lib/recommendations";
 import { ROLES, roleById } from "@/lib/roles";
-import { subCanReach, subCanSee } from "@/lib/sub-access";
+import { subCanSee } from "@/lib/sub-access";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +82,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
         <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="directory-list">
           {shown.map((row) => {
             const connection = connectionByMember.get(row.id);
-            const status = connection?.status === "ACCEPTED" ? "ACCEPTED" : connection?.status === "PENDING" ? (connection.fromId === user.id ? "PENDING" : "INCOMING") : "NONE";
+            const status = circleState(connection, user.id);
             return (
               <li key={row.id} className={`${card} min-w-0 p-3`} data-testid="directory-row">
                 <Link href={`/members/${row.id}`} className="flex min-h-[72px] items-center gap-3 hover:text-forest">
@@ -94,23 +93,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
                     {row.location ? <span className="block truncate text-[13px] text-mut">{row.location}</span> : null}
                   </span>
                 </Link>
-                {subCanReach(viewer, row) ? (
-                  <div className="mt-2 flex min-w-0 flex-wrap items-center">
-                    {status === "NONE" ? (
-                      <form action={requestConnection} className="w-full min-w-0">
-                        <input type="hidden" name="toId" value={row.id} />
-                        <input type="hidden" name="back" value={back} />
-                        <SubmitButton className={`${btn} min-h-11 w-full whitespace-normal`} data-testid="directory-add-circle" pendingLabel="Sending request…">{tx("Add to My Circle")}</SubmitButton>
-                      </form>
-                    ) : status === "PENDING" ? (
-                      <span className="flex min-h-11 items-center text-[14px] text-mut" data-testid="directory-pending">{tx("Request pending")}</span>
-                    ) : status === "INCOMING" ? (
-                      <Link href="/network" className="inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">{tx("Respond")}</Link>
-                    ) : (
-                      <span className="flex min-h-11 items-center text-[14px] text-forest" data-testid="directory-in-circle">{tx("In My Circle")}</span>
-                    )}
-                  </div>
-                ) : null}
+                <CircleRequestControl viewer={viewer} member={row} state={status} back={back} prefix="directory" tx={tx} />
               </li>
             );
           })}

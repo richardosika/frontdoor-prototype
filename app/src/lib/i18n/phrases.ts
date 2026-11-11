@@ -12,6 +12,11 @@ import { NOV11_PHRASES } from "@/lib/i18n/nov11-phrases";
 import { NOV10_PHRASES } from "@/lib/i18n/nov10-phrases";
 
 const P: Record<string, readonly [string, string, string]> = {
+  "Request sent": ["Solicitud enviada", "Anfrage gesendet", "リクエスト送信済み"],
+  "In your circle": ["En su círculo", "In Ihrem Kreis", "サークルに追加済み"],
+  "Circle request": ["Solicitud de círculo", "Kreisanfrage", "サークルへのリクエスト"],
+  "Withdrawing…": ["Retirando…", "Wird zurückgezogen…", "取り消し中…"],
+  "Withdraw request": ["Retirar solicitud", "Anfrage zurückziehen", "リクエストを取り消す"],
   "Who viewed you": ["Quién vio su perfil", "Wer Sie angesehen hat", "プロフィールを見た人"],
   "developer viewed your profile this week": ["desarrollador vio su perfil esta semana", "Entwickler hat diese Woche Ihr Profil angesehen", "人のデベロッパーが今週プロフィールを閲覧"],
   "developers viewed your profile this week": ["desarrolladores vieron su perfil esta semana", "Entwickler haben diese Woche Ihr Profil angesehen", "人のデベロッパーが今週プロフィールを閲覧"],

@@ -14,9 +14,9 @@ const SENT_TONE: Record<string, string> = {
 };
 const SENT_LABEL: Record<string, string> = { PENDING: "Waiting for a reply", ACCEPTED: "Accepted", DECLINED: "Declined" };
 
-/** Outbound requests: project contacts and introduction requests this member sent, with their status. */
+/** Outbound requests: circle, project contact and introduction requests this member sent, with their status. */
 async function SentList({ userId, tx, locale }: { userId: string; tx: (t: string) => string; locale: string }) {
-  const [contacts, intros] = await Promise.all([
+  const [contacts, intros, connections] = await Promise.all([
     prisma.projectContact.findMany({
       where: { fromId: userId },
       include: { to: { select: { id: true, name: true, org: true } }, project: { select: { name: true } } },
@@ -27,10 +27,12 @@ async function SentList({ userId, tx, locale }: { userId: string; tx: (t: string
       include: { to: { select: { id: true, name: true, org: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.connection.findMany({ where: { fromId: userId }, include: { to: { select: { id: true, name: true, org: true } } }, orderBy: { createdAt: "desc" } }),
   ]);
   const rows = [
-    ...contacts.map((c) => ({ id: c.id, at: c.createdAt, kind: tx("Contact about this project"), to: c.to, about: c.project.name, status: c.status as string })),
-    ...intros.map((i) => ({ id: i.id, at: i.createdAt, kind: tx("Introduction request"), to: i.to, about: "", status: i.status as string })),
+    ...contacts.map((c) => ({ id: c.id, route: "contact", at: c.createdAt, kind: tx("Contact about this project"), to: c.to, about: c.project.name, status: c.status as string })),
+    ...intros.map((i) => ({ id: i.id, route: "intro", at: i.createdAt, kind: tx("Introduction request"), to: i.to, about: "", status: i.status as string })),
+    ...connections.map((c) => ({ id: c.id, route: "connection", at: c.createdAt, kind: tx("Circle request"), to: c.to, about: "", status: c.status as string })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" });
   if (!rows.length) return null;
@@ -39,10 +41,10 @@ async function SentList({ userId, tx, locale }: { userId: string; tx: (t: string
     <h2 className="px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Requests you sent")}</h2>
     <ul className="divide-y divide-line" data-testid="sent-list">
       {rows.map((row) => (
-        <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3" data-testid="sent-row">
+        <li key={`${row.route}-${row.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3" data-testid="sent-row">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-brass">{row.kind}</p>
-            <Link href={`/members/${row.to.id}`} className="font-semibold text-forest [overflow-wrap:anywhere]">
+            <Link href={`/messages/sent/${row.route}/${row.id}`} className="font-semibold text-forest [overflow-wrap:anywhere]">
               {row.to.name}
             </Link>
             <p className="text-[13px] text-mut [overflow-wrap:anywhere]">
@@ -69,7 +71,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const q = typeof params.q === "string" ? params.q.slice(0, 80) : "";
   const [conversations, requestsSent] = await Promise.all([
     listConversations(user.id),
-    Promise.all([prisma.projectContact.count({ where: { fromId: user.id } }), prisma.introduction.count({ where: { fromId: user.id } })]).then(([a, b]) => a + b),
+    Promise.all([prisma.projectContact.count({ where: { fromId: user.id } }), prisma.introduction.count({ where: { fromId: user.id } }), prisma.connection.count({ where: { fromId: user.id } })]).then(([a, b, c]) => a + b + c),
   ]);
   const none = conversations.length === 0;
   return (
