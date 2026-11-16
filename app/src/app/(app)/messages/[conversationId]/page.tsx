@@ -162,7 +162,7 @@ export default async function ThreadPage({
             <>
               <form action={sendMessage} className="mb-3 flex gap-2">
                 <input type="hidden" name="conversationId" value={conversation.id} />
-                <input name="body" className={field} placeholder={`Message ${other.name.split(" ")[0]}…`} required />
+                <input name="body" className={field} placeholder={tx("Message {name}…").replace("{name}", other.name.split(" ")[0])} required />
                 <SubmitButton className={btn} pendingLabel="Sending…">
                   {tx("Send")}
                 </SubmitButton>

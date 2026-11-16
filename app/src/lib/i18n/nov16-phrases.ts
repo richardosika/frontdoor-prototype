@@ -17,4 +17,7 @@ export const NOV16_PHRASES: Record<string, readonly [string, string, string]> = 
   "{name} asked for an introduction. Accept or decline in {place}.": ["{name} pidió una presentación. Acepte o rechace en {place}.", "{name} bittet um eine Vorstellung. Annehmen oder ablehnen unter {place}.", "{name}さんが紹介をリクエストしました。{place}で承諾または辞退してください。"],
   "{name} accepted your connection request.": ["{name} aceptó su solicitud de conexión.", "{name} hat Ihre Verbindungsanfrage angenommen.", "{name}さんがつながりのリクエストを承諾しました。"],
   "{name} declined your connection request.": ["{name} rechazó su solicitud de conexión.", "{name} hat Ihre Verbindungsanfrage abgelehnt.", "{name}さんがつながりのリクエストを辞退しました。"],
+  "Message {name}…": ["Mensaje para {name}…", "Nachricht an {name}…", "{name}さんへのメッセージ…"],
+  "Moderators can read messages for safety and verification. Opening a conversation in moderation is logged.": ["Los moderadores pueden leer los mensajes por seguridad y verificación. Abrir una conversación en moderación queda registrado.", "Moderatoren können Nachrichten zur Sicherheit und Überprüfung lesen. Das Öffnen einer Unterhaltung in der Moderation wird protokolliert.", "安全確認と審査のため、モデレーターはメッセージを閲覧できます。モデレーションで会話を開くと記録されます。"],
+  "New conversation": ["Conversación nueva", "Neue Unterhaltung", "新しい会話"],
 };

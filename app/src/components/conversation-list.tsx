@@ -2,6 +2,7 @@ import { serverTx } from "@/lib/i18n/server";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { field } from "@/components/ui";
+import { renderCircleMessage } from "@/lib/circle-requests";
 import { conversationListState, type ConversationRow } from "@/lib/conversations";
 
 /**
@@ -72,7 +73,7 @@ export async function ConversationList({
                   </span>
                   <span className="block truncate text-[12px] text-mut">{conversation.sub}</span>
                   <span className={`mt-0.5 flex items-center gap-2 text-[13px] ${bold ? "font-semibold text-ink" : "text-mut"}`}>
-                    <span className="min-w-0 flex-1 truncate">{conversation.lastFromMe ? `${tx("You")}: ` : ""}{conversation.preview}</span>
+                    <span className="min-w-0 flex-1 truncate">{conversation.lastFromMe ? `${tx("You")}: ` : ""}{conversation.previewKind === "CONNECTION" ? renderCircleMessage(conversation.preview, conversation.viewerRole, tx) : conversation.preview === "New conversation" ? tx("New conversation") : conversation.preview}</span>
                     {bold ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-forest" aria-label={tx("Unread")} /> : null}
                   </span>
                 </span>

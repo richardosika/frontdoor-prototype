@@ -31,6 +31,9 @@ export async function listConversations(userId: string) {
       initials: other.initials,
       sub: [other.org, roleShort(roleLabel(other.role)), other.location].filter(Boolean).join(" · "),
       preview: last?.body ?? "New conversation",
+      // Nov 16: circle request previews render in the reader's language and point to My Circle.
+      previewKind: last?.kind ?? "",
+      viewerRole: (conversation.userAId === userId ? conversation.userA : conversation.userB).role as string,
       time: last ? timeAgo(last.createdAt) : "",
       unread: unreadMap.get(conversation.id) ?? 0,
       photoId: other.photoId ?? "",
