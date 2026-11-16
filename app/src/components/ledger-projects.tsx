@@ -367,7 +367,9 @@ export async function LedgerProjects({ data, role, extraCategories, filters, myW
             <summary className={`${btn} w-full cursor-pointer list-none sm:w-auto [&::-webkit-details-marker]:hidden`}>+ {tx("Add a project")}</summary>
             <p className="mt-2 text-[14px] text-mut">{role === "GENERAL_CONTRACTOR"
               ? tx("Staff review each project. Once it is approved, open it from Your projects to post a trade bid package or create a Deal Room.")
-              : tx("Staff review each project. Once it is approved, open it from Your projects to create a Deal Room.")}</p>
+              : role === "ARCHITECT_ENGINEER"
+                ? tx("Staff review each project. Once it is approved, open it from Your projects to create a Deal Room.")
+                : tx("Staff review each project. Once it is approved, open it from Your projects to request bids from members on it.")}</p>
             <div className="mt-3 rounded border border-line bg-cream p-4 md:p-5">
               <ProjectForm back="/feed" />
             </div>

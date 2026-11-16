@@ -60,9 +60,9 @@ export function subCanReach(viewer: Member, other: Member): boolean {
   return cats.includes("GENERAL_CONTRACTOR") || cats.includes("ARCHITECT_ENGINEER");
 }
 
-/** Owners whose projects a member sees in Opportunities and the Ledger. Subs: GCs and architects; others: developers. */
+/** Owners whose projects a member sees in Opportunities and the Ledger. Subs: GCs and architects only; others: developers, investors and family offices. */
 export function opportunityOwnerRoles(viewer: Member): readonly string[] {
-  return isSubOnly(viewer) ? SUB_DIRECT_ROLES : ["DEVELOPER"];
+  return isSubOnly(viewer) ? SUB_DIRECT_ROLES : ["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE"];
 }
 
 /** Whether a seek category is shown to this member (e.g. Suggest a vendor categories). */

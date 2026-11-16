@@ -48,7 +48,7 @@ describe("Nov 10: subcontractor access", () => {
   it("subs no longer get the GC add-on; Opportunities come from GCs and architects", () => {
     expect(interestCategories(sub)).toEqual(["SUBCONTRACTOR"]);
     expect(opportunityOwnerRoles(sub)).toEqual(["GENERAL_CONTRACTOR", "ARCHITECT_ENGINEER"]);
-    expect(opportunityOwnerRoles(gc)).toEqual(["DEVELOPER"]);
+    expect(opportunityOwnerRoles(gc)).toEqual(["DEVELOPER", "INVESTOR_PE", "FAMILY_OFFICE"]);
   });
 });
 

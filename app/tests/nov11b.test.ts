@@ -14,9 +14,9 @@ const reach = (role: string, extraCategories = "") => gettingStarted({ ...setup,
 const locales = ["en", "es", "de", "ja"] as const;
 
 describe("November 11 product fixes", () => {
-  it("allows seeking for the three project owner roles", () => {
-    for (const role of ["DEVELOPER", "GENERAL_CONTRACTOR", "ARCHITECT_ENGINEER"]) expect(canSeekOnProject(role)).toBe(true);
-    for (const role of ["SUBCONTRACTOR", "LENDER", "INVESTOR_PE", "BROKER", null, undefined]) expect(canSeekOnProject(role)).toBe(false);
+  it("allows seeking for the five project owner roles", () => {
+    for (const role of ["DEVELOPER", "GENERAL_CONTRACTOR", "ARCHITECT_ENGINEER", "INVESTOR_PE", "FAMILY_OFFICE"]) expect(canSeekOnProject(role)).toBe(true);
+    for (const role of ["SUBCONTRACTOR", "LENDER", "BROKER", null, undefined]) expect(canSeekOnProject(role)).toBe(false);
   });
 
   it("uses the same seeking policy for creation, resubmission and profile forms", () => {
