@@ -3,6 +3,7 @@ import { requestConnection } from "@/actions/social";
 import { SubmitButton } from "@/components/submit-button";
 import { btn } from "@/components/ui";
 import { subCanReach } from "@/lib/sub-access";
+import { circleHome } from "@/lib/circle-requests";
 
 export type CircleState = "NONE" | "PENDING" | "INCOMING" | "ACCEPTED";
 type Person = { id: string; role: string; extraCategories?: string | null };
@@ -20,7 +21,7 @@ export function CircleRequestControl({ viewer, member, state, back, prefix, tx }
       <input type="hidden" name="back" value={back} />
       <SubmitButton className={`${btn} min-h-11 w-full whitespace-normal`} data-testid={`${prefix}-add-circle`} pendingLabel="Sending request…">{tx("Add to My Circle")}</SubmitButton>
     </form> : state === "PENDING" ? <span className="flex min-h-11 items-center text-[14px] text-mut" data-testid={`${prefix}-pending`}>{tx("Request sent")}</span>
-    : state === "INCOMING" ? <Link href="/network" className="inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass">{tx("Respond")}</Link>
+    : state === "INCOMING" ? <Link href={circleHome(viewer.role).href} className="inline-flex min-h-11 items-center text-[14px] font-semibold text-forest underline decoration-brass" data-testid={`${prefix}-respond`}>{tx("Respond to request")}</Link>
     : <span className="flex min-h-11 items-center text-[14px] text-forest" data-testid={`${prefix}-in-circle`}>{tx("In your circle")}</span>}
   </div>;
 }

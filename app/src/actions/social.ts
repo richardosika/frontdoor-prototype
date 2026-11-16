@@ -17,6 +17,7 @@ import { appBaseUrl } from "@/lib/url";
 import { COLD_MESSAGE_REASON } from "@/lib/project-contact";
 import { canMessagePair } from "@/lib/project-contact-db";
 import { subCanReach, SUB_REACH_REASON } from "@/lib/sub-access";
+import { circleHome, circleMessageBody, safeBack as safeInternalPath, withParam } from "@/lib/circle-requests";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -76,7 +77,7 @@ export async function requestConnection(formData: FormData) {
     from: user,
     toId,
     kind: "CONNECTION",
-    body: `${user.name} requested to connect. Accept or decline in Network.`,
+    body: circleMessageBody("request", user.name, target.role),
   });
   if (!sent.ok) redirect(dest("error", sent.reason, `/members/${toId}?error=${encodeURIComponent(sent.reason)}`));
 
@@ -90,14 +91,18 @@ export async function requestConnection(formData: FormData) {
 export async function withdrawConnection(formData: FormData) {
   const user = await requireUser();
   const connectionId = String(formData.get("connectionId") || "");
-  await prisma.connection.updateMany({
+  // Nov 16: the thread page withdraws too and comes back to the same thread.
+  const back = safeInternalPath(formData.get("back"));
+  const changed = await prisma.connection.updateMany({
     where: { id: connectionId, fromId: user.id, status: "PENDING" },
     data: { status: "DECLINED" },
   });
   revalidatePath("/network");
+  revalidatePath("/deals");
   revalidatePath("/directory");
   revalidatePath("/members", "layout");
   revalidatePath("/messages", "layout");
+  if (back) redirect(changed.count ? withParam(back, "notice", "Request withdrawn.") : back);
   redirect(`/messages/sent/connection/${encodeURIComponent(connectionId)}`);
 }
 
@@ -105,17 +110,20 @@ export async function respondConnection(formData: FormData) {
   const user = await requireUser();
   const connectionId = String(formData.get("connectionId") || "");
   const decision = String(formData.get("decision") || "");
-  if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect("/network");
+  // Nov 16: answered from My Circle, Find your team, a profile or the message thread; come back to that page.
+  const home = user.role === "DEVELOPER" ? circleHome(user.role).href : "/network";
+  const back = safeInternalPath(formData.get("back")) ?? home;
+  if (decision !== "ACCEPTED" && decision !== "DECLINED") redirect(back);
 
   const connection = await prisma.connection.findUnique({ where: { id: connectionId } });
-  if (!connection || connection.toId !== user.id || connection.status !== "PENDING") redirect("/network");
-  if (await isBlocked(user.id, connection.fromId)) redirect("/network?error=Messaging+is+closed+between+these+members.");
+  if (!connection || connection.toId !== user.id || connection.status !== "PENDING") redirect(back);
+  if (await isBlocked(user.id, connection.fromId)) redirect(withParam(back, "error", "Messaging is closed between these members."));
 
   const changed = await prisma.connection.updateMany({
     where: { id: connection.id, toId: user.id, status: "PENDING" },
     data: { status: decision },
   });
-  if (!changed.count) redirect("/network");
+  if (!changed.count) redirect(back);
   await deliverPortalMessage({
     from: user,
     toId: connection.fromId,
@@ -123,8 +131,11 @@ export async function respondConnection(formData: FormData) {
     body: decision === "ACCEPTED" ? `${user.name} accepted your connection request.` : `${user.name} declined your connection request.`,
   });
   revalidatePath("/network");
-  revalidatePath("/messages");
-  redirect("/network");
+  revalidatePath("/deals");
+  revalidatePath("/directory");
+  revalidatePath("/members", "layout");
+  revalidatePath("/messages", "layout");
+  redirect(withParam(back, "notice", decision === "ACCEPTED" ? "Added to My Circle." : "Request declined."));
 }
 
 export async function introduceMember(formData: FormData) {
@@ -165,7 +176,7 @@ export async function introduceMember(formData: FormData) {
   await prisma.introduction.create({ data: { fromId: user.id, toId: otherId, note, isTest: user.isTest } });
   await notify(other.id, {
     title: "Introduction request",
-    body: `${user.name} asked for an introduction. Accept or decline in Network.`,
+    body: circleMessageBody("intro", user.name, null),
     href: "/network",
   });
   if (other.notifyIntros) {

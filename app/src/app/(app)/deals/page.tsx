@@ -13,6 +13,7 @@ import { Banner } from "@/components/banner";
 import { MyCircleList } from "@/components/my-circle";
 import { IntroduceMembers } from "@/components/introduce-members";
 import { RecommendedConnections } from "@/components/recommended-connections";
+import { CircleRequests } from "@/components/circle-requests";
 import { PageHeader } from "@/components/page-header";
 import { SlimFilterBar } from "@/components/slim-filters";
 import { btn, btnOutline, card, field } from "@/components/ui";
@@ -197,6 +198,7 @@ async function FindYourTeam({ user, error, notice }: { user: { id: string }; err
       ))}
       <section id="my-circle" className="mt-8 scroll-mt-20">
         <h2 className="mb-3 font-serif text-[26px]">{tx("My Circle")}</h2>
+        <CircleRequests userId={user.id} back="/deals#my-circle" />
         <MyCircleList people={circle} back="/deals#my-circle" />
         <RecommendedConnections user={user} />
         <IntroduceMembers people={circle.map((p) => ({ id: p.id, name: p.name, org: p.org }))} />

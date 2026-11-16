@@ -3,14 +3,15 @@ import { serverTx } from "@/lib/i18n/server";
 import { memberLine } from "@/lib/member-line";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { sendMessage } from "@/actions/social";
+import { respondConnection, sendMessage, withdrawConnection } from "@/actions/social";
 import { BlockButton, UnblockButton } from "@/components/block-controls";
 import { Avatar } from "@/components/avatar";
 import { Banner } from "@/components/banner";
 import { TierBadge } from "@/components/badge";
 import { ConversationList } from "@/components/conversation-list";
 import { ReportDialog } from "@/components/report-dialog";
-import { btn, field } from "@/components/ui";
+import { btn, btnOutline, field } from "@/components/ui";
+import { renderCircleMessage } from "@/lib/circle-requests";
 import { requireUser } from "@/lib/current-user";
 import { listConversations } from "@/lib/conversations";
 import { ModeratorNotice } from "@/components/moderator-notice";
@@ -58,7 +59,15 @@ export default async function ThreadPage({
   const other = conversation.userAId === user.id ? conversation.userB : conversation.userA;
   const blockedByViewer = blocks.some((item) => item.blockerId === user.id);
   const messagingClosed = blocks.length > 0;
-  const conversations = await listConversations(user.id);
+  const [conversations, circleRequest] = await Promise.all([
+    listConversations(user.id),
+    // Nov 16 (Julia, step 24): a pending circle request between the two shows here with Withdraw, or Accept and Decline.
+    prisma.connection.findFirst({
+      where: { status: "PENDING", OR: [{ fromId: user.id, toId: other.id }, { fromId: other.id, toId: user.id }] },
+      select: { id: true, fromId: true },
+    }),
+  ]);
+  const threadPath = `/messages/${conversation.id}`;
 
   return (
     <div className="lg:grid lg:min-h-dvh lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -89,13 +98,47 @@ export default async function ThreadPage({
         </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
           <Banner error={query.error ? tx(query.error) : undefined} notice={query.notice ? tx(query.notice) : undefined} />
-          {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">Say hello to {other.name}.</p> : null}
+          {circleRequest && !messagingClosed ? (
+            <section className="rounded border border-line bg-paper p-3 text-sm" data-testid="thread-circle-request">
+              {circleRequest.fromId === user.id ? (
+                <>
+                  <p className="font-semibold text-forest">{tx("Circle request sent")}</p>
+                  <p className="mt-0.5 text-mut" data-testid="thread-circle-status">{tx("Waiting for a reply")}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <form action={withdrawConnection}>
+                      <input type="hidden" name="connectionId" value={circleRequest.id} />
+                      <input type="hidden" name="back" value={threadPath} />
+                      <SubmitButton className={`${btnOutline} min-h-11 whitespace-normal`} pendingLabel="Withdrawing…" data-testid="thread-withdraw">{tx("Withdraw request")}</SubmitButton>
+                    </form>
+                    <Link href={`/messages/sent/connection/${circleRequest.id}`} className="inline-flex min-h-11 items-center text-forest underline decoration-brass">{tx("View request")}</Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-forest">{tx("{name} asked to join your circle.").replace("{name}", other.name)}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:flex">
+                    <form action={respondConnection}>
+                      <input type="hidden" name="connectionId" value={circleRequest.id} />
+                      <input type="hidden" name="back" value={threadPath} />
+                      <SubmitButton className={`${btnOutline} min-h-11 w-full`} name="decision" value="DECLINED" data-testid="thread-circle-decline">{tx("Decline")}</SubmitButton>
+                    </form>
+                    <form action={respondConnection}>
+                      <input type="hidden" name="connectionId" value={circleRequest.id} />
+                      <input type="hidden" name="back" value={threadPath} />
+                      <SubmitButton className={`${btn} min-h-11 w-full`} name="decision" value="ACCEPTED" data-testid="thread-circle-accept">{tx("Accept")}</SubmitButton>
+                    </form>
+                  </div>
+                </>
+              )}
+            </section>
+          ) : null}
+          {conversation.messages.length === 0 ? <p className="text-center text-sm text-mut">{tx("Say hello to {name}.").replace("{name}", other.name)}</p> : null}
           {conversation.messages.map((message) => {
             if (isRenderedSystemNotice(message.kind, message.body)) {
               return (
                 <article key={message.id} className="rounded border border-brass border-l-4 bg-cream px-3 py-3 text-sm text-ink">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brass">System · {systemNoticeLabelFor(message.kind, message.body)}</p>
-                  <p className="mt-1 leading-snug">{message.body}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("System")} · {tx(systemNoticeLabelFor(message.kind, message.body))}</p>
+                  <p className="mt-1 leading-snug">{message.kind === "CONNECTION" ? renderCircleMessage(message.body, user.role, tx) : message.body}</p>
                 </article>
               );
             }

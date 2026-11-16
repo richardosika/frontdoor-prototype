@@ -11,8 +11,9 @@ describe("Nov 11 circle controls and sent receipts", () => {
   it("shares guarded circle states across all member entry points", () => {
     expect(control).toContain("!subCanReach(viewer, member)");
     expect(control).toContain("action={requestConnection}");
-    for (const text of ["Add to My Circle", "Request sent", "In your circle", "Respond"]) expect(control).toContain(`tx("${text}")`);
-    expect(control).toContain('href="/network"');
+    for (const text of ["Add to My Circle", "Request sent", "In your circle", "Respond to request"]) expect(control).toContain(`tx("${text}")`);
+    // Nov 16: Respond goes to the incoming list (My Circle, or Find your team for developers).
+    expect(control).toContain("href={circleHome(viewer.role).href}");
     expect(control).toContain("min-h-11 w-full whitespace-normal");
     for (const path of ["src/components/recommended-connections.tsx", "src/components/vendor-profile.tsx", "src/app/(app)/directory/page.tsx"]) expect(source(path)).toContain("<CircleRequestControl");
     expect(source("src/components/recommended-connections.tsx")).toContain("prisma.connection.findMany");

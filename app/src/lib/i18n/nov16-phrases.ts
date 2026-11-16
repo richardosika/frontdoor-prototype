@@ -1,0 +1,20 @@
+/** Nov 16 (Julia's test, steps 21 and 24): circle requests. English keys; Spanish, German and Japanese values. */
+export const NOV16_PHRASES: Record<string, readonly [string, string, string]> = {
+  "System": ["Sistema", "System", "システム"],
+  "Connection": ["Conexión", "Verbindung", "つながり"],
+  "Access": ["Acceso", "Zugang", "アクセス"],
+  "Vouch": ["Aval", "Empfehlung", "推薦"],
+  "Notice": ["Aviso", "Hinweis", "お知らせ"],
+  "Say hello to {name}.": ["Salude a {name}.", "Sagen Sie {name} Hallo.", "{name}さんにあいさつしましょう。"],
+  "Circle requests": ["Solicitudes de círculo", "Kreisanfragen", "サークルへのリクエスト"],
+  "Circle request sent": ["Solicitud de círculo enviada", "Kreisanfrage gesendet", "サークルへのリクエストを送信しました"],
+  "View request": ["Ver solicitud", "Anfrage ansehen", "リクエストを見る"],
+  "Respond to request": ["Responder a la solicitud", "Auf Anfrage antworten", "リクエストに対応する"],
+  "Request withdrawn.": ["Solicitud retirada.", "Anfrage zurückgezogen.", "リクエストを取り消しました。"],
+  "{name} asked to join your circle.": ["{name} pidió unirse a su círculo.", "{name} möchte in Ihren Kreis aufgenommen werden.", "{name}さんがあなたのサークルへの参加をリクエストしました。"],
+  "You blocked this member. To connect again, use Unblock in the ⋯ menu.": ["Usted bloqueó a este miembro. Para volver a conectar, use Desbloquear en el menú ⋯.", "Sie haben dieses Mitglied blockiert. Um sich wieder zu verbinden, wählen Sie im Menü ⋯ „Blockierung aufheben“.", "このメンバーをブロックしています。再びつながるには、⋯ メニューの「ブロック解除」を使ってください。"],
+  "{name} asked to join your circle. Accept or decline in {place}.": ["{name} pidió unirse a su círculo. Acepte o rechace en {place}.", "{name} möchte in Ihren Kreis aufgenommen werden. Annehmen oder ablehnen unter {place}.", "{name}さんがあなたのサークルへの参加をリクエストしました。{place}で承諾または辞退してください。"],
+  "{name} asked for an introduction. Accept or decline in {place}.": ["{name} pidió una presentación. Acepte o rechace en {place}.", "{name} bittet um eine Vorstellung. Annehmen oder ablehnen unter {place}.", "{name}さんが紹介をリクエストしました。{place}で承諾または辞退してください。"],
+  "{name} accepted your connection request.": ["{name} aceptó su solicitud de conexión.", "{name} hat Ihre Verbindungsanfrage angenommen.", "{name}さんがつながりのリクエストを承諾しました。"],
+  "{name} declined your connection request.": ["{name} rechazó su solicitud de conexión.", "{name} hat Ihre Verbindungsanfrage abgelehnt.", "{name}さんがつながりのリクエストを辞退しました。"],
+};

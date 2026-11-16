@@ -9,6 +9,7 @@ import { MyCircleList } from "@/components/my-circle";
 import { PageHeader } from "@/components/page-header";
 import { IntroduceMembers } from "@/components/introduce-members";
 import { RecommendedConnections } from "@/components/recommended-connections";
+import { CircleRequests } from "@/components/circle-requests";
 import { btn, btnOutline } from "@/components/ui";
 import { requireUser } from "@/lib/current-user";
 import { serverTx } from "@/lib/i18n/server";
@@ -90,6 +91,7 @@ export default async function NetworkPage({ searchParams }: { searchParams: Prom
           </ul>
         </section>
       ) : null}
+      <CircleRequests userId={user.id} back="/network" />
       <RecommendedConnections user={user} />
       <div className="mt-4">
         <MyCircleList people={people} />

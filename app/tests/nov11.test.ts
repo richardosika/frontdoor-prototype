@@ -53,7 +53,8 @@ describe("Nov 11: member feedback", () => {
     expect(control).toContain('name="back" value={back}');
     expect(control).toContain('tx("Add to My Circle")');
     expect(control).toContain('state === "INCOMING"');
-    expect(control).toContain('href="/network"');
+    // Nov 16: Respond goes to the incoming list (My Circle, or Find your team for developers).
+    expect(control).toContain("href={circleHome(viewer.role).href}");
     expect(page).toContain("<Banner error=");
     expect(page).toContain('const key of ["q", "category", "location"]');
     expect(page.match(/prisma.connection.findMany/g)).toHaveLength(1);

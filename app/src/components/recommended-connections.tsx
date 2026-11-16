@@ -8,6 +8,7 @@ import { circleIds, staffNameSet } from "@/lib/project-contact-db";
 import { parseSeeking } from "@/lib/project-contact";
 import { formatReason, NOT_STAFF_WHERE, recommend, type RecProject } from "@/lib/recommendations";
 import { roleLabel, roleShort } from "@/lib/roles";
+import { blockedIds, withoutBlocked } from "@/lib/circle-requests";
 
 /** Recommended connections with the reason for each, from location, profession or category, and project type. */
 export async function RecommendedConnections({ user: viewer }: { user: { id: string } }) {
@@ -17,7 +18,7 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
   const projectSelect = { name: true, asset: true, city: true, state: true, location: true, reviewStatus: true, seeking: true, bidRequests: { where: { status: "OPEN" }, select: { template: { select: { category: true } } } } } as const;
   type Row = { name: string; asset: string; city: string; state: string; location: string; reviewStatus: string; seeking: string; bidRequests: { template: { category: string } }[] };
   const toProject = (p: Row): RecProject => ({ ...p, seeking: parseSeeking(p.seeking), bidCategories: p.bidRequests.map((b) => b.template.category) });
-  const [projects, circle, others, staff] = await Promise.all([
+  const [projects, circle, others, staff, blocks] = await Promise.all([
     prisma.trackProject.findMany({ where: { userId: user.id, reviewStatus: { not: "DECLINED" } }, select: projectSelect }),
     circleIds(user.id),
     prisma.user.findMany({
@@ -27,16 +28,19 @@ export async function RecommendedConnections({ user: viewer }: { user: { id: str
       orderBy: { createdAt: "desc" },
     }),
     staffNameSet(),
+    prisma.block.findMany({ where: { OR: [{ blockerId: viewer.id }, { blockedId: viewer.id }] }, select: { blockerId: true, blockedId: true } }),
   ]);
+  // Nov 16 (Julia, step 21): members blocked either way are not recommended; Add to My Circle could never succeed for them.
+  const reachable = withoutBlocked(others, blockedIds(user.id, blocks));
   const seeking = [...new Set(projects.filter((p) => p.reviewStatus === "APPROVED").flatMap((p) => parseSeeking(p.seeking)))];
-  const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, others.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle, 6, staff);
+  const picks = recommend({ ...user, seeking, projects: projects.map(toProject) }, reachable.map((o) => ({ ...o, projects: o.projects.map(toProject) })), circle, 6, staff);
   if (!picks.length) return null;
   const connections = await prisma.connection.findMany({
     where: { OR: [{ fromId: user.id, toId: { in: picks.map((p) => p.id) } }, { toId: user.id, fromId: { in: picks.map((p) => p.id) } }] },
     select: { fromId: true, toId: true, status: true },
   });
   const connectionByMember = new Map(connections.map((c) => [c.fromId === user.id ? c.toId : c.fromId, c]));
-  const byId = new Map(others.map((o) => [o.id, o]));
+  const byId = new Map(reachable.map((o) => [o.id, o]));
   return (
     <section className={`${card} mt-4 p-4`} data-testid="recommended-connections">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brass">{tx("Recommended for you")}</h2>

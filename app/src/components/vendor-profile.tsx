@@ -147,7 +147,7 @@ export async function VendorProfile({
 
         <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap sm:items-start" data-testid="vendor-actions">
           {closed ? (
-            <p className="rounded border border-line bg-cream px-3 py-2 text-[15px] text-ink">{tx("Messaging is closed between these members.")}</p>
+            <p className="rounded border border-line bg-cream px-3 py-2 text-[15px] text-ink" data-testid="vendor-closed">{blockedByViewer ? tx("You blocked this member. To connect again, use Unblock in the ⋯ menu.") : tx("Messaging is closed between these members.")}</p>
           ) : (
             <>
               <CircleRequestControl viewer={viewer} member={member} state={connection} back={`/members/${member.id}`} prefix="vendor" tx={tx} />
