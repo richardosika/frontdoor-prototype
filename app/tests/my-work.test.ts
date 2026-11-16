@@ -14,8 +14,8 @@ describe("#44 My work right now", () => {
     ];
     expect(inTalks(rows, "me").map((r) => [r.id, r.state])).toEqual([["a", "Sent"], ["b", "Received"], ["c", "Accepted"]]);
   });
-  it("Getting started past-work step points to profile Past work", () => {
-    const items = gettingStarted({ role: "GENERAL_CONTRACTOR", profileDone: true, ndaAccepted: true, projectCount: 0, seekingSet: false, approvedProject: false, projectPending: false, outreachSent: 0, hasPhoto: false, hasCredential: true } as never);
+  it("Getting started past-work step points to profile Past work (non-posting roles)", () => {
+    const items = gettingStarted({ role: "LENDER", profileDone: true, ndaAccepted: true, projectCount: 0, seekingSet: false, approvedProject: false, projectPending: false, outreachSent: 0, hasPhoto: false, hasCredential: true } as never);
     expect(items.find((i) => i.id === "work")?.href).toBe("/profile#past-work");
   });
 });

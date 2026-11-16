@@ -1,3 +1,4 @@
+import { canSeekOnProject } from "@/lib/project-seeking";
 import { isSubOnly } from "@/lib/sub-access";
 import { roleProfile } from "@/lib/role-profile";
 /**
@@ -126,7 +127,7 @@ export function gettingStarted(input: {
     return sequential([
       { id: "nda", label: "Accept the Member NDA", href: "/member-nda", done: input.ndaAccepted },
       { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
-      { id: "project", label: "Add your first project", href: "/projects?add=1#add-project", done: input.projectCount > 0 },
+      { id: "project", label: "Add a project", href: "/projects?add=1#add-project", done: input.projectCount > 0 },
       { id: "seeking", label: "Choose who you're seeking", href: "/projects", done: input.seekingSet },
       // #36: done only when an approved project seeks someone and nothing newer is still waiting for staff.
       { id: "approved", label: "Submit and get approved by staff", href: "/projects", done: input.approvedProject && !input.projectPending, waiting: Boolean(input.projectPending) },
@@ -140,7 +141,10 @@ export function gettingStarted(input: {
     rp.credentialRequired
       ? { id: "profile", label: `Complete your profile with your ${rp.credential.toLowerCase()}`, href: "/profile#profile-credential", done: input.profileDone && Boolean(input.hasCredential) }
       : { id: "profile", label: "Complete your profile", href: "/profile", done: input.profileDone },
-    { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
+    // Nov 16 (Richard): members who post projects for bid add a project here, not past work.
+    canSeekOnProject(input.role)
+      ? { id: "work", label: "Add a project", href: "/profile#add-project", done: input.projectCount > 0 }
+      : { id: "work", label: rp.portfolio, href: "/profile#past-work", done: input.projectCount > 0 },
     { id: "photo", label: "Add a profile photo", href: "/profile", done: input.hasPhoto },
     input.outreachSent === 0 && input.noMatches
       ? { id: "reach", label: "Contact a project seeking your category", href: "/deals", done: true, note: isSubOnly(input) ? "You're first in line. We'll alert you the moment a general contractor or architect posts a project seeking a {category}." : "You're first in line. We'll alert you the moment a developer posts a project seeking a {category}." }
