@@ -1,3 +1,4 @@
+import { canSeekOnProject } from "@/lib/project-seeking";
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { addContactToCircle, respondProjectContact } from "@/actions/projects";
@@ -293,7 +294,7 @@ export async function LedgerProjects({ data, role, extraCategories, filters, myW
     </section>
   ) : null;
 
-  // #44: every member type except developers gets "My work right now" instead of My projects, Add a project and matching.
+  // Non-developers see their pipeline, with project ownership controls for eligible roles.
   const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "America/New_York" });
   const work = myWork ? (
     <section id="ledger-my-work" className={`${box} scroll-mt-20`} data-testid="ledger-my-work" key="work">
@@ -347,6 +348,32 @@ export async function LedgerProjects({ data, role, extraCategories, filters, myW
           </ul>
         </div>
       </div>
+      {!developer && canSeekOnProject(role) ? (
+        <div className="mt-4 border-t border-line pt-4" data-testid="my-work-own-projects">
+          <h3 className={h2}>{tx("Your projects")} <span className="text-mut">({data.myProjects.length})</span></h3>
+          {data.myProjects.length === 0 ? <p className="mt-2 text-[15px] text-mut">{tx("No projects listed yet.")}</p> : null}
+          <ul className="mt-2">
+            {data.myProjects.map((project) => (
+              <li key={project.id} className="flex min-w-0 flex-wrap items-center gap-2 border-t border-line py-2 first:border-t-0">
+                <span className="min-w-0 flex-1 basis-64">
+                  <Link href={`/projects/${project.id}`} className="font-semibold text-forest underline decoration-brass underline-offset-2 [overflow-wrap:anywhere]">{project.name}</Link>
+                  <span className="block text-[14px] text-mut [overflow-wrap:anywhere]">{[tx(project.asset), projectLocation(project) || project.location, String(project.year)].filter(Boolean).join(" · ")}</span>
+                </span>
+                <ReviewChip status={project.reviewStatus} />
+              </li>
+            ))}
+          </ul>
+          <details id="ledger-add-project" data-testid="ledger-add-project" className="mt-3 scroll-mt-20" open={openAdd || undefined}>
+            <summary className={`${btn} w-full cursor-pointer list-none sm:w-auto [&::-webkit-details-marker]:hidden`}>+ {tx("Add a project")}</summary>
+            <p className="mt-2 text-[14px] text-mut">{role === "GENERAL_CONTRACTOR"
+              ? tx("Staff review each project. Once it is approved, open it from Your projects to post a trade bid package or create a Deal Room.")
+              : tx("Staff review each project. Once it is approved, open it from Your projects to create a Deal Room.")}</p>
+            <div className="mt-3 rounded border border-line bg-cream p-4 md:p-5">
+              <ProjectForm back="/feed" />
+            </div>
+          </details>
+        </div>
+      ) : null}
     </section>
   ) : null;
   // #44 expanded: value headline, big opportunity cards, smaller My work, results strip.

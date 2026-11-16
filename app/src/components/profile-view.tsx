@@ -279,7 +279,7 @@ export async function ProfileView({
           <span className="text-[16px] leading-relaxed text-ink">{tx("Approved members are in the platform.")}</span>
         </div>
         <h2 id="past-work" className="mb-2 mt-6 scroll-mt-20 text-[13px] font-semibold uppercase tracking-[0.16em] text-brass" data-testid="track-record-title">
-          {member.role === "DEVELOPER" ? tx("My Projects") : tx("Past work")}
+          {member.role === "DEVELOPER" ? tx("My Projects") : canSeekOnProject(member.role) ? tx("My projects") : tx("Past work")}
         </h2>
         {projects.length === 0 ? <p className="text-[16px] text-mut">{tx("No projects listed yet.")}</p> : null}
         <ul>

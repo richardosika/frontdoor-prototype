@@ -20,4 +20,10 @@ export const NOV16_PHRASES: Record<string, readonly [string, string, string]> = 
   "Message {name}…": ["Mensaje para {name}…", "Nachricht an {name}…", "{name}さんへのメッセージ…"],
   "Moderators can read messages for safety and verification. Opening a conversation in moderation is logged.": ["Los moderadores pueden leer los mensajes por seguridad y verificación. Abrir una conversación en moderación queda registrado.", "Moderatoren können Nachrichten zur Sicherheit und Überprüfung lesen. Das Öffnen einer Unterhaltung in der Moderation wird protokolliert.", "安全確認と審査のため、モデレーターはメッセージを閲覧できます。モデレーションで会話を開くと記録されます。"],
   "New conversation": ["Conversación nueva", "Neue Unterhaltung", "新しい会話"],
+  "Your projects": ["Sus proyectos", "Ihre Projekte", "あなたのプロジェクト"],
+  "My projects": ["Mis proyectos", "Meine Projekte", "マイプロジェクト"],
+  "Add a project": ["Añadir un proyecto", "Projekt hinzufügen", "プロジェクトを追加"],
+  "No projects listed yet.": ["Aún no hay proyectos.", "Noch keine Projekte aufgeführt.", "まだプロジェクトはありません。"],
+  "Staff review each project. Once it is approved, open it from Your projects to post a trade bid package or create a Deal Room.": ["El personal revisa cada proyecto. Una vez aprobado, ábralo desde Sus proyectos para publicar un paquete de licitación por oficio o crear una sala de negocios.", "Das Team prüft jedes Projekt. Öffnen Sie es nach der Genehmigung unter Ihre Projekte, um ein Gewerkpaket zur Ausschreibung zu veröffentlichen oder einen Deal Room zu erstellen.", "スタッフが各プロジェクトを審査します。承認後、あなたのプロジェクトから開いて、工種別入札パッケージを掲載するか、ディールルームを作成できます。"],
+  "Staff review each project. Once it is approved, open it from Your projects to create a Deal Room.": ["El personal revisa cada proyecto. Una vez aprobado, ábralo desde Sus proyectos para crear una sala de negocios.", "Das Team prüft jedes Projekt. Öffnen Sie es nach der Genehmigung unter Ihre Projekte, um einen Deal Room zu erstellen.", "スタッフが各プロジェクトを審査します。承認後、あなたのプロジェクトから開いてディールルームを作成できます。"],
 };

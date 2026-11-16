@@ -182,7 +182,7 @@ describe("#32 track record", () => {
     expect(fixRoleTypos("Devloper")).toBe("Developer");
     expect(fixRoleTypos("Lead devloper")).toBe("Lead developer");
     const view = read("src/components/profile-view.tsx");
-    expect(view).toContain('tx("My Projects") : tx("Past work")');
+    expect(view).toContain('tx("My Projects") : canSeekOnProject(member.role) ? tx("My projects") : tx("Past work")');
     expect(view).not.toContain("<ProjectDocuments");
     expect(view).not.toContain("setProjectSharing");
     expect(view).toContain('data-testid="track-project-row"');
