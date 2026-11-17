@@ -52,6 +52,8 @@ const NOTICE_LABELS: Record<string, string> = {
   renewal: "Renewal email",
   payment_failed: "Payment failed email",
   insurance_expiring_30: "Insurance policy expiration reminder",
+  insurance_expired_weekly: "Insurance policy expired (weekly reminder)",
+  insurance_suspended: "Account suspended for expired insurance",
   card_expiring_30: "Card expires in 30 days email",
   card_expiring_2: "Card expires in 2 days email",
   admin_decision: "Decision email",

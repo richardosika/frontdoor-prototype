@@ -1,5 +1,5 @@
 "use server";
-import { requiresInsurance } from "@/lib/insurance-compliance";
+import { requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { insuranceFromJoin } from "@/lib/insurance-input";
 import { subProfileFromJoin } from "@/lib/trades";
 
@@ -220,7 +220,10 @@ export async function reviewApplication(formData: FormData) {
   const paying = paymentRequired(application.role);
   const duesCents = annualDuesCents(application.role);
   const paymentToken = paying ? randomBytes(24).toString("hex") : null;
-  const inScope = requiresInsurance(application.role);
+  const inScope = requiresInsuranceFor({
+    role: application.role,
+    extraCategories: ((extra) => (Array.isArray(extra) ? extra.map(String) : []))((application.joinProfile as { extraCategories?: unknown } | null)?.extraCategories),
+  });
   const insurance = inScope ? insuranceFromJoin(application.joinProfile) : null;
   const user = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({

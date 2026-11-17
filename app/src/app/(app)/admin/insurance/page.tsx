@@ -3,23 +3,25 @@ import { InsuranceReminderControls } from "@/components/insurance-reminder-contr
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
-import { INSURANCE_ROLES, insuranceDaysUntil, INSURANCE_TIME_ZONE } from "@/lib/insurance-compliance";
-import { insuranceMemberSelect, memberInsuranceComplete } from "@/lib/insurance-member";
+import { insuranceDaysUntil, insuranceScopeWhere, INSURANCE_TIME_ZONE, requiresInsuranceFor } from "@/lib/insurance-compliance";
+import { insuranceMemberSelect, memberInsuranceStatus } from "@/lib/insurance-member";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminInsurancePage() {
   await requireAdmin();
-  const [locale, tx, members] = await Promise.all([
+  const [locale, tx, rows] = await Promise.all([
     currentLocale(),
     serverTx(),
     prisma.user.findMany({
-      where: { status: "ACTIVE", role: { in: [...INSURANCE_ROLES] } },
+      where: { status: "ACTIVE", ...insuranceScopeWhere() },
       select: { ...insuranceMemberSelect, _count: { select: { insuranceReminders: true } } },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     }),
   ]);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: INSURANCE_TIME_ZONE });
+  // Nov 17 (decision 2): extra categories count; the contains filter is re-checked exactly here.
+  const members = rows.filter(requiresInsuranceFor);
   const now = new Date();
   return (
     <div>
@@ -33,7 +35,7 @@ export default async function AdminInsurancePage() {
             return (
               <li className={`${card} grid min-w-0 gap-2 p-4 sm:grid-cols-4 sm:items-center`} key={member.id}>
                 <Link className="flex min-h-11 items-center font-semibold underline decoration-brass" href={`/admin/members/${member.id}`}>{member.name}</Link>
-                <span>{tx(memberInsuranceComplete(member) ? "Complete" : "Missing")}</span>
+                <span>{tx(memberInsuranceStatus(member))}</span>
                 <span>{tx("Next expiration")}{next ? ` · ${date.format(next.expiresOn)}` : " · —"}</span>
                 <span>{tx("Reminders recorded")} · {new Intl.NumberFormat(locale).format(member._count.insuranceReminders)}</span>
               </li>

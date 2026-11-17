@@ -8,7 +8,8 @@ import { ReachOut, StatusPill, type ReachProject } from "@/components/reach-out"
 import { btnOutline } from "@/components/ui";
 import { openConversation } from "@/actions/social";
 import { BlockButton, RemoveFromCircleButton, UnblockButton } from "@/components/block-controls";
-import { coverageSummary, type Coverage } from "@/lib/insurance";
+import { coverageSummary, shortMoney, type Coverage } from "@/lib/insurance";
+import { policyLimitLine, requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { currentLocale, serverTx } from "@/lib/i18n/server";
 import { roleProfile } from "@/lib/role-profile";
 import { prisma } from "@/lib/prisma";
@@ -60,7 +61,6 @@ export async function VendorProfile({
   blockedByThem,
   reviewed,
   inCircle = false,
-  viewerCanOpenCoi = false,
 }: {
   member: Member;
   viewer: { id: string; role: string; extraCategories?: string };
@@ -75,7 +75,6 @@ export async function VendorProfile({
   /** Nov 6: this member is in the viewer's My Circle, so the ⋯ menu offers Remove (without blocking). */
   inCircle?: boolean;
   /** Nov 6: the viewer is an approved active general contractor, so the sub's certificate of insurance opens for them. */
-  viewerCanOpenCoi?: boolean;
 }) {
   const tx = await serverTx();
   const locale = await currentLocale();
@@ -84,7 +83,13 @@ export async function VendorProfile({
   const rp = roleProfile(member.role);
   // Nov 6 Subcontractors: trades in the viewer's language, metros, union / prevailing wage, bonding, COI on file.
   const isSub = member.role === "SUBCONTRACTOR";
-  const coiOnFile = isSub ? Boolean(await prisma.insuranceCertificate.findUnique({ where: { userId: member.id }, select: { id: true } })) : false;
+  // Nov 17 (Richard, decision 5): other members see policy types, limits and whether each is current. Never the COI or agent.
+  const insured = await prisma.user.findUnique({
+    where: { id: member.id },
+    select: { role: true, extraCategories: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } },
+  });
+  const now = new Date();
+  const policyLines = insured && requiresInsuranceFor(insured) ? insured.insurancePolicies.map((policy) => policyLimitLine(policy, now, tx, shortMoney)) : [];
   const yn = (v?: string) => (v === "yes" ? tx("Yes") : v === "no" ? tx("No") : "");
   const subFacts = isSub
     ? [
@@ -92,8 +97,6 @@ export async function VendorProfile({
         ["Union shop", yn(member.unionShop)],
         ["Prevailing-wage work", yn(member.prevailingWage)],
         ["Bonding capacity", member.bondingCapacity ?? ""],
-        // When the viewer can open it, the link below replaces the "On file" line.
-        ["Certificate of insurance", coiOnFile && !viewerCanOpenCoi ? tx("On file") : ""],
       ]
     : [];
   const facts = [
@@ -105,6 +108,7 @@ export async function VendorProfile({
     [rp.size, member.typicalJobSize || member.checkSize],
     [rp.credential, member.licenses ?? ""],
     ["Insurance", [coverageSummary(member.insuranceCoverage ?? [], tx), member.insuranceInfo ?? ""].filter(Boolean).join(" · ")],
+    ["Insurance policies", policyLines.join("\n")],
   ].filter(([, value]) => value);
   const contacted = reach.filter((project) => project.status);
   return (
@@ -180,19 +184,9 @@ export async function VendorProfile({
             {facts.map(([label, value]) => (
               <div key={label} className="min-w-0">
                 <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mut">{tx(label)}</dt>
-                <dd className="mt-0.5 text-[16px] text-ink [overflow-wrap:anywhere]">{value}</dd>
+                <dd className="mt-0.5 whitespace-pre-line text-[16px] text-ink [overflow-wrap:anywhere]">{value}</dd>
               </div>
             ))}
-            {coiOnFile && viewerCanOpenCoi ? (
-              <div className="min-w-0 sm:col-span-2" data-testid="vendor-coi">
-                <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mut">{tx("Certificate of insurance")}</dt>
-                <dd className="mt-0.5">
-                  <a href={`/api/insurance-certificates/${member.id}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-[16px] font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]" data-testid="vendor-coi-link">
-                    {tx("View insurance certificate")}
-                  </a>
-                </dd>
-              </div>
-            ) : null}
             {member.website ? (
               <div className="min-w-0">
                 <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mut">{tx("Website")}</dt>

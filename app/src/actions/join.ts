@@ -1,5 +1,5 @@
 "use server";
-import { insuranceComplete, insuranceDateKey, INSURANCE_REQUIRED, requiresInsurance } from "@/lib/insurance-compliance";
+import { insuranceComplete, insuranceDateKey, INSURANCE_REQUIRED, POLICY_REQUIRED, requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { readCertificate, readInsurance } from "@/lib/insurance-input";
 import { MEMBER_RISK_VERSION } from "@/lib/member-risk";
 import { MEMBER_NDA_SLUG, memberNdaVersion } from "@/lib/member-nda";
@@ -84,7 +84,7 @@ async function submitJoinApplicationChecked(
   if (errors.length) return { ok: false, error: errors[0] };
   let certificate: Awaited<ReturnType<typeof readCertificate>> | undefined;
   let insuranceProfile;
-  if (requiresInsurance(profile.role)) {
+  if (requiresInsuranceFor(profile)) {
     certificate = await readCertificate(formData);
     if (!certificate.ok) return certificate;
     const { agent, result } = readInsurance(formData);
@@ -92,6 +92,7 @@ async function submitJoinApplicationChecked(
       hasCoi: Boolean(certificate.file), agentEmail: agent.insuranceAgentEmail, agentPhone: agent.insuranceAgentPhone,
     })) return { ok: false, error: INSURANCE_REQUIRED };
     if (!result.ok) return result;
+    if (!result.policies.length) return { ok: false, error: POLICY_REQUIRED };
     insuranceProfile = {
       ...agent,
       policies: result.policies.map(({ expiresOn, ...policy }) => ({ ...policy, expiresKey: insuranceDateKey(expiresOn) })),

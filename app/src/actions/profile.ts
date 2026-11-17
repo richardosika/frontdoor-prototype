@@ -1,6 +1,6 @@
 "use server";
 import { parseTrades, tradeLabel, yesNo } from "@/lib/trades";
-import { insuranceComplete, INSURANCE_REQUIRED, requiresInsurance } from "@/lib/insurance-compliance";
+import { insuranceComplete, insuranceDaysUntil, INSURANCE_REQUIRED, POLICY_REQUIRED, requiresInsuranceFor, unresolvedExpired } from "@/lib/insurance-compliance";
 import { readCertificate, readInsurance } from "@/lib/insurance-input";
 import { US_STATES } from "@/lib/member-network";
 import { coverageFromForm } from "@/lib/insurance";
@@ -66,36 +66,44 @@ export async function saveProfile(formData: FormData) {
     };
     sub.licenses = [sub.licenseState, licenseNumber].filter(Boolean).join(" ");
   }
-  const compliance = requiresInsurance(user.role);
+  // Nov 17 (Richard, decisions 2 and 3): extra categories count too, and an incomplete insurance block warns instead of blocking the save.
+  const compliance = requiresInsuranceFor(user);
   const input = compliance ? readInsurance(formData) : null;
   const certificate = compliance ? await readCertificate(formData) : null;
-  // Reject invalid insurance before writing profile fields, so a failed save cannot silently apply only some edits.
-  const insuranceError = (error: string): never => redirect(`/profile?error=${encodeURIComponent(error)}`);
-  if (input && !input.result.ok) insuranceError(input.result.error);
-  if (certificate && !certificate.ok) insuranceError(certificate.error);
+  const warnings: string[] = [];
+  if (input && !input.result.ok) warnings.push(input.result.error);
+  if (certificate && !certificate.ok) warnings.push(certificate.error);
+  // Invalid policy rows keep the policies already on file rather than wiping them.
+  const policies = input?.result.ok ? input.result.policies : null;
+  const newCertificate = certificate?.ok ? certificate.file : null;
   await prisma.$transaction(async (tx) => {
-    if (input?.result.ok && certificate?.ok) {
-      const existing = certificate.file || await tx.insuranceCertificate.findUnique({
-        where: { userId: user.id }, select: { id: true },
-      });
-      if (!insuranceComplete({
-        hasCoi: Boolean(existing), agentEmail: input.agent.insuranceAgentEmail, agentPhone: input.agent.insuranceAgentPhone,
-      })) insuranceError(INSURANCE_REQUIRED);
-    }
     await tx.user.update({
       where: { id: user.id },
       data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location, ...sub, ...input?.agent },
     });
-    if (input?.result.ok && certificate?.ok) {
-      if (certificate.file) {
-        await tx.insuranceCertificate.upsert({
-          where: { userId: user.id }, update: certificate.file, create: { ...certificate.file, userId: user.id },
-        });
-      }
+    if (newCertificate) {
+      await tx.insuranceCertificate.upsert({
+        where: { userId: user.id }, update: newCertificate, create: { ...newCertificate, userId: user.id },
+      });
+    }
+    if (policies) {
       await tx.insurancePolicy.deleteMany({ where: { userId: user.id } });
-      await tx.insurancePolicy.createMany({ data: input.result.policies.map((policy) => ({ ...policy, userId: user.id })) });
+      await tx.insurancePolicy.createMany({ data: policies.map((policy) => ({ ...policy, userId: user.id })) });
     }
   });
+  if (compliance && input) {
+    const [coi, saved] = await Promise.all([
+      prisma.insuranceCertificate.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      prisma.insurancePolicy.findMany({ where: { userId: user.id }, select: { type: true, expiresOn: true } }),
+    ]);
+    if (!insuranceComplete({ hasCoi: Boolean(coi), agentEmail: input.agent.insuranceAgentEmail, agentPhone: input.agent.insuranceAgentPhone })) warnings.push(INSURANCE_REQUIRED);
+    if (!saved.length) warnings.push(POLICY_REQUIRED);
+    // Decision 4: a current policy for every expired type lifts an insurance suspension right away.
+    const now = new Date();
+    if (user.insuranceSuspendedAt && saved.some((p) => insuranceDaysUntil(p.expiresOn, now) >= 0) && !unresolvedExpired(saved, now, user.insuranceSuspensionLiftedAt).length) {
+      await prisma.user.update({ where: { id: user.id }, data: { insuranceSuspendedAt: null } });
+    }
+  }
   if (picks?.added.length) {
     await notifyAdmins({
       title: "Category review needed",
@@ -127,7 +135,8 @@ export async function saveProfile(formData: FormData) {
   }
   revalidatePath("/profile");
   revalidatePath("/network");
-  redirect(`/profile?notice=${encodeURIComponent(cardUploaded ? "Profile saved. Business card uploaded." : "Profile saved")}`);
+  const warning = warnings[0] ? `&warning=${encodeURIComponent(warnings[0])}` : "";
+  redirect(`/profile?notice=${encodeURIComponent(cardUploaded ? "Profile saved. Business card uploaded." : "Profile saved")}${warning}`);
 }
 
 export async function saveNotificationPrefs(formData: FormData) {

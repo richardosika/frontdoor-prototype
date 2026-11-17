@@ -303,6 +303,10 @@ model User {
   insuranceAgentPhone     String @default("")
   insurancePolicies       InsurancePolicy[]
   insuranceReminders      InsuranceReminder[]
+  // Nov 17 (Richard, decision 4): suspended for an expired policy left un-renewed after four weekly reminders.
+  insuranceSuspendedAt        DateTime?
+  insuranceSuspensionLiftedAt DateTime?
+  insuranceExpiredReminders   InsuranceExpiredReminder[]
   legalAcceptances        LegalAcceptance[]
   applicationDecisions    ApplicationDecision[]  @relation("DecisionActor")
   paymentEvents           PaymentEvent[]
@@ -1439,6 +1443,9 @@ model InsurancePolicy {
   type      String
   otherName String   @default("")
   expiresOn DateTime
+  /// Nov 17 (Richard, decision 5): whole dollars; members see limits, never the COI or agent.
+  limitAmount     Int @default(0)
+  aggregateAmount Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1454,6 +1461,20 @@ model InsuranceReminder {
   sentAt     DateTime @default(now())
 
   @@unique([userId, policyType, expiresKey])
+}
+
+/// Nov 17 (Richard, decision 4): weekly reminders 1 to 4 after a policy expires, one row per policy, date and week.
+model InsuranceExpiredReminder {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyType String
+  expiresKey String
+  week       Int
+  sentAt     DateTime @default(now())
+
+  @@unique([userId, policyType, expiresKey, week])
+  @@index([userId])
 }
 
 model ApplicationInsuranceFile {

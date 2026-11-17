@@ -26,5 +26,6 @@ export function startInsuranceReminderSchedule() {
   }
   timer = setInterval(() => void check(), 60 * 60 * 1000);
   timer.unref();
-  void check();
+  // First check 15 minutes after boot (not at boot), so staff can preview a run from Admin → Insurance after a deploy.
+  setTimeout(() => void check(), 15 * 60 * 1000).unref();
 }

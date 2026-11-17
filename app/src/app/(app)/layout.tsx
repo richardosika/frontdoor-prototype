@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
+import { InsuranceSuspendedNotice } from "@/components/insurance-suspended";
+import { insuranceSuspensionAllows } from "@/lib/insurance-compliance";
 import { Shell } from "@/components/shell";
 import { ActionDonePopup } from "@/components/report-sent";
 import { isDeveloperRole } from "@/lib/member-reach";
@@ -13,6 +16,9 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   await enforceMemberNda(user);
+  // Nov 17 (Richard, decision 4): an insurance suspension holds member pages but keeps Profile, Settings and Alerts open.
+  const suspended = Boolean(user.insuranceSuspendedAt) && !user.isAdmin;
+  const held = suspended && !insuranceSuspensionAllows((await headers()).get("x-pf-path") ?? "");
   if (user.paymentStatus === "PAID" && user.renewalAt && !user.cancelRequestedAt) {
     const { maybeSendFullPriceReminder } = await import("@/lib/payment-record");
     await maybeSendFullPriceReminder(user.id).catch(() => {
@@ -64,7 +70,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       interestWaiting={interestWaiting}
       locale={await currentLocale()}
     >
-      {children}
+      {suspended ? <InsuranceSuspendedNotice held={held} /> : null}
+      {held ? null : children}
       <Suspense fallback={null}>
         <ActionDonePopup />
       </Suspense>

@@ -85,11 +85,9 @@ export function canOpenInsuranceCertificate(
   viewer: { id: string; isAdmin?: boolean | null; status?: string | null; paymentStatus?: string | null; role: string | null | undefined; extraCategories?: string | null },
   owner: { id: string; role: string | null | undefined; extraCategories?: string | null },
 ): boolean {
-  if (viewer.id === owner.id) return true;
-  if (viewer.isAdmin) return true;
-  if (viewer.status !== "ACTIVE") return false;
-  if (!["PAID", "WAIVED", "NOT_REQUIRED"].includes(String(viewer.paymentStatus || ""))) return false;
-  return isGeneralContractor(viewer) && isSubcontractor(owner);
+  // Nov 17 (Richard, decision 5): replaces the Nov 6 GC rule. Only the member and Private Floor staff open a COI;
+  // other members see policy types, limits and whether each is current.
+  return viewer.id === owner.id || Boolean(viewer.isAdmin);
 }
 
 export type SubForMatch = { id?: string; role: string; extraCategories?: string | null; trades: string; markets: string; location: string };

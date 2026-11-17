@@ -77,21 +77,18 @@ describe("Nov 6 subcontractors", () => {
   });
 });
 
-describe("insurance certificate access (Nov 6, Richard Osika)", () => {
+describe("insurance certificate access (Nov 17, Richard Osika: staff only, replaces the Nov 6 GC rule)", () => {
   const sub = { id: "s1", role: "SUBCONTRACTOR", extraCategories: "" };
   const gc = { id: "g1", role: "GENERAL_CONTRACTOR", extraCategories: "", status: "ACTIVE", paymentStatus: "PAID" };
-  it("lets the sub, staff and approved active GCs open it", () => {
+  it("lets only the member and staff open it", () => {
     expect(canOpenInsuranceCertificate({ ...sub }, sub)).toBe(true);
     expect(canOpenInsuranceCertificate({ id: "a1", role: "DEVELOPER", isAdmin: true }, sub)).toBe(true);
-    expect(canOpenInsuranceCertificate(gc, sub)).toBe(true);
-    expect(canOpenInsuranceCertificate({ ...gc, paymentStatus: "WAIVED" }, sub)).toBe(true);
-    expect(canOpenInsuranceCertificate({ ...gc, role: "INSURER", extraCategories: "GENERAL_CONTRACTOR" }, sub)).toBe(true);
   });
-  it("refuses other roles, inactive or unpaid GCs, and non-sub owners", () => {
+  it("refuses every other member, including GCs", () => {
+    expect(canOpenInsuranceCertificate(gc, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate({ ...gc, paymentStatus: "WAIVED" }, sub)).toBe(false);
+    expect(canOpenInsuranceCertificate({ ...gc, role: "INSURER", extraCategories: "GENERAL_CONTRACTOR" }, sub)).toBe(false);
     expect(canOpenInsuranceCertificate({ ...gc, role: "DEVELOPER" }, sub)).toBe(false);
-    expect(canOpenInsuranceCertificate({ ...gc, id: "s2", role: "SUBCONTRACTOR" }, sub)).toBe(false);
-    expect(canOpenInsuranceCertificate({ ...gc, status: "SUSPENDED" }, sub)).toBe(false);
-    expect(canOpenInsuranceCertificate({ ...gc, paymentStatus: "UNPAID" }, sub)).toBe(false);
     expect(canOpenInsuranceCertificate(gc, { id: "x", role: "ARCHITECT_ENGINEER", extraCategories: "" })).toBe(false);
   });
 });

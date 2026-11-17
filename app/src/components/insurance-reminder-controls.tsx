@@ -13,7 +13,18 @@ const resultLabels = {
   claimed: "Already recorded",
   failed: "Delivery failed",
   suppressed: "Email suppressed",
+  suspended: "Account suspended",
+  lifted: "Suspension lifted",
 };
+
+function kindLabel(item: { kind: string; week?: number; suspendKey?: string }, tx: (text: string) => string) {
+  if (item.kind === "expired") {
+    return [tx("Expired: reminder {week} of 4").replace("{week}", String(item.week ?? 1)), tx("Suspension on {date}").replace("{date}", item.suspendKey ?? "")].join(" · ");
+  }
+  if (item.kind === "suspend") return tx("Account suspension");
+  if (item.kind === "lift") return tx("Suspension lifted");
+  return tx("30-day reminder");
+}
 
 export function InsuranceReminderControls() {
   const tx = useTx();
@@ -35,9 +46,9 @@ export function InsuranceReminderControls() {
             {state.reminders.length ? (
               <ul className="divide-y divide-line">
                 {state.reminders.map((item) => (
-                  <li key={JSON.stringify([item.userId, item.type, item.expiresKey])} className="py-2">
+                  <li key={JSON.stringify([item.userId, item.type, item.expiresKey, item.kind, item.week])} className="py-2" data-testid={`insurance-run-${item.kind}`}>
                     <Link href={`/admin/members/${item.userId}`} className="inline-flex min-h-11 items-center underline decoration-brass">{item.name}</Link>
-                    {" · "}{insurancePolicyLabel(item.type, item.otherName, tx)}{" · "}{item.expiresKey}{" · "}{tx(resultLabels[item.result])}
+                    {item.type ? <>{" · "}{insurancePolicyLabel(item.type, item.otherName, tx)}{" · "}{item.expiresKey}</> : null}{" · "}{kindLabel(item, tx)}{" · "}{tx(resultLabels[item.result])}
                   </li>
                 ))}
               </ul>

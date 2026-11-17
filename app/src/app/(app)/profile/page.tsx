@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; warning?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -25,6 +25,14 @@ export default async function ProfilePage({
       {params.error || params.notice ? (
         <div className="px-4 pt-3 md:px-0">
           <Banner error={params.error ? tx(params.error) : undefined} notice={params.notice ? tx(params.notice) : undefined} />
+        </div>
+      ) : null}
+      {params.warning ? (
+        /* Nov 17 (Richard, decision 3): the profile saved, but insurance is incomplete. */
+        <div className="px-4 md:px-0">
+          <p role="alert" data-testid="insurance-warning" className="mb-3 rounded border border-brass bg-brass-soft px-3 py-2 text-sm font-semibold text-forest [overflow-wrap:anywhere]">
+            {tx("Profile saved, but your insurance is not complete:")} {tx(params.warning)}
+          </p>
         </div>
       ) : null}
       <div className="px-4 md:px-0"><InsurancePrompt user={user} /></div>

@@ -19,8 +19,11 @@ export function readInsurance(form: FormData) {
   const types = form.getAll("policyType");
   const dates = form.getAll("policyExpiration");
   const names = form.getAll("policyOtherName");
-  const rows = Array.from({ length: Math.max(types.length, dates.length, names.length) }, (_, i) => ({
+  const limits = form.getAll("policyLimit");
+  const aggregates = form.getAll("policyAggregate");
+  const rows = Array.from({ length: Math.max(types.length, dates.length, names.length, limits.length, aggregates.length) }, (_, i) => ({
     type: String(types[i] ?? ""), expiresKey: String(dates[i] ?? ""), otherName: String(names[i] ?? ""),
+    limit: String(limits[i] ?? ""), aggregate: String(aggregates[i] ?? ""),
   }));
   return {
     agent: {
@@ -40,8 +43,11 @@ export function insuranceFromJoin(profile: unknown) {
   const read = (value: unknown) => typeof value === "string" ? value : "";
   const rows = Array.isArray(data.policies) ? data.policies.map((row) => ({
     type: read(row?.type), expiresKey: read(row?.expiresKey), otherName: read(row?.otherName),
+    limit: typeof row?.limitAmount === "number" ? row.limitAmount : 0,
+    aggregate: typeof row?.aggregateAmount === "number" ? row.aggregateAmount : 0,
   })) : [];
-  const result = validatePolicies(rows);
+  // Applications sent before limits were required (Nov 17 evening) still carry their dated policies over.
+  const result = validatePolicies(rows, { requireLimit: false });
   return {
     agent: {
       insuranceAgentName: read(data.insuranceAgentName),

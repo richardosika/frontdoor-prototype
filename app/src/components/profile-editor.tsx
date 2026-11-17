@@ -1,5 +1,5 @@
 import { InsuranceFields } from "@/components/insurance-fields";
-import { insuranceDateKey, requiresInsurance } from "@/lib/insurance-compliance";
+import { insuranceDateKey, requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { loadMemberInsurance } from "@/lib/insurance-member";
 import { prisma } from "@/lib/prisma";
 import { SubmitButton } from "@/components/submit-button";
@@ -58,7 +58,7 @@ export async function ProfileEditor({
     orderBy: { uploadedAt: "desc" },
   }) : null;
   const cardDate = card ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" }).format(card.uploadedAt) : "";
-  const compliance = member.id && requiresInsurance(member.role ?? "") ? await loadMemberInsurance(member.id) : null;
+  const compliance = member.id && requiresInsuranceFor(member) ? await loadMemberInsurance(member.id) : null;
   const coverage = normalizeCoverage(member.insuranceCoverage);
   const rp = roleProfile(member.role);
   const t = translator(locale);
@@ -224,10 +224,9 @@ export async function ProfileEditor({
           {compliance ? (
             <div className="min-w-0 sm:col-span-2">
               <InsuranceFields
-                subcontractor={member.role === "SUBCONTRACTOR"}
                 certificate={compliance.insuranceCertificate}
                 agent={compliance}
-                policies={compliance.insurancePolicies.map(({ type, otherName, expiresOn }) => ({ type, otherName, expiresKey: insuranceDateKey(expiresOn) }))}
+                policies={compliance.insurancePolicies.map(({ type, otherName, expiresOn, limitAmount, aggregateAmount }) => ({ type, otherName, expiresKey: insuranceDateKey(expiresOn), limit: limitAmount || "", aggregate: aggregateAmount || "" }))}
               >
                 {coverageFields}
               </InsuranceFields>

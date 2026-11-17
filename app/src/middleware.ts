@@ -114,8 +114,14 @@ const withSession = auth(async (req) => {
     return redirectPublic(req, "/feed");
   }
 
-  return withRobots(NextResponse.next());
+  // Nov 17 (insurance suspension): the app layout needs the path to allow Profile while other member pages are held.
+  // Always overwritten here, so a client cannot supply its own value.
+  const headers = new Headers(req.headers);
+  headers.set(PATH_HEADER, path);
+  return withRobots(NextResponse.next({ request: { headers } }));
 }) as unknown as NextMiddleware;
+
+const PATH_HEADER = "x-pf-path";
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const path = req.nextUrl.pathname;

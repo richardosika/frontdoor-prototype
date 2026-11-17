@@ -1,7 +1,7 @@
 "use client";
 
 import { InsuranceFields } from "@/components/insurance-fields";
-import { INSURANCE_REQUIRED, POLICY_COUNT_ERROR, POLICY_ERROR, requiresInsurance } from "@/lib/insurance-compliance";
+import { INSURANCE_REQUIRED, POLICY_COUNT_ERROR, POLICY_ERROR, POLICY_LIMIT_ERROR, POLICY_REQUIRED, requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { createContext, useContext, useState } from "react";
 import { useLocale, useTx } from "@/components/locale-context";
 import { sortByShownLabel } from "@/lib/category-sort";
@@ -99,7 +99,7 @@ function ChipSet({
 }
 
 function applicationErrorField(message: string) {
-  if ([INSURANCE_REQUIRED, POLICY_ERROR, POLICY_COUNT_ERROR, "Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG)."].includes(message)) return "insurance";
+  if ([INSURANCE_REQUIRED, POLICY_ERROR, POLICY_COUNT_ERROR, POLICY_REQUIRED, POLICY_LIMIT_ERROR, "Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG)."].includes(message)) return "insurance";
   return joinErrorField(message);
 }
 
@@ -494,9 +494,9 @@ export function JoinApplication({
             <input className={field} inputMode="url" placeholder="example.com/article" value={profile.press[0]} onChange={(event) => patch({ press: [event.target.value, profile.press[1] || ""] })} />
             <input className={field} inputMode="url" placeholder="example.com/article" value={profile.press[1]} onChange={(event) => patch({ press: [profile.press[0] || "", event.target.value] })} />
           </div>
-          {requiresInsurance(profile.role) ? (
+          {requiresInsuranceFor(profile) ? (
             <div className="mt-6 min-w-0">
-              <InsuranceFields application subcontractor={profile.role === "SUBCONTRACTOR"} />
+              <InsuranceFields application />
               <FieldError name="insurance" />
             </div>
           ) : null}

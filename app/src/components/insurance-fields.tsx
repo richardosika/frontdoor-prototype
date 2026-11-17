@@ -3,11 +3,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocale, useTx } from "@/components/locale-context";
 import { field, labelCls } from "@/components/ui";
+import { MoneyInput } from "@/components/money-input";
 import { INSURANCE_REQUIRED, INSURANCE_TIME_ZONE, MAX_POLICIES, POLICY_TYPES, type PolicyInput } from "@/lib/insurance-compliance";
 
 const control = `${field} min-h-11 min-w-0`;
 const action = "inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-forest underline decoration-brass";
-const blank = { type: "", expiresKey: "", otherName: "" };
+const blank: PolicyInput = { type: "", expiresKey: "", otherName: "", limit: "", aggregate: "" };
 
 function PolicyRow({ policy, remove }: { policy: PolicyInput; remove?: () => void }) {
   const tx = useTx();
@@ -24,6 +25,15 @@ function PolicyRow({ policy, remove }: { policy: PolicyInput; remove?: () => voi
         <span className={labelCls}>{tx("Expiration date")}</span>
         <input name="policyExpiration" type="date" defaultValue={policy.expiresKey} className={control} />
       </label>
+      {/* Nov 17 (Richard, decision 5): limits are what other members see; the COI and agent stay with staff. */}
+      <label className="min-w-0">
+        <span className={labelCls}>{tx("Coverage limit")}</span>
+        <MoneyInput name="policyLimit" defaultValue={policy.limit ? String(policy.limit) : ""} className={control} placeholder="" />
+      </label>
+      <label className="min-w-0">
+        <span className={labelCls}>{tx("Aggregate limit (optional)")}</span>
+        <MoneyInput name="policyAggregate" defaultValue={policy.aggregate ? String(policy.aggregate) : ""} className={control} placeholder="" />
+      </label>
       <label className="hidden min-w-0 group-has-[select:has(option[value=OTHER]:checked)]:block sm:col-span-2">
         <span className={labelCls}>{tx("Coverage name")}</span>
         <input name="policyOtherName" defaultValue={policy.otherName} maxLength={100} className={control} />
@@ -33,10 +43,8 @@ function PolicyRow({ policy, remove }: { policy: PolicyInput; remove?: () => voi
   );
 }
 
-export function InsuranceFields({ application = false, subcontractor = false, certificate, agent, policies = [], children }: {
+export function InsuranceFields({ application = false, certificate, agent, policies = [], children }: {
   application?: boolean;
-  /** Subcontractor COIs are also open to general contractor members (Nov 6 rule); everyone else's stay with the member and staff. */
-  subcontractor?: boolean;
   certificate?: { fileName: string; uploadedAt: Date } | null;
   agent?: { insuranceAgentName: string; insuranceAgentEmail: string; insuranceAgentPhone: string };
   policies?: PolicyInput[];
@@ -65,9 +73,7 @@ export function InsuranceFields({ application = false, subcontractor = false, ce
       <label className="min-w-0">
         <span className={labelCls}>{tx(certificate ? "Replace certificate of insurance" : "Certificate of insurance")}</span>
         <input name="coi" type="file" accept="application/pdf,image/jpeg,image/png" className="block min-h-11 w-full min-w-0 text-sm file:mr-2 file:min-h-11" />
-        <span className="mt-1 block text-sm text-mut">{tx(subcontractor
-          ? "PDF, JPG or PNG up to 10 MB. Only you, Private Floor staff and general contractor members can open it; other members see that it is on file."
-          : "PDF, JPG or PNG up to 10 MB. Only you and Private Floor staff can open it.")}</span>
+        <span className="mt-1 block text-sm text-mut">{tx("PDF, JPG or PNG up to 10 MB. Only you and Private Floor staff can see your certificate and agent details. Other members see only your policy types, limits and whether each is current.")}</span>
       </label>
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <label className="min-w-0 sm:col-span-2">
@@ -84,7 +90,8 @@ export function InsuranceFields({ application = false, subcontractor = false, ce
         </label>
       </div>
       <fieldset className="grid min-w-0 gap-2">
-        <legend className={labelCls}>{tx("Policies (optional)")}</legend>
+        <legend className={labelCls}>{tx("Policies")} *</legend>
+        <p className="text-sm text-mut">{tx("Add at least one policy with its type, coverage limit and expiration date. We remind you 30 days before a policy expires.")}</p>
         {rows.map(({ id, policy }) => (
           <PolicyRow key={id} policy={policy} remove={enhanced ? () => setRows((current) => current.filter((row) => row.id !== id)) : undefined} />
         ))}

@@ -1,5 +1,5 @@
 import { AdminInsuranceCard } from "@/components/admin-insurance-card";
-import { requiresInsurance } from "@/lib/insurance-compliance";
+import { requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -99,7 +99,7 @@ export default async function AdminMemberPage({
             </Link>
           </p>
         </section>
-        {requiresInsurance(member.role) ? <AdminInsuranceCard userId={member.id} /> : null}
+        {requiresInsuranceFor(member) ? <AdminInsuranceCard userId={member.id} /> : null}
         <PaymentPanel
           userId={member.id}
           role={member.role}
