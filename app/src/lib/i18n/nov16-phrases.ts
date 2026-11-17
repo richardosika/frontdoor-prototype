@@ -1,5 +1,11 @@
 /** Nov 16 (Julia's test, steps 21 and 24): circle requests. English keys; Spanish, German and Japanese values. */
 export const NOV16_PHRASES: Record<string, readonly [string, string, string]> = {
+  "My Deal Rooms": ["Mis salas de negocios", "Meine Deal Rooms", "マイディールルーム"],
+  "Owner: {name}": ["Propietario: {name}", "Eigentümer: {name}", "オーナー: {name}"],
+  "You own this room": ["Usted es propietario de esta sala", "Sie sind Eigentümer dieses Raums", "あなたがこのルームのオーナーです"],
+  "Access requested": ["Acceso solicitado", "Zugang angefragt", "アクセスをリクエスト済み"],
+  "1 access request waiting": ["1 solicitud de acceso pendiente", "1 Zugangsanfrage ausstehend", "1件のアクセスリクエストが待機中"],
+  "{n} access requests waiting": ["{n} solicitudes de acceso pendientes", "{n} Zugangsanfragen ausstehend", "{n}件のアクセスリクエストが待機中"],
   "Profile saved. Business card uploaded.": ["Perfil guardado. Tarjeta de presentación cargada.", "Profil gespeichert. Visitenkarte hochgeladen.", "プロフィールを保存し、名刺をアップロードしました。"],
   "On file: {fileName} · uploaded {date}": ["En archivo: {fileName} · cargada el {date}", "Gespeichert: {fileName} · hochgeladen am {date}", "保存済み: {fileName} · アップロード日 {date}"],
   "No business card on file.": ["No hay tarjeta de presentación guardada.", "Keine Visitenkarte gespeichert.", "名刺は保存されていません。"],

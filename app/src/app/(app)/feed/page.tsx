@@ -6,6 +6,8 @@ import { JoinEntryBanner } from "@/components/already-signed-in";
 import { Banner } from "@/components/banner";
 import { GettingStarted } from "@/components/getting-started";
 import { ReviewTracker } from "@/components/review-tracker";
+import { MyDealRooms } from "@/components/my-deal-rooms";
+import { loadMyDealRooms } from "@/lib/my-deal-rooms";
 import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
 import { dismissLedgerProject } from "@/actions/feed";
@@ -68,6 +70,7 @@ export default async function FeedPage({
   // Nov 5: members other than developers see opportunities, connections and the side panels only once every
   // Getting started step before the first outreach is done (outreach needs the opportunities, so it stays open).
   const locked = !developer && checklist.some((item) => item.id !== "reach" && !item.done);
+  const dealRooms = locked ? [] : await loadMyDealRooms(user);
   const myWork = isDeveloperRole(user.role) ? null : await loadMyWork(user, ledgerProjects.newForYou);
   const [unreadCount, pendingRequests] = await Promise.all([
     prisma.message.count({ where: { readAt: null, senderId: { not: user.id }, conversation: { OR: [{ userAId: user.id }, { userBId: user.id }] } } }),
@@ -250,10 +253,13 @@ export default async function FeedPage({
             <p className="mt-2 text-[15px] leading-relaxed text-sand md:text-[16px]">{tx("Opportunities, your circle and who viewed your profile stay hidden until each Getting started step above is done. This keeps every member on Private Floor fully reviewed and complete.")}</p>
           </section>
         ) : (
-          <LedgerProjects data={ledgerProjects} role={user.role} extraCategories={user.extraCategories} filters={filters} myWork={myWork}
-            results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
-            dismissAction={dismissLedgerProject}
-          />
+          <>
+            <LedgerProjects data={ledgerProjects} role={user.role} extraCategories={user.extraCategories} filters={filters} myWork={myWork}
+              results={isDeveloperRole(user.role) ? null : await loadResults(user, ledgerProjects.allSeeking)}
+              dismissAction={dismissLedgerProject}
+            />
+            <MyDealRooms rows={dealRooms} />
+          </>
         )}
         {!isDeveloperRole(user.role) && checklist.every((item) => item.done) ? (
           <p className="mb-4 rounded border border-line bg-paper px-4 py-2 text-[14px] text-mut" data-testid="getting-started-done">✓ {tx("Getting started is complete.")} ({checklist.length} / {checklist.length})
