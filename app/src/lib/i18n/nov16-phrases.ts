@@ -1,5 +1,8 @@
 /** Nov 16 (Julia's test, steps 21 and 24): circle requests. English keys; Spanish, German and Japanese values. */
 export const NOV16_PHRASES: Record<string, readonly [string, string, string]> = {
+  "Profile saved. Business card uploaded.": ["Perfil guardado. Tarjeta de presentación cargada.", "Profil gespeichert. Visitenkarte hochgeladen.", "プロフィールを保存し、名刺をアップロードしました。"],
+  "On file: {fileName} · uploaded {date}": ["En archivo: {fileName} · cargada el {date}", "Gespeichert: {fileName} · hochgeladen am {date}", "保存済み: {fileName} · アップロード日 {date}"],
+  "No business card on file.": ["No hay tarjeta de presentación guardada.", "Keine Visitenkarte gespeichert.", "名刺は保存されていません。"],
   "System": ["Sistema", "System", "システム"],
   "Connection": ["Conexión", "Verbindung", "つながり"],
   "Access": ["Acceso", "Zugang", "アクセス"],

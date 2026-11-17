@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { SubmitButton } from "@/components/submit-button";
 import { saveProfile } from "@/actions/profile";
 import { SubProfileFields } from "@/components/sub-profile-fields";
@@ -48,6 +49,12 @@ export async function ProfileEditor({
   };
 }) {
   const locale = await currentLocale();
+  const card = member.id ? await prisma.businessCard.findFirst({
+    where: { deletedAt: null, OR: [{ userId: member.id }, { application: { userId: member.id } }] },
+    select: { fileName: true, uploadedAt: true },
+    orderBy: { uploadedAt: "desc" },
+  }) : null;
+  const cardDate = card ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" }).format(card.uploadedAt) : "";
   const coverage = normalizeCoverage(member.insuranceCoverage);
   const rp = roleProfile(member.role);
   const t = translator(locale);
@@ -219,7 +226,14 @@ export async function ProfileEditor({
       ) : null}
       <label>
         <span className={labelCls}>{t("profile.card")}</span>
-        <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="text-[15px]" />
+        <input name="card" type="file" accept="image/jpeg,image/png,application/pdf" className="max-w-full text-[15px]" />
+        {card ? (
+          <span className="mt-2 block text-[14px] text-mut [overflow-wrap:anywhere]" data-testid="business-card-on-file">
+            {phrase(locale, "On file: {fileName} · uploaded {date}").replace("{fileName}", card.fileName).replace("{date}", cardDate)}
+          </span>
+        ) : (
+          <span className="mt-2 block text-[14px] text-mut" data-testid="business-card-none">{phrase(locale, "No business card on file.")}</span>
+        )}
       </label>
       <SubmitButton className={btn}>
         {t("profile.save")}

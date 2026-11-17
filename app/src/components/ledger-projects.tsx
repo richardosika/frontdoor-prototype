@@ -349,19 +349,26 @@ export async function LedgerProjects({ data, role, extraCategories, filters, myW
         </div>
       </div>
       {!developer && canSeekOnProject(role) ? (
-        <div className="mt-4 border-t border-line pt-4" data-testid="my-work-own-projects">
+        <div id="ledger-your-projects" className="mt-4 scroll-mt-20 border-t border-line pt-4" data-testid="my-work-own-projects">
           <h3 className={h2}>{tx("Your projects")} <span className="text-mut">({data.myProjects.length})</span></h3>
           {data.myProjects.length === 0 ? <p className="mt-2 text-[15px] text-mut">{tx("No projects listed yet.")}</p> : null}
           <ul className="mt-2">
-            {data.myProjects.map((project) => (
+            {data.myProjects.map((project) => {
+              const pending = data.received.filter((row) => row.project.id === project.id && row.status === "PENDING").length;
+              return (
               <li key={project.id} className="flex min-w-0 flex-wrap items-center gap-2 border-t border-line py-2 first:border-t-0">
                 <span className="min-w-0 flex-1 basis-64">
                   <Link href={`/projects/${project.id}`} className="font-semibold text-forest underline decoration-brass underline-offset-2 [overflow-wrap:anywhere]">{project.name}</Link>
                   <span className="block text-[14px] text-mut [overflow-wrap:anywhere]">{[tx(project.asset), projectLocation(project) || project.location, String(project.year)].filter(Boolean).join(" · ")}</span>
                 </span>
+                {pending ? (
+                  <Link href={`/projects/${project.id}#interest`} className="inline-flex min-h-9 items-center rounded-full border border-[#A2412C] bg-paper px-3 text-[13px] font-semibold text-[#A2412C]" data-testid="project-waiting-chip">
+                    {pending} {tx(pending === 1 ? "interest request waiting" : "interest requests waiting")}
+                  </Link>
+                ) : null}
                 <ReviewChip status={project.reviewStatus} />
               </li>
-            ))}
+            ); })}
           </ul>
           <details id="ledger-add-project" data-testid="ledger-add-project" className="mt-3 scroll-mt-20" open={openAdd || undefined}>
             <summary className={`${btn} w-full cursor-pointer list-none sm:w-auto [&::-webkit-details-marker]:hidden`}>+ {tx("Add a project")}</summary>

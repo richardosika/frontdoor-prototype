@@ -10,6 +10,16 @@ import { moneyDigits } from "@/lib/money";
 const DAY = 24 * 60 * 60 * 1000;
 export const ACCEPTED_IN_TALKS_DAYS = 14;
 
+/** Choose the destination using received rows and the full pending count. */
+export function contactRequestHref(developer: boolean, pendingCount: number, ownProjects: { id: string }[], received: { status: string; project: { id: string } }[]): string {
+  if (developer) return "/projects#interest";
+  const ownIds = new Set(ownProjects.map((project) => project.id));
+  const ownPending = received.filter((row) => row.status === "PENDING" && ownIds.has(row.project.id));
+  const projectIds = new Set(ownPending.map((row) => row.project.id));
+  if (ownPending.length > 0 && ownPending.length === pendingCount && projectIds.size === 1) return `/projects/${ownPending[0].project.id}#interest`;
+  return ownPending.length ? "#ledger-your-projects" : "#ledger-my-work";
+}
+
 export type TalkState = "Sent" | "Received" | "Accepted";
 
 /** Pure: which contacts are "in talks" and with what label, newest first. */

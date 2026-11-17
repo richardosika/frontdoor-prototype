@@ -10,7 +10,7 @@ import { LedgerProjects } from "@/components/ledger-projects";
 import { loadLedgerProjects, loadMyCircle } from "@/lib/ledger-projects";
 import { dismissLedgerProject } from "@/actions/feed";
 import { Avatar } from "@/components/avatar";
-import { loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
+import { contactRequestHref, loadMyWork, loadResults, loadSidePanels } from "@/lib/my-work";
 import { BRAND } from "@/lib/brand";
 import { requireUser } from "@/lib/current-user";
 import { gettingStarted, isDeveloperRole, readSlimFilters } from "@/lib/member-reach";
@@ -77,7 +77,7 @@ export default async function FeedPage({
     ? []
     : [
         // Nov 10 (Julia): new opportunities are no longer counted here; each new project carries its own "New" tag.
-        pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: developer ? "/projects#interest" : "#ledger-my-work" } : null,
+        pendingRequests ? { n: pendingRequests, text: tx(pendingRequests === 1 ? "new contact request" : "new contact requests"), href: contactRequestHref(developer, pendingRequests, mine, ledgerProjects.received) } : null,
         unreadCount ? { n: unreadCount, text: tx(unreadCount === 1 ? "unread message" : "unread messages"), href: "/messages" } : null,
       ].filter((x): x is { n: number; text: string; href: string } => Boolean(x));
   const side = myWork ? await loadSidePanels(user, myWork.active) : null;

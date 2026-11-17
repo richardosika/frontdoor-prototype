@@ -84,6 +84,7 @@ export async function saveProfile(formData: FormData) {
       href: "/admin/categories",
     });
   }
+  let cardUploaded = false;
   const upload = formData.get("card");
   if (upload instanceof File && upload.size > 0) {
     const bytes = new Uint8Array(await upload.arrayBuffer());
@@ -96,16 +97,18 @@ export async function saveProfile(formData: FormData) {
       sizeBytes: bytes.byteLength,
       bytes: Buffer.from(bytes),
       deletedAt: null,
+      uploadedAt: new Date(),
       userId: user.id,
       ...(application?.id ? { applicationId: application.id } : {}),
     };
     const existing = await prisma.businessCard.findUnique({ where: { userId: user.id } });
     if (existing) await prisma.businessCard.update({ where: { id: existing.id }, data });
     else await prisma.businessCard.create({ data });
+    cardUploaded = true;
   }
   revalidatePath("/profile");
   revalidatePath("/network");
-  redirect("/profile?notice=Profile+saved");
+  redirect(`/profile?notice=${encodeURIComponent(cardUploaded ? "Profile saved. Business card uploaded." : "Profile saved")}`);
 }
 
 export async function saveNotificationPrefs(formData: FormData) {
