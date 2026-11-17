@@ -1,5 +1,7 @@
 "use server";
-import { COI_MAX_BYTES, coiType, parseTrades, tradeLabel, yesNo } from "@/lib/trades";
+import { parseTrades, tradeLabel, yesNo } from "@/lib/trades";
+import { insuranceComplete, INSURANCE_REQUIRED, requiresInsurance } from "@/lib/insurance-compliance";
+import { readCertificate, readInsurance } from "@/lib/insurance-input";
 import { US_STATES } from "@/lib/member-network";
 import { coverageFromForm } from "@/lib/insurance";
 
@@ -63,19 +65,36 @@ export async function saveProfile(formData: FormData) {
       bondingCapacity: String(formData.get("bondingCapacity") || "").trim().slice(0, 120),
     };
     sub.licenses = [sub.licenseState, licenseNumber].filter(Boolean).join(" ");
-    const coi = formData.get("coi");
-    if (coi instanceof File && coi.size > 0) {
-      if (coi.size > COI_MAX_BYTES) redirect(`/profile?error=${encodeURIComponent("Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG).")}`);
-      const bytes = new Uint8Array(await coi.arrayBuffer());
-      const contentType = coiType(bytes);
-      if (!contentType) redirect(`/profile?error=${encodeURIComponent("Attach a certificate of insurance up to 10 MB (PDF, JPG or PNG).")}`);
-      const data = { fileName: coi.name.replace(/[^\w .()-]/g, "_").slice(0, 160) || "certificate-of-insurance", contentType, sizeBytes: bytes.byteLength, bytes: Buffer.from(bytes), uploadedAt: new Date() };
-      await prisma.insuranceCertificate.upsert({ where: { userId: user.id }, update: data, create: { ...data, userId: user.id } });
-    }
   }
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location, ...sub },
+  const compliance = requiresInsurance(user.role);
+  const input = compliance ? readInsurance(formData) : null;
+  const certificate = compliance ? await readCertificate(formData) : null;
+  // Reject invalid insurance before writing profile fields, so a failed save cannot silently apply only some edits.
+  const insuranceError = (error: string): never => redirect(`/profile?error=${encodeURIComponent(error)}`);
+  if (input && !input.result.ok) insuranceError(input.result.error);
+  if (certificate && !certificate.ok) insuranceError(certificate.error);
+  await prisma.$transaction(async (tx) => {
+    if (input?.result.ok && certificate?.ok) {
+      const existing = certificate.file || await tx.insuranceCertificate.findUnique({
+        where: { userId: user.id }, select: { id: true },
+      });
+      if (!insuranceComplete({
+        hasCoi: Boolean(existing), agentEmail: input.agent.insuranceAgentEmail, agentPhone: input.agent.insuranceAgentPhone,
+      })) insuranceError(INSURANCE_REQUIRED);
+    }
+    await tx.user.update({
+      where: { id: user.id },
+      data: { bio, website, markets, dealTypes, assetClasses, checkSize, ...(offering === undefined ? {} : { offering }), ...vendor, ...insurance, ...(picks ? { extraCategories: picks.extraCategories, pendingCategories: picks.pendingCategories } : {}), location, ...sub, ...input?.agent },
+    });
+    if (input?.result.ok && certificate?.ok) {
+      if (certificate.file) {
+        await tx.insuranceCertificate.upsert({
+          where: { userId: user.id }, update: certificate.file, create: { ...certificate.file, userId: user.id },
+        });
+      }
+      await tx.insurancePolicy.deleteMany({ where: { userId: user.id } });
+      await tx.insurancePolicy.createMany({ data: input.result.policies.map((policy) => ({ ...policy, userId: user.id })) });
+    }
   });
   if (picks?.added.length) {
     await notifyAdmins({

@@ -298,6 +298,11 @@ model User {
   moderationEvents        ModerationEvent[]
   businessCard            BusinessCard?
   insuranceCertificate    InsuranceCertificate?
+  insuranceAgentName      String @default("")
+  insuranceAgentEmail     String @default("")
+  insuranceAgentPhone     String @default("")
+  insurancePolicies       InsurancePolicy[]
+  insuranceReminders      InsuranceReminder[]
   legalAcceptances        LegalAcceptance[]
   applicationDecisions    ApplicationDecision[]  @relation("DecisionActor")
   paymentEvents           PaymentEvent[]
@@ -396,6 +401,7 @@ model Application {
   testProfile            String                @default("")
   reviewProgress         Json?
   businessCard           BusinessCard?
+  insuranceFile          ApplicationInsuranceFile?
   runs                   VerificationRun[]
   decisions              ApplicationDecision[]
   notices                OutboxNotice[]
@@ -1424,4 +1430,39 @@ model CardExpiryNotice {
 
   @@unique([userId, kind, expKey])
   @@index([userId])
+}
+
+model InsurancePolicy {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  otherName String   @default("")
+  expiresOn DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model InsuranceReminder {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyType String
+  expiresKey String
+  sentAt     DateTime @default(now())
+
+  @@unique([userId, policyType, expiresKey])
+}
+
+model ApplicationInsuranceFile {
+  id            String      @id @default(cuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fileName      String
+  contentType   String
+  sizeBytes     Int
+  bytes         Bytes
+  uploadedAt    DateTime    @default(now())
 }

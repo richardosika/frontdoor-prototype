@@ -119,6 +119,7 @@ const withSession = auth(async (req) => {
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const path = req.nextUrl.pathname;
+  if (path === "/api/cron/insurance-reminders") return withRobots(NextResponse.next());
   const gatePassword = process.env.SITE_GATE_PASSWORD;
   let newGateCookie: string | null = null;
   if (siteGateConfigured(gatePassword) && !siteGateExempt(path)) {

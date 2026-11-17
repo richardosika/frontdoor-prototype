@@ -1,4 +1,6 @@
 "use server";
+import { insuranceComplete, insuranceDateKey, INSURANCE_REQUIRED, requiresInsurance } from "@/lib/insurance-compliance";
+import { readCertificate, readInsurance } from "@/lib/insurance-input";
 import { MEMBER_RISK_VERSION } from "@/lib/member-risk";
 import { MEMBER_NDA_SLUG, memberNdaVersion } from "@/lib/member-nda";
 import { normalizeWebUrl } from "@/lib/web-url";
@@ -80,6 +82,21 @@ async function submitJoinApplicationChecked(
   }
   const errors = [...pageOneErrors(profile), ...pageTwoErrors(profile)];
   if (errors.length) return { ok: false, error: errors[0] };
+  let certificate: Awaited<ReturnType<typeof readCertificate>> | undefined;
+  let insuranceProfile;
+  if (requiresInsurance(profile.role)) {
+    certificate = await readCertificate(formData);
+    if (!certificate.ok) return certificate;
+    const { agent, result } = readInsurance(formData);
+    if (!insuranceComplete({
+      hasCoi: Boolean(certificate.file), agentEmail: agent.insuranceAgentEmail, agentPhone: agent.insuranceAgentPhone,
+    })) return { ok: false, error: INSURANCE_REQUIRED };
+    if (!result.ok) return result;
+    insuranceProfile = {
+      ...agent,
+      policies: result.policies.map(({ expiresOn, ...policy }) => ({ ...policy, expiresKey: insuranceDateKey(expiresOn) })),
+    };
+  }
   const waiting = await checkJoinEmail(profile.email);
   if (!waiting.ok) return { ok: false, error: waiting.detail };
 
@@ -112,7 +129,7 @@ async function submitJoinApplicationChecked(
     .map((link) => `${link.kind}: ${normalizeWebUrl(link.url)}`)
     .join("\n")
     .slice(0, 1000);
-  const stored = { ...profile, password: "" };
+  const stored = { ...profile, password: "", insuranceProfile };
 
   const application = await prisma.$transaction(async (tx) => {
     const created = await tx.application.create({
@@ -141,6 +158,9 @@ async function submitJoinApplicationChecked(
         duesWaived: annualDuesCents(profile.role) === 0,
       },
     });
+    if (certificate?.ok && certificate.file) {
+      await tx.applicationInsuranceFile.create({ data: { applicationId: created.id, ...certificate.file } });
+    }
     if (card) {
       await tx.businessCard.create({
         data: {

@@ -1,4 +1,6 @@
 "use server";
+import { requiresInsurance } from "@/lib/insurance-compliance";
+import { insuranceFromJoin } from "@/lib/insurance-input";
 import { subProfileFromJoin } from "@/lib/trades";
 
 import { categoryForRole, serializeSeeking } from "@/lib/project-contact";
@@ -218,39 +220,73 @@ export async function reviewApplication(formData: FormData) {
   const paying = paymentRequired(application.role);
   const duesCents = annualDuesCents(application.role);
   const paymentToken = paying ? randomBytes(24).toString("hex") : null;
-  const user = await prisma.user.create({
-    data: {
-      email: application.email,
-      passwordHash: application.passwordHash,
-      name: application.name,
-      initials: initialsFromName(application.name),
-      role: application.role as MemberRole,
-      // #42: categories the applicant also covers, from the join form. They wait for staff review.
-      pendingCategories: serializeSeeking(
-        ((extra) => (Array.isArray(extra) ? extra.map(String) : []))((application.joinProfile as { extraCategories?: unknown } | null)?.extraCategories).filter((id) => id !== categoryForRole(application.role)),
-      ),
-      org: application.org,
-      location: application.location,
-      // Nov 6: a subcontractor's trades, states and license from the join form carry onto the profile.
-      ...(application.role === "SUBCONTRACTOR" ? subProfileFromJoin(application.joinProfile) : {}),
-      credentialNote: card && !card.deletedAt ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
-      bio: "",
-      phone: application.phone,
-      linkedinUrl: application.linkedinUrl,
-      tier: "INVITED",
-      status: "ACTIVE",
-      isTest: application.isTest,
-      paymentStatus: paying ? "DUE" : "NOT_REQUIRED",
-      duesCents,
-      paymentToken,
-    },
-  });
-  if (card) {
-    await prisma.businessCard.update({
-      where: { id: card.id },
+  const inScope = requiresInsurance(application.role);
+  const insurance = inScope ? insuranceFromJoin(application.joinProfile) : null;
+  const user = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email: application.email,
+        passwordHash: application.passwordHash,
+        name: application.name,
+        initials: initialsFromName(application.name),
+        role: application.role as MemberRole,
+        // #42: categories the applicant also covers, from the join form. They wait for staff review.
+        pendingCategories: serializeSeeking(
+          ((extra) => (Array.isArray(extra) ? extra.map(String) : []))((application.joinProfile as { extraCategories?: unknown } | null)?.extraCategories).filter((id) => id !== categoryForRole(application.role)),
+        ),
+        org: application.org,
+        location: application.location,
+        // Nov 6: a subcontractor's trades, states and license from the join form carry onto the profile.
+        ...(application.role === "SUBCONTRACTOR" ? subProfileFromJoin(application.joinProfile) : {}),
+        ...insurance?.agent,
+        credentialNote: card && !card.deletedAt ? CARD_UPLOADED_NOTE : CARD_MISSING_NOTE,
+        bio: "",
+        phone: application.phone,
+        linkedinUrl: application.linkedinUrl,
+        tier: "INVITED",
+        status: "ACTIVE",
+        isTest: application.isTest,
+        paymentStatus: paying ? "DUE" : "NOT_REQUIRED",
+        duesCents,
+        paymentToken,
+      },
+    });
+    if (card) {
+      await tx.businessCard.update({
+        where: { id: card.id },
+        data: { userId: user.id },
+      });
+    }
+    if (inScope) {
+      const file = await tx.applicationInsuranceFile.findUnique({
+        where: { applicationId: application.id },
+        select: { fileName: true, contentType: true, sizeBytes: true, bytes: true, uploadedAt: true },
+      });
+      if (file) await tx.insuranceCertificate.create({ data: { ...file, userId: user.id } });
+      if (insurance?.policies.length) {
+        await tx.insurancePolicy.createMany({ data: insurance.policies.map((policy) => ({ ...policy, userId: user.id })) });
+      }
+    }
+    await tx.application.update({
+      where: { id: application.id },
+      data: {
+        status: paying ? "PAYMENT_DUE" : "APPROVED",
+        duesCents,
+        reviewerNote: applicantMessage,
+        internalNote: storedInternalNote(application.internalNote, auditNote),
+        reviewedAt: new Date(),
+        reviewerId: admin.id,
+        userId: user.id,
+      },
+    });
+    await tx.legalAcceptance.updateMany({
+      where: { applicationId: application.id },
       data: { userId: user.id },
     });
-  }
+
+    return user;
+  });
+
   if (!paying) {
     const { alertNewMemberMatches } = await import("@/lib/member-alerts");
     await alertNewMemberMatches(user.id).catch(() => 0);
@@ -266,23 +302,6 @@ export async function reviewApplication(formData: FormData) {
   const { prefillFromApplication } = await import("@/lib/guided-prefill-db");
   await prefillFromApplication(application.id).catch((error) => {
     console.error("guided prefill failed", error instanceof Error ? error.message : "error");
-  });
-
-  await prisma.application.update({
-    where: { id: application.id },
-    data: {
-      status: paying ? "PAYMENT_DUE" : "APPROVED",
-      duesCents,
-      reviewerNote: applicantMessage,
-      internalNote: storedInternalNote(application.internalNote, auditNote),
-      reviewedAt: new Date(),
-      reviewerId: admin.id,
-      userId: user.id,
-    },
-  });
-  await prisma.legalAcceptance.updateMany({
-    where: { applicationId: application.id },
-    data: { userId: user.id },
   });
 
   const person = { name: application.name, role: application.role, org: application.org, location: application.location };

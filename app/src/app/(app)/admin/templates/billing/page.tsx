@@ -1,3 +1,5 @@
+import { INSURANCE_PATH } from "@/lib/insurance-compliance";
+import { insuranceExpiringEmail } from "@/lib/insurance-email";
 import { MobileTitle, PageHeader } from "@/components/page-header";
 import { card } from "@/components/ui";
 import { requireAdmin } from "@/lib/current-user";
@@ -24,6 +26,7 @@ export default async function BillingEmailPreviewsPage() {
         {BILLING_EMAIL_LOCALES.map((locale) => {
           const input = { locale, name: "Alex", expiresOn, link: `${base}/settings#billing` };
           const emails = [
+            insuranceExpiringEmail({ locale, expiresOn, type: "GL", otherName: "", link: `${base}${INSURANCE_PATH}` }),
             cardExpiringEmail("30", input),
             cardExpiringEmail("2", input),
             paymentDeclinedEmail({ locale, name: "Alex", link: `${base}/pay` }),

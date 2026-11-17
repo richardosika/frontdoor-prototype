@@ -1,3 +1,4 @@
+import { InsurancePrompt } from "@/components/insurance-prompt";
 import { Banner } from "@/components/banner";
 import { BidsWon } from "@/components/bids-won";
 import { ReferralRecognition } from "@/components/referral-recognition";
@@ -26,6 +27,7 @@ export default async function ProfilePage({
           <Banner error={params.error ? tx(params.error) : undefined} notice={params.notice ? tx(params.notice) : undefined} />
         </div>
       ) : null}
+      <div className="px-4 md:px-0"><InsurancePrompt user={user} /></div>
       <ProfileView
         member={loaded.member}
         projects={loaded.projects}

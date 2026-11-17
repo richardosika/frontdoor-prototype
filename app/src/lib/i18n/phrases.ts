@@ -11,6 +11,7 @@ import { SUB_PHRASES } from "@/lib/i18n/sub-phrases";
 import { NOV11_PHRASES } from "@/lib/i18n/nov11-phrases";
 import { NOV10_PHRASES } from "@/lib/i18n/nov10-phrases";
 import { NOV16_PHRASES } from "@/lib/i18n/nov16-phrases";
+import { NOV17_PHRASES } from "@/lib/i18n/nov17-phrases";
 
 const P: Record<string, readonly [string, string, string]> = {
   "Request sent": ["Solicitud enviada", "Anfrage gesendet", "リクエスト送信済み"],
@@ -1105,6 +1106,7 @@ for (const [k, v] of Object.entries(NETWORK_PHRASES)) if (!P[k]) P[k] = v;
 for (const [k, v] of Object.entries(NOV10_PHRASES)) P[k] = v;
 for (const [k, v] of Object.entries(NOV11_PHRASES)) P[k] = v;
 for (const [k, v] of Object.entries(NOV16_PHRASES)) if (!P[k]) P[k] = v;
+for (const [k, v] of Object.entries(NOV17_PHRASES)) if (!P[k]) P[k] = v;
 export const PHRASES = P;
 
 const INDEX: Record<Exclude<Locale, "en">, 0 | 1 | 2> = { es: 0, de: 1, ja: 2 };

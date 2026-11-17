@@ -41,4 +41,14 @@ export async function register() {
   ensureWatchlistFresh().catch((error) => {
     console.error("Could not refresh the OFAC cache", error);
   });
+  // Nov 17 (Julia's minutes): daily insurance expiration reminders. INSURANCE_REMINDERS=off turns the timer off.
+  // The NEXT_RUNTIME check sits on this branch too so the edge bundle drops the import (it pulls node:crypto through notices).
+  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.INSURANCE_REMINDERS !== "off") {
+    try {
+      const { startInsuranceReminderSchedule } = await import("@/lib/insurance-reminder-schedule");
+      startInsuranceReminderSchedule();
+    } catch (error) {
+      console.error("Could not start the insurance reminder schedule", error);
+    }
+  }
 }

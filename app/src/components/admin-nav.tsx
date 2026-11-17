@@ -1,10 +1,12 @@
 "use client";
 
+import { useTx } from "@/components/locale-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ADMIN_GROUPS, COMMAND_CENTER, adminLinkActive } from "@/lib/admin-home";
 
 function NavLinks({ pathname }: { pathname: string }) {
+  const tx = useTx();
   const homeOn = adminLinkActive(pathname, COMMAND_CENTER.href);
   return (
     <nav aria-label="Admin">
@@ -32,7 +34,7 @@ function NavLinks({ pathname }: { pathname: string }) {
                       on ? "border-brass bg-cream font-semibold text-forest" : "border-transparent text-ink hover:bg-cream"
                     }`}
                   >
-                    {link.label}
+                    {link.href === "/admin/insurance" ? tx(link.label) : link.label}
                   </Link>
                 </li>
               );

@@ -1,3 +1,6 @@
+import { InsuranceFields } from "@/components/insurance-fields";
+import { insuranceDateKey, requiresInsurance } from "@/lib/insurance-compliance";
+import { loadMemberInsurance } from "@/lib/insurance-member";
 import { prisma } from "@/lib/prisma";
 import { SubmitButton } from "@/components/submit-button";
 import { saveProfile } from "@/actions/profile";
@@ -55,12 +58,55 @@ export async function ProfileEditor({
     orderBy: { uploadedAt: "desc" },
   }) : null;
   const cardDate = card ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" }).format(card.uploadedAt) : "";
+  const compliance = member.id && requiresInsurance(member.role ?? "") ? await loadMemberInsurance(member.id) : null;
   const coverage = normalizeCoverage(member.insuranceCoverage);
   const rp = roleProfile(member.role);
   const t = translator(locale);
   const markets = selected(member.markets);
   const dealTypes = selected(member.dealTypes);
   const assets = selected(member.assetClasses);
+  const coverageFields = (
+    <fieldset className="sm:col-span-2" data-testid="profile-insurance">
+      <legend className={labelCls}>{phrase(locale, compliance ? "Coverage lines" : "Insurance")}</legend>
+      <p className="mb-3 font-sans text-[14px] text-mut">{phrase(locale, "Check each coverage you carry and add the limit. Optional. Shown on your profile to developers.")}</p>
+      <input type="hidden" name="insuranceShown" value="1" />
+      <div className="grid gap-2">
+        {INSURANCE_TYPES.map((t) => {
+          const have = coverage.find((c) => c.type === t.id);
+          return (
+            <div key={t.id} className="group rounded-sm border border-line px-3 py-2 has-[:checked]:border-brass" data-testid={`ins-${t.id}`}>
+              <label className="flex min-h-11 items-center gap-3 font-sans text-[17px] text-forest">
+                <input type="checkbox" name="insCov" value={t.id} defaultChecked={!!have} className={box} data-testid={`ins-check-${t.id}`} />
+                {phrase(locale, t.label)}
+              </label>
+              <div className="hidden gap-3 pb-2 pt-1 group-has-[:checked]:grid sm:grid-cols-2">
+                {"named" in t ? (
+                  <label className="sm:col-span-2">
+                    <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "Coverage name")}</span>
+                    <input name={`insName_${t.id}`} defaultValue={have?.name ?? ""} maxLength={60} className={field} data-testid={`ins-name-${t.id}`} />
+                  </label>
+                ) : null}
+                <label>
+                  <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "limitLabel" in t ? t.limitLabel : "Limit")}</span>
+                  <MoneyInput name={`insLim_${t.id}`} defaultValue={have?.limit ? String(have.limit) : ""} className={field} placeholder="" />
+                </label>
+                {"agg" in t ? (
+                  <label>
+                    <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, t.aggLabel)}</span>
+                    <MoneyInput name={`insAgg_${t.id}`} defaultValue={have?.aggregate ? String(have.aggregate) : ""} className={field} placeholder="" />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <label className="mt-3 block">
+        <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "Insurance notes")}</span>
+        <textarea name="insuranceInfo" defaultValue={member.insuranceInfo ?? ""} rows={2} maxLength={400} className={field} data-testid="ins-notes" />
+      </label>
+    </fieldset>
+  );
   return (
     <form action={saveProfile} className="mt-6 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 rounded border border-line bg-cream p-5 sm:p-7">
       <h2 className="font-serif text-2xl text-forest sm:text-[28px]">{t("profile.edit")}</h2>
@@ -175,46 +221,18 @@ export async function ProfileEditor({
             <textarea name="licenses" defaultValue={member.licenses ?? ""} rows={2} maxLength={400} className={field} placeholder={rp.credentialHint ? phrase(locale, rp.credentialHint) : undefined} />
             {rp.credentialRequired ? <span className="mt-1 block font-sans text-[14px] text-mut">{phrase(locale, "Needed to finish Getting started. Staff check it against public records.")}</span> : null}
           </label>}
-          <fieldset className="sm:col-span-2" data-testid="profile-insurance">
-            <legend className={labelCls}>{phrase(locale, "Insurance")}</legend>
-            <p className="mb-3 font-sans text-[14px] text-mut">{phrase(locale, "Check each coverage you carry and add the limit. Optional. Shown on your profile to developers.")}</p>
-            <input type="hidden" name="insuranceShown" value="1" />
-            <div className="grid gap-2">
-              {INSURANCE_TYPES.map((t) => {
-                const have = coverage.find((c) => c.type === t.id);
-                return (
-                  <div key={t.id} className="group rounded-sm border border-line px-3 py-2 has-[:checked]:border-brass" data-testid={`ins-${t.id}`}>
-                    <label className="flex min-h-11 items-center gap-3 font-sans text-[17px] text-forest">
-                      <input type="checkbox" name="insCov" value={t.id} defaultChecked={!!have} className={box} data-testid={`ins-check-${t.id}`} />
-                      {phrase(locale, t.label)}
-                    </label>
-                    <div className="hidden gap-3 pb-2 pt-1 group-has-[:checked]:grid sm:grid-cols-2">
-                      {"named" in t ? (
-                        <label className="sm:col-span-2">
-                          <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "Coverage name")}</span>
-                          <input name={`insName_${t.id}`} defaultValue={have?.name ?? ""} maxLength={60} className={field} data-testid={`ins-name-${t.id}`} />
-                        </label>
-                      ) : null}
-                      <label>
-                        <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "limitLabel" in t ? t.limitLabel : "Limit")}</span>
-                        <MoneyInput name={`insLim_${t.id}`} defaultValue={have?.limit ? String(have.limit) : ""} className={field} placeholder="" />
-                      </label>
-                      {"agg" in t ? (
-                        <label>
-                          <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, t.aggLabel)}</span>
-                          <MoneyInput name={`insAgg_${t.id}`} defaultValue={have?.aggregate ? String(have.aggregate) : ""} className={field} placeholder="" />
-                        </label>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+          {compliance ? (
+            <div className="min-w-0 sm:col-span-2">
+              <InsuranceFields
+                subcontractor={member.role === "SUBCONTRACTOR"}
+                certificate={compliance.insuranceCertificate}
+                agent={compliance}
+                policies={compliance.insurancePolicies.map(({ type, otherName, expiresOn }) => ({ type, otherName, expiresKey: insuranceDateKey(expiresOn) }))}
+              >
+                {coverageFields}
+              </InsuranceFields>
             </div>
-            <label className="mt-3 block">
-              <span className="mb-1 block font-sans text-[14px] text-mut">{phrase(locale, "Insurance notes")}</span>
-              <textarea name="insuranceInfo" defaultValue={member.insuranceInfo ?? ""} rows={2} maxLength={400} className={field} data-testid="ins-notes" />
-            </label>
-          </fieldset>
+          ) : coverageFields}
           {rp.privateTerms ? (
             <label className="sm:col-span-2" data-testid="profile-private-terms">
               <span className={labelCls}>{phrase(locale, "Rates and terms (private)")}</span>

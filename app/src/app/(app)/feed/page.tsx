@@ -1,3 +1,4 @@
+import { InsurancePrompt } from "@/components/insurance-prompt";
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { requestConnection } from "@/actions/social";
@@ -246,6 +247,7 @@ export default async function FeedPage({
         ) : null}
         {/* #44 expanded: for everyone but developers, Getting started becomes a thin bar at the bottom once complete. */}
         <GettingStarted items={checklist} category={ledgerProjects.myCategories.map((id) => tx(seekLabel(id))).join(" / ")} />
+        <InsurancePrompt user={user} />
         {note}
         {locked ? (
           <section className="mb-6 rounded border border-forest bg-forest p-4 text-paper md:p-5" data-testid="ledger-locked">

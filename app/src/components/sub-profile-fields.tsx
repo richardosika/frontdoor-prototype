@@ -10,19 +10,15 @@ const field =
 const box = "h-5 w-5 shrink-0 accent-[#1F3A2E]";
 
 /**
- * Nov 6 Subcontractors: trades, metros, union / prevailing wage, contractor license, certificate of insurance and
+ * Nov 6 Subcontractors: trades, metros, union / prevailing wage, contractor license and
  * bonding capacity, inside the profile editor form. States served use the profile's state checkboxes (markets).
  */
 export async function SubProfileFields({ userId }: { userId: string }) {
   const locale = await currentLocale();
   const tx = (s: string) => phrase(locale, s);
-  const [u, coi] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { trades: true, metros: true, unionShop: true, prevailingWage: true, licenseNumber: true, licenseState: true, bondingCapacity: true } }),
-    prisma.insuranceCertificate.findUnique({ where: { userId }, select: { fileName: true, uploadedAt: true } }),
-  ]);
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { trades: true, metros: true, unionShop: true, prevailingWage: true, licenseNumber: true, licenseState: true, bondingCapacity: true } });
   if (!u) return null;
   const picked = new Set(parseTrades(u.trades));
-  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/New_York" });
   const YesNo = ({ name, value, label }: { name: string; value: string; label: string }) => (
     <fieldset className="min-w-0">
       <legend className={labelCls}>{tx(label)}</legend>
@@ -75,16 +71,6 @@ export async function SubProfileFields({ userId }: { userId: string }) {
           </select>
         </label>
       </div>
-      <label data-testid="sub-coi">
-        <span className={labelCls}>{tx("Certificate of insurance")} *</span>
-        {coi ? (
-          <span className="mb-2 block font-sans text-[15px] text-forest" data-testid="sub-coi-on-file">
-            ✓ {tx("On file")}: <a href="/api/insurance-certificates/me" target="_blank" rel="noreferrer" className="underline decoration-brass [overflow-wrap:anywhere]">{coi.fileName}</a> · {date.format(coi.uploadedAt)}
-          </span>
-        ) : null}
-        <input name="coi" type="file" accept="application/pdf,image/jpeg,image/png" className="block w-full text-[15px] file:mr-3 file:min-h-11 file:rounded-sm file:border file:border-forest file:bg-paper file:px-4 file:font-semibold file:text-forest" data-testid="sub-coi-input" />
-        <span className="mt-1 block font-sans text-[14px] text-mut">{tx("PDF, JPG or PNG up to 10 MB. Only you, Private Floor staff and general contractor members can open it; other members see that it is on file.")}</span>
-      </label>
       <label>
         <span className={labelCls}>{tx("Bonding capacity (optional)")}</span>
         <input name="bondingCapacity" defaultValue={u.bondingCapacity} maxLength={120} className={field} placeholder={tx("e.g. $2M single, $5M aggregate")} data-testid="sub-bonding" />
