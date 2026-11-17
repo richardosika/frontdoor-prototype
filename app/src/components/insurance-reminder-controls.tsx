@@ -8,7 +8,7 @@ import { btn, btnOutline } from "@/components/ui";
 import { insurancePolicyLabel } from "@/lib/insurance-compliance";
 
 const resultLabels = {
-  due: "Due",
+  due: "Due to send",
   sent: "Sent to Outbox",
   claimed: "Already recorded",
   failed: "Delivery failed",

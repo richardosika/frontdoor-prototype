@@ -102,7 +102,8 @@ export function InsuranceFields({ application = false, subcontractor = false, ce
           </details>
         ))}
       </fieldset>
-      {children}
+      {/* Wrapped so a child's sm:col-span-2 cannot add implicit grid columns to this block. */}
+      {children ? <div className="min-w-0">{children}</div> : null}
     </section>
   );
 }
