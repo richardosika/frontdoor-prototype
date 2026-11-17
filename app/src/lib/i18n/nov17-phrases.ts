@@ -37,6 +37,12 @@ export const NOV17_PHRASES: Record<string, readonly [string, string, string]> = 
   "Insurance agent": ["Agente de seguros", "Versicherungsagent", "保険代理店担当者"],
   "Certificate of insurance": ["Certificado de seguro", "Versicherungsnachweis", "保険証明書"],
   "PDF, JPG or PNG up to 10 MB. Only you and Private Floor staff can open it.": ["PDF, JPG o PNG de hasta 10 MB. Solo usted y el personal de Private Floor pueden abrirlo.", "PDF, JPG oder PNG bis 10 MB. Nur Sie und das Private Floor Team können die Datei öffnen.", "PDF、JPG、PNG（10MBまで）。開けるのはご本人とPrivate Floorのスタッフのみです。"],
+  "Sent to Outbox": ["Enviado a la bandeja de salida", "An den Postausgang gesendet", "送信トレイに送信済み"],
+  "Already recorded": ["Ya registrado", "Bereits erfasst", "記録済み"],
+  "Delivery failed": ["Error de entrega", "Zustellung fehlgeschlagen", "配信に失敗しました"],
+  "Email suppressed": ["Correo suprimido", "E-Mail unterdrückt", "メール送信停止中"],
+  "Complete": ["Completo", "Vollständig", "完了"],
+  "Missing": ["Falta", "Fehlt", "未登録"],
   "Members": ["Miembros", "Mitglieder", "会員"],
   "Coverage lines": ["Coberturas", "Deckungen", "補償内容"],
 };
