@@ -44,7 +44,7 @@ export default async function BidsPage({ searchParams }: { searchParams: Promise
                   <span className="block font-semibold text-forest underline decoration-brass [overflow-wrap:anywhere]">{tx(tradeLabel(r.trade))} · {r.project.name}</span>
                   <span className="block text-[14px] text-mut">{who(r.requester)} · {r.project.location} · {tx("Due")} {date.format(r.dueAt)}</span>
                 </Link>
-                <StatusPill status="NEW" tx={tx} />
+                <StatusPill status={r.opportunityStatus} tx={tx} />
               </li>
             ))}
           </ul>

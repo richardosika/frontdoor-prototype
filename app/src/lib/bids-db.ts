@@ -1,3 +1,4 @@
+import { splitTradeOpportunities } from "@/lib/bid-opportunities";
 import type { BidField } from "@/lib/bid-templates";
 import { isVerifiedGc } from "@/lib/bid-plans";
 import { prisma } from "@/lib/prisma";
@@ -140,11 +141,10 @@ export async function loadBidsHome(userId: string) {
         })
       ).filter((r) => !receivedIds.has(r.id))
     : [];
-  // Nov 6: trade bid packages open to this subcontractor (their trade, their area) that they were not sent directly.
-  const trade = viewer && viewer.status === "ACTIVE" && ["PAID", "WAIVED", "NOT_REQUIRED"].includes(viewer.paymentStatus) && isSubcontractor(viewer)
-    ? (await openPackagesFor(viewer)).filter((r) => !receivedIds.has(r.id))
-    : [];
-  const toDo = received.filter((r) => !r.request.bids.length || r.request.bids[0].status === "DRAFT");
+  const eligibleSub = viewer && viewer.status === "ACTIVE" && ["PAID", "WAIVED", "NOT_REQUIRED"].includes(viewer.paymentStatus) && isSubcontractor(viewer);
+  const { opportunities: trade, toDo } = eligibleSub
+    ? splitTradeOpportunities(received, await openPackagesFor(viewer), new Date())
+    : { opportunities: [], toDo: received.filter((r) => !r.request.bids.length || r.request.bids[0].status === "DRAFT") };
   const sent = received.filter((r) => r.request.bids.length && r.request.bids[0].status !== "DRAFT");
   return { toDo, sent, requested, open, trade };
 }
