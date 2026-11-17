@@ -22,14 +22,15 @@ export function contactRequestHref(developer: boolean, pendingCount: number, own
 
 export type TalkState = "Sent" | "Received" | "Accepted";
 
-/** Pure: which contacts are "in talks" and with what label, newest first. */
+/** Pure: which contacts are "in talks" and with what label. Requests waiting on this member come first (Nov 17, Julia:
+ * the Ledger's "new contact request" link pointed here, but the 8-row cut hid an older waiting request); then newest first. */
 export function inTalks<T extends { status: string; fromId: string; createdAt: Date; decidedAt?: Date | null }>(rows: T[], userId: string, now = new Date()): (T & { state: TalkState })[] {
   const out: (T & { state: TalkState })[] = [];
   for (const row of rows) {
     if (row.status === "PENDING") out.push({ ...row, state: row.fromId === userId ? "Sent" : "Received" });
     else if (row.status === "ACCEPTED" && now.getTime() - (row.decidedAt ?? row.createdAt).getTime() <= ACCEPTED_IN_TALKS_DAYS * DAY) out.push({ ...row, state: "Accepted" });
   }
-  return out.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return out.sort((a, b) => Number(b.state === "Received") - Number(a.state === "Received") || b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function loadMyWork(user: { id: string; role: string; extraCategories?: string | null }, newForYou: number) {

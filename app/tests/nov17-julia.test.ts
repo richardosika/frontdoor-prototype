@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { contactRequestHref } from "@/lib/my-work";
+import { contactRequestHref, inTalks } from "@/lib/my-work";
 import { phrase } from "@/lib/i18n/phrases";
 
 const own = [{ id: "own" }, { id: "second" }];
@@ -46,5 +46,10 @@ describe("Nov 17 Julia fixes", () => {
         expect(phrase(locale, text)).not.toBe(text);
       }
     }
+  });
+  it("keeps a waiting request inside the 8-row In talks cut", () => {
+    const d = (n: number) => new Date(Date.now() - n * 3600_000);
+    const rows = [...Array.from({ length: 9 }, (_, i) => ({ id: `s${i}`, status: "PENDING", fromId: "me", createdAt: d(i + 1) })), { id: "old", status: "PENDING", fromId: "sub", createdAt: d(200) }];
+    expect(inTalks(rows, "me").slice(0, 8)[0]).toMatchObject({ id: "old", state: "Received" });
   });
 });

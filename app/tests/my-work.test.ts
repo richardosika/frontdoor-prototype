@@ -12,7 +12,7 @@ describe("#44 My work right now", () => {
       { id: "e", status: "ACCEPTED", fromId: "me", createdAt: d(40), decidedAt: d(30) },
       { id: "f", status: "DECLINED", fromId: "me", createdAt: d(1) },
     ];
-    expect(inTalks(rows, "me").map((r) => [r.id, r.state])).toEqual([["a", "Sent"], ["b", "Received"], ["c", "Accepted"]]);
+    expect(inTalks(rows, "me").map((r) => [r.id, r.state])).toEqual([["b", "Received"], ["a", "Sent"], ["c", "Accepted"]]);
   });
   it("Getting started past-work step points to profile Past work (non-posting roles)", () => {
     const items = gettingStarted({ role: "LENDER", profileDone: true, ndaAccepted: true, projectCount: 0, seekingSet: false, approvedProject: false, projectPending: false, outreachSent: 0, hasPhoto: false, hasCredential: true } as never);
