@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/current-user";
 import { currentLocale } from "@/lib/i18n/server";
 import { answerMemberQuestion, helpChips } from "@/lib/help/member-store";
 import { isDeveloperRole } from "@/lib/member-reach";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,9 @@ function openSession(request: Request): { sessionKey: string; fresh: boolean } {
 }
 
 export async function GET(request: Request) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("json");
+  if (held) return held;
   if (!sameOrigin(request.headers.get("origin"), request.headers.get("host"))) {
     return NextResponse.json({ error: "Help is unavailable." }, { status: 403 });
   }
@@ -48,6 +52,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("json");
+  if (held) return held;
   if (!sameOrigin(request.headers.get("origin"), request.headers.get("host"))) {
     return NextResponse.json({ error: "Help is unavailable." }, { status: 403 });
   }

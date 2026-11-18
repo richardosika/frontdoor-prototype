@@ -5,6 +5,10 @@ import { moderationDenial } from "@/lib/messaging";
 import { blocksMembership } from "@/lib/payments";
 import { adminSignInAllowed } from "@/lib/sign-in";
 import { verificationDenial } from "@/lib/verification";
+import { enforceInsuranceHold } from "@/lib/insurance-hold";
+
+/** insuranceSubmission: only the Profile insurance save and the Member NDA acceptance pass an insurance suspension. */
+type AccessOptions = { insuranceSubmission?: boolean };
 
 export async function currentUser() {
   const session = await auth();
@@ -12,15 +16,17 @@ export async function currentUser() {
   return prisma.user.findUnique({ where: { id: session.user.id } });
 }
 
-export async function requireAccount() {
+export async function requireAccount(opts: AccessOptions = {}) {
   const user = await currentUser();
   if (!user) redirect("/login");
   if (user.status !== "ACTIVE") redirect("/suspended");
+  // Nov 17 follow-up (Richard): enforced here so every page, layout and server action that loads the member is held.
+  await enforceInsuranceHold(user, opts);
   return user;
 }
 
-export async function requireUser() {
-  const user = await requireAccount();
+export async function requireUser(opts: AccessOptions = {}) {
+  const user = await requireAccount(opts);
   if (!user.isAdmin && blocksMembership(user.paymentStatus)) redirect("/pay");
   return user;
 }

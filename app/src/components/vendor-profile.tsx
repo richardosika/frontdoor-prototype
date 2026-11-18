@@ -89,7 +89,9 @@ export async function VendorProfile({
     select: { role: true, extraCategories: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } },
   });
   const now = new Date();
-  const policyLines = insured && requiresInsuranceFor(insured) ? insured.insurancePolicies.map((policy) => policyLimitLine(policy, now, tx, shortMoney)) : [];
+  const insuranceFact = insured && requiresInsuranceFor(insured)
+    ? ["Insurance policies", insured.insurancePolicies.map((policy) => policyLimitLine(policy, now, tx, shortMoney)).join("\n")]
+    : ["Insurance", [coverageSummary(member.insuranceCoverage ?? [], tx), member.insuranceInfo ?? ""].filter(Boolean).join(" · ")];
   const yn = (v?: string) => (v === "yes" ? tx("Yes") : v === "no" ? tx("No") : "");
   const subFacts = isSub
     ? [
@@ -107,8 +109,7 @@ export async function VendorProfile({
     ["Years in business", member.yearsInBusiness ?? ""],
     [rp.size, member.typicalJobSize || member.checkSize],
     [rp.credential, member.licenses ?? ""],
-    ["Insurance", [coverageSummary(member.insuranceCoverage ?? [], tx), member.insuranceInfo ?? ""].filter(Boolean).join(" · ")],
-    ["Insurance policies", policyLines.join("\n")],
+    insuranceFact,
   ].filter(([, value]) => value);
   const contacted = reach.filter((project) => project.status);
   return (

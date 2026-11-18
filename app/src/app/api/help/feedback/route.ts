@@ -3,10 +3,14 @@ import { sameOrigin } from "@/lib/help/answer";
 import { scopedHelpKey, sessionFromHeader } from "@/lib/help/store";
 import { currentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("json");
+  if (held) return held;
   if (!sameOrigin(request.headers.get("origin"), request.headers.get("host"))) {
     return NextResponse.json({ error: "Help is unavailable." }, { status: 403 });
   }

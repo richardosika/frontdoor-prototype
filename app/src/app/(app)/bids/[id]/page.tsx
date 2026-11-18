@@ -103,7 +103,7 @@ async function loadReq(id: string) {
 async function Compare({ readOnly = false, req, fields, questions, tx, locale, due, head }: { readOnly?: boolean; req: Req; fields: BidField[]; questions: string[]; tx: Tx; locale: string; due: string; head: React.ReactNode }) {
   const rows = await prisma.bid.findMany({
     where: { requestId: req.id, status: { not: "DRAFT" } },
-    include: { bidder: { select: { id: true, name: true, org: true, insuranceCoverage: true, insuranceInfo: true, credentialNote: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } } } },
+    include: { bidder: { select: { id: true, name: true, org: true, role: true, extraCategories: true, insuranceCoverage: true, insuranceInfo: true, credentialNote: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } } } },
   });
   const bids = rows
     .map((b) => {
@@ -222,7 +222,7 @@ async function Compare({ readOnly = false, req, fields, questions, tx, locale, d
 async function BidForm({ req, fields, questions, userId, tx, locale, due, head, view }: { req: Req; fields: BidField[]; questions: string[]; userId: string; tx: Tx; locale: string; due: string; head: React.ReactNode; view: { v?: string; edit: boolean; thanks: boolean } }) {
   const [bid, me] = await Promise.all([
     prisma.bid.findUnique({ where: { requestId_bidderId: { requestId: req.id, bidderId: userId } }, select: { id: true, status: true, values: true, answers: true, pdfName: true, pdfSize: true, submittedAt: true, revisions: { select: { version: true, values: true, submittedAt: true } } } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { insuranceCoverage: true, insuranceInfo: true, credentialNote: true, trades: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true, extraCategories: true, insuranceCoverage: true, insuranceInfo: true, credentialNote: true, trades: true, insurancePolicies: { orderBy: { expiresOn: "asc" }, select: { type: true, otherName: true, expiresOn: true, limitAmount: true, aggregateAmount: true } } } }),
   ]);
   // Nov 10: every submitted version; the original shows by default and the sub can switch between them.
   const versions = bid ? versionsOf(bid, bid.revisions) : [];

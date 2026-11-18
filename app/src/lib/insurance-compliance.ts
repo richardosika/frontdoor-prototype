@@ -172,7 +172,13 @@ export function policyLimitLine(
 }
 
 /** Pages a member suspended for insurance can still open. */
-export const SUSPENSION_ALLOWED_PATHS = ["/profile", "/settings", "/alerts"];
+/**
+ * Nov 17 follow-up (Richard): while insurance-suspended, the insurance submission on Profile is the only thing open.
+ * /member-nda stays reachable only because the NDA gate runs before every member page (otherwise a redirect loop).
+ */
+export const SUSPENSION_ALLOWED_PATHS = ["/profile", "/member-nda"];
+export const INSURANCE_HELD_PATH = "/profile?held=1#insurance-compliance";
+export const INSURANCE_HELD_MESSAGE = "This is unavailable while your account is suspended. The only thing you can do now is update your insurance on your Profile.";
 export function insuranceSuspensionAllows(path: string) {
   return SUSPENSION_ALLOWED_PATHS.some((allowed) => path === allowed || path.startsWith(`${allowed}/`));
 }

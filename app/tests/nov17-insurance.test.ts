@@ -256,10 +256,11 @@ describe("Nov 17 decisions: extra categories, status, limits", () => {
     expect(policyLimitLine({ type: "AUTO", otherName: "", expiresOn: insuranceNoon("2026-11-01")!, limitAmount: 500_000, aggregateAmount: 0 }, NOW, (s) => s, String)).toBe("Commercial auto · 500000 · Expired");
   });
 
-  it("keeps Profile, Settings and Alerts open during a suspension", () => {
+  it("keeps only Profile (and the NDA gate) open during a suspension", () => {
     expect(insuranceSuspensionAllows("/profile")).toBe(true);
-    expect(insuranceSuspensionAllows("/settings")).toBe(true);
-    expect(insuranceSuspensionAllows("/alerts")).toBe(true);
+    expect(insuranceSuspensionAllows("/member-nda")).toBe(true);
+    expect(insuranceSuspensionAllows("/settings")).toBe(false);
+    expect(insuranceSuspensionAllows("/alerts")).toBe(false);
     expect(insuranceSuspensionAllows("/feed")).toBe(false);
     expect(insuranceSuspensionAllows("/profiles-evil")).toBe(false);
   });

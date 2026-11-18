@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   await enforceMemberNda(user);
-  // Nov 17 (Richard, decision 4): an insurance suspension holds member pages but keeps Profile, Settings and Alerts open.
+  // Nov 17 (Richard): requireUser above already redirects a held member's other pages to Profile; this is a second guard.
   const suspended = Boolean(user.insuranceSuspendedAt) && !user.isAdmin;
   const held = suspended && !insuranceSuspensionAllows((await headers()).get("x-pf-path") ?? "");
   if (user.paymentStatus === "PAID" && user.renewalAt && !user.cancelRequestedAt) {

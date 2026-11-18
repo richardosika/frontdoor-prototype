@@ -67,7 +67,7 @@ export async function ProfileEditor({
   const assets = selected(member.assetClasses);
   const coverageFields = (
     <fieldset className="sm:col-span-2" data-testid="profile-insurance">
-      <legend className={labelCls}>{phrase(locale, compliance ? "Coverage lines" : "Insurance")}</legend>
+      <legend className={labelCls}>{phrase(locale, "Insurance")}</legend>
       <p className="mb-3 font-sans text-[14px] text-mut">{phrase(locale, "Check each coverage you carry and add the limit. Optional. Shown on your profile to developers.")}</p>
       <input type="hidden" name="insuranceShown" value="1" />
       <div className="grid gap-2">
@@ -227,9 +227,7 @@ export async function ProfileEditor({
                 certificate={compliance.insuranceCertificate}
                 agent={compliance}
                 policies={compliance.insurancePolicies.map(({ type, otherName, expiresOn, limitAmount, aggregateAmount }) => ({ type, otherName, expiresKey: insuranceDateKey(expiresOn), limit: limitAmount || "", aggregate: aggregateAmount || "" }))}
-              >
-                {coverageFields}
-              </InsuranceFields>
+              />
             </div>
           ) : coverageFields}
           {rp.privateTerms ? (

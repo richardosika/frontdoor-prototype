@@ -28,7 +28,9 @@ import { notify, notifyAdmins } from "@/lib/notify";
 import { appBaseUrl } from "@/lib/url";
 
 export async function saveProfile(formData: FormData) {
-  const user = await requireUser();
+  // Nov 17 follow-up (Richard): an insurance-suspended member may still save, but only the insurance part is used.
+  const user = await requireUser({ insuranceSubmission: true });
+  if (user.insuranceSuspendedAt && !user.isAdmin) return saveSuspendedInsurance(user, formData);
   const bio = String(formData.get("bio") || "").trim().slice(0, 1200);
   const website = normalizeWebUrl(String(formData.get("website") || "")).slice(0, 200);
   const markets = formData.getAll("markets").map((value) => String(value)).filter(Boolean).join(", ");
@@ -137,6 +139,40 @@ export async function saveProfile(formData: FormData) {
   revalidatePath("/network");
   const warning = warnings[0] ? `&warning=${encodeURIComponent(warnings[0])}` : "";
   redirect(`/profile?notice=${encodeURIComponent(cardUploaded ? "Profile saved. Business card uploaded." : "Profile saved")}${warning}`);
+}
+
+/** The only write an insurance-suspended member can make: certificate, agent and policies. Nothing else on the form is read. */
+async function saveSuspendedInsurance(user: Awaited<ReturnType<typeof requireUser>>, formData: FormData): Promise<never> {
+  const input = readInsurance(formData);
+  const certificate = await readCertificate(formData);
+  const warnings: string[] = [];
+  if (!input.result.ok) warnings.push(input.result.error);
+  if (!certificate.ok) warnings.push(certificate.error);
+  const policies = input.result.ok ? input.result.policies : null;
+  const newCertificate = certificate.ok ? certificate.file : null;
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { ...input.agent } });
+    if (newCertificate) {
+      await tx.insuranceCertificate.upsert({ where: { userId: user.id }, update: newCertificate, create: { ...newCertificate, userId: user.id } });
+    }
+    if (policies) {
+      await tx.insurancePolicy.deleteMany({ where: { userId: user.id } });
+      await tx.insurancePolicy.createMany({ data: policies.map((policy) => ({ ...policy, userId: user.id })) });
+    }
+  });
+  const [coi, saved] = await Promise.all([
+    prisma.insuranceCertificate.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    prisma.insurancePolicy.findMany({ where: { userId: user.id }, select: { type: true, expiresOn: true } }),
+  ]);
+  if (!insuranceComplete({ hasCoi: Boolean(coi), agentEmail: input.agent.insuranceAgentEmail, agentPhone: input.agent.insuranceAgentPhone })) warnings.push(INSURANCE_REQUIRED);
+  if (!saved.length) warnings.push(POLICY_REQUIRED);
+  const now = new Date();
+  const lifted = saved.some((p) => insuranceDaysUntil(p.expiresOn, now) >= 0) && !unresolvedExpired(saved, now, user.insuranceSuspensionLiftedAt).length;
+  if (lifted) await prisma.user.update({ where: { id: user.id }, data: { insuranceSuspendedAt: null } });
+  revalidatePath("/profile");
+  const notice = lifted ? "Insurance saved. Your account is active again." : "Insurance saved";
+  const warning = warnings[0] ? `&warning=${encodeURIComponent(warnings[0])}` : "";
+  redirect(`/profile?notice=${encodeURIComponent(notice)}${warning}`);
 }
 
 export async function saveNotificationPrefs(formData: FormData) {

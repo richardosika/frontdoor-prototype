@@ -7,11 +7,15 @@ import { sendNotice } from "@/lib/notices";
 import { prisma } from "@/lib/prisma";
 import { BRAND } from "@/lib/brand";
 import { roleLabel } from "@/lib/roles";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
 /** #49: hand a Help question to staff: an admin alert plus an email (delivery goes to the test recipient only). */
 export async function POST(request: Request) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("json");
+  if (held) return held;
   if (!sameOrigin(request.headers.get("origin"), request.headers.get("host"))) return NextResponse.json({ error: "Help is unavailable." }, { status: 403 });
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });

@@ -61,7 +61,6 @@ export const NOV17_PHRASES: Record<string, readonly [string, string, string]> = 
   "Account suspended": ["Cuenta suspendida", "Konto gesperrt", "アカウント利用停止中"],
   "Suspended for an expired policy on {date}. The member can sign in and update insurance on Profile; a current policy lifts it automatically.": ["Suspendida por una póliza vencida el {date}. El miembro puede iniciar sesión y actualizar su seguro en el Perfil; una póliza vigente la levanta automáticamente.", "Am {date} wegen einer abgelaufenen Police gesperrt. Das Mitglied kann sich anmelden und die Versicherung im Profil aktualisieren; eine gültige Police hebt die Sperrung automatisch auf.", "{date}に期限切れの保険により利用停止。会員はログインしてプロフィールで保険を更新できます。有効な保険を追加すると自動で解除されます。"],
   "Lift insurance suspension": ["Levantar la suspensión por seguro", "Versicherungssperre aufheben", "保険による利用停止を解除"],
-  "This page is unavailable until your insurance is updated.": ["Esta página no está disponible hasta que actualice su seguro.", "Diese Seite ist erst nach Aktualisierung Ihrer Versicherung verfügbar.", "保険を更新するまで、このページはご利用いただけません。"],
   "Update insurance on your Profile": ["Actualice su seguro en su Perfil", "Versicherung im Profil aktualisieren", "プロフィールで保険を更新"],
   "Profile saved, but your insurance is not complete:": ["Perfil guardado, pero su seguro no está completo:", "Profil gespeichert, aber Ihre Versicherung ist nicht vollständig:", "プロフィールを保存しましたが、保険情報が不足しています："],
   "Current": ["Vigente", "Gültig", "有効"],
@@ -78,5 +77,9 @@ export const NOV17_PHRASES: Record<string, readonly [string, string, string]> = 
   "If the policy is not updated, your account will be suspended on {suspendOn}.": ["Si la póliza no se actualiza, su cuenta se suspenderá el {suspendOn}.", "Wird die Police nicht aktualisiert, wird Ihr Konto am {suspendOn} gesperrt.", "保険が更新されない場合、{suspendOn}にアカウントの利用を停止します。"],
   "Insurance policies": ["Pólizas de seguro", "Versicherungspolicen", "保険契約"],
   "Members": ["Miembros", "Mitglieder", "会員"],
-  "Coverage lines": ["Coberturas", "Deckungen", "補償内容"],
+  // Nov 17 follow-up (Richard): only the insurance submission is open while suspended.
+  "This is unavailable while your account is suspended. The only thing you can do now is update your insurance on your Profile.": ["Esto no está disponible mientras su cuenta esté suspendida. Lo único que puede hacer ahora es actualizar su seguro en su Perfil.", "Dies ist nicht verfügbar, solange Ihr Konto gesperrt ist. Sie können jetzt nur Ihre Versicherung im Profil aktualisieren.", "アカウントの利用停止中はご利用いただけません。現在できるのは、プロフィールで保険を更新することだけです。"],
+  "Save insurance": ["Guardar seguro", "Versicherung speichern", "保険を保存"],
+  "Insurance saved": ["Seguro guardado", "Versicherung gespeichert", "保険を保存しました"],
+  "Insurance saved. Your account is active again.": ["Seguro guardado. Su cuenta vuelve a estar activa.", "Versicherung gespeichert. Ihr Konto ist wieder aktiv.", "保険を保存しました。アカウントは再び有効になりました。"],
 };

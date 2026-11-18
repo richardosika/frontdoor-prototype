@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checklistRoom } from "@/lib/deal-checklist-db";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,9 @@ const notFound = () => new Response("Not found", { status: 404, headers: { "cont
 
 /** A checklist file, for the deal room's sponsor, approved members, and staff only. */
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("html");
+  if (held) return held;
   const session = await auth();
   if (!session?.user?.id) return notFound();
   const viewer = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, isAdmin: true, status: true } });

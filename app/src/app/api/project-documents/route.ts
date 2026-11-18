@@ -3,11 +3,15 @@ import { currentUser } from "@/lib/current-user";
 import { blocksMembership } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
 import { DOC_ERROR, announceDocumentChange, readUpload } from "@/lib/project-upload";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
 /** #34: one labeled file per request so the uploader can show per-file progress and errors. Owner only. */
 export async function POST(request: Request) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("json");
+  if (held) return held;
   const user = await currentUser();
   if (!user || user.status !== "ACTIVE" || (!user.isAdmin && blocksMembership(user.paymentStatus))) return Response.json({ error: "Sign in again." }, { status: 401 });
   let form: FormData;

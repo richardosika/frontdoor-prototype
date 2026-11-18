@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { canOpenRequest } from "@/lib/bid-plans";
 import { prisma } from "@/lib/prisma";
+import { insuranceHoldResponse } from "@/lib/insurance-hold";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,9 @@ const notFound = () => new Response("Not found", { status: 404, headers: { "cont
 
 /** Plans on a bid request: the requester, picked members, any verified GC on an open request, and staff. */
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  // Nov 17 follow-up (Richard): an insurance-suspended member can only update insurance.
+  const held = await insuranceHoldResponse("html");
+  if (held) return held;
   const session = await auth();
   if (!session?.user?.id) return notFound();
   const viewer = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, role: true, status: true, paymentStatus: true, isAdmin: true, extraCategories: true, trades: true, markets: true, location: true } });

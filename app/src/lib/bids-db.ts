@@ -7,7 +7,7 @@ import { openPackagesFor } from "@/lib/trades-db";
 import { circleIds, projectAudience } from "@/lib/project-contact-db";
 import { allowedRecipients, canRequestBids, parseJson } from "@/lib/bids";
 import { coverageSummary, normalizeCoverage, shortMoney } from "@/lib/insurance";
-import { policyLimitLine } from "@/lib/insurance-compliance";
+import { policyLimitLine, requiresInsuranceFor } from "@/lib/insurance-compliance";
 import { ALL_TEMPLATE_SEEDS } from "@/lib/bid-templates";
 import { sendEmail } from "@/lib/email";
 import { isLocale } from "@/lib/i18n/messages";
@@ -28,14 +28,16 @@ export async function bidAccess(projectId: string, viewerId: string) {
 
 /** Insurance and license, auto-filled from the bidder's verified profile. */
 export function profileFacts(
-  user: { insuranceCoverage: unknown; insuranceInfo: string; credentialNote: string; insurancePolicies?: { type: string; otherName: string; expiresOn: Date; limitAmount: number; aggregateAmount: number }[] },
+  user: { role?: string | null; extraCategories?: string | readonly string[] | null; insuranceCoverage: unknown; insuranceInfo: string; credentialNote: string; insurancePolicies?: { type: string; otherName: string; expiresOn: Date; limitAmount: number; aggregateAmount: number }[] },
   tx: (s: string) => string = (s) => s,
 ) {
   // Nov 17 (Richard, decision 5): dated policies with limits come first; the COI and agent are never shown to members.
   const now = new Date();
   const policies = (user.insurancePolicies ?? []).map((policy) => policyLimitLine(policy, now, tx, shortMoney)).join("; ");
-  const cov = coverageSummary(normalizeCoverage(user.insuranceCoverage), tx);
-  return { insurance: policies || cov || user.insuranceInfo || "", license: user.credentialNote || "" };
+  const insurance = requiresInsuranceFor(user)
+    ? policies
+    : policies || coverageSummary(normalizeCoverage(user.insuranceCoverage), tx) || user.insuranceInfo || "";
+  return { insurance, license: user.credentialNote || "" };
 }
 
 export async function approvedTemplates() {

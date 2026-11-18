@@ -9,7 +9,8 @@ import { prisma } from "@/lib/prisma";
 
 /** Records the member's acceptance of the current Member NDA: timestamp and version, on the account and in the legal record. */
 export async function acceptMemberNda(formData: FormData) {
-  const user = await requireUser();
+  // The NDA gate runs before Profile, so an insurance-suspended member must be able to accept it to reach the insurance form.
+  const user = await requireUser({ insuranceSubmission: true });
   const next = safeNext(formData.get("next"));
   if (formData.get("agree") !== "on") redirect(`/member-nda?error=1&next=${encodeURIComponent(next)}`);
   const version = memberNdaVersion();
