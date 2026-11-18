@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "groundTruthNote": "QA 27 Oct 2026. Person titles are public-page assumptions and are not confirmed by Richard. The fake combines a gibberish company name, street number 0, and an unregistered domain. Emails are Gmail so the email domain is not evidence.",
+    "defaults": {
+      "role": "DEVELOPER",
+      "phone": "",
+      "socialLinks": "",
+      "statement": "I invest in and operate commercial real estate and would like to meet other owners and operators.",
+      "inviteNote": "PF-BENCH-0000 · Benchmark invite code",
+      "linkedinUrl": "",
+      "location": "New York, NY",
+      "watchlist": "full"
+    }
+  },
+  "cases": [
+    {
+      "id": "QAJLL",
+      "kind": "real",
+      "label": "Jones Lang LaSalle / Christian Ulbrich",
+      "personAssumption": "Christian Ulbrich - jll.com leadership pages name him as Chief Executive Officer; title unconfirmed by Richard",
+      "name": "Christian Ulbrich",
+      "email": "pf.bench.qajll@gmail.com",
+      "org": "Jones Lang LaSalle",
+      "website": "https://www.jll.com",
+      "linkedinUrl": "https://www.linkedin.com/company/jll/",
+      "location": "Chicago, IL",
+      "role": "BROKER"
+    },
+    {
+      "id": "QATURN",
+      "kind": "real",
+      "label": "Turner Construction / Peter Davoren",
+      "personAssumption": "Peter Davoren - turnerconstruction.com leadership names him as Chairman and CEO; title unconfirmed by Richard",
+      "name": "Peter Davoren",
+      "email": "pf.bench.qaturn@gmail.com",
+      "org": "Turner Construction",
+      "website": "https://www.turnerconstruction.com",
+      "linkedinUrl": "https://www.linkedin.com/company/turner-construction-company/",
+      "location": "New York, NY",
+      "role": "GENERAL_CONTRACTOR"
+    },
+    {
+      "id": "QASKA",
+      "kind": "real",
+      "label": "Skanska USA / Richard Kennedy (usa.skanska.com redirect)",
+      "personAssumption": "Richard Kennedy - skanska.com/us/en leadership; the application site is the usa.skanska.com host that redirects; title unconfirmed by Richard",
+      "name": "Richard Kennedy",
+      "email": "pf.bench.qaska@gmail.com",
+      "org": "Skanska USA",
+      "website": "https://www.usa.skanska.com",
+      "linkedinUrl": "https://www.linkedin.com/company/skanska/",
+      "location": "New York, NY",
+      "role": "GENERAL_CONTRACTOR"
+    },
+    {
+      "id": "QAMM",
+      "kind": "real",
+      "label": "Marcus & Millichap / Hessam Nadji",
+      "personAssumption": "Hessam Nadji - marcusmillichap.com names him as President and Chief Executive Officer; title unconfirmed by Richard",
+      "name": "Hessam Nadji",
+      "email": "pf.bench.qamm@gmail.com",
+      "org": "Marcus & Millichap",
+      "website": "https://www.marcusmillichap.com",
+      "linkedinUrl": "https://www.linkedin.com/company/marcus-&-millichap/",
+      "location": "Calabasas, CA",
+      "role": "BROKER"
+    },
+    {
+      "id": "QAF01",
+      "kind": "fake",
+      "label": "Gibberish company, 0 Nowhere Lane, unregistered domain",
+      "personAssumption": "Invented. The company name is gibberish, the street number is 0, and the domain is not registered.",
+      "name": "Nix Qwvzn",
+      "email": "pf.bench.qaf01@gmail.com",
+      "org": "Blorptex Qwvzn Builders LLC",
+      "website": "https://qwvzn-blorptex-holdings-1789.com",
+      "linkedinUrl": "",
+      "location": "0 Nowhere Lane, NY 10001",
+      "role": "DEVELOPER"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+ "_meta": {
+  "title": "Private Floor Club verification benchmark - batch 6 cases",
+  "groundTruthNote": "GROUND TRUTH TO BE CONFIRMED BY RICHARD. Batch 6 (2026-10-26). Pairings checked current via free web search 2026-10-26 (linkSource). B6R01 tests EDGAR on a large public REIT (SL Green CIK 1040971). B6R02 is a family-owned private developer (no EDGAR). B6R03 is a capital advisor. B6R04 tests law-firm bio crawl (H3) AND a firm rename: Kramer Levin became Herbert Smith Freehills Kramer (HSF Kramer) in June 2025; kramerlevin.com redirects to hsfkramer.com, which answers HTTP 403 to non-browser clients; bio lives at hsfkramer.com/our-people/j/jay-a-neveloff. LinkedIn slugs confirmed by HTTP 200 + page title on 2026-10-26. B6F01 is invented (domain does not resolve; LinkedIn profile does not exist).",
+  "defaults": {
+   "role": "DEVELOPER",
+   "phone": "",
+   "socialLinks": "",
+   "statement": "I invest in and operate commercial and residential real estate and would like to meet other owners and operators.",
+   "inviteNote": "PF-BENCH-0000 \u00b7 Benchmark invite code",
+   "linkedinUrl": "",
+   "website": "",
+   "location": "New York, NY",
+   "watchlist": "full"
+  },
+  "emailPolicy": "Every case uses a Gmail address (except F02 which is a disposable mailinator address on purpose) so the email domain carries no signal. Nothing is ever sent to these addresses."
+ },
+ "cases": [
+  {
+   "id": "B6R01",
+   "kind": "real",
+   "label": "SL Green Realty Corp / Marc Holliday",
+   "segment": "NYC public office REIT / developer (EDGAR: SL Green Realty Corp CIK 1040971)",
+   "name": "Marc Holliday",
+   "email": "marc.holliday.b6@gmail.com",
+   "org": "SL Green Realty Corp",
+   "website": "https://slgreen.com",
+   "linkedinUrl": "https://www.linkedin.com/company/sl-green/",
+   "location": "New York, NY",
+   "role": "DEVELOPER",
+   "statement": "I chair and run a Manhattan office REIT that owns, develops and finances commercial real estate and would like to meet owners and capital partners.",
+   "linkStatus": "verified",
+   "linkSource": "slgreen.com/about/executive-management/marc-holliday (Chairman & CEO); SEC DEF 14A 2026-04-22 (CEO since 2004; ceased Interim President 2026-02-27 when Harrison Sitomer named President)",
+   "personAssumption": "Marc Holliday - slgreen.com/about/executive-management/marc-holliday (Chairman & CEO); SEC DEF 14A 2026-04-22 (CEO since 2004; ceased Interim President 2026-02-27 when Harrison Sitomer named President); title unconfirmed by Richard"
+  },
+  {
+   "id": "B6R02",
+   "kind": "real",
+   "label": "LeFrak Organization / Richard LeFrak",
+   "segment": "NYC family-owned private developer / owner",
+   "name": "Richard LeFrak",
+   "email": "richard.lefrak.b6@gmail.com",
+   "org": "LeFrak Organization",
+   "website": "https://www.lefrak.com",
+   "linkedinUrl": "https://www.linkedin.com/company/lefrak-organization/",
+   "location": "New York, NY",
+   "role": "DEVELOPER",
+   "statement": "I lead a fourth-generation family real estate company that builds and owns residential and commercial property in New York, New Jersey and Florida.",
+   "linkStatus": "verified",
+   "linkSource": "CNBC 2026-07-15 and 2026-09-29 (LeFrak Organization CEO); lefrak.com/news-and-press (Chairman and CEO); TRD 2025-02-27 says firm calls him executive chairman",
+   "personAssumption": "Richard LeFrak - CNBC 2026-07-15 and 2026-09-29 (LeFrak Organization CEO); lefrak.com/news-and-press (Chairman and CEO); TRD 2025-02-27 says firm calls him executive chairman; title unconfirmed by Richard"
+  },
+  {
+   "id": "B6R03",
+   "kind": "real",
+   "label": "Ackman-Ziff Real Estate Group / Simon Ziff",
+   "segment": "NYC real estate capital advisor / debt and equity broker",
+   "name": "Simon Ziff",
+   "email": "simon.ziff.b6@gmail.com",
+   "org": "Ackman-Ziff Real Estate Group",
+   "website": "https://www.ackmanziff.com",
+   "linkedinUrl": "https://www.linkedin.com/company/ackman-ziff/",
+   "location": "New York, NY",
+   "role": "BROKER",
+   "statement": "I run a New York real estate capital advisory firm arranging debt, mezzanine and JV equity and want to meet owners and developers.",
+   "linkStatus": "verified",
+   "linkSource": "ackmanziff.com/company (President since 1995); The Real Deal 2026-01-08; Commercial Observer 2026-04-30",
+   "personAssumption": "Simon Ziff - ackmanziff.com/company (President since 1995); The Real Deal 2026-01-08; Commercial Observer 2026-04-30; title unconfirmed by Richard"
+  },
+  {
+   "id": "B6R04",
+   "kind": "real",
+   "label": "Kramer Levin Naftalis & Frankel LLP (now HSF Kramer) / Jay A. Neveloff",
+   "segment": "NYC real estate transactional attorney (firm renamed 2025 to Herbert Smith Freehills Kramer; tests H3 bio crawl)",
+   "name": "Jay Neveloff",
+   "email": "jay.neveloff.b6@gmail.com",
+   "org": "Kramer Levin Naftalis & Frankel LLP",
+   "website": "https://www.kramerlevin.com",
+   "linkedinUrl": "https://www.linkedin.com/company/kramer-levin-naftalis-&-frankel-llp/",
+   "location": "New York, NY",
+   "role": "RE_ATTORNEY",
+   "statement": "I chair the real estate practice at a New York law firm representing developers, owners, funds and lenders in development, joint ventures and financing.",
+   "linkStatus": "verified",
+   "linkSource": "hsfkramer.com/our-people/j/jay-a-neveloff (Partner, Chair of Real Estate US); kramerlevin.com/en/people/jay-a-neveloff.html (archived Kramer Levin bio); HSF Kramer news 2026-05-12 (CO Power 100 2026)",
+   "personAssumption": "Jay Neveloff - hsfkramer.com/our-people/j/jay-a-neveloff (Partner, Chair of Real Estate US); kramerlevin.com/en/people/jay-a-neveloff.html (archived Kramer Levin bio); HSF Kramer news 2026-05-12 (CO Power 100 2026); title unconfirmed by Richard"
+  },
+  {
+   "id": "B6F01",
+   "kind": "fake",
+   "label": "Batch-6 fake: invented capital-partners LLC, nonexistent website and LinkedIn",
+   "name": "Percival Thornquist",
+   "email": "percival.thornquist.b6@gmail.com",
+   "org": "Harrowgate Lantern Capital Partners LLC",
+   "website": "https://www.harrowgatelanterncap.com",
+   "linkedinUrl": "https://www.linkedin.com/in/percival-thornquist-hlcp",
+   "location": "Greenwich, CT",
+   "role": "INVESTOR_PE",
+   "statement": "I manage a $250M real estate private equity fund investing in multifamily and industrial value-add deals across the Northeast and want to meet sponsors and co-GPs."
+  }
+ ]
+}

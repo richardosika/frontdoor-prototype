@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Stand-in PF mark. Approved concept C SVGs in private-floor-site/tools/brand-src were not readable from this environment. -->
+  <rect width="32" height="32" fill="#1F3A2E"/>
+  <rect x="10.3" y="10.3" width="11.4" height="11.4" fill="none" stroke="#A8843F" stroke-width="1.4" transform="rotate(45 16 16)"/>
+  <text x="16" y="19.2" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="8" fill="#F4EFE4">PF</text>
+</svg>
