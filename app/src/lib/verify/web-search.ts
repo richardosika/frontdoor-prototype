@@ -48,28 +48,45 @@ export function bingResultTexts(html: string): string[] {
 }
 
 /** Keyless Wikidata entity search. Used only after DuckDuckGo, Bing, and Wikipedia return nothing usable. */
-export function wikidataSearchResultTexts(payload: string): string[] {
+export function wikidataSearchResultPages(payload: string): { text: string; href: string }[] {
   try {
-    const parsed = JSON.parse(payload) as { search?: { label?: string; description?: string }[] };
+    const parsed = JSON.parse(payload) as { search?: { id?: string; label?: string; description?: string }[] };
     if (!Array.isArray(parsed.search)) return [];
     return parsed.search
-      .map((row) => stripTags(`${row.label || ""} ${row.description || ""}`).trim())
-      .filter((text) => text.length > 2);
+      .map((row) => ({
+        text: stripTags(`${row.label || ""} ${row.description || ""}`).trim(),
+        href: row.id ? `https://www.wikidata.org/wiki/${encodeURIComponent(row.id)}` : "",
+      }))
+      .filter((row) => row.text.length > 2);
+  } catch {
+    return [];
+  }
+}
+
+export function wikidataSearchResultTexts(payload: string): string[] {
+  return wikidataSearchResultPages(payload).map((row) => row.text);
+}
+
+export function wikipediaRestResultPages(payload: string): { text: string; href: string }[] {
+  try {
+    const parsed = JSON.parse(payload) as { pages?: { key?: string; title?: string; excerpt?: string; description?: string }[] };
+    if (!Array.isArray(parsed.pages)) return [];
+    return parsed.pages
+      .map((row) => {
+        const key = String(row.key || "").trim().replace(/ /g, "_");
+        return {
+          text: stripTags(`${row.title || ""} ${row.description || ""} ${row.excerpt || ""}`).trim(),
+          href: key ? `https://en.wikipedia.org/wiki/${encodeURIComponent(key)}` : "",
+        };
+      })
+      .filter((row) => row.text.length > 2);
   } catch {
     return [];
   }
 }
 
 export function wikipediaRestResultTexts(payload: string): string[] {
-  try {
-    const parsed = JSON.parse(payload) as { pages?: { title?: string; excerpt?: string; description?: string }[] };
-    if (!Array.isArray(parsed.pages)) return [];
-    return parsed.pages
-      .map((row) => stripTags(`${row.title || ""} ${row.description || ""} ${row.excerpt || ""}`).trim())
-      .filter((text) => text.length > 2);
-  } catch {
-    return [];
-  }
+  return wikipediaRestResultPages(payload).map((row) => row.text);
 }
 
 export function wikipediaResultTexts(payload: string): string[] {
@@ -208,8 +225,8 @@ export async function webFootprintCheck(facts: ApplicantFacts, fetchText: FetchT
       attempts.push({ provider: provider.provider, state: "negative", sample: negative.slice(0, 180), url: provider.url });
       break;
     }
-    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && !leftTheCompany(text, org));
-    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && leftTheCompany(text, org));
+    const hit = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && !leftTheCompany(text, org, facts.name));
+    const departed = snippets.find((text) => mentionsPersonAndCompany(text, facts.name, org) && leftTheCompany(text, org, facts.name));
     if (hit) {
       attempts.push({ provider: provider.provider, state: "hit", sample: hit.slice(0, 180), url: provider.url });
       break;

@@ -1,5 +1,5 @@
 import { politeFetch } from "@/lib/verify/fetch";
-import { distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, surnameForSearch } from "@/lib/verify/public-match";
+import { collapseAmpersandInitials, distinctiveCompanyTokens, domainBrand, isDistinctiveCompanyToken, isGenericFirmToken, isShortBrandToken, isStandaloneGenericQueryToken, mentionsPerson, reportingOwnerDisplayMatches, surnameForSearch } from "@/lib/verify/public-match";
 import { stripQaOrg } from "@/lib/verify/qa-marker";
 import type { CheckOutput } from "@/lib/verify/types";
 
@@ -32,16 +32,34 @@ export function parseCompanyTickers(payload: string): EdgarCompany[] | null {
 
 const LEGAL_SUFFIX = new Set(["llc", "inc", "incorporated", "corp", "corporation", "co", "ltd", "limited", "plc", "lp", "llp", "pc", "pllc"]);
 
+/** Trailing bank charters. "National Bank" stays, because it is part of the brand. */
+function stripTrailingBankForm(tokens: string[]): string[] {
+  let rest = tokens;
+  const phrases = [
+    ["national", "association"],
+    ["federal", "savings", "bank"],
+  ];
+  for (const phrase of phrases) {
+    if (rest.length > phrase.length && rest.slice(-phrase.length).join(" ") === phrase.join(" ")) rest = rest.slice(0, -phrase.length);
+  }
+  const single = new Set(["fsb", "ssb", "na"]);
+  while (rest.length > 1 && single.has(rest[rest.length - 1] || "")) rest = rest.slice(0, -1);
+  return rest;
+}
+
 /** Lowercase name with punctuation and legal suffixes removed. "CBRE Group, Inc." and "CBRE GROUP INC" both become "cbre group". */
 export function normalizeFirmName(value: string): string {
-  return value
-    .replace(/\([^)]*\)/g, " ")
-    .toLowerCase()
-    .replace(/&amp;/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token))
-    .join(" ");
+  let tokens = stripTrailingBankForm(
+    collapseAmpersandInitials(value)
+      .replace(/\([^)]*\)/g, " ")
+      .toLowerCase()
+      .replace(/&amp;/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 2 && !LEGAL_SUFFIX.has(token)),
+  );
+  if (tokens.length > 1 && tokens[tokens.length - 1] === "company") tokens = tokens.slice(0, -1);
+  return tokens.join(" ");
 }
 
 /**
@@ -155,7 +173,7 @@ export function insiderSearchUrl(surname: string, cik: string, form: string): st
 /** A reporting-owner display name on a CIK-scoped Form 3, 4, or 5. The company line in the same filing is not the person. */
 export function reportingOwnerLine(names: string[] | string[][], person: string): string {
   for (const group of filingGroups(names)) {
-    const hit = group.find((name) => mentionsPerson(name, person));
+    const hit = group.find((name) => reportingOwnerDisplayMatches(name, person));
     if (hit) return hit.replace(/\s+/g, " ").trim();
   }
   return "";
@@ -500,15 +518,17 @@ export function filingNames(payload: string): string[][] | null {
  * A person named on a related filer. Shown as evidence. It is not an exact match and it does not add points.
  * A fuzzy parent stays at 0.
  */
-export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string): string {
+export function affiliateFilingNote(hits: EdgarTextHit[], person: string, org: string, matchedCik = ""): string {
   const tokens = distinctiveCompanyTokens(org)
     .map((token) => token.toLowerCase())
     .filter((token) => isDistinctiveCompanyToken(token) || isShortBrandToken(token));
   if (!tokens.length || !person.trim()) return "";
+  const sameRegistrant = padCik(matchedCik);
   for (const hit of hits) {
     const companies = hit.names.map((name) => companyFromDisplayName(name)).filter((row): row is EdgarCompany => Boolean(row?.title));
     const company = companies.find((row) => row.cik) || companies.find((row) => firmTokens(row.title).some((token) => tokens.includes(token)));
     if (!company?.title || sameFirmName(company.title, org)) continue;
+    if (sameRegistrant && padCik(company.cik) === sameRegistrant) continue;
     if (!firmTokens(company.title).some((token) => tokens.includes(token))) continue;
     const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, person));
     if (!named) continue;
@@ -527,19 +547,90 @@ export function filingGroups(names: string[] | string[][]): string[][] {
   return [names as string[]];
 }
 
+const FUND_EXTRA = new Set(["debt", "fund", "funds", "partners", "partner", "holdings", "holding", "series", "ma", "feeder", "master", "credit", "equity"]);
+
+/** "Madison Realty Capital Debt MA I LP" starts with the firm and adds only fund words. "Madison Air Solutions" does not. */
+export function fundNameExtendsFirm(title: string, org: string): boolean {
+  const orgTokens = firmTokens(org);
+  const titleTokens = firmTokens(title);
+  if (orgTokens.length < 2 || titleTokens.length <= orgTokens.length) return false;
+  if (titleTokens.slice(0, orgTokens.length).join(" ") !== orgTokens.join(" ")) return false;
+  const extra = titleTokens.slice(orgTokens.length);
+  return extra.length > 0 && extra.every((token) => FUND_EXTRA.has(token) || /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)$/.test(token));
+}
+
+/** "Dime Commercial Bank" can be listed as Dime Commercial Bancshares. The FDIC holding-company name is included. */
+export function bankHoldingAliases(org: string, nameHcr = ""): string[] {
+  const names = new Set<string>();
+  if (nameHcr.trim()) names.add(nameHcr.trim());
+  const tokens = firmTokens(org);
+  const bankAt = tokens.lastIndexOf("bank");
+  if (bankAt >= 0) {
+    const stem = tokens.filter((_, index) => index !== bankAt).join(" ");
+    if (stem) {
+      names.add(`${stem} bancorp`);
+      names.add(`${stem} bancshares`);
+      names.add(`${stem} financial`);
+    }
+  }
+  return [...names];
+}
+
 function sameFirmName(title: string, org: string): boolean {
   const left = normalizeFirmName(org);
   const right = normalizeFirmName(title);
   return Boolean(left) && left === right;
 }
 
+const EDGAR_SUFFIX_WORD = new Set([
+  "properties",
+  "realty",
+  "trust",
+  "holdings",
+  "group",
+  "corp",
+  "inc",
+  "incorporated",
+  "corporation",
+  "company",
+  "companies",
+  "llc",
+  "lp",
+  "llp",
+  "plc",
+  "ltd",
+  "limited",
+  "co",
+  "international",
+]);
+
+/** "JBG SMITH Properties" is "JBG SMITH" plus a suffix word. "JBG SMITH Capital Partners Fund" is not. */
+function suffixOnlyExtension(title: string, org: string): boolean {
+  const shorter = firmTokens(org);
+  const longer = firmTokens(title);
+  if (!shorter.length || longer.length <= shorter.length) return false;
+  if (longer.slice(0, shorter.length).join(" ") !== shorter.join(" ")) return false;
+  return longer.slice(shorter.length).every((token) => EDGAR_SUFFIX_WORD.has(token));
+}
+
+function domainAgreesWithFirm(org: string, title: string, website: string): boolean {
+  const stem = domainBrand(website);
+  if (!stem) return false;
+  const orgCompact = normalizeFirmName(org).replace(/\s+/g, "");
+  const titleWithoutSuffix = firmTokens(title).filter((token) => !EDGAR_SUFFIX_WORD.has(token)).join("");
+  return stem === orgCompact || stem === titleWithoutSuffix;
+}
+
 /**
  * The person counts only on a filing that also carries the exact company name.
  * A person on a parent, affiliate, or different registrant does not tie this company.
  */
-export function personOnFiling(names: string[] | string[][], person: string, org: string): string {
+export function personOnFiling(names: string[] | string[][], person: string, org: string, website = ""): string {
   for (const group of filingGroups(names)) {
-    const companyHere = group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, org));
+    const companyHere = group.some((name) => {
+      const title = companyFromDisplayName(name)?.title || name;
+      return sameFirmName(title, org) || (suffixOnlyExtension(title, org) && domainAgreesWithFirm(org, title, website));
+    });
     if (!companyHere) continue;
     const hit = group.find((name) => mentionsPerson(name, person));
     if (hit) return hit;
@@ -561,6 +652,7 @@ export function assessEdgarMatch(input: {
   insiderNames?: string[] | string[][];
   identity?: EdgarFilerIdentity | null;
   textHits?: EdgarTextHit[];
+  holdingAliases?: string[];
 }): Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly"> {
   input = { ...input, org: stripQaOrg(input.org || "") };
   const groups = filingGroups(input.filingNames);
@@ -571,9 +663,20 @@ export function assessEdgarMatch(input: {
     flat.map(companyFromDisplayName).filter((row): row is EdgarCompany => Boolean(row)),
     input.org,
   );
-  const match = fromList || tickerMatch || fromFiling;
+  let match = fromList || tickerMatch || fromFiling;
+  // "Colliers International Group Inc." is Colliers plus wrapper words, not a parent.
+  let wrapperSame = false;
+  if (!match && firmTokens(input.org).length === 1) {
+    const wrapped = input.companies.find(
+      (row) => suffixOnlyExtension(row.title, input.org) && domainAgreesWithFirm(input.org, row.title, input.website || ""),
+    );
+    if (wrapped) {
+      match = wrapped;
+      wrapperSame = true;
+    }
+  }
   const tickerAccepted = Boolean(tickerMatch) && match === tickerMatch;
-  const personLine = personOnFiling(groups, input.person, input.org);
+  const personLine = personOnFiling(groups, input.person, input.org, input.website || "");
   if (!input.tickersOk && flat.length === 0) {
     return {
       status: "UNAVAILABLE",
@@ -583,17 +686,57 @@ export function assessEdgarMatch(input: {
     };
   }
   if (!match) {
+    const aliases = [...new Set([...(input.holdingAliases || []), ...bankHoldingAliases(input.org)])];
+    const holding = input.companies.find((row) => aliases.some((alias) => sameFirmName(row.title, alias)));
+    const fundHit = (input.textHits || []).find((hit) => {
+      const company = hit.names.map((name) => companyFromDisplayName(name)).find((row) => row && fundNameExtendsFirm(row.title, input.org));
+      const named = hit.personMatched || hit.names.some((name) => mentionsPerson(name, input.person));
+      return Boolean(company && named);
+    });
+    if (fundHit) {
+      const company = fundHit.names.map((name) => companyFromDisplayName(name)).find((row) => row && fundNameExtendsFirm(row.title, input.org));
+      const who = fundHit.names.find((name) => mentionsPerson(name, input.person)) || input.person;
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: company?.cik ? edgarCompanyUrl(company.cik) : "https://www.sec.gov/edgar/search/",
+        finding: `EDGAR lists ${company?.title || "a fund"}, CIK ${company?.cik || ""}. The filer name starts with the firm and adds only fund words. A filing names ${who}. This is not the company's own exact SEC name. It does not tie the person by itself.`.replace(/\s+/g, " ").trim(),
+      };
+    }
+    if (holding) {
+      const named = input.filingNames
+        ? filingGroups(input.filingNames).some(
+            (group) => group.some((name) => mentionsPerson(name, input.person)) && group.some((name) => sameFirmName(companyFromDisplayName(name)?.title || name, holding.title)),
+          ) || Boolean(reportingOwnerLine(input.insiderNames || [], input.person))
+        : Boolean(reportingOwnerLine(input.insiderNames || [], input.person));
+      if (named) {
+        return {
+          status: "PASS",
+          corroborates: true,
+          url: edgarCompanyUrl(holding.cik),
+          finding: `EDGAR lists the holding company ${holding.title}${holding.ticker ? ` (${holding.ticker})` : ""}, CIK ${holding.cik}. A filing names the person at that holding company.`,
+        };
+      }
+      return {
+        status: "INCONCLUSIVE",
+        corroborates: false,
+        companyOnly: true,
+        url: edgarCompanyUrl(holding.cik),
+        finding: `EDGAR lists the holding company ${holding.title}${holding.ticker ? ` (${holding.ticker})` : ""}, CIK ${holding.cik}. That is the bank's listed parent, not a person tie.`,
+      };
+    }
     const parent = shorterParentCandidate(input.companies, input.org) || partialEdgarCandidate(input.companies, input.org);
     if (parent) {
       const result = parentMatchResult(parent, personNamedWithFirm(groups, input.person, parent.title));
-      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org, parent.cik);
       if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
       return result;
     }
     const related = sharedWordAffiliate(input.companies, input.org);
     if (related) {
       const result = differentCompanyResult(related);
-      const note = affiliateFilingNote(input.textHits || [], input.person, input.org);
+      const note = affiliateFilingNote(input.textHits || [], input.person, input.org, related.cik);
       if (note) result.finding = `${result.finding} ${note}`.replace(/\s+/g, " ").trim();
       return result;
     }
@@ -614,7 +757,8 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR's current name for CIK ${match.cik} is ${input.identity.currentName}. ${titled} is a former name. Needs review. A former name is not an exact match and does not corroborate.`,
     };
   }
-  if (!sameFirmName(match.title, input.org) && !tickerAccepted) {
+  const suffixSame = wrapperSame || (suffixOnlyExtension(match.title, input.org) && domainAgreesWithFirm(input.org, match.title, input.website || ""));
+  if (!sameFirmName(match.title, input.org) && !tickerAccepted && !suffixSame) {
     return {
       status: "INCONCLUSIVE",
       corroborates: false,
@@ -623,7 +767,7 @@ export function assessEdgarMatch(input: {
       finding: `EDGAR lists ${titled}, CIK ${match.cik}. A parent, affiliate, or different name is not an exact match for the company on the application. It is inconclusive and does not corroborate. This is not a pass.`,
     };
   }
-  const ownerLine = tickerAccepted || sameFirmName(match.title, input.org) ? reportingOwnerLine(input.insiderNames || [], input.person) : "";
+  const ownerLine = tickerAccepted || sameFirmName(match.title, input.org) || suffixSame ? reportingOwnerLine(input.insiderNames || [], input.person) : "";
   const personSentence = personLine
     ? ` A filing names ${personLine.replace(/\s+/g, " ").trim()}.`
     : ownerLine
@@ -691,6 +835,7 @@ export async function lookupEdgar(
   person: string,
   fetchText?: FetchText,
   website = "",
+  nameHcr = "",
 ): Promise<Pick<CheckOutput, "status" | "finding" | "url" | "corroborates" | "reviewFlag" | "companyOnly">> {
   org = stripQaOrg(org);
   const tokens = org.trim();
@@ -748,5 +893,6 @@ export async function lookupEdgar(
     insiderNames,
     identity,
     textHits,
+    holdingAliases: bankHoldingAliases(org, nameHcr),
   });
 }

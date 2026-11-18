@@ -227,8 +227,11 @@ export function zipMatchesState(state: string, zip: string): boolean {
 export type LocalAddress =
   | { kind: "absent" }
   | { kind: "unstructured" }
+  | { kind: "non-us"; finding: string }
   | { kind: "invalid"; finding: string }
   | { kind: "pass"; parsed: ParsedAddress; geocode: boolean };
+
+const CANADIAN_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 
 /** Local checks only. A full street with a sane state and ZIP can still go to the Census geocoder. */
 export function assessLocalAddress(location: string): LocalAddress {
@@ -237,6 +240,9 @@ export function assessLocalAddress(location: string): LocalAddress {
   const parsed = parseApplicationLocation(text);
   if (!parsed) return { kind: "unstructured" };
   if (!US_POSTAL_CODES.has(parsed.state)) {
+    if (CANADIAN_PROVINCES.has(parsed.state)) {
+      return { kind: "non-us", finding: "Non-US address, not checked by the Census geocoder." };
+    }
     return {
       kind: "invalid",
       finding: `The address did not check out. ${parsed.state || "The state"} is not a US state code.`,

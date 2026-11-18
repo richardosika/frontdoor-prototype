@@ -1,6 +1,7 @@
 import { normalizeFirmName } from "@/lib/verify/edgar";
 import { normalizeName } from "@/lib/verify/fuzzy";
-import { normalizeGenerationalSuffix } from "@/lib/verify/public-match";
+import { registryNameIsGenericOnly } from "@/lib/verify/ny-registry";
+import { foldMarks, normalizeGenerationalSuffix } from "@/lib/verify/public-match";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 
 const SEVERE = /\b(bankruptcy|fraud|indicted|ponzi)\b/i;
@@ -61,7 +62,7 @@ function anchoredName(hay: string, body: string): boolean {
  * One token is not a full name, so "TestAF" alone is not searched and not a hit.
  */
 export function courtNameParts(name: string): { given: string[]; surname: string } | null {
-  const parts = name
+  const parts = foldMarks(name)
     .split(/\s+/)
     .map((part) => part.replace(/^[^A-Za-z0-9-]+|[^A-Za-z0-9-]+$/g, ""))
     .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 2);
@@ -107,8 +108,8 @@ function personPhrase(text: string, name: string): boolean {
 
 function companyPhrase(text: string, org: string): boolean {
   const phrase = normalizeFirmName(org);
-  if (!phrase) return false;
-  return containsPhrase(text, phrase);
+  if (!phrase || registryNameIsGenericOnly(org)) return false;
+  return containsPhrase(foldMarks(text), phrase);
 }
 
 function recordFields(result: CourtHit): string[] {
@@ -122,13 +123,21 @@ function courtRow(partial: Omit<CheckOutput, "ranAt" | "key" | "source" | "weigh
 
 export function assessCourts(
   payload: string,
-  http: { ok: boolean; status: number },
+  http: { ok: boolean; status: number; failure?: string },
   facts: ApplicantFacts,
 ): Omit<CheckOutput, "ranAt"> {
   if (http.status === 401 || http.status === 403 || http.status === 0 || !http.ok) {
+    const reason =
+      http.failure === "timeout" || http.status === 0
+        ? "CourtListener timed out. The free opinion search at /api/rest/v4/search/?type=o did not answer in time."
+        : http.status === 401
+          ? "CourtListener returned HTTP 401. The free search did not accept this request without a token."
+          : http.status === 403
+            ? "CourtListener returned HTTP 403. The request was blocked."
+            : `CourtListener returned HTTP ${http.status}.`;
     return courtRow({
       status: "UNAVAILABLE",
-      finding: "CourtListener was blocked, timed out, or did not respond. This source could not be checked.",
+      finding: `${reason} Unavailable. Not a pass.`,
     });
   }
   const results = courtResults(payload);

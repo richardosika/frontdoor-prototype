@@ -3,21 +3,21 @@ import { assessLocalAddress, assessNominatimBody, expandStreetSuffix, geocoderSa
 import { isReservedDomain } from "@/lib/verify/host";
 import { assessRdap, cardConsistencyCheck, collectChecks, companyNameLooksReal, inviteCheck, linkedinFormatCheck, noteIncorporationRegistry, personNameTokensLookMadeUp, phoneStateCheck, plausibilityCheck, registryLinkCheck, resolveAddressCheck, sanctionsCheck, settleWithin, settleWithinRetry, TEST_WATCHLIST, tokenLooksGibberish } from "@/lib/verify/checks";
 import { RERUN_STATUS, rerunChecksHref } from "@/lib/rerun-checks";
-import { assessStateRegistry, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
+import { assessFdicBank, assessStateRegistry, fdicBankFindUrl, registryPortal, socrataRegistryUrl } from "@/lib/verify/state-registries";
 import { assessCourts, courtSearchQuery } from "@/lib/verify/courts";
-import { assessEdgarMatch, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, parseSubmissionsIdentity, submissionsUrl } from "@/lib/verify/edgar";
+import { assessEdgarMatch, bankHoldingAliases, clearEdgarTickerCache, companyFromDisplayName, edgarCompanySearchPhrase, edgarTickerDomainMatch, fundNameExtendsFirm, insiderSearchUrl, lookupEdgar, matchEdgarCompany, matchedNameIsFormer, normalizeFirmName, parseSubmissionsIdentity, reportingOwnerLine, submissionsUrl } from "@/lib/verify/edgar";
 import { classifyFetchError, fetchLimits, looksLikeHtml, nextRedirectUrl, nextTimeoutMs, prepareFetchedText, userAgentFor, USER_AGENT } from "@/lib/verify/fetch";
 import { applyReviewSkips, companyCouldNotBeFound, companyExistsEvidence, companyFileBesideApplication, corroboratingPasses, dedupeSourceLines, gradeChecks, gradeComparisonLine, namesPersonAndCompany, neutralScreenNewsPass, noteAfterRerun, outsideSourceConfirmsCompany, rerunAuditSummary, type GradeReport } from "@/lib/verify/grade";
-import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, gdeltQuery, instagramCompanyTag, judgeHeadline, newsSearchQueries, ordinaryResults, queryCity, socialSearchQuery } from "@/lib/verify/news";
-import { assessNyRegistry, normalizeRegistryName } from "@/lib/verify/ny-registry";
+import { alignNewsRows, civilDocket, classifyNews, companyForeclosure, companyNearPerson, gdeltQuery, instagramCompanyTag, judgeHeadline, newsChecks, newsSearchQueries, ordinaryResults, plaintiffSolicitation, publisherArticleUrl, queryCity, reputationalHeadline, socialSearchQuery } from "@/lib/verify/news";
+import { assessNyRegistry, normalizeRegistryName, nyRegistryExactUrl, nyRegistryQueryUrl, registryNameIsGenericOnly, relatedBrandNames } from "@/lib/verify/ny-registry";
 import { factsForSearch } from "@/lib/verify/qa-marker";
-import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, pageBrandNames, personHit, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
+import { brandAliases, companySearchTerm, distinctiveCompanyTokens, domainBrand, domainMatchesOrgStem, firmContainsApplicantName, formalGivenName, formalGivenNames, hostMatchesOrgLetters, isDistinctiveCompanyToken, leftTheCompany, linkedinCompanyMatchesOrg, linkedinProfileMatchesPerson, mentionsBrandAlias, mentionsCompany, mentionsPerson, orgLettersLabel, pageBrandNames, personHit, personSearchSpellings, personWithoutSuffix, surnameForSearch } from "@/lib/verify/public-match";
 import { formatRunScores, scoreOf } from "@/lib/verify/score";
 import { completeScreenRows, fallbackTeamUrls, hostIsApplicant, isBotChallenge, linkedinCompanyFollow, runPublicScreen, sameOriginPages, scorePublicText, serpUnusable, sitemapLastNameUrls, sitemapPersonUrls, socialLinksFrom, surnamePageUrls, youtubeTitles } from "@/lib/verify/screen";
 import { emptyPrefillFacts, suggestCompany } from "@/lib/guided-prefill";
-import { approveConfirmMessage, unverifiedPersonItems } from "@/lib/review-steps";
+import { approveConfirmMessage, displayedCheckFinding, unverifiedPersonItems } from "@/lib/review-steps";
 import { evidenceRowsForRun } from "@/lib/guided-prefill-db";
-import { isLinkedInDirectory, webFootprintCheck } from "@/lib/verify/web-search";
+import { isLinkedInDirectory, webFootprintCheck, wikipediaRestResultPages } from "@/lib/verify/web-search";
 import type { ApplicantFacts, CheckOutput } from "@/lib/verify/types";
 import { watchlistNeedsRefresh } from "@/lib/verify/watchlist";
 
@@ -900,7 +900,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       [row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, corroborates: false, finding: "company confirmed, person NOT confirmed. Name: no. Company: yes." })],
       filledIn,
     );
-    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+    expect(linkedinOnly.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (0 of 4)");
     expect(linkedinOnly.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
     const news = row({ key: "news", status: "PASS", corroborates: true, finding: "Neutral coverage names this person and company." });
     const backed = gradeChecks([news], filledIn);
@@ -912,7 +912,7 @@ describe("completeness and a company-only LinkedIn page need an independent sour
       ],
       filledIn,
     );
-    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+    expect(linkedinBacked.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (0 of 4)");
     expect(linkedinBacked.score).toBeGreaterThan(linkedinOnly.score);
   });
 });
@@ -1408,7 +1408,7 @@ describe("QA follow-up scoring", () => {
     const identity = graded.categories.find((category) => category.id === "identity");
     expect(company?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
     expect(company?.reason).not.toContain("includes the person or company (8 of 8)");
-    expect(identity?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+    expect(identity?.reason).toContain("Company confirmed, person not confirmed (0 of 4)");
     expect(graded.summary.checkedOut).toContain("Company confirmed, person not confirmed");
     expect(graded.summary.company).toContain("Company confirmed, person not confirmed");
     expect(graded.summary.company).not.toContain("No company website was confirmed");
@@ -1476,7 +1476,7 @@ describe("QA follow-up scoring", () => {
       expect(linkedin?.corroborates).toBe(false);
       const graded = gradeChecks(checks, applicant);
       expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("Company confirmed, person not confirmed (4 of 8)");
-      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (2 of 4)");
+      expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (0 of 4)");
       expect(graded.recommendation.startsWith("APPROVE")).toBe(false);
     }
   });
@@ -2190,6 +2190,7 @@ describe("batch 3 name suffixes, departures, and company pages", () => {
     );
     expect(calls.filter((url) => url.startsWith("https://bramblewick-group.example"))).toEqual([
       "https://bramblewick-group.example",
+      "https://bramblewick-group.example",
       "https://bramblewick-group.example/sitemap.xml",
     ]);
     for (const host of ["bramblewick-group.example", "www.linkedin.com", "x.com", "www.facebook.com", "www.instagram.com", "www.youtube.com", "www.tiktok.com"]) {
@@ -2445,7 +2446,13 @@ describe("batch 4 company search terms", () => {
   it("searches a firm word that is not the applicant's surname", async () => {
     expect(companySearchTerm("Tutor Perini Corporation", "Ronald Tutor")).toBe("perini");
     expect(companySearchTerm("Belkin Burden Goldman LLP", "Sherwin Belkin")).toBe("burden goldman");
-    expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("organization");
+    expect(companySearchTerm("The Durst Organization", "Douglas Durst")).toBe("durst organization");
+    expect(companySearchTerm("The Brodsky Organization", "Daniel Brodsky")).toBe("brodsky organization");
+    expect(companySearchTerm("LeFrak Organization", "Richard LeFrak")).toBe("lefrak organization");
+    expect(companySearchTerm("Plaza Construction", "David Wang")).toBe("plaza construction");
+    expect(companySearchTerm("Rockrose Development Corp.", "Justin Elghanayan")).toBe("rockrose");
+    expect(socialSearchQuery("David Wang", "Plaza Construction")).toBe(`"David Wang" "plaza construction"`);
+    expect(socialSearchQuery("David Wang", "Plaza Construction")).not.toBe(`"David Wang" "plaza"`);
     expect(companySearchTerm("Related Companies", "Stephen Ross")).toBe("related companies");
 
     const tutor = facts({
@@ -2468,11 +2475,16 @@ describe("batch 4 company search terms", () => {
     });
     expect(newsSearchQueries(tutor)[0]).toBe(`"Ronald Tutor" "perini"`);
     expect(newsSearchQueries(belkin)[0]).toBe(`"Sherwin Belkin" "burden goldman"`);
-    expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "organization"`);
+    expect(newsSearchQueries(durst)[0]).toBe(`"Douglas Durst" "durst organization"`);
+    expect(newsSearchQueries(facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization", location: "New York, NY" }))[0]).toBe(
+      `"Daniel Brodsky" "brodsky organization"`,
+    );
+    expect(socialSearchQuery("Daniel Brodsky", "The Brodsky Organization")).toBe(`"Daniel Brodsky" "brodsky organization"`);
+    expect(socialSearchQuery("Richard LeFrak", "LeFrak Organization")).toBe(`"Richard LeFrak" "lefrak organization"`);
     expect(newsSearchQueries(facts({ name: "Stephen Ross", applicantName: "Stephen Ross", org: "Related Companies" }))[0]).toBe(
       `"Stephen Ross" "related companies"`,
     );
-    noRepeatedWord([...newsSearchQueries(tutor), ...newsSearchQueries(belkin), ...newsSearchQueries(durst)]);
+    noRepeatedWord([...newsSearchQueries(tutor), ...newsSearchQueries(belkin)]);
 
     const checks = await runPublicScreen(tutor, async () => ({ ok: false, status: 404, text: "" }));
     const youtube = checks.find((check) => check.key === "screen-youtube");
@@ -4788,7 +4800,7 @@ describe("company-only live QA fixtures", () => {
       fried: fried.score,
       fake: fake.score,
     };
-    expect(after).toEqual({ cbre: 38, brookfield: 44, aecom: 38, prologis: 38, gilbane: 44, fried: 38, fake: 28 });
+    expect(after).toEqual({ cbre: 38, brookfield: 42, aecom: 38, prologis: 38, gilbane: 42, fried: 38, fake: 28 });
     expect(after.fake).toBeLessThan(liveBefore.fake);
     for (const score of [after.cbre, after.brookfield, after.aecom, after.prologis, after.gilbane, after.fried]) {
       expect(after.fake).toBeLessThan(score);
@@ -4926,7 +4938,7 @@ describe("self-reported website credit needs an outside source", () => {
       facts({ name: "Christian Ulbrich", applicantName: "Christian Ulbrich", org: "Jones Lang LaSalle", website: "https://www.jll.com/", location: "Chicago, IL" }),
     );
 
-    expect(gilbane.score).toBe(44);
+    expect(gilbane.score).toBe(42);
     expect(stein.score).toBe(44);
     expect(skanska.score).toBe(44);
     expect(rxr.score).toBe(62);
@@ -5016,7 +5028,7 @@ describe("self-reported website credit needs an outside source", () => {
     expect(fake.score).toBeLessThan(44);
     // Fixture gap is 6 (Gilbane 44, gated fake 38). Richard's live pair was Gilbane and Joshua Stein at F 48
     // against a fake at F 44. Removing the 4 points makes that live gap 8. Both are short of the 15-point target.
-    expect(gilbane.score - fake.score).toBe(6);
+    expect(gilbane.score - fake.score).toBe(4);
     expect(gilbane.score - fake.score).toBeLessThan(15);
     expect(brinkwell.score).toBeLessThan(fake.score);
     expect(brinkwell.score).toBeLessThanOrEqual(40);
@@ -5368,11 +5380,11 @@ describe("a DuckDuckGo challenge does not erase a public record", () => {
     expect(graded.categories.find((category) => category.id === "completeness")?.earned).toBe(6);
     expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(12);
     expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
-    expect(graded.score).toBe(68);
+    expect(graded.score).toBe(66);
     expect(graded.letter).toBe("D");
   });
 
-  it("keeps the application fields when every search engine is blocked, and does not score that block as a pass", async () => {
+  it("does not award completeness for a blocked search when the person is not tied, and does not score that block as a pass", async () => {
     const checks = await runPublicScreen(mullen, async (url) => {
       if (url.includes("stobuildinggroup.com")) return { ok: true, status: 200, text: "<html><p>STO Building Group leadership Robert Mullen</p></html>" };
       return { ok: false, status: 202, text: "challenge" };
@@ -5392,13 +5404,14 @@ describe("a DuckDuckGo challenge does not erase a public record", () => {
     const completeness = graded.categories.find((category) => category.id === "completeness");
     const company = graded.categories.find((category) => category.id === "company");
     const footprint = graded.categories.find((category) => category.id === "footprint");
-    expect(completeness?.earned).toBe(6);
+    expect(completeness?.earned).toBe(0);
+    expect(completeness?.reason).toContain("No independent source");
     expect(footprint?.earned).toBe(0);
     expect(footprint?.reason.toLowerCase()).toContain("could not check");
     expect(footprint?.reason.toLowerCase()).toContain("search blocked");
     expect(company?.reason.toLowerCase()).toContain("could not check, search blocked");
     expect(company?.earned).toBe(8);
-    expect(graded.score).toBe(56);
+    expect(graded.score).toBe(48);
     expect(graded.letter).toBe("F");
     const fake = gradeChecks(web, facts({ location: "New York, NY", statement: "I develop small buildings and keep a written record of each project for the application." }));
     expect(fake.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
@@ -5465,7 +5478,7 @@ describe("batch 13 search, particles, foreclosure topic, and affiliate filings",
     expect(footprint?.status).toBe("PASS");
     expect(recovered.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
     expect(recovered.letter).toBe("D");
-    expect(recovered.score).toBe(68);
+    expect(recovered.score).toBe(66);
     expect(recovered.recommendation).not.toBe("APPROVE");
 
     const blocked = await runPublicScreen(ripka, async (url) => {
@@ -5974,5 +5987,1469 @@ describe("corroboration, social prose, lawsuit headlines, and QA query prefix", 
     });
     expect(seen.some((url) => /QA-TEST|QA%2DTEST|QA-TEST/i.test(decodeURIComponent(url)))).toBe(false);
     expect(seen.some((url) => decodeURIComponent(url).includes("Walker"))).toBe(true);
+  });
+});
+
+describe("live search budget, exact EDGAR credit, and company-file YouTube", () => {
+  it("keeps searching when DuckDuckGo hangs and records which source answered", async () => {
+    const applicant = facts({
+      name: "Ada West",
+      applicantName: "Ada West",
+      org: "Western Alliance Bancorporation",
+      location: "Phoenix, AZ",
+      website: "",
+    });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com")) return new Promise(() => undefined);
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.reuters.com/western-alliance">Ada West leads Western Alliance Bancorporation in Phoenix</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.corroborates).toBe(true);
+    expect(web?.finding).toContain("DuckDuckGo (timed out)");
+    expect(web?.finding).toContain("Bing (result)");
+    expect(web?.finding).not.toContain("timed out or was dropped");
+    const footprint = checks.find((check) => check.key === "web-footprint");
+    expect(footprint?.status).not.toBe("UNAVAILABLE");
+    const graded = gradeChecks([web!, footprint!], applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(8);
+  }, 20000);
+
+  it("does not score a search where every free source times out", async () => {
+    const applicant = facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation", website: "" });
+    const checks = await runPublicScreen(applicant, async (url) => {
+      if (/duckduckgo|bing\.com|brave\.com|mojeek|wikipedia|wikidata|gdeltproject/.test(url)) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = checks.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("UNAVAILABLE");
+    expect(web?.corroborates).not.toBe(true);
+    expect(web?.finding).toContain("DuckDuckGo (timed out)");
+    expect(web?.finding).toContain("Bing (timed out)");
+    expect(web?.finding).toContain("Not checked");
+    expect(web?.finding).toContain("Not a pass");
+    const graded = gradeChecks(checks, applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+    expect(graded.summary.couldNotCheck).toContain("DuckDuckGo (timed out)");
+    expect(graded.summary.checkedOut).not.toContain("public web result names");
+  });
+
+  it("names the CourtListener failure and does not award points", () => {
+    const applicant = facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation" });
+    const denied = assessCourts("", { ok: false, status: 401 }, applicant);
+    expect(denied.status).toBe("UNAVAILABLE");
+    expect(denied.finding).toContain("HTTP 401");
+    expect(denied.finding).toContain("Not a pass");
+    const blocked = assessCourts("", { ok: false, status: 403 }, applicant);
+    expect(blocked.finding).toContain("HTTP 403");
+    const timed = assessCourts("", { ok: false, status: 0, failure: "timeout" }, applicant);
+    expect(timed.finding).toContain("timed out");
+    expect(timed.finding).toContain("/api/rest/v4/search/?type=o");
+    const graded = gradeChecks(
+      [row({ key: "courts", status: timed.status, weight: 0, finding: timed.finding, source: "CourtListener" })],
+      applicant,
+    );
+    expect(graded.score).toBeLessThan(70);
+    expect(graded.summary.couldNotCheck).toContain("timed out");
+    expect(graded.summary.checkedOut).not.toContain("CourtListener");
+  });
+
+  it("gives exact current-name EDGAR credit only when an independent source ties the person", () => {
+    const exact = "EDGAR's current name for CIK 1212545 is WESTERN ALLIANCE BANCORPORATION. That is an exact current-name match. It does not tie the person to the firm.";
+    const edgar = row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, corroborates: false, finding: exact, source: "SEC EDGAR" });
+    const local = [
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      row({ key: "rdap", status: "PASS", finding: "RDAP responded." }),
+    ];
+    const applicant = facts({ name: "Ada West", applicantName: "Ada West", org: "Western Alliance Bancorporation", website: "https://www.westernalliancebancorporation.com" });
+    const untied = gradeChecks([...local, edgar], applicant);
+    expect(untied.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(untied.summary.company).toContain("does not tie the person");
+    const before = gradeChecks(local, applicant);
+    expect(untied.score - before.score).toBe(0);
+    const tied = gradeChecks(
+      [...local, edgar, row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names Ada West at Western Alliance Bancorporation." })],
+      applicant,
+    );
+    expect(tied.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+    expect(tied.score).toBeGreaterThan(untied.score);
+
+    const fake = gradeChecks(
+      [
+        ...local,
+        row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, corroborates: false, finding: "Found: a page on the company site. Name: no. Company: yes. City: no. Confidence: high." }),
+        edgar,
+      ],
+      facts({
+        name: "Nix Qwvzn",
+        applicantName: "Nix Qwvzn",
+        org: "Western Alliance Bancorporation",
+        website: "https://www.westernalliancebancorporation.com",
+        statement: "I run a made-up desk and this file should stay below a C.",
+      }),
+    );
+    expect(fake.categories.find((category) => category.id === "company")?.reason).toContain("0 of 6");
+    expect(fake.letter).toBe("F");
+    expect(fake.score).toBeLessThanOrEqual(48);
+    expect(fake.recommendation).not.toBe("APPROVE");
+    expect(fake.recommendation).not.toBe("APPROVE WITH CONDITIONS");
+  });
+
+  it("does not say Company: yes on a YouTube miss for the company file or the application", async () => {
+    const page = '{"title":{"runs":[{"text":"Walker & Dunlop earnings call"}]}}';
+    const fetchText = async (url: string) => (url.includes("youtube.com") ? { ok: true, status: 200, text: page } : { ok: false, status: 404, text: "" });
+    const application = await runPublicScreen(
+      facts({ name: "Willy Walker", applicantName: "Willy Walker", org: "Walker & Dunlop", website: "" }),
+      fetchText,
+    );
+    const companyFile = await runPublicScreen(
+      facts({ name: "Walker & Dunlop", applicantName: "Willy Walker", org: "Walker & Dunlop", website: "" }),
+      fetchText,
+    );
+    const appRow = application.find((check) => check.key === "screen-youtube");
+    const companyRow = companyFile.find((check) => check.key === "screen-youtube");
+    expect(appRow?.finding).toContain("Name: no");
+    expect(appRow?.finding).toContain("Company: no");
+    expect(companyRow?.finding).toContain("Company: no");
+    expect(companyRow?.finding).not.toContain("Company: yes");
+    expect(displayedCheckFinding(companyRow?.finding || "")).toContain("Company: no");
+    expect(displayedCheckFinding("No result found that names this person and this company. Name: no. Company: yes. City: no. Confidence: low.")).toContain(
+      "Company: no",
+    );
+  });
+
+  it("says one independent source tied the person, and names an EDGAR reporting-owner filing", () => {
+    const tied = gradeChecks(
+      [
+        row({
+          key: "screen-web",
+          status: "PASS",
+          corroborates: true,
+          finding: "A public web result names the person and the company. Name: yes. Company: yes. City: yes. Confidence: high.",
+          source: "Bing",
+          url: "https://www.bisnow.com/daniel-brodsky",
+        }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization", website: "https://www.brodsky.com" }),
+    );
+    expect(tied.summary.reasoning).toContain("One independent source tied this person to this company.");
+    expect(tied.summary.reasoning).toContain("Approval needs two.");
+    expect(tied.summary.reasoning).not.toContain("Nothing tied this person to that company");
+    const edgar = gradeChecks(
+      [
+        row({
+          key: "edgar",
+          status: "PASS",
+          corroborates: true,
+          finding: "EDGAR lists Brodsky Organization. A Form 3, 4, or 5 for this CIK names Brodsky Daniel as a reporting owner.",
+          source: "SEC EDGAR",
+        }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(edgar.summary.company).toContain("reporting-owner filing (Form 3, 4, or 5)");
+    expect(edgar.summary.checkedOut).toContain("reporting-owner filing (Form 3, 4, or 5)");
+    const samePoints = gradeChecks(
+      [row({ key: "edgar", status: "PASS", corroborates: true, finding: "EDGAR lists the company.", source: "SEC EDGAR" })],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(edgar.score).toBe(samePoints.score);
+
+    const missed = gradeChecks(
+      [
+        row({
+          key: "screen-web",
+          status: "UNAVAILABLE",
+          finding: "Tried DuckDuckGo (timed out), Bing (timed out). Not checked. Not a pass.",
+          source: "Web search",
+        }),
+        row({
+          key: "web-footprint",
+          status: "UNAVAILABLE",
+          finding: "Tried DuckDuckGo (timed out), Bing (timed out). Not checked. Not a pass.",
+          source: "Web search",
+        }),
+        row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names the person and the company.", source: "News" }),
+      ],
+      facts({ name: "Daniel Brodsky", applicantName: "Daniel Brodsky", org: "The Brodsky Organization" }),
+    );
+    expect(missed.summary.company.toLowerCase()).toContain("unavailable");
+    expect(missed.summary.company).not.toContain("did not return a page");
+    expect(missed.categories.find((category) => category.id === "footprint")?.reason.toLowerCase()).toContain("unavailable");
+    expect(missed.categories.find((category) => category.id === "footprint")?.reason).not.toContain("did not return a page");
+  });
+
+  it("retries a failed Bing page and does not call that a miss", async () => {
+    const applicant = facts({
+      name: "Justin Elghanayan",
+      applicantName: "Justin Elghanayan",
+      org: "Rockrose Development Corp.",
+      location: "New York, NY",
+      website: "",
+    });
+    let bingCalls = 0;
+    const recovered = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 0, text: "" };
+      if (url.includes("bing.com")) {
+        bingCalls += 1;
+        if (bingCalls === 1) return { ok: true, status: 200, text: "<html><body></body></html>" };
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.loopnet.com/justin-elghanayan">Justin Elghanayan | Rockrose Development Corp.</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = recovered.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("PASS");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).toContain("Bing (result)");
+    expect(web?.finding).toContain("loopnet.com");
+
+    const stillDown = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("duckduckgo.com") || url.includes("bing.com")) return { ok: true, status: 200, text: "<html><body></body></html>" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const missed = stillDown.find((check) => check.key === "screen-web");
+    expect(missed?.status).toBe("INCONCLUSIVE");
+    expect(missed?.corroborates).not.toBe(true);
+    expect(missed?.finding).toContain("Not found");
+    expect(missed?.finding).not.toContain("Not checked");
+    expect(missed?.finding).toContain("Tried");
+    const missedGrade = gradeChecks([missed!], applicant);
+    expect(missedGrade.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+
+    const unrelated = `<ol><li class="b_algo"><a href="https://example.com/other">Justin Elghanayan announced a project for a different firm in New York</a></li></ol>`;
+    const realMiss = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bing.com") || url.includes("duckduckgo.com")) return { ok: true, status: 200, text: unrelated };
+      return { ok: false, status: 404, text: "" };
+    });
+    const emptyHit = realMiss.find((check) => check.key === "screen-web");
+    expect(emptyHit?.status).toBe("INCONCLUSIVE");
+    expect(emptyHit?.finding).toContain("Tried");
+    expect(emptyHit?.finding).not.toContain("Search did not complete");
+    expect(gradeChecks([emptyHit!], applicant).categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+  });
+
+  it("does not treat a lowercase plaza as Plaza Construction", () => {
+    const factsForHeadline = {
+      name: "David Wang",
+      applicantName: "David Wang",
+      org: "Plaza Construction",
+      location: "New York, NY",
+    };
+    expect(judgeHeadline("Cochecton Planning Board moves Fosterdale plaza construction forward", factsForHeadline).company).toBe(false);
+    expect(judgeHeadline("Grand Army Plaza Construction Site opens downtown", factsForHeadline).company).toBe(false);
+    expect(judgeHeadline("David Wang leads Plaza Construction in New York", factsForHeadline).company).toBe(true);
+    const rows = classifyNews(
+      facts(factsForHeadline),
+      [
+        {
+          title: "Cochecton Planning Board moves Fosterdale plaza construction forward",
+          snippet: "The board discussed plaza construction.",
+          url: "https://example.com/fosterdale",
+          source: "Local",
+          provider: "Google News",
+          publishedAt: null,
+        },
+        {
+          title: "Grand Army Plaza Construction Site opens downtown",
+          snippet: "Work continues at Grand Army Plaza.",
+          url: "https://example.com/army",
+          source: "Local",
+          provider: "Google News",
+          publishedAt: null,
+        },
+      ],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((item) => item.key === "news");
+    expect(news?.finding).not.toContain("names the person or the company");
+    expect(news?.finding.toLowerCase()).not.toContain("plaza construction");
+  });
+
+  it("does not treat a Bing page of unrelated first names as an answer", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "",
+    });
+    const todd = [
+      "Todd Smith joined a Chicago firm",
+      "Todd Allen spoke at a conference",
+      "Todd Harris bought a house",
+      "Todd Nguyen opened a cafe",
+      "Todd Patel ran a marathon",
+      "Todd Brooks published a novel",
+      "Todd Bennett coaches youth sports",
+      "Todd Carter visited Denver",
+      "Todd Edwards teaches chemistry",
+      "Todd Foster listed a car for sale",
+    ];
+    const page = `<ol>${todd.map((title, index) => `<li class="b_algo"><a href="https://example.com/todd-${index}">${title}</a></li>`).join("")}</ol>`;
+    let bingCalls = 0;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bing.com")) {
+        bingCalls += 1;
+        return { ok: true, status: 200, text: page };
+      }
+      if (url.includes("duckduckgo.com")) return { ok: true, status: 200, text: "<html><body></body></html>" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    const footprint = rows.find((check) => check.key === "web-footprint");
+    expect(bingCalls).toBeGreaterThanOrEqual(1);
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.corroborates).not.toBe(true);
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).not.toContain("Not checked");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).toContain("Bing (unrelated results)");
+    expect(footprint?.status).toBe("INCONCLUSIVE");
+    expect(footprint?.finding).toContain("Tried");
+    expect(footprint?.corroborates).not.toBe(true);
+    const graded = gradeChecks([web!, footprint!], applicant);
+    expect(graded.categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+    expect(graded.score).toBeLessThanOrEqual(49);
+    expect(graded.letter).toBe("F");
+  });
+
+  it("keeps an ordinary dictionary word with the rest of the brand", () => {
+    expect(companySearchTerm("Ocean Bank", "Carlos Alfonso")).toBe("ocean bank");
+    expect(companySearchTerm("Ocean Bank", "Carlos Alfonso")).not.toBe("ocean");
+    expect(socialSearchQuery("Carlos Alfonso", "Ocean Bank")).toBe(`"Carlos Alfonso" "ocean bank"`);
+    expect(companySearchTerm("Related Group", "Jorge Perez")).toBe("related group");
+    expect(companySearchTerm("Plaza Construction", "David Wang")).toBe("plaza construction");
+    expect(companySearchTerm("Rockrose Development Corp.", "Justin Elghanayan")).toBe("rockrose");
+    const falseLines = [
+      ["related group of burglaries", "Related Group"],
+      ["ocean waters flood bank parking lot", "Ocean Bank"],
+      ["ocean bank reports record quarter", "Ocean Bank"],
+      ["related group breaks ground in brickell", "Related Group"],
+    ] as const;
+    for (const [line, org] of falseLines) {
+      expect(mentionsCompany(line, org)).toBe(false);
+      expect(judgeHeadline(line, { name: "Alex Example", org, location: "Miami, FL" }).company).toBe(false);
+    }
+    expect(mentionsCompany("Ocean Bank reports record quarter", "Ocean Bank")).toBe(true);
+    expect(mentionsCompany("Related Group breaks ground in Brickell", "Related Group")).toBe(true);
+    expect(judgeHeadline("Ocean Bank reports record quarter", { name: "Carlos Alfonso", org: "Ocean Bank", location: "Miami, FL" }).company).toBe(true);
+    expect(judgeHeadline("Related Group breaks ground in Brickell", { name: "Jorge Perez", org: "Related Group", location: "Miami, FL" }).company).toBe(true);
+  });
+
+  it("keeps the search engine notes on the web footprint row", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "https://www.bassberry.com",
+    });
+    const hit = `<ol><li class="b_algo"><a href="https://www.bassberry.com/people/todd-rolapp">Todd Rolapp is a partner at Bass, Berry &amp; Sims</a></li></ol>`;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bassberry.com") && !url.includes("bing") && !url.includes("duckduckgo")) {
+        return { ok: true, status: 200, text: "<html><p>Todd Rolapp is a partner at Bass, Berry & Sims in Nashville.</p></html>" };
+      }
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: hit };
+      if (url.includes("duckduckgo.com")) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    const footprint = rows.find((check) => check.key === "web-footprint");
+    expect(web?.finding).toContain("Tried");
+    expect(footprint?.finding).toContain("Tried");
+    expect(footprint?.finding).toContain("applicant's own site");
+    expect(footprint?.finding).not.toContain("No result found that names this person and this company");
+    expect(footprint?.corroborates).not.toBe(true);
+  });
+
+  it("retries one company-site 403 and leaves a second 403 unchecked", async () => {
+    const applicant = facts({
+      name: "Todd Rolapp",
+      applicantName: "Todd Rolapp",
+      org: "Bass, Berry & Sims",
+      location: "Nashville, TN",
+      website: "https://www.bassberry.com",
+    });
+    let calls = 0;
+    const recovered = await runPublicScreen(applicant, async (url) => {
+      if (url.startsWith("https://www.bassberry.com")) {
+        calls += 1;
+        if (calls === 1) return { ok: false, status: 403, text: "" };
+        return { ok: true, status: 200, text: "<html><p>Todd Rolapp is a partner at Bass, Berry & Sims in Nashville.</p></html>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = recovered.find((check) => check.key === "website");
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(website?.status).toBe("PASS");
+    expect(website?.corroborates).not.toBe(true);
+
+    const blocked = await runPublicScreen(applicant, async (url) => {
+      if (url.startsWith("https://www.bassberry.com")) return { ok: false, status: 403, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const denied = blocked.find((check) => check.key === "website");
+    expect(denied?.status).toBe("UNAVAILABLE");
+    expect(denied?.corroborates).not.toBe(true);
+    expect(denied?.finding).toContain("403");
+    expect(gradeChecks([denied!], applicant).categories.find((category) => category.id === "company")?.earned || 0).toBe(0);
+  });
+
+  it("does not restore completeness when web search failed and EDGAR only shows the company", () => {
+    const applicant = facts({
+      name: "Pat Notreal",
+      applicantName: "Pat Notreal",
+      org: "Western Alliance Bancorporation",
+      phone: "212-555-0199",
+      website: "https://westernalliance.example",
+      location: "Phoenix, AZ",
+      statement: "I develop small buildings and keep a written record of each project for the application.",
+    });
+    const blocked = "All free search sources blocked. Tried Bing (challenge page). Search blocked. Not checked. Not a pass.";
+    const companyOnly = [
+      row({ key: "screen-web", status: "UNAVAILABLE", corroborates: false, finding: blocked }),
+      row({ key: "web-footprint", status: "UNAVAILABLE", corroborates: false, finding: blocked }),
+      row({
+        key: "edgar",
+        status: "INCONCLUSIVE",
+        companyOnly: true,
+        corroborates: false,
+        finding: "EDGAR exact current-name match. Name: no. Company: yes.",
+      }),
+      row({ key: "email-syntax", status: "PASS" }),
+      row({ key: "disposable-email", status: "PASS" }),
+      row({ key: "role-address", status: "PASS" }),
+      row({ key: "plausibility", status: "PASS" }),
+      row({ key: "sanctions", status: "PASS" }),
+      row({ key: "duplicate", status: "PASS" }),
+      row({ key: "text-risk", status: "PASS" }),
+      row({ key: "velocity", status: "PASS" }),
+    ];
+    const fake = gradeChecks(companyOnly, applicant);
+    expect(fake.categories.find((category) => category.id === "completeness")?.earned).toBe(0);
+    expect(fake.categories.find((category) => category.id === "completeness")?.reason).toContain("No independent source");
+    expect(fake.letter).toBe("F");
+    expect(fake.score).toBeLessThanOrEqual(49);
+    const tied = gradeChecks(
+      [
+        row({
+          key: "screen-web",
+          status: "PASS",
+          corroborates: true,
+          finding: "Tried Bing (result). Pat Notreal at Western Alliance Bancorporation. Name: yes. Company: yes.",
+          url: "https://www.reuters.com/pat-notreal",
+        }),
+        ...companyOnly.filter((check) => check.key !== "screen-web"),
+      ],
+      applicant,
+    );
+    expect(tied.categories.find((category) => category.id === "completeness")?.earned).toBeGreaterThan(0);
+  });
+
+  it("says not found when search engines return pages that do not name the person", async () => {
+    const applicant = facts({
+      name: "Nina Quell",
+      applicantName: "Nina Quell",
+      org: "Quell Holdings",
+      location: "New York, NY",
+      website: "",
+    });
+    const page = `<ol><li class="b_algo"><a href="https://example.com/other">A downtown project was announced in New York</a></li></ol>`;
+    const ddg = `<a class="result__a" href="https://example.com/two">Another firm published a market note</a>`;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: page };
+      if (url.includes("duckduckgo.com")) return { ok: true, status: 200, text: ddg };
+      if (url.includes("brave.com") || url.includes("mojeek.com")) return { ok: true, status: 200, text: page };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).not.toContain("Not checked");
+    expect(web?.corroborates).not.toBe(true);
+  });
+
+  it("matches a brand that uses of", () => {
+    expect(companySearchTerm("Banc of California")).toBe("banc of california");
+    expect(companySearchTerm("Bank of America")).toBe("bank of america");
+    expect(mentionsCompany("Banc of California reported earnings", "Banc of California")).toBe(true);
+    expect(mentionsCompany("Bank of America reported earnings", "Bank of America")).toBe(true);
+    expect(mentionsCompany("the bank of america river flooded the lot", "Bank of America")).toBe(false);
+    expect(socialSearchQuery("Jared Wolff", "Banc of California")).toContain("banc of california");
+  });
+
+  it("retries a nickname search with the formal first name when the quotes are ignored", async () => {
+    expect(formalGivenName("Bill Dillon")).toBe("William");
+    expect(formalGivenName("Rob Blalock")).toBe("Robert");
+    expect(formalGivenName("William Dillon")).toBeNull();
+    const bill = facts({
+      name: "Bill Dillon",
+      applicantName: "Bill Dillon",
+      org: "Northmarq",
+      location: "Dallas, TX",
+      website: "",
+    });
+    const queries: string[] = [];
+    const rows = await runPublicScreen(bill, async (url) => {
+      const decoded = decodeURIComponent(url);
+      queries.push(decoded);
+      if (url.includes("bing.com") && decoded.includes("William Dillon")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.northmarq.com/william">William Dillon leads Northmarq in Dallas</a></li></ol>`,
+        };
+      }
+      if (url.includes("bing.com")) {
+        return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://www.bill.com/">Bill.com expense software</a></li></ol>` };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(queries.some((query) => query.includes("William Dillon"))).toBe(true);
+    expect(web?.status).toBe("PASS");
+    expect(web?.finding).toContain("Northmarq");
+    expect(web?.corroborates).toBe(true);
+
+    const robQueries: string[] = [];
+    const rob = await runPublicScreen(
+      facts({ name: "Rob Blalock", applicantName: "Rob Blalock", org: "Harbert Realty", location: "Birmingham, AL", website: "" }),
+      async (url) => {
+        const decoded = decodeURIComponent(url);
+        robQueries.push(decoded);
+        if (decoded.includes("Robert Blalock") && url.includes("bing.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<ol><li class="b_algo"><a href="https://www.harbertrealty.com/robert">Robert Blalock at Harbert Realty</a></li></ol>`,
+          };
+        }
+        if (url.includes("bing.com")) {
+          return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://www.roblox.com/">Roblox games</a></li></ol>` };
+        }
+        return { ok: false, status: 404, text: "" };
+      },
+    );
+    expect(robQueries.some((query) => query.includes("Robert Blalock"))).toBe(true);
+    expect(rob.find((check) => check.key === "screen-web")?.status).toBe("PASS");
+  });
+
+  it("keeps Sterling Bay as the full brand", () => {
+    expect(companySearchTerm("Sterling Bay", "Andy Gloor")).toBe("sterling bay");
+    expect(companySearchTerm("Sterling Bay", "Andy Gloor")).not.toBe("bay");
+    expect(socialSearchQuery("Andy Gloor", "Sterling Bay")).toBe(`"Andy Gloor" "sterling bay"`);
+    expect(mentionsCompany("Sterling Bay broke ground in Chicago", "Sterling Bay")).toBe(true);
+    expect(mentionsCompany("the bay was closed for repairs", "Sterling Bay")).toBe(false);
+  });
+
+  it("does not cap a company-only crime headline that does not name the person", () => {
+    const applicant = facts({ name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" });
+    const headlineFacts = { name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" };
+    const robbery = "49-year-old man arrested after brazen robbery at Bank of Hawaii in Waikiki";
+    expect(judgeHeadline(robbery, headlineFacts).person).toBe(false);
+    const rows = classifyNews(
+      applicant,
+      [{ title: robbery, snippet: robbery, url: "https://example.com/robbery", source: "Hawaii News Now", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const news = rows.find((item) => item.key === "news");
+    expect(news?.status).not.toBe("FAIL");
+    expect(news?.reviewFlag).not.toBe(true);
+    expect(news?.finding.toLowerCase()).not.toContain("names this person");
+    const charged = classifyNews(
+      applicant,
+      [{ title: "Bank of Hawaii charged with fraud", snippet: "Bank of Hawaii charged with fraud", url: "https://example.com/fraud", source: "Local", provider: "Google News", publishedAt: null }],
+      [{ name: "Google News", state: "responded" }],
+    );
+    const chargedNews = charged.find((item) => item.key === "news");
+    expect(chargedNews?.status).not.toBe("FAIL");
+    expect(chargedNews?.finding.toLowerCase()).toContain("company-level crime");
+    const named = judgeHeadline("Jim Polk arrested after fraud at Bank of Hawaii", headlineFacts);
+    expect(named.person).toBe(true);
+    expect(named.kind).toBe("hard");
+    const graded = gradeChecks([news!, row({ key: "sanctions", status: "PASS" })], applicant);
+    expect(graded.banner || "").not.toMatch(/names this person/i);
+  });
+
+  it("counts a departure only for the person who is leaving", () => {
+    const headline = "Bank of Hawaii CEO Peter Ho to Retire, James Polk Named Successor";
+    expect(leftTheCompany(headline, "Bank of Hawaii", "Jim Polk")).toBe(false);
+    expect(leftTheCompany("Peter Ho to retire from Bank of Hawaii", "Bank of Hawaii", "Peter Ho")).toBe(true);
+    const arrival = judgeHeadline(headline, { name: "Jim Polk", applicantName: "Jim Polk", org: "Bank of Hawaii", location: "Honolulu, HI" });
+    expect(arrival.person).toBe(true);
+    expect(arrival.company).toBe(true);
+    expect(arrival.departed).toBe(false);
+    expect(arrival.tone).toBe("neutral");
+  });
+
+  it("treats JBG SMITH Properties as JBG SMITH when the domain agrees", () => {
+    const matched = assessEdgarMatch({
+      org: "JBG SMITH",
+      person: "Matt Kelly",
+      tickersOk: true,
+      companies: [{ title: "JBG SMITH Properties", ticker: "JBGS", cik: "1689796" }],
+      filingNames: [["JBG SMITH Properties (JBGS) (CIK 0001689796)", "KELLY W MATTHEW"]],
+      website: "https://www.jbgsmith.com",
+    });
+    expect(matched.status).toBe("PASS");
+    expect(matched.corroborates).toBe(true);
+    expect(matched.finding).toContain("KELLY W MATTHEW");
+    const different = assessEdgarMatch({
+      org: "Western Alliance Capital LLC",
+      person: "Pat Fake",
+      tickersOk: true,
+      companies: [{ title: "Western Alliance Bancorporation", ticker: "WAL", cik: "1212545" }],
+      filingNames: [["Western Alliance Bancorporation (WAL) (CIK 0001212545)"]],
+      website: "https://dead.example",
+    });
+    expect(different.status).not.toBe("PASS");
+    expect(different.corroborates).not.toBe(true);
+  });
+
+  it("matches formal names and a leading initial without surname-only hits", () => {
+    expect(formalGivenName("Matt Kelly")).toBe("Matthew");
+    expect(formalGivenName("Les Hiscoe")).toBe("Leslie");
+    expect(formalGivenName("Andy Gloor")).toBe("Andrew");
+    expect(formalGivenName("Doug Smith")).toBe("Douglas");
+    expect(personHit("W. Matthew Kelly", "Matt Kelly")).toBe("match");
+    expect(personHit("KELLY W MATTHEW", "Matt Kelly")).toBe("match");
+    expect(personHit("Leslie Hiscoe", "Les Hiscoe")).toBe("match");
+    expect(personHit("Adams", "Pat Adams")).toBe("none");
+    expect(personHit("Samuel Adams", "Pat Adams")).toBe("none");
+  });
+
+  it("does not treat Northmarq as gibberish", () => {
+    expect(tokenLooksGibberish("Northmarq")).toBe(false);
+    expect(plausibilityCheck(facts({ name: "Jeff Weidell", applicantName: "Jeff Weidell", org: "Northmarq" })).status).toBe("PASS");
+    expect(tokenLooksGibberish("Xqzvbn")).toBe(true);
+    expect(companyNameLooksReal("Xqzvbn Holdings")).toBe(false);
+    expect(plausibilityCheck(facts({ name: "Ada Fake", applicantName: "Ada Fake", org: "Xqzvbn Holdings" })).status).toBe("FAIL");
+    expect(companyNameLooksReal("qwerty")).toBe(false);
+  });
+
+  it("calls a quote-ignoring page unchecked when another engine did not answer", async () => {
+    const applicant = facts({ name: "Rob Blalock", applicantName: "Rob Blalock", org: "Harbert Realty", location: "Birmingham, AL", website: "" });
+    const roblox = `<ol><li class="b_algo"><a href="https://www.roblox.com/">Roblox games</a></li></ol>`;
+    const rows = await runPublicScreen(applicant, async (url) => {
+      const decoded = decodeURIComponent(url);
+      if (url.includes("duckduckgo.com") && !url.includes("lite")) return { ok: false, status: 0, text: "" };
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: decoded.includes("Robert") ? roblox : roblox };
+      return { ok: true, status: 200, text: "<html><body></body></html>" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).not.toContain("Search did not complete");
+    expect(web?.corroborates).not.toBe(true);
+    expect(gradeChecks([web!], applicant).categories.find((category) => category.id === "footprint")?.earned).toBe(0);
+  });
+
+  it("matches Hawai'i and does not invent of inside a brand", () => {
+    expect(mentionsCompany("Bank of Hawai\u2018i names Jim Polk CEO", "Bank of Hawaii")).toBe(true);
+    expect(mentionsCompany("Bank of Hawai'i names Jim Polk CEO", "Bank of Hawaii")).toBe(true);
+    expect(mentionsCompany("Ocean of Bank opened a branch", "Ocean Bank")).toBe(false);
+    expect(mentionsCompany("Banc of California reported earnings", "Banc of California")).toBe(true);
+    expect(mentionsCompany("Bank of America reported earnings", "Bank of America")).toBe(true);
+  });
+
+  it("ties a reporting owner when the nickname is the EDGAR middle name", () => {
+    expect(personHit("Kelly William Matthew", "Matt Kelly")).toBe("none");
+    expect(reportingOwnerLine([["Kelly William Matthew"]], "Matt Kelly")).toBe("Kelly William Matthew");
+    expect(personHit("Jeanneret Bradley A", "Brad Jeanneret")).toBe("match");
+    expect(personHit("Bradley A. Jeanneret President", "Brad Jeanneret")).toBe("match");
+    expect(personHit("Silverstein", "Larry Silverstein")).toBe("none");
+    const tied = assessEdgarMatch({
+      org: "JBG SMITH",
+      person: "Matt Kelly",
+      tickersOk: true,
+      companies: [{ title: "JBG SMITH Properties", ticker: "JBGS", cik: "1689796" }],
+      filingNames: [["JBG SMITH Properties (JBGS) (CIK 0001689796)"]],
+      insiderNames: [["Kelly William Matthew"]],
+      website: "https://www.jbgsmith.com",
+    });
+    expect(tied.status).toBe("PASS");
+    expect(tied.corroborates).toBe(true);
+    expect(tied.finding).toContain("Kelly William Matthew");
+    const impersonation = assessEdgarMatch({
+      org: "Toll Brothers",
+      person: "Larry Silverstein",
+      tickersOk: true,
+      companies: [{ title: "TOLL BROTHERS INC", ticker: "TOL", cik: "794170" }],
+      filingNames: [["TOLL BROTHERS INC (TOL) (CIK 0000794170)"]],
+      insiderNames: [],
+      website: "https://www.tollbrothers.com",
+    });
+    expect(impersonation.corroborates).not.toBe(true);
+    expect(impersonation.finding).not.toContain("Silverstein");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: impersonation.status, companyOnly: impersonation.companyOnly, corroborates: impersonation.corroborates, finding: impersonation.finding })],
+      facts({ name: "Larry Silverstein", applicantName: "Larry Silverstein", org: "Toll Brothers" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.earned).toBe(0);
+  });
+
+  it("treats Colliers International Group as Colliers, not a parent", () => {
+    const colliers = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers International Group Inc.", ticker: "CIGI", cik: "913353" }],
+      filingNames: [],
+      website: "https://www.colliers.com",
+    });
+    expect(colliers.finding.toLowerCase()).not.toContain("parent match");
+    expect(colliers.status).not.toBe("PASS");
+    expect(colliers.corroborates).not.toBe(true);
+    expect(colliers.companyOnly).toBe(true);
+    const otherDomain = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers International Group Inc.", ticker: "CIGI", cik: "913353" }],
+      filingNames: [],
+      website: "https://some-other-domain.com",
+    });
+    expect(otherDomain.finding.toLowerCase()).toContain("parent match");
+    expect(otherDomain.corroborates).not.toBe(true);
+    const fund = assessEdgarMatch({
+      org: "Colliers",
+      person: "Jay Hennick",
+      tickersOk: true,
+      companies: [{ title: "Colliers Capital Partners Fund", ticker: "X", cik: "1" }],
+      filingNames: [],
+    });
+    expect(fund.corroborates).not.toBe(true);
+    expect(fund.finding.toLowerCase()).toContain("parent match");
+    expect(fund.companyOnly).not.toBe(true);
+  });
+
+  it("does not fail a Canadian province as a bad US state", async () => {
+    const local = assessLocalAddress("Toronto, ON");
+    expect(local.kind).toBe("non-us");
+    const row = await resolveAddressCheck({
+      facts: facts({ location: "Toronto, ON" }),
+      watchlist: [],
+      network: false,
+    });
+    expect(row?.status).toBe("INCONCLUSIVE");
+    expect(row?.finding).toContain("Non-US address");
+    expect(row?.finding).not.toContain("did not check out");
+    const garbage = assessLocalAddress("Nowhere, ZZ");
+    expect(garbage.kind).toBe("invalid");
+  });
+
+  it("keeps a clean empty search answer as not found", async () => {
+    const applicant = facts({ name: "Michael Heller", applicantName: "Michael Heller", org: "Cozen O'Connor", location: "Philadelphia, PA", website: "" });
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("html.duckduckgo.com")) return { ok: false, status: 202, text: "challenge" };
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://example.com/other">A different Michael</a></li></ol>` };
+      if (url.includes("lite.duckduckgo.com") || url.includes("mojeek.com") || url.includes("wikidata.org")) return { ok: true, status: 200, text: "<html></html>" };
+      if (url.includes("brave.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("gdeltproject.org")) return { ok: false, status: 0, text: "" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const web = rows.find((check) => check.key === "screen-web");
+    expect(web?.status).toBe("INCONCLUSIVE");
+    expect(web?.finding).toContain("Not found");
+    expect(web?.finding).toContain("Tried");
+    expect(web?.finding).not.toContain("Search did not complete");
+    expect(web?.corroborates).not.toBe(true);
+  });
+
+  it("keeps an apostrophe in the Cozen query and ignores a class-action hiring headline", () => {
+    expect(companySearchTerm("Cozen O'Connor", "Michael Heller")).toContain("o'connor");
+    expect(socialSearchQuery("Michael Heller", "Cozen O'Connor")).toContain("o'connor");
+    expect(mentionsCompany("Cozen O Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen O'Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen O\u2019Connor opened an office", "Cozen O'Connor")).toBe(true);
+    expect(mentionsCompany("Cozen OConnor opened an office", "Cozen O'Connor")).toBe(true);
+    const headline = "Cozen O'Connor loses class action leaders to New York's Skadden";
+    expect(plaintiffSolicitation(headline)).toBe(false);
+    expect(judgeHeadline(headline, { name: "Michael Heller", org: "Cozen O'Connor", location: "Philadelphia, PA" }).kind).not.toBe("civil");
+  });
+
+  it("accepts a registry name that only adds construction when the domain agrees", () => {
+    const colorado = registryPortal("CO");
+    const rows = JSON.stringify([{ entityname: "Hensel Phelps Construction Co.", entitystatus: "Good Standing" }]);
+    const hit = assessStateRegistry(colorado!, "Hensel Phelps", { ok: true, status: 200, text: rows }, "https://www.henselphelps.com");
+    expect(hit.status).toBe("PASS");
+    expect(hit.corroborates).not.toBe(true);
+    expect(hit.finding).toContain("Hensel Phelps Construction Co.");
+    expect(hit.finding).toContain("does not tie a person");
+    const missed = assessStateRegistry(colorado!, "Hensel Phelps", { ok: true, status: 200, text: rows }, "https://not-hensel.example");
+    expect(missed.status).toBe("INCONCLUSIVE");
+    expect(missed.finding).toContain("No entity uses this exact name");
+  });
+
+  it("asks the registry for names that start with the firm", () => {
+    const colorado = socrataRegistryUrl(registryPortal("CO")!, "Hensel Phelps");
+    expect(colorado.toLowerCase()).toContain("like");
+    expect(colorado.toLowerCase()).toContain("hensel");
+    expect(colorado.toLowerCase()).toContain("phelps%");
+    expect(colorado).not.toContain(" in(");
+    const ny = nyRegistryQueryUrl("Eastdil Secured");
+    expect(ny.toLowerCase()).toContain("like");
+    expect(ny.toLowerCase()).toContain("eastdil");
+    const listed = assessNyRegistry("Eastdil Secured", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "EASTDIL SECURED, L.L.C." }]),
+    });
+    expect(listed.status).toBe("PASS");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("EASTDIL SECURED, L.L.C.");
+    const foundation = assessStateRegistry(
+      registryPortal("CO")!,
+      "Hensel Phelps",
+      { ok: true, status: 200, text: JSON.stringify([{ entityname: "HENSEL PHELPS FOUNDATION", entitystatus: "Good Standing" }]) },
+      "https://www.henselphelps.com",
+    );
+    expect(foundation.status).toBe("INCONCLUSIVE");
+    expect(foundation.corroborates).not.toBe(true);
+  });
+
+  it("asks for the typed spelling, then accepts only an exact normalized registry name", () => {
+    const whereOf = (url: string) => new URL(url).searchParams.get("$where")?.toUpperCase() || "";
+    const paul = whereOf(nyRegistryQueryUrl("Paul, Weiss, Rifkind, Wharton & Garrison LLP"));
+    expect(paul).toContain("LIKE 'PAUL, WEISS, RIFKIND, WHARTON & GARRISON%'");
+    expect(paul).toContain("LIKE 'PAUL, WEISS, RIFKIND, WHARTON AND GARRISON%'");
+    expect(paul).toContain("LIKE 'PAUL WEISS RIFKIND WHARTON GARRISON%'");
+    const meister = whereOf(nyRegistryQueryUrl("Meister Seelig & Schuster PLLC"));
+    expect(meister).toContain("LIKE 'MEISTER SEELIG & SCHUSTER%'");
+    expect(meister).toContain("LIKE 'MEISTER SEELIG AND SCHUSTER%'");
+    expect(meister).toContain("LIKE 'MEISTER SEELIG SCHUSTER%'");
+    const herrick = whereOf(nyRegistryQueryUrl("Herrick, Feinstein LLP"));
+    expect(herrick).toContain("LIKE 'HERRICK, FEINSTEIN%'");
+    expect(whereOf(nyRegistryQueryUrl("Madison Realty Capital"))).toContain("LIKE 'MADISON REALTY CAPITAL%'");
+
+    const listed = assessNyRegistry("Paul, Weiss, Rifkind, Wharton & Garrison LLP", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "PAUL, WEISS, RIFKIND, WHARTON & GARRISON LLP" }]),
+    });
+    expect(listed.status).toBe("PASS");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("PAUL, WEISS, RIFKIND, WHARTON & GARRISON LLP");
+    const meisterHit = assessNyRegistry("Meister Seelig & Schuster PLLC", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "MEISTER SEELIG & SCHUSTER PLLC" }]),
+    });
+    expect(meisterHit.status).toBe("PASS");
+    expect(meisterHit.corroborates).not.toBe(true);
+    const madison = assessNyRegistry("Madison Realty Capital", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "MADISON REALTY CAPITAL, L.P." }]),
+    });
+    expect(madison.status).toBe("PASS");
+    expect(madison.corroborates).not.toBe(true);
+    const prefixOnly = assessNyRegistry("Paul, Weiss, Rifkind, Wharton & Garrison LLP", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "PAUL WEISS CAPITAL LLC" }]),
+    });
+    expect(prefixOnly.status).toBe("INCONCLUSIVE");
+    expect(prefixOnly.corroborates).not.toBe(true);
+    expect(prefixOnly.finding).toContain("No active entity uses this exact name");
+  });
+
+  it("awards a Canadian province only when an independent source tied the person", () => {
+    const address = row({
+      key: "address",
+      status: "INCONCLUSIVE",
+      finding: "Non-US address, not checked by the Census geocoder.",
+    });
+    const applicant = facts({ name: "Jay Hennick", applicantName: "Jay Hennick", org: "Colliers", location: "Toronto, ON" });
+    const alone = gradeChecks([address], applicant);
+    expect(alone.categories.find((category) => category.id === "completeness")?.reason).toContain("No independent source");
+    expect(alone.categories.find((category) => category.id === "completeness")?.reason).not.toContain("(2 of 2)");
+    const tied = gradeChecks(
+      [address, row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names Jay Hennick at Colliers." })],
+      applicant,
+    );
+    expect(tied.categories.find((category) => category.id === "completeness")?.reason).toContain("A location is on the application (2 of 2)");
+  });
+
+  it("uses one own-site search when the company site blocks, and ignores a lookalike", async () => {
+    const applicant = facts({
+      name: "Jay Hennick",
+      applicantName: "Jay Hennick",
+      org: "Colliers",
+      website: "https://www.colliers.com",
+      location: "Toronto, ON",
+    });
+    const own = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("colliers.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.colliers.com/en/experts/jay-hennick">Jay Hennick of Colliers</a></li></ol>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = own.find((check) => check.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.selfReported).toBe(true);
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.finding).toContain("Own-site page found by search");
+    expect(website?.url).toContain("colliers.com/en/experts");
+
+    const lookalike = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("colliers.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://www.colliers-group.com/jay">Jay Hennick of Colliers Group</a></li></ol>`,
+        };
+      }
+      return { ok: true, status: 200, text: "<html></html>" };
+    });
+    const missed = lookalike.find((check) => check.key === "website");
+    expect(missed?.status).not.toBe("PASS");
+    expect(missed?.url || "").not.toContain("colliers-group.com");
+    expect(missed?.corroborates).not.toBe(true);
+  });
+
+  it("credits a person headline only when the article names the company nearby", () => {
+    const near = `${"x".repeat(20)} Roy March leads Eastdil Secured in New York. ${"y".repeat(20)}`;
+    const far = `Roy March spoke at a conference. ${"z".repeat(400)} Eastdil Secured announced a deal.`;
+    expect(companyNearPerson(near, "Roy March", "Eastdil Secured")).toBe(true);
+    expect(companyNearPerson(far, "Roy March", "Eastdil Secured")).toBe(false);
+    expect(companyNearPerson(`Larry Silverstein built a tower. ${"q".repeat(400)} Toll Brothers sold homes.`, "Larry Silverstein", "Toll Brothers")).toBe(false);
+  });
+
+  it("does not search a common-word surname by itself", () => {
+    const queries = newsSearchQueries(facts({ name: "Roy March", applicantName: "Roy March", org: "Eastdil Secured", location: "New York, NY" }));
+    expect(queries.some((query) => query === `"March" "eastdil secured"` || query.startsWith(`"March"`))).toBe(false);
+    expect(queries.some((query) => query.includes("Roy March") && query.toLowerCase().includes("eastdil"))).toBe(true);
+  });
+
+  it("treats and and ampersand as the same company connector", () => {
+    expect(mentionsCompany("Holland and Knight LLP", "Holland & Knight")).toBe(true);
+    expect(mentionsCompany("Holland & Knight LLP", "Holland and Knight")).toBe(true);
+  });
+
+  it("counts a possessive surname in a company headline at low weight", () => {
+    const score = scorePublicText("Colliers extends CEO and major shareholder Hennick's contract", {
+      name: "Jay Hennick",
+      org: "Colliers",
+      location: "Toronto, ON",
+    });
+    expect(score.company).toBe(true);
+    expect(score.name).toBe(true);
+    expect(score.confidence).toBe("low");
+  });
+
+  it("does not treat a Bing page that ignored site: as an own-site miss", async () => {
+    const applicant = facts({
+      name: "Bess Freedman",
+      applicantName: "Bess Freedman",
+      org: "Brown Harris Stevens",
+      website: "https://www.bhsusa.com",
+      location: "New York, NY",
+    });
+    const ignored = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bhsusa.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<ol><li class="b_algo"><a href="https://example.com/bess">Battery energy storage systems</a></li></ol>`,
+        };
+      }
+      if (url.includes("lite.duckduckgo.com")) return { ok: false, status: 202, text: "anomaly" };
+      return { ok: false, status: 404, text: "" };
+    });
+    const missed = ignored.find((check) => check.key === "website");
+    expect(missed?.status).toBe("UNAVAILABLE");
+    expect(missed?.finding).toContain("Own-site search did not complete; site blocked a direct fetch");
+    expect(missed?.finding).not.toContain("No result found");
+    expect(missed?.corroborates).not.toBe(true);
+
+    const found = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("bhsusa.com") && !url.includes("bing.com") && !url.includes("duckduckgo.com")) return { ok: false, status: 403, text: "" };
+      if (url.includes("bing.com")) {
+        return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://example.com/bess">Battery storage</a></li></ol>` };
+      }
+      if (url.includes("lite.duckduckgo.com")) {
+        return {
+          ok: true,
+          status: 200,
+          text: `<table><tr><td><a class="result-link" href="https://www.bhsusa.com/bhs-leadership/bessfreedman">Leadership</a></td></tr><tr><td class="result-snippet">Bess Freedman, Chief Executive Officer, Brown Harris Stevens</td></tr></table>`,
+        };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = found.find((check) => check.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.selfReported).toBe(true);
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.url).toContain("bhsusa.com/bhs-leadership/bessfreedman");
+  });
+
+  it("tries both formal names for Pat, and matches Rick and Bess", () => {
+    expect(formalGivenNames("Pat Quinn")).toEqual(["Patrick", "Patricia"]);
+    expect(formalGivenName("Pat Quinn")).toBe("Patrick");
+    expect(personHit("Richard A. Lanoha President", "Rick Lanoha")).toBe("match");
+    expect(personHit("Elizabeth Freedman", "Bess Freedman")).toBe("match");
+  });
+
+  it("reads a publisher article instead of a Google News redirect", async () => {
+    expect(publisherArticleUrl("https://news.google.com/rss/articles/abc")).toBe("");
+    expect(publisherArticleUrl("https://commercialobserver.com/roy-march")).toContain("commercialobserver.com");
+    const fetched: string[] = [];
+    const rows = await newsChecks(
+      facts({ name: "Roy March", applicantName: "Roy March", org: "Eastdil Secured", location: "New York, NY" }),
+      async (url) => {
+        fetched.push(url);
+        if (url.includes("news.google.com/rss/articles")) return { ok: true, status: 200, text: "<html>interstitial</html>" };
+        if (url.includes("news.google.com")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<rss><channel><item><title>Roy March - Commercial Observer</title><link>https://news.google.com/rss/articles/abc</link><source>Commercial Observer</source><description>Roy March</description></item></channel></rss>`,
+          };
+        }
+        if (url.includes("bing.com/news")) {
+          return {
+            ok: true,
+            status: 200,
+            text: `<rss><channel><item><title>Roy March - Commercial Observer</title><link>https://www.bing.com/news/apiclick.aspx?url=${encodeURIComponent("https://commercialobserver.com/roy-march")}</link><description>Roy March</description></item></channel></rss>`,
+          };
+        }
+        if (url.includes("commercialobserver.com")) {
+          return { ok: true, status: 200, text: "Roy March leads Eastdil Secured in New York." };
+        }
+        if (url.includes("gdelt")) return { ok: true, status: 200, text: '{"articles":[]}' };
+        return { ok: true, status: 200, text: "<rss><channel></channel></rss>" };
+      },
+    );
+    const news = rows.find((row) => row.key === "news");
+    expect(news?.status).toBe("PASS");
+    expect(fetched.some((url) => url.includes("news.google.com/rss/articles"))).toBe(false);
+    expect(rows.some((row) => row.url.includes("commercialobserver.com"))).toBe(true);
+    expect(news?.corroborates).toBe(true);
+  });
+
+  it("treats a bank charter as a suffix and the same CIK as this company", () => {
+    expect(normalizeFirmName("Valley National Bank")).toBe("valley national bank");
+    expect(normalizeFirmName("Flagstar Bank, National Association")).toBe("flagstar bank");
+    expect(normalizeFirmName("Flagstar Bank, N.A.")).toBe("flagstar bank");
+    expect(normalizeFirmName("Flagstar Bank, FSB")).toBe("flagstar bank");
+    expect(normalizeRegistryName("Flagstar Bank, National Association")).toBe("flagstar bank");
+    const graded = assessEdgarMatch({
+      org: "Flagstar Bank",
+      person: "Joseph Otting",
+      tickersOk: true,
+      companies: [{ title: "FLAGSTAR BANK, NATIONAL ASSOCIATION", ticker: "FLG", cik: "910073" }],
+      filingNames: [],
+      insiderNames: [["Otting Joseph M."]],
+      identity: {
+        currentName: "FLAGSTAR BANK, NATIONAL ASSOCIATION",
+        formerNames: ["FLAGSTAR FINANCIAL, INC."],
+      },
+      textHits: [
+        {
+          names: ["FLAGSTAR FINANCIAL, INC. CIK 0000910073", "Otting Joseph M."],
+          form: "DEF 14A",
+          fileDate: "2024-04-01",
+          personMatched: true,
+        },
+      ],
+    });
+    expect(graded.status).toBe("PASS");
+    expect(graded.corroborates).toBe(true);
+    expect(graded.finding).toContain("Otting Joseph M.");
+    expect(graded.finding).not.toContain("affiliate filing");
+    expect(graded.finding).not.toContain("different or related company");
+  });
+
+  it("uses FDIC BankFind for an active bank and ignores a different name", () => {
+    expect(fdicBankFindUrl("Flagstar Bank")).toContain("api.fdic.gov/banks/institutions");
+    expect(fdicBankFindUrl("Flagstar Bank").toLowerCase()).toContain("name%3aflagstar");
+    const body = JSON.stringify({
+      data: [{ data: { NAME: "Flagstar Bank, National Association", CERT: 32541, CITY: "Hicksville", STALP: "NY", ACTIVE: 1 } }],
+    });
+    const hit = assessFdicBank("Flagstar Bank", "Hicksville, NY", { ok: true, status: 200, text: body });
+    expect(hit?.status).toBe("PASS");
+    expect(hit?.corroborates).not.toBe(true);
+    expect(hit?.finding).toContain("FDIC BankFind lists Flagstar Bank, National Association (active, Hicksville NY)");
+    const elsewhere = assessFdicBank("Flagstar Bank", "Los Angeles, CA", { ok: true, status: 200, text: body });
+    expect(elsewhere?.status).toBe("INCONCLUSIVE");
+    expect(elsewhere?.reviewFlag).toBe(true);
+    expect(elsewhere?.corroborates).not.toBe(true);
+    const other = assessFdicBank("Acme Bank", "New York, NY", { ok: true, status: 200, text: body });
+    expect(other).toBeNull();
+  });
+
+  it("accepts a trailing US registry qualifier when the domain initials match", () => {
+    const rows = JSON.stringify([{ current_entity_name: "HOGAN LOVELLS CADWALADER US LLP" }]);
+    const hit = assessNyRegistry("Hogan Lovells Cadwalader", { ok: true, status: 200, text: rows }, "https://www.hlc.com", true);
+    expect(hit.status).toBe("PASS");
+    expect(hit.corroborates).not.toBe(true);
+    expect(hit.finding).toContain("HOGAN LOVELLS CADWALADER US LLP");
+    const unresolved = assessNyRegistry("Hogan Lovells Cadwalader", { ok: true, status: 200, text: rows }, "https://www.hlc.com", false);
+    expect(unresolved.status).toBe("INCONCLUSIVE");
+    expect(unresolved.corroborates).not.toBe(true);
+    const other = assessNyRegistry("Hogan Lovells Cadwalader", { ok: true, status: 200, text: rows }, "https://www.not-hlc.example", true);
+    expect(other.status).toBe("INCONCLUSIVE");
+  });
+
+  it("keeps a Wikipedia page link for the web footprint", async () => {
+    const pages = wikipediaRestResultPages(
+      JSON.stringify({
+        pages: [{ key: "Bess_Freedman", title: "Bess Freedman", excerpt: "Bess Freedman is currently the CEO of Brown Harris Stevens" }],
+      }),
+    );
+    expect(pages[0]?.href).toBe("https://en.wikipedia.org/wiki/Bess_Freedman");
+    const applicant = facts({
+      name: "Bess Freedman",
+      applicantName: "Bess Freedman",
+      org: "Brown Harris Stevens",
+      location: "New York, NY",
+    });
+    const wiki = JSON.stringify({
+      pages: [{ key: "Bess_Freedman", title: "Bess Freedman", excerpt: "Bess Freedman is currently the CEO of Brown Harris Stevens" }],
+    });
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("wikipedia.org/w/rest.php")) return { ok: true, status: 200, text: wiki };
+      if (url.includes("wikidata.org")) return { ok: true, status: 200, text: '{"search":[]}' };
+      return { ok: true, status: 200, text: "<html></html>" };
+    });
+    const footprint = rows.find((row) => row.key === "web-footprint");
+    expect(footprint?.status).toBe("PASS");
+    expect(footprint?.url).toContain("https://en.wikipedia.org/wiki/Bess_Freedman");
+    expect(footprint?.corroborates).toBe(true);
+  });
+
+  it("asks the registry for an exact name before a prefix, and skips a generic one-word prefix", () => {
+    const exact = new URL(nyRegistryExactUrl("M&T Bank")).searchParams.get("$where") || "";
+    expect(exact.toUpperCase()).toContain("IN(");
+    expect(exact.toUpperCase()).toContain("M&T BANK");
+    expect(exact.toUpperCase()).toContain("M & T BANK");
+    const like = new URL(nyRegistryQueryUrl("M&T Bank")).searchParams.get("$where") || "";
+    expect(like.toUpperCase()).not.toContain("LIKE 'BANK%'");
+    expect(like.toUpperCase()).toContain("M&T BANK");
+    expect(new URL(nyRegistryQueryUrl("M&T Bank")).searchParams.get("$order")).toContain("length(");
+    const ll = new URL(nyRegistryExactUrl("L&L Holding Company")).searchParams.get("$where") || "";
+    expect(ll.toUpperCase()).toContain("L & L HOLDING");
+    const rxr = new URL(nyRegistryQueryUrl("RXR")).searchParams.get("$order") || "";
+    expect(rxr).toContain("length(");
+  });
+
+  it("keeps single-letter ampersand initials as one distinctive token", () => {
+    expect(normalizeFirmName("M&T Bank")).toBe("mt bank");
+    expect(normalizeFirmName("M&T BANK CORP")).toBe("mt bank");
+    expect(normalizeRegistryName("L & L Holding Co., L.L.C.")).toBe(normalizeRegistryName("L&L Holding Company"));
+    expect(normalizeFirmName("AT&T")).toBe("att");
+    expect(normalizeFirmName("Robins & Morton")).toBe("robins morton");
+    expect(mentionsCompany("Rene Jones of M&T Bank", "M&T Bank")).toBe(true);
+    expect(domainMatchesOrgStem("mtb", "M&T Bank")).toBe(true);
+    const other = assessNyRegistry("Q&Z Bank", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "BANK, INC." }, { current_entity_name: "M&T BANK CORPORATION" }]),
+    });
+    expect(other.status).toBe("INCONCLUSIVE");
+    expect(other.corroborates).not.toBe(true);
+    expect(normalizeRegistryName("Q&Z Bank")).toBe("qz bank");
+  });
+
+  it("folds an accented given name instead of cutting it off", () => {
+    expect(personWithoutSuffix("René Jones")).toBe("Rene Jones");
+    expect(personWithoutSuffix("René Jones")).not.toContain("Ren Jones");
+    expect(personSearchSpellings("René Jones")).toEqual(expect.arrayContaining(["René Jones", "Rene Jones"]));
+    expect(personWithoutSuffix("José Muñoz")).toBe("Jose Munoz");
+    expect(personWithoutSuffix("Zoë Adler")).toBe("Zoe Adler");
+    expect(personWithoutSuffix("Müller Schmidt")).toBe("Muller Schmidt");
+    expect(personWithoutSuffix("Ñúñez García")).toBe("Nunez Garcia");
+    expect(personHit("René F. Jones leads the bank", "Rene Jones")).toBe("match");
+    const queries = newsSearchQueries(facts({ name: "René Jones", applicantName: "René Jones", org: "M&T Bank", location: "Buffalo, NY" }));
+    expect(queries.some((query) => query.includes("Ren Jones") && !query.includes("Rene") && !query.includes("René"))).toBe(false);
+    expect(queries.some((query) => query.includes("Rene Jones") || query.includes("René Jones"))).toBe(true);
+  });
+
+  it("retries a web search with the formal name only after the nickname misses", async () => {
+    const applicant = facts({
+      name: "Chuck Bendit",
+      applicantName: "Chuck Bendit",
+      org: "Taconic Partners",
+      location: "New York, NY",
+    });
+    const hit = `<ol><li class="b_algo"><a href="https://www.commercialobserver.com/charles">Charles Bendit of Taconic Partners</a> Chuck Bendit Taconic Partners</li></ol>`;
+    const urls: string[] = [];
+    await runPublicScreen(applicant, async (url) => {
+      urls.push(url);
+      if (url.includes("bing.com")) return { ok: true, status: 200, text: hit };
+      return { ok: true, status: 200, text: "<html></html>" };
+    });
+    expect(urls.some((url) => url.includes("bing.com/search") && decodeURIComponent(url).includes("Charles Bendit"))).toBe(false);
+    const missed: string[] = [];
+    await runPublicScreen(applicant, async (url) => {
+      missed.push(url);
+      if (decodeURIComponent(url).includes("Charles Bendit")) {
+        return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://www.commercialobserver.com/charles">Taconic Partners co-CEOs Charles Bendit</a></li></ol>` };
+      }
+      return { ok: true, status: 200, text: `<ol><li class="b_algo"><a href="https://example.com/other">Unrelated storage</a></li></ol>` };
+    });
+    expect(missed.some((url) => url.includes("bing.com/search") && decodeURIComponent(url).includes("Charles Bendit"))).toBe(true);
+    expect(formalGivenName("Chuck Bendit")).toBe("Charles");
+  });
+
+  it("matches an FDIC holding-company name and ignores a website-only row", () => {
+    expect(fdicBankFindUrl("M&T Bank").toLowerCase()).toContain("name%3amt");
+    expect(fdicBankFindUrl("M&T Bank")).toContain("NAMEHCR");
+    const body = JSON.stringify({
+      data: [{ data: { NAME: "Manufacturers and Traders Trust Company", NAMEHCR: "M&T BANK CORPORATION", WEBADDR: "www.mtb.com", CITY: "Buffalo", STALP: "NY", ACTIVE: 1 } }],
+    });
+    const hit = assessFdicBank("M&T Bank", "Buffalo, NY", { ok: true, status: 200, text: body });
+    expect(hit?.status).toBe("PASS");
+    expect(hit?.corroborates).not.toBe(true);
+    expect(hit?.finding).toContain("Manufacturers and Traders Trust Company");
+    expect(hit?.finding).toContain("holding company M&T BANK CORPORATION");
+    expect(hit?.finding).toContain("Buffalo NY");
+    const siteOnly = JSON.stringify({
+      data: [{ data: { NAME: "Other National Bank", NAMEHCR: "OTHER BANCORP", WEBADDR: "www.mtb.com", CITY: "Buffalo", STALP: "NY", ACTIVE: 1 } }],
+    });
+    expect(assessFdicBank("M&T Bank", "Buffalo, NY", { ok: true, status: 200, text: siteOnly })).toBeNull();
+    const elsewhere = assessFdicBank("M&T Bank", "Los Angeles, CA", { ok: true, status: 200, text: body });
+    expect(elsewhere?.status).toBe("INCONCLUSIVE");
+    expect(elsewhere?.reviewFlag).toBe(true);
+  });
+
+  it("does not let company-only credit confirm an invented person", () => {
+    const checks = [
+      row({ key: "email-syntax", status: "PASS", finding: "The email address is well formed." }),
+      row({ key: "disposable-email", status: "PASS", finding: "The email domain is not disposable." }),
+      row({ key: "role-address", status: "PASS", finding: "The email is not a shared inbox." }),
+      row({ key: "website", status: "PASS", companyOnly: true, selfReported: true, finding: "Company: yes. Name: no." }),
+      row({ key: "business-registry", status: "PASS", corroborates: false, finding: "NY Active Corporations lists PAUL, WEISS, RIFKIND, WHARTON & GARRISON LLP." }),
+      row({ key: "rdap", status: "PASS", finding: "A domain record responded." }),
+      row({ key: "linkedin-fetch", status: "PASS", companyOnly: true, finding: "Company: yes. Name: no. A LinkedIn company page." }),
+      row({ key: "plausibility", status: "PASS", finding: "The name, company, and role are readable." }),
+      row({ key: "invite-source", status: "PASS", finding: "A referral or request code is on the file." }),
+      row({ key: "sanctions", status: "PASS", finding: "No name matched the OFAC list that was loaded." }),
+      row({ key: "duplicate", status: "PASS", finding: "The email is not a known member." }),
+      row({ key: "text-risk", status: "PASS", finding: "The write-up has no fraud-pattern phrasing." }),
+      row({ key: "velocity", status: "PASS", finding: "There was no burst of applications." }),
+      row({ key: "news", status: "UNAVAILABLE", finding: "News could not be checked for free." }),
+    ];
+    const graded = gradeChecks(checks, facts({ name: "Thaddeus Wrenmoor", applicantName: "Thaddeus Wrenmoor", org: "Paul, Weiss, Rifkind, Wharton & Garrison LLP", website: "https://www.paulweiss.com", location: "New York, NY" }));
+    expect(graded.categories.find((category) => category.id === "identity")?.reason).toContain("Company confirmed, person not confirmed (0 of 4)");
+    expect(graded.score).toBeLessThanOrEqual(48);
+    expect(graded.letter).toBe("F");
+    expect(graded.caps.join(" ")).toContain("could not be checked for free");
+  });
+
+  it("refuses a registry match that is only generic words", () => {
+    expect(registryNameIsGenericOnly("Holding Company")).toBe(true);
+    const generic = assessNyRegistry("Holding Company", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([{ current_entity_name: "HOLDING COMPANY, INC." }]),
+    });
+    expect(generic.status).toBe("INCONCLUSIVE");
+    expect(generic.finding).toContain("too generic to match for free");
+    expect(generic.corroborates).not.toBe(true);
+  });
+
+  it("does not treat a different ampersand initial as the same sanctions entity", () => {
+    const list = [{ name: "I&S HOLDING COMPANY, S.A.", location: "" }];
+    const different = sanctionsCheck(facts({ name: "Robert Lapidus", org: "L&L Holding Company", location: "New York, NY" }), list, "2026-01-01");
+    expect(different.status).toBe("PASS");
+    expect(different.reviewFlag).not.toBe(true);
+    const same = sanctionsCheck(facts({ name: "Robert Lapidus", org: "I&S Holding Company", location: "New York, NY" }), list, "2026-01-01");
+    expect(same.status).toBe("FAIL");
+    expect(same.finding).toContain("I&S HOLDING COMPANY, S.A.");
+  });
+
+  it("discovers a company site from the firm's own letters, never from an email domain", async () => {
+    expect(orgLettersLabel("Madison Realty Capital")).toBe("madisonrealtycapital");
+    expect(hostMatchesOrgLetters("www.madisonrealtycapital.com", "Madison Realty Capital")).toBe(true);
+    expect(hostMatchesOrgLetters("mail.privatefloorclub.com", "Madison Realty Capital")).toBe(false);
+    const applicant = facts({
+      name: "Josh Zegen",
+      applicantName: "Josh Zegen",
+      org: "Madison Realty Capital",
+      website: "",
+      email: "josh@some-other-domain.com",
+      location: "New York, NY",
+    });
+    const rows = await runPublicScreen(applicant, async (url) => {
+      if (url.includes("madisonrealtycapital.com")) {
+        return { ok: true, status: 200, text: "<html><p>Josh Zegen is a principal at Madison Realty Capital.</p></html>" };
+      }
+      return { ok: false, status: 404, text: "" };
+    });
+    const website = rows.find((row) => row.key === "website");
+    expect(website?.status).toBe("PASS");
+    expect(website?.finding).toContain("Discovered company site (not on the application)");
+    expect(website?.finding).toContain("Name: yes");
+    expect(website?.corroborates).not.toBe(true);
+    expect(website?.url).toContain("madisonrealtycapital.com");
+    const unnamed = await runPublicScreen(
+      facts({ name: "Thaddeus Wrenmoor", applicantName: "Thaddeus Wrenmoor", org: "Paul, Weiss, Rifkind, Wharton & Garrison LLP", website: "", location: "New York, NY" }),
+      async () => ({ ok: true, status: 200, text: "<html><p>Paul, Weiss, Rifkind, Wharton and Garrison LLP is a law firm.</p></html>" }),
+    );
+    expect(unnamed.find((row) => row.key === "website")?.status).toBe("NOT_RUN");
+  });
+
+  it("gives half EDGAR credit for a fund that starts with the firm, not for a one-word cousin", () => {
+    expect(fundNameExtendsFirm("Madison Realty Capital Debt MA I LP", "Madison Realty Capital")).toBe(true);
+    expect(fundNameExtendsFirm("Madison Air Solutions Corp", "Madison Realty Capital")).toBe(false);
+    const fund = assessEdgarMatch({
+      org: "Madison Realty Capital",
+      person: "Josh Zegen",
+      tickersOk: true,
+      companies: [{ title: "Madison Air Solutions Corp", ticker: "MAIR", cik: "2098430" }],
+      filingNames: [],
+      textHits: [
+        {
+          names: ["Madison Realty Capital Debt MA I LP (CIK 1817862)", "Josh Zegen"],
+          form: "D",
+          fileDate: "2020-07-27",
+          personMatched: true,
+        },
+      ],
+    });
+    expect(fund.status).toBe("INCONCLUSIVE");
+    expect(fund.companyOnly).toBe(true);
+    expect(fund.corroborates).not.toBe(true);
+    expect(fund.finding).toContain("Madison Realty Capital Debt MA I LP");
+    expect(fund.finding).not.toContain("Madison Air");
+    const graded = gradeChecks(
+      [row({ key: "edgar", status: "INCONCLUSIVE", companyOnly: true, finding: fund.finding, corroborates: false }), row({ key: "news", status: "PASS", corroborates: true, finding: "A headline names Josh Zegen at Madison Realty Capital." })],
+      facts({ name: "Josh Zegen", org: "Madison Realty Capital" }),
+    );
+    expect(graded.categories.find((category) => category.id === "company")?.reason).toContain("3 of 6");
+  });
+
+  it("links a bank to its bancorp or bancshares holding company", () => {
+    expect(bankHoldingAliases("Dime Commercial Bank", "Dime Commercial Bancshares Inc")).toEqual(
+      expect.arrayContaining(["Dime Commercial Bancshares Inc", "dime commercial bancorp", "dime commercial bancshares"]),
+    );
+    const dime = assessEdgarMatch({
+      org: "Dime Commercial Bank",
+      person: "Stuart Lubow",
+      tickersOk: true,
+      companies: [{ title: "Dime Commercial Bancshares, Inc.", ticker: "DCOM", cik: "846617" }],
+      filingNames: [["Dime Commercial Bancshares, Inc.", "Stuart Lubow"]],
+      holdingAliases: bankHoldingAliases("Dime Commercial Bank", "DIME COMMERCIAL BANCSHARES INC"),
+    });
+    expect(dime.status).toBe("PASS");
+    expect(dime.corroborates).toBe(true);
+    expect(dime.finding).toContain("846617");
+    const valley = assessEdgarMatch({
+      org: "Valley National Bank",
+      person: "Ira Robbins",
+      tickersOk: true,
+      companies: [{ title: "VALLEY NATIONAL BANCORP", ticker: "VLY", cik: "714310" }],
+      filingNames: [],
+      holdingAliases: bankHoldingAliases("Valley National Bank"),
+    });
+    expect(valley.status).toBe("INCONCLUSIVE");
+    expect(valley.companyOnly).toBe(true);
+    expect(valley.corroborates).not.toBe(true);
+    expect(valley.finding).toContain("VALLEY NATIONAL BANCORP");
+    expect(valley.finding).not.toContain("shares one word");
+  });
+
+  it("matches Stu to Stuart and does not match a different given name", () => {
+    expect(formalGivenNames("Stu Lubow")).toContain("Stuart");
+    expect(personHit("Stuart H. Lubow, Chief Executive Officer", "Stu Lubow")).toBe("match");
+    expect(personHit("Steve Lubow of Dime Commercial Bank", "Stu Lubow")).toBe("none");
+    const queries = newsSearchQueries(facts({ name: "Stu Lubow", applicantName: "Stu Lubow", org: "Dime Commercial Bank", location: "Hauppauge, NY" }));
+    expect(queries.some((query) => query.includes("Stuart Lubow"))).toBe(true);
+  });
+
+  it("reports a SiteGround or Vercel challenge as unavailable", async () => {
+    const sg = `<html><head><meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=1"></head><body></body></html>`;
+    const vercel = `<html><head><title>Vercel Security Checkpoint</title></head><body>429</body></html>`;
+    expect(isBotChallenge(sg)).toBe(true);
+    expect(isBotChallenge(vercel)).toBe(true);
+    const fisher = await runPublicScreen(
+      facts({ name: "Kenneth Fisher", applicantName: "Kenneth Fisher", org: "Fisher Brothers", website: "https://www.fisherbrothers.com", location: "New York, NY" }),
+      async (url) => (url.includes("fisherbrothers.com") ? { ok: true, status: 202, text: sg } : { ok: false, status: 404, text: "" }),
+    );
+    const fisherSite = fisher.find((row) => row.key === "website");
+    expect(fisherSite?.status).toBe("UNAVAILABLE");
+    expect(fisherSite?.finding).toContain("blocked by a bot challenge");
+    expect(fisherSite?.finding).not.toContain("No result found");
+    const realberry = await runPublicScreen(
+      facts({ name: "Chad McWhinney", applicantName: "Chad McWhinney", org: "Realberry", website: "https://www.realberry.com", location: "Denver, CO" }),
+      async (url) => (url.includes("realberry.com") ? { ok: false, status: 429, text: vercel } : { ok: false, status: 404, text: "" }),
+    );
+    const realberrySite = realberry.find((row) => row.key === "website");
+    expect(realberrySite?.status).toBe("UNAVAILABLE");
+    expect(realberrySite?.finding).toContain("blocked by a bot challenge");
+    expect(realberrySite?.corroborates).not.toBe(true);
+  });
+
+  it("lists brand-prefix registry names without awarding points", () => {
+    const names = relatedBrandNames(
+      ["REALBERRY REAL ESTATE SERVICES, LLC", "SOME OTHER LLC", "REALBERRY HOLDINGS"],
+      "Realberry",
+    );
+    expect(names).toContain("REALBERRY REAL ESTATE SERVICES, LLC");
+    const listed = assessNyRegistry("Fisher Brothers", {
+      ok: true,
+      status: 200,
+      text: JSON.stringify([
+        { current_entity_name: "FISHER BROTHERS MANAGEMENT CO. LLC" },
+        { current_entity_name: "FISHER BROTHERS FINANCIAL AND DEVELOPMENT COMPANY LLC" },
+      ]),
+    });
+    expect(listed.status).toBe("INCONCLUSIVE");
+    expect(listed.corroborates).not.toBe(true);
+    expect(listed.finding).toContain("FISHER BROTHERS MANAGEMENT CO. LLC");
+    expect(listed.finding).toContain("adds no points");
+  });
+
+  it("surfaces a reputational mention without scoring it, and reads a rebrand headline", () => {
+    expect(reputationalHeadline("Denver developer identified in Epstein files", "Chad McWhinney")).toBe(true);
+    expect(reputationalHeadline("Chad McWhinney identified in Epstein files", "Chad McWhinney")).toBe(false);
+    const body = `${"x".repeat(20)} Chad McWhinney leads Realberry in Denver. ${"y".repeat(20)}`;
+    expect(companyNearPerson(body, "Chad McWhinney", "Realberry")).toBe(true);
+    expect(judgeHeadline("McWhinney rebrands as Realberry", { name: "Chad McWhinney", org: "Realberry", location: "Denver, CO" }).company).toBe(true);
+    const graded = gradeChecks(
+      [
+        row({
+          key: "news-reputation",
+          status: "INCONCLUSIVE",
+          weight: 0,
+          finding: "Reputational story names this person - review. Denver developer mentioned in newly-released Epstein files. This is a mention for a reviewer, not a finding of wrongdoing, and it does not change the score.",
+          url: "https://www.denverpost.com/epstein",
+        }),
+      ],
+      facts({ name: "Chad McWhinney", org: "Realberry" }),
+    );
+    expect(graded.attention.some((item) => item.severity === "Medium" && item.title.includes("Reputational story"))).toBe(true);
+    expect(graded.attention.some((item) => /involved in/i.test(item.detail))).toBe(false);
+    expect(graded.caps.join(" ")).not.toContain("Reputational");
+    expect(graded.score).toBeLessThanOrEqual(48);
   });
 });

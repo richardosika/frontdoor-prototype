@@ -219,7 +219,7 @@ export function displayedSentences(text: string): string {
       "Found: A page on the company site. Company confirmed; person NOT confirmed.",
     )
     .replace(/\bno match found\b(?!\.)/gi, "No match found.")
-    .replace(/no match found([\s\S]*?)Company:\s*yes\b/gi, "No match found$1Company: no")
+    .replace(/(no match found|no result found)([\s\S]*?Name:\s*no\b[\s\S]*?)Company:\s*yes\b/gi, "$1$2Company: no")
     .replace(/\b(Found|Not found): ([a-z])/g, (_, label: string, letter: string) => `${label}: ${letter.toUpperCase()}`);
   const sentences = capitalizeSentences(prepared).replace(/^([a-z])/, (letter) => letter.toUpperCase());
   return sentences.replace(/([A-Za-z][A-Za-z0-9 &'’-]*?): ([a-z])/g, (full, label: string, letter: string) => {
